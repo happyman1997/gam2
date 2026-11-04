@@ -87,7 +87,8 @@ class Model:
             elif t == "ell":
                 m.ops.append(("ell", op[1] * k, op[2] * k, op[3], op[4]))
             elif t == "limb":
-                m.ops.append(("limb", [p * k for p in op[1]], op[2], op[3], op[4]))
+                wd = op[2] if k < 1.4 else max(op[2], int(round(op[2] * k * 0.75)))
+                m.ops.append(("limb", [p * k for p in op[1]], wd, op[3], op[4]))
             elif t == "poly":
                 m.ops.append(("poly", [p * k for p in op[1]], op[2]))
             elif t == "solid":
