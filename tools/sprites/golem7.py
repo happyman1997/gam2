@@ -200,38 +200,67 @@ def tool_cannon(m, Hn, fdir, pose, core_k, t, side=1):
 TOOLS = dict(hammer=tool_hammer, shield=tool_shield, claw=tool_claw, cannon=tool_cannon)
 
 
+M_PUFF = Mat(ramp("#26262a", "#36363a", "#4a4a50", "#606066", "#7c7c82"))
+M_PUFF.smoke = True
+M_SPARK = Mat(ramp("#5a3a10", "#a06a18", "#e0a030", "#ffd870", "#fff6d0"), emissive=hexc("#ffc060"), glow_r=5, glow_k=0.45)
+M_DEADCORE = Mat(ramp("#1e0c06", "#3a140a", "#5a200e", "#7a3214", "#9a4a20"), emissive=hexc("#a03810"), glow_r=7, glow_k=0.2)
+
+
 def model(cfg, lv=1, pose="idle"):
-    """cfg keys: legs, head, core, arms (far, near), tools (far, near). lv: int or dict per slot."""
+    """cfg keys: legs, head, core, arms (far, near), tools (far, near). lv: int or dict per slot.
+    pose: idle, attack or broken (slumped, core nearly out, the far arm torn off and lying in front)."""
     L = lv if isinstance(lv, dict) else {k: lv for k in ("legs", "head", "core", "armour", "arm_far", "arm_near", "tool_far", "tool_near")}
+    broken = pose == "broken"
+    p = "idle" if broken else pose
     hip = HIP[cfg["legs"]]
     lower = Model()
     LEGS[cfg["legs"]](lower, hip, L["legs"])
     up = Model()
+    debris = Model()
     G6.torso(up, hip)
     G6.armour(up, hip, L["armour"])
-    G6.core(up, hip, cfg["core"], L["core"])
+    if broken:
+        c = np.array((9.9, hip + 10.5, 0))
+        up.cyl(c + (-1.1, 0, 0), c + (-0.1, 0, 0), 4.4, M_DIRON)
+        up.ell(c, (1.4, 2.8, 2.8), M_DEADCORE)
+        up.box(c + (0.9, 0.4, 0), (0.5, 6.0, 0.6), M_HOLE, rot_x(0.5))
+    else:
+        G6.core(up, hip, cfg["core"], L["core"])
     G6.HEADS[cfg["head"]](up, hip, cfg["core"], L["head"])
+    S_far = None
     for slot, side, z in (("far", -1, -12.5), ("near", 1, 12.0)):
         S = np.array((0.5, hip + 14, z))
         tool = cfg["tools"][slot]
-        Hn = hand_target(tool, S, side, pose)
-        Hn, fdir = draw_arm(up, S, Hn, cfg["arms"][slot], L["arm_" + slot], side, tool)
+        target = debris if (broken and slot == "far") else up
+        if broken and slot == "far":
+            S_far = S
+        Hn = hand_target(tool, S, side, p)
+        Hn, fdir = draw_arm(target, S, Hn, cfg["arms"][slot], L["arm_" + slot], side, tool)
         fn = TOOLS[tool]
         if tool == "hammer":
-            fn(up, Hn, fdir, pose, cfg["core"], L["tool_" + slot])
+            fn(target, Hn, fdir, p, cfg["core"], L["tool_" + slot])
         else:
-            fn(up, Hn, fdir, pose, cfg["core"], L["tool_" + slot], side)
+            fn(target, Hn, fdir, p, cfg["core"], L["tool_" + slot], side)
     if pose == "attack":
         lean = -0.16 if "hammer" in cfg["tools"].values() else 0.07
         up = pivot(up, rot_z(lean), (0, hip, 0))
+    if broken:
+        for d in ((0.6, 3.4, 2.8), (2.2, 5.0, 3.6), (-0.8, 6.2, 3.0), (1.4, 7.4, 2.2)):
+            up.ell(S_far + d, (0.7, 0.7, 0.7), M_SPARK)
+        for i, d in enumerate(((1, 14, 0), (-1.5, 19, 1), (-4.5, 24, 0), (-8, 28, 0.5))):
+            up.ell(np.array((0, hip + 10, 0)) + d, (3.2 + i * 0.8, 3.0, 3.0), M_PUFF)
+        up = pivot(up, rot_z(-0.36), (0, hip, 0)).transformed(I3, (0, -2.5, 0))
+        debris = debris.transformed(I3, -S_far)
+        debris = debris.transformed(rot_y(0.5) @ rot_x(-np.pi / 2), (16.0, 2.6, 6.0))
     m = Model()
     m.extend(lower)
     m.extend(up)
+    m.extend(debris)
     return m
 
 
 def dims(k):
-    return int(100 * k), int(92 * k), int(round(40 * k)), int(round(82 * k))
+    return int(104 * k), int(104 * k), int(round(40 * k)), int(round(82 * k))
 
 
 def build(cfg, lv=1, pose="idle", k=2.0, **kw):
