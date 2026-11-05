@@ -212,33 +212,56 @@ def improvised(which, after=False):
 
 # ---------------------------------------------------------------- the Maniac himself
 def maniac(pose="idle"):
-    """A wild-haired madman on a rickety walker with three mismatched legs."""
+    """A wild-haired madman on a tall rickety walker: a bird leg, a spring leg and a wheel."""
     m = Model()
-    tbox(m, (0, 11.0, 0), (12, 10), (13, 11), 4.5, WOOD)
-    m.box((0, 13.6, 0), (13.5, 0.8, 11.5), M_DIRON)
-    # mismatched legs: a spring, a peg and a wheel
-    for i in range(4):
-        p = np.array((-4.0, 8.2 - i * 1.8, -3.5))
-        m.cyl(p, p + (0, 0.7, 0), 1.6, M_IRON if i % 2 else M_BRONZE, seg=8)
-    m.box((-4.0, 1.0, -3.5), (3.5, 2.0, 3.0), M_IRON)
-    m.cyl((4.5, 8.8, -3.5), (5.5, 0.2, -3.5), 0.8, WOOD, seg=5)
-    m.cyl((0.5, 4.2, 4.2), (0.5, 4.2, 5.4), 4.2, M_DIRON, seg=14)
-    m.cyl((0.5, 4.2, 5.4), (0.5, 4.2, 5.7), 1.2, M_BRONZE, seg=6)
-    m.cyl((0.5, 8.8, 4.0), (0.5, 4.2, 4.6), 0.6, M_IRON, seg=5)
-    # crooked chimney and junk
-    m.cyl((-5.0, 13.6, 3.5), (-5.6, 19.0, 3.0), 0.8, M_DIRON, seg=6)
-    m.cyl((-5.6, 19.0, 3.0), (-3.6, 21.5, 3.4), 0.8, M_DIRON, seg=6)
-    m.ell((-2.5, 23.5, 3.4), (1.6, 1.4, 1.4), M_PUFF)
-    m.box((-4.0, 15.2, -3.0), (2.4, 2.4, 2.4), WOOD)
-    human(m, (1.5, 14.0, 0.0), CLOTH_RED, pose, hammer=True, goggles=True)
-    h = np.array((1.7, 24.0, 0.0))
-    for d in ((-0.6, 1.6, 0.0), (-1.4, 1.2, 1.0), (-1.4, 1.2, -1.0), (0.2, 1.7, 0.8), (0.2, 1.7, -0.8), (-1.8, 0.4, 0)):
-        m.cyl(h + (0, 0.6, 0), h + np.array(d) * 1.8, 0.45, HAIR, r1=0.1, seg=4)
+    tbox(m, (0, 15.0, 0), (13, 11), (14, 12), 5.0, WOOD)
+    m.box((0, 17.8, 0), (14.5, 0.8, 12.5), M_DIRON)
+    # a backward-bending bird leg
+    m.cyl((-3.0, 13.0, -4.0), (-6.5, 8.0, -4.5), 1.3, M_IRON, seg=6)
+    m.ell((-6.5, 8.0, -4.5), (1.5, 1.5, 1.5), M_BRONZE)
+    m.cyl((-6.5, 8.0, -4.5), (-3.5, 0.8, -4.5), 1.0, M_IRON, seg=6)
+    for d in ((3.0, 0, 0.8), (3.0, 0, -0.8), (-2.0, 0, 0)):
+        spike_(m, (-3.5, 0.8, -4.5), (-3.5 + d[0], 0.2, -4.5 + d[2]), 0.45)
+    # a spring leg
+    for i in range(6):
+        p = np.array((4.0, 12.5 - i * 1.9, -4.0))
+        m.cyl(p, p + (0, 0.8, 0), 1.7, M_IRON if i % 2 else M_BRONZE, seg=8)
+    m.box((4.0, 0.8, -4.0), (4.0, 1.6, 3.6), M_IRON)
+    # a big wheel
+    m.cyl((0.5, 5.6, 4.6), (0.5, 5.6, 6.2), 5.6, M_DIRON, seg=16)
+    for a_ in np.linspace(0, np.pi, 4)[:-1]:
+        m.box((0.5, 5.6, 6.3), (10.8, 0.6, 0.3), M_BRONZE, rot_z(a_))
+    m.cyl((0.5, 12.8, 4.4), (0.5, 5.6, 5.0), 0.7, M_IRON, seg=5)
+    # crooked chimney spitting mad colours, a big gear, junk
+    m.cyl((-5.5, 17.8, 3.5), (-6.4, 25.0, 3.0), 1.0, M_DIRON, seg=6)
+    m.cyl((-6.4, 25.0, 3.0), (-3.6, 28.0, 3.6), 1.0, M_DIRON, seg=6)
+    for i, d in enumerate(((-2.4, 30.0, 3.8), (-0.8, 32.5, 3.4), (1.2, 34.5, 3.8))):
+        m.ell(d, (1.0 + i * 0.3, 1.0 + i * 0.3, 1.0 + i * 0.3), MAD if i % 2 == 0 else MADG)
+    m.cyl((-6.8, 20.0, -2.0), (-7.8, 20.0, -2.0), 4.2, M_BRONZE, seg=14)
+    for a_ in np.linspace(0, 2 * np.pi, 13)[:-1]:
+        m.box((-7.3, 20.0 + np.sin(a_) * 4.6, -2.0 + np.cos(a_) * 4.6), (1.0, 1.2, 1.2), M_BRONZE)
+    m.box((-3.5, 19.6, -3.2), (2.6, 2.6, 2.6), WOOD)
+    m.cyl((5.5, 17.8, -4.5), (6.5, 24.0, -4.5), 0.35, M_DIRON, seg=4)
+    m.ell((6.6, 23.2, -4.5), (0.9, 1.2, 0.9), MADG)                          # hanging lamp
+    human(m, (1.5, 18.0, 0.0), CLOTH_RED, pose, goggles=True)
+    # giant wrench
+    hand = np.array((3.1, 24.4, 1.8)) if pose == "idle" else np.array((4.5, 25.0, 1.8))
+    top = hand + ((1.2, 6.0, 0.3) if pose == "idle" else (6.5, 1.5, 0.3))
+    m.cyl(hand, top, 0.45, M_IRON, seg=5)
+    m.box(top, (3.0, 1.2, 1.0), M_IRON, rot_z(np.arctan2(top[1] - hand[1], top[0] - hand[0])))
+    h = np.array((1.7, 28.0, 0.0))
+    for d in ((-0.6, 1.6, 0.0), (-1.4, 1.2, 1.0), (-1.4, 1.2, -1.0), (0.2, 1.7, 0.9), (0.2, 1.7, -0.9),
+              (-1.8, 0.3, 0), (-0.8, 1.9, 0.5), (-0.8, 1.9, -0.5)):
+        m.cyl(h + (0, 0.6, 0), h + np.array(d) * 2.2, 0.5, HAIR, r1=0.1, seg=4)
     if pose == "attack":
-        for d in ((4.0, 26.0, 1.0), (5.5, 24.0, -1.0), (3.0, 28.0, 0.0)):
-            m.ell(d, (0.5, 0.5, 0.5), MAD if d[0] > 4 else MADG)
-        m.cyl((3.0, 25.0, 1.5), (7.5, 22.0, 2.5), 0.25, MAD, seg=4)
+        for d in ((7.0, 30.0, 1.0), (8.5, 28.0, -1.0), (6.0, 32.0, 0.0), (9.0, 26.0, 1.5)):
+            m.ell(d, (0.6, 0.6, 0.6), MAD if d[0] > 7 else MADG)
+        m.cyl((5.0, 29.0, 1.5), (10.5, 25.0, 2.5), 0.3, MAD, seg=4)
     return m
+
+
+def spike_(m, a, b, r):
+    m.cyl(a, b, r, M_IRON, r1=0.1, seg=4)
 
 
 def render_model(m, k, w=104, h=110, ox=42, oy=88):

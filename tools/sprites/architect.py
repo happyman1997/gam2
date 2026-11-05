@@ -159,9 +159,17 @@ def architect(pose="idle"):
     tbox(m, (-9.5, 23.5, 0), (3.2, 3.2), (3.2, 3.2), 3.2, STONE)        # counterweight
     hook = tip + (0, -7.0, 0) if pose == "idle" else tip + (2.5, -6.0, 0)
     m.cyl(tip, hook, 0.18, M_DIRON, seg=4)
-    tbox(m, hook + (0, -2.0, 0), (3.6, 3.6), (3.6, 3.6), 3.6, STONE)
+    tbox(m, hook + (0, -2.6, 0), (5.0, 5.0), (5.0, 5.0), 5.0, STONE)
     human(m, (2.0, 12.5, -1.5), LINEN, pose)
-    m.cyl((3.6, 21.6, -3.2), (3.6, 21.6, -0.6), 0.6, PAPER, seg=6)    # scroll of drawings
+    bp = np.array((4.2, 21.0, -2.0))                                       # an unrolled blueprint
+    m.box(bp, (0.3, 3.4, 4.6), Mat(ramp("#0c1a3a", "#16306a", "#2a52a0", "#4a7ad0", "#8ab4f0")), rot_z(-0.3))
+    for dy in (-1.0, 0.0, 1.0):
+        m.box(bp + (0.25, dy, 0), (0.1, 0.25, 3.8), Mat(ramp("#6a9ad0", "#8ab4e0", "#b0d0f0", "#d8ecff", "#ffffff"),
+                                                         emissive=hexc("#9ad0ff"), glow_r=3, glow_k=0.25), rot_z(-0.3))
+    m.cyl((-3.5, 27.2, 0), (-3.5, 33.0, 0), 0.3, M_DIRON, seg=4)            # flag on the mast
+    m.box((-5.4, 31.6, 0), (3.6, 2.4, 0.3), Mat(ramp("#2a1a06", "#5a3a0e", "#9a6a1a", "#d8a030", "#f6d070")))
+    for i in range(3):                                                     # a half-built pillar on the deck
+        tbox(m, (-3.0, 13.5 + i * 2.2, 3.4), (3.0, 3.0), (2.8, 2.8), 2.0, STONE)
     tbox(m, (2.2, 24.6, -1.5), (2.6, 2.6), (1.8, 1.8), 2.2, LEATHER)   # tall hat
     m.box((2.2, 23.5, -1.5), (3.4, 0.4, 3.4), LEATHER)
     if pose == "attack":

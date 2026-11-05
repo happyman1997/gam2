@@ -1,4 +1,4 @@
-"""The Inventor (an augmented human) and small golems fitted with augments, plus the Father of the Colossus."""
+"""The Inventor (an augmented human) and small golems fitted with augments."""
 import numpy as np
 from kit import *
 from r3d import Model, Mat, render, rot_z, rot_y, rot_x, I3
@@ -49,14 +49,22 @@ def inventor(pose="idle"):
     m.ell(h, (1.5, 1.6, 1.5), SKIN)
     m.ell(h + (-0.5, 0.7, 0), (1.45, 1.1, 1.55), HAIR)
     for z in (-0.6, 0.6):
-        m.ell(h + (1.3, 0.2, z), (0.3, 0.45, 0.45), GLASS)
+        m.ell(h + (1.3, 0.2, z), (0.35, 0.55, 0.55), ARC)
     m.box(h + (0.4, 0.2, 0), (2.4, 0.3, 3.0), LEATHER)
     # backpack with a tesla coil
-    tbox(m, (-2.6, 12.5, 0), (2.4, 3.6), (2.2, 3.2), 5.0, M_BRONZE)
-    coil(m, (-2.8, 15.0, 0), 5.0, 1.0)
-    m.ell((-2.8, 20.6, 0), (1.3, 1.3, 1.3), ARC)
-    for i, d in enumerate(((2.5, 2.0, 1.0), (-2.0, 2.5, -1.5), (0.5, 3.5, 2.0))):
-        zigzag(m, (-2.8, 20.6, 0), np.array((-2.8, 20.6, 0)) + d, n=3, amp=0.6, seed=i)
+    tbox(m, (-2.8, 12.5, 0), (2.8, 4.2), (2.6, 3.8), 6.0, M_BRONZE)
+    coil(m, (-3.0, 15.5, 0), 7.0, 1.3)
+    m.cyl((-3.0, 22.6, 0), (-3.0, 23.0, 0), 2.6, COPPER, seg=12)
+    m.ell((-3.0, 24.2, 0), (1.6, 1.6, 1.6), ARC_BIG)
+    for i, d in enumerate(((3.5, 2.5, 1.5), (-3.0, 3.0, -2.0), (0.5, 4.5, 2.5), (2.0, 1.0, -3.0))):
+        zigzag(m, (-3.0, 24.2, 0), np.array((-3.0, 24.2, 0)) + d, n=3, amp=0.7, seed=i)
+    # a hovering helper drone
+    dr = np.array((5.5, 21.0, 4.0)) if pose == "idle" else np.array((8.0, 19.0, 3.0))
+    m.ell(dr, (1.6, 1.0, 1.6), M_BRONZE)
+    m.ell(dr + (1.4, -0.1, 0), (0.45, 0.45, 0.45), ARC)
+    for dx, dz in ((1.6, 1.6), (-1.6, 1.6), (1.6, -1.6), (-1.6, -1.6)):
+        m.cyl(dr, dr + (dx, 0.3, dz), 0.2, M_DIRON, seg=4)
+        m.cyl(dr + (dx, 0.5, dz), dr + (dx, 0.6, dz), 1.1, MIRROR, seg=8)
     # mechanical far arm with a claw hand
     S = np.array((0.2, 14.4, -2.2))
     E = S + (1.0, -3.2, -0.6)
@@ -114,33 +122,6 @@ def augmented(aug, pose="idle"):
             m = m.transformed(rot_z(-0.35), (4.0, 7.0, 0))
             for d in ((-8, 2, 0), (-11, 3, 2), (-10, 0, -2)):
                 m.ell(np.array(d, float), (1.4, 1.2, 1.2), M_PUFF)
-    return m
-
-
-# ---------------------------------------------------------------- Father of the Colossus
-def colossus(pose="idle"):
-    """The leader himself is a super-golem: level III modules everywhere plus colossal modules."""
-    c = cfg(legs="pillars", head="visor", core="fire", arms=("heavy", "heavy"), tools=("hammer", "shield"))
-    m = G.model(c, 3, pose)
-    hip = G.HIP["pillars"]
-    lean = rot_z(-0.16) if pose == "attack" else I3
-    piv = np.array((0, hip, 0))
-    extra = Model()
-    for z in (-8.5, 8.5):                                            # shoulder battery
-        b = np.array((-1.0, hip + 21.0, z))
-        extra.box(b, (6.0, 3.0, 4.0), M_DIRON)
-        extra.cyl(b + (1.0, 1.0, 0), b + (13.0, 1.0, 0), 1.5, M_IRON, seg=8)
-        extra.cyl(b + (11.5, 1.0, 0), b + (13.4, 1.0, 0), 1.9, M_BRONZE, seg=8)
-        if pose == "attack":
-            extra.ell(b + (15.0, 1.0, 0), (2.2, 1.8, 1.8), FLAME)
-    extra.cyl((-9.5, hip + 6.0, 0), (-9.5, hip + 20.0, 0), 4.6, M_DIRON, seg=10)   # reactor
-    for y in (hip + 9.0, hip + 13.0, hip + 17.0):
-        extra.cyl((-9.5, y, 0), (-9.5, y + 0.8, 0), 4.9, Mat(EMBER, emissive=hexc("#ff7a20"), glow_r=8, glow_k=0.35), seg=10)
-    for z in (-2.5, 2.5):
-        extra.cyl((-10.5, hip + 20.0, z), (-11.5, hip + 28.0, z), 1.3, M_DIRON, seg=6)
-    extra.ell((-12.0, hip + 31.0, 0), (2.6, 2.2, 2.2), M_PUFF)
-    extra.ell((-13.5, hip + 34.5, 0.5), (3.2, 2.6, 2.6), M_PUFF)
-    m.extend(extra.transformed(lean, piv - lean @ piv))
     return m
 
 

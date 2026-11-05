@@ -4,6 +4,9 @@ from kit import *
 import architect as AR
 import inventor as IV
 import maniac as MN
+import colossus as CL
+import golem7 as G7
+import swarm1 as SW
 from noise import value_noise
 from paths import font, out
 
@@ -33,26 +36,26 @@ def fonts():
 
 
 LEADERS = [
-    ("Отец колосса", "размер 6 · армия из одного",
-     lambda p: IV.render_model(IV.colossus(p), 2.0, w=110, h=130, ox=46, oy=104), 70,
+    ("Отец колосса", "размер 7 · титан, армия из одного",
+     lambda p: CL.build(p, 1.45), 80,
      [("Сотрясение", "каждые 3 хода: оглушает мелких врагов вокруг"),
       ("Неудержимый", "постоянно: не сдвинуть, не отбросить, не оглушить"),
       ("Второе дыхание", "раз за бой при поломке: встаёт с половиной прочности"),
       ("Один за всех", "поход: 7 ячеек и колоссальные модули, лидерства — на одного помощника")]),
     ("Изобретатель", "размер 3 · аугменты дают армии способности",
-     lambda p: IV.render_model(IV.inventor(p), 3.0, w=50, h=56, ox=22, oy=46), 30,
+     lambda p: IV.render_model(IV.inventor(p), 3.6, w=56, h=60, ox=24, oy=48), 30,
      [("Шокер", "атака: бьёт током, оглушает механизмы"),
       ("Полевая настройка", "в начале боя: соседний голем получает аугмент на бой"),
       ("Перегрузка", "каждые 3 хода: аугмент соседа срабатывает дважды"),
       ("Мастерская аугментов", "поход: аугменты в мастерской, малые корпуса дешевле")]),
     ("Маньяк", "размер 4 · безумные конструкты",
-     lambda p: MN.render_model(MN.maniac(p), 2.6, w=60, h=70, ox=28, oy=60), 34,
+     lambda p: MN.render_model(MN.maniac(p), 2.9, w=60, h=76, ox=28, oy=62), 38,
      [("Импровизация", "каждые 3 хода: модуль соседа на ход становится другим"),
       ("Это должно работать!", "когда его конструкт ломается: взрыв и град деталей"),
       ("Дикий смех", "постоянно: у врагов рядом падает боевой дух"),
       ("Свободная сборка", "поход: модули в любые ячейки, +2 к вместимости")]),
     ("Зодчий", "размер 4 · армия становится крепостью",
-     lambda p: AR.render_model(AR.architect(p), 2.1, w=60, h=80, ox=28, oy=66), 34,
+     lambda p: AR.render_model(AR.architect(p), 2.6, w=60, h=84, ox=28, oy=68), 36,
      [("Сигнал к развёртыванию", "на 2-м ходу: големы со строительными модулями разворачиваются"),
       ("Камень к камню", "постоянно: развёрнутых рядом не окружить, они чинятся"),
       ("Смена позиции", "каждые 4 хода: развёрнутый голем переходит на соседнюю клетку"),
@@ -60,13 +63,29 @@ LEADERS = [
 ]
 
 
+ACCENT = ["#ff7a20", "#40d8ff", "#e060e0", "#e2b968"]
+
+
 def overview():
-    WW, HH = 960, 640
+    WW, HH = 960, 960
     sc = canvas(WW, HH, 21)
+    QH = 330
     for i, (_, _, fn, sw, _) in enumerate(LEADERS):
-        x0, y0 = (i % 2) * 480, 50 + (i // 2) * 295
-        put(sc, fn("idle"), x0 + 110, y0 + 180, sw)
-        put(sc, fn("attack"), x0 + 300, y0 + 180, sw)
+        x0, y0 = (i % 2) * 480, 50 + (i // 2) * QH
+        sc.glow(x0 + 200, y0 + 150, 190, hexc(ACCENT[i]), 0.28)
+        put(sc, fn("idle"), x0 + 120, y0 + 220, sw)
+        put(sc, fn("attack"), x0 + 330, y0 + 220, sw)
+    # true relative scale
+    yb = 50 + 2 * QH + 210
+    r = 1.15 / 1.8
+    row = [(CL.build("idle", 1.15), "Отец колосса · 7", 70),
+           (G7.build(G7.cfg(legs="pillars", arms=("heavy", "heavy"), tools=("hammer", "shield")), 3, "idle", k=2.2 * r), "большой голем · 6", 36),
+           (G7.build(G7.cfg(), 1, "idle", k=1.6 * r), "средний голем · 5", 24),
+           (IV.render_model(IV.inventor("idle"), 1.9 * r * 1.55, w=56, h=60, ox=24, oy=48), "Изобретатель · 3", 10),
+           (SW.build((), 0.0, "idle", k=r), "рабочая роя · 1", 6)]
+    xs = [150, 360, 520, 650, 770]
+    for (spr, _, sw), x in zip(row, xs):
+        put(sc, spr, x, yb, sw)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft, fh, fb, fbs, fr = fonts()
@@ -74,14 +93,17 @@ def overview():
     d.text((24, 60), "Лидер — юнит на поле. Способности срабатывают сами по условию. Гибель лидера бой не заканчивает.",
            font=fr, fill=MUT)
     for i, (name, sub, _, _, ab) in enumerate(LEADERS):
-        x0, y0 = (i % 2) * 480 * S, (50 + (i // 2) * 295) * S
-        d.text((x0 + 24, y0 + 6), name, font=fh, fill=GOLD)
+        x0, y0 = (i % 2) * 480 * S, (50 + (i // 2) * QH) * S
+        d.text((x0 + 24, y0 + 6), name, font=fh, fill=hexc(ACCENT[i]).astype(int).tolist() and tuple(int(c) for c in hexc(ACCENT[i])))
         d.text((x0 + 24 + d.textlength(name, font=fh) + 12, y0 + 12), sub, font=fr, fill=MUT)
-        y = y0 + 190 * S
+        y = y0 + 230 * S
         for nm, txt in ab:
             d.text((x0 + 24, y), nm, font=fbs, fill=INK)
             d.text((x0 + 24 + d.textlength(nm, font=fbs) + 10, y + 1), txt, font=fr, fill=MUT)
             y += 24
+    d.text((24, (50 + 2 * QH) * S + 6), "Масштаб: всё в настоящем соотношении размеров", font=fh, fill=GOLD)
+    for (_, label, _), x in zip(row, xs):
+        d.text((x * S - d.textlength(label, font=fr) / 2, (yb + 8) * S), label, font=fr, fill=INK)
     img.save(out("foundry_leaders.png"))
 
 
