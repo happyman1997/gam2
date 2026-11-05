@@ -11,6 +11,9 @@ WOOD = Mat(ramp("#1e1208", "#3a2412", "#5a3a1e", "#7c562e", "#a07844"))
 STONE = Mat(ramp("#22202a", "#3e3a46", "#5e5a68", "#86828e", "#b2aeb8"))
 MORTAR = Mat(ramp("#1a1820", "#2a2830", "#3a3842", "#4a4852", "#5a5862"))
 RUNE = Mat(EMBER, emissive=hexc("#ff8a30"), glow_r=5, glow_k=0.35)
+TAR = Mat(ramp("#0a0506", "#1e0e0a", "#3a1e10", "#62361a", "#94602c"))
+TAR_HOT = Mat(ramp("#3a1206", "#6a2a0c", "#a04a14", "#d07a24", "#f0b050"), emissive=hexc("#e07020"), glow_r=6, glow_k=0.35)
+FLAME_SMALL = Mat(FIRE, emissive=hexc("#ff8a30"), glow_r=9, glow_k=0.6)
 PAPER = Mat(ramp("#4a4436", "#7a7258", "#aaa080", "#d8cea8", "#f6eed2"))
 
 
@@ -100,22 +103,46 @@ def with_module(module, deployed=False, tier=2, pose="idle"):
                     leaf.box((0.7, y, z * -0.45), (0.3, 1.0, 11.5), M_IRON)
                 leaf = leaf.transformed(rot_y(ang * 0.8), (0, 0, 0))
                 m.extend(leaf.transformed(I3, (12.0, 0.5, z)))
-    elif module == "bell":
-        if not deployed:
-            m.cyl((-6.0, top - 1, 0), (-6.0, top + 4.0, 0), 1.8, M_BRONZE, r1=3.0, seg=10)
-        else:
-            for z in (-7.5, 7.5):
-                m.box((0.5, top + 12.0, z), (1.8, 26.0, 1.8), WOOD)
-            m.box((0.5, top + 25.6, 0), (2.0, 1.8, 17.5), WOOD)
-            sw = 0.0 if pose == "idle" else 0.45
-            bell = Model()
-            bell.cyl((0, -0.8, 0), (0, -7.2, 0), 2.0, M_BRONZE, r1=4.8, seg=12)
-            bell.ell((0, -7.4, 0), (1.0, 1.0, 1.0), M_DIRON)
-            m.extend(bell.transformed(rot_x(sw) @ rot_z(sw * 0.5), (0.5, top + 25.0, 0)))
+    elif module == "pitch":
+        def cauldron(r, h, tier):
+            pot = Model()
+            pot.cyl((0, -h, 0), (0, 0, 0), r * 0.7, M_DIRON, r1=r, seg=16)
+            pot.cyl((0, 0, 0), (0, 1.0, 0), r * 1.08, M_IRON, seg=16)
+            pot.cyl((0, 0.8, 0), (0, 1.2, 0), r * 0.92, TAR_HOT, seg=16)
+            band = M_BRONZE if tier > 1 else M_IRON
+            pot.cyl((0, -h * 0.35, 0), (0, -h * 0.35 + 0.9, 0), r * 0.92, band, seg=16)
+            for z in (-1, 1):
+                pot.cyl((0, -h * 0.35, z * r * 0.85), (0, -h * 0.35, z * (r + 2.2)), 0.8, M_IRON, seg=6)
+            return pot
+        if not deployed:                                             # cauldron carried upright on the back
+            cx = -6.5
+            tbox(m, (cx, top - 0.5, 0), (8.0, 9.0), (7.0, 8.0), 3.0, STONE)
+            m.ell((cx + 3.6, top - 0.5, 0), (0.6, 0.9, 2.2), RUNE)
+            m.cyl((cx, top + 1.0, 0), (cx, top + 4.0, 0), 1.6, M_IRON, seg=8)
+            m.extend(cauldron(5.6, 6.5, tier).transformed(I3, (cx, top + 10.5, 0)))
+            m.ell((cx - 0.5, top + 14.0, 0.5), (2.6, 2.0, 2.0), M_PUFF)
+        else:                                                        # a hearth column on the back, the cauldron tips forward
+            cx = -5.0
+            mat = STONE if tier > 1 else WOOD
+            tbox(m, (cx, top + 4.0, 0), (11.0, 12.0), (9.0, 10.0), 12.0, mat)
+            tbox(m, (cx, top + 10.6, 0), (10.0, 11.0), (11.0, 12.0), 1.4, M_BRONZE if tier > 1 else M_IRON)
+            for z in (-3.0, 0.0, 3.0):
+                m.ell((cx + 4.6, top + 4.0, z), (0.7, 1.4, 1.1), FLAME_SMALL)
+            piv = np.array((cx + 5.0, top + 20.0, 0))
+            for z in (-1, 1):                                        # cradle arms
+                m.cyl((cx, top + 11.0, z * 9.4), piv + (0, 0, z * 9.4), 1.0, M_IRON, seg=6)
+            tilt = 0.0 if pose == "idle" else -1.1
+            R = rot_z(tilt)
+            m.extend(cauldron(7.0, 8.0, tier).transformed(R, piv + (0, 2.8, 0)))
             if pose == "attack":
-                for r in (9.0, 12.5):
-                    for a in np.linspace(-0.8, 0.8, 6):
-                        m.ell((0.5 + np.cos(a) * r, top + 18.0, np.sin(a) * r), (0.4, 0.4, 0.4), M_SPARK)
+                lip = piv + (0, 2.8, 0) + R @ np.array((7.4, 1.0, 0))
+                end = np.array((19.0, 0.6, 0.5))
+                pts = [lip, lip + (5.0, -0.8, 0.3), np.array((17.5, 12.0, 0.5)), end]
+                for p0, p1, r0, r1 in zip(pts[:-1], pts[1:], (2.4, 2.0, 1.7), (2.0, 1.7, 1.8)):
+                    m.cyl(p0, p1, r0, TAR, r1=r1, seg=8)
+                m.ell(end + (2.0, -0.2, 0), (8.0, 0.7, 6.5), TAR)
+                m.ell(lip + (0.5, 4.5, 0), (3.0, 2.2, 2.2), M_PUFF)
+                m.ell(end + (4.0, 3.0, 3.0), (3.2, 2.2, 2.4), M_PUFF)
     return m
 
 
