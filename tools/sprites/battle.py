@@ -137,7 +137,7 @@ def build():
             put(sc, spr, fx, fy)
         items.append((fy, f))
     lx, ly = X0 + 2.5 * CW, Y0 + 6.8 * CH
-    lead = LD.build("forge", "idle", k=1.0)
+    lead = LD.build("colossus", "idle", k=1.0)
     items.append((ly, lambda: (shadow(sc, lx + 2, ly, 34, 7), put(sc, lead, lx, ly))))
 
     # ---------------- swarm
