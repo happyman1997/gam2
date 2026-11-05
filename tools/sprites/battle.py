@@ -4,7 +4,7 @@ from PIL import ImageFont
 from kit import *
 from r3d import rot_x, rot_z, render
 import golem7 as G
-import leaders as LD
+import architect as AR
 import swarm1 as W
 from golem7 import cfg
 from noise import value_noise
@@ -137,7 +137,7 @@ def build():
             put(sc, spr, fx, fy)
         items.append((fy, f))
     lx, ly = X0 + 2.5 * CW, Y0 + 6.8 * CH
-    lead = LD.build("colossus", "idle", k=1.0)
+    lead = AR.render_model(AR.architect("idle"), 1.55)
     items.append((ly, lambda: (shadow(sc, lx + 2, ly, 34, 7), put(sc, lead, lx, ly))))
 
     # ---------------- swarm
