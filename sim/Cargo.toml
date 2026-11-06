@@ -1,0 +1,7 @@
+[package]
+name = "sim"
+version = "0.1.0"
+edition = "2021"
+description = "Deterministic battle simulation: two armies and a seed in, an outcome and an event list out."
+
+[dependencies]
