@@ -1,8 +1,9 @@
 //! Units as data: damage and armor types, passives, abilities, unit templates.
 
 /// Damage types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Dmg {
+    #[default]
     Pierce,
     Slash,
     Blunt,
@@ -109,6 +110,41 @@ pub enum Trait {
     Unstoppable,
     /// Enemies within `radius` check fear `1–die` against morale every round.
     Fear { die: u32, radius: u32 },
+    /// The side's leader: its death matters (the Swarm: «Обезглавленный рой»).
+    Leader,
+    /// The Swarm: +1 morale for every adjacent ally, up to +4 («Стая»).
+    Staya,
+    /// The Swarm: a kill heals a quarter of health («Пожирание»).
+    Devour,
+    /// Ant: +1 to the damage bonus with 3+ adjacent allies («Строй»).
+    Stroy,
+    /// Wasp: flies over everyone, goes for archers and leaders first.
+    Flyer,
+    /// Scorpion: a blow that gets through adds `1–die` poison.
+    Venom { die: u32 },
+    /// Barrel: bursts with acid `1–die` on everyone adjacent when it dies, its own too.
+    BurstAcid { die: u32 },
+    /// Beetle: the first melee blow of the battle is ×1.5 and knocks back.
+    Charge,
+    /// Isopod: whoever hits it in melee takes `1–die` piercing.
+    Thorns { die: u32 },
+    /// Isopod: below half health curls up — +3 armor, no attacks.
+    CurlUp,
+    /// Grasshopper: in the first round leaps over the line into the enemy's back rows.
+    Leap,
+    /// Mantis: two blows a round.
+    TwinBlades,
+    /// Firefly: enemy archers aim at it first.
+    Glow,
+    /// Hive Mind: every ally has the full «Стая» bonus.
+    HiveMind,
+    /// Devourer: every 2nd kill — ×1.4 health and +2 to the blow, up to twice; starves without kills.
+    Grows,
+    /// Cuckoo: a blow that gets through infects; an infected enemy that dies hatches 2 larvae
+    /// (not mechanisms).
+    Infects,
+    /// Cuckoo: in the first round one allied worker appears in the enemy's rear («Подкидыш»).
+    Changeling,
 }
 
 /// Abilities with a condition.
@@ -129,11 +165,17 @@ pub enum Ability {
     PointBlank,
     /// Once per round takes a blow meant for an adjacent allied golem (Перехват).
     Intercept,
+    /// Every `every` rounds, instead of attacking: adjacent enemies miss next round (Светляк).
+    Flash { every: u32 },
+    /// Every `every` rounds: `n` larvae (workers) hatch next to it; they act from the next round (Матка).
+    Brood { every: u32, n: u32 },
+    /// Every `every` rounds: marks the most dangerous enemy; allies who reach it hit it first, +1 (Разум улья).
+    Mark { every: u32 },
 }
 
 #[derive(Clone, Debug)]
 pub struct Template {
-    pub name: &'static str,
+    pub name: std::borrow::Cow<'static, str>,
     pub size: u32,
     pub hp: i32,
     pub die: u32,

@@ -60,6 +60,19 @@ pub struct Unit {
     pub burn: u32,
     pub plates: u32,
     pub intercept_used: bool,
+    /// Poison still to come; 10% of it (at least 1) each round.
+    pub poison: i32,
+    /// Attacks miss up to and including this round (Вспышка светляка).
+    pub blind_until: u32,
+    /// Round the unit appeared in: summons do not act in it.
+    pub born: u32,
+    pub charged: bool,
+    pub kills: u32,
+    pub growth: u32,
+    pub last_meal: u32,
+    /// Side whose larvae hatch from this unit when it dies (Кукушка).
+    pub infected: Option<u8>,
+    pub curled: bool,
 }
 
 impl Unit {
@@ -83,6 +96,10 @@ pub enum Event {
     Heal { u: usize, t: usize, amount: i32 },
     Knockback { t: usize },
     Burn { t: usize, dmg: i32 },
+    Poison { t: usize, dmg: i32 },
+    Summon { u: usize },
+    Mark { t: usize },
+    Blind { t: usize },
 }
 
 #[derive(Clone, Debug)]
@@ -149,12 +166,17 @@ impl Grid {
     }
 }
 
+#[derive(Default)]
 struct Hit {
     attacker: usize,
     target: usize,
     raw: i32,
     dmg: Dmg,
     probivnoy: bool,
+    melee: bool,
+    knock: bool,
+    venom: u32,
+    infect: bool,
 }
 
 pub struct Battle {
@@ -163,11 +185,13 @@ pub struct Battle {
     rng: Rng,
     pub round: u32,
     pub log: Option<Vec<Event>>,
+    /// Target marked by each side's Hive Mind.
+    mark: [Option<usize>; 2],
 }
 
 impl Battle {
     pub fn new(seed: u64) -> Self {
-        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None }
+        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None, mark: [None, None] }
     }
 
     pub fn with_log(mut self) -> Self {
@@ -241,8 +265,60 @@ impl Battle {
             burn: 0,
             plates,
             intercept_used: false,
+            poison: 0,
+            blind_until: 0,
+            born: self.round,
+            charged: false,
+            kills: 0,
+            growth: 0,
+            last_meal: self.round,
+            infected: None,
+            curled: false,
         });
         id
+    }
+
+    fn allies_adjacent(&self, i: usize) -> usize {
+        let side = self.units[i].side;
+        (0..self.units.len())
+            .filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.dist(i, k) <= 1)
+            .count()
+    }
+
+    /// Morale with «Стая» and the Hive Mind.
+    fn morale_of(&self, j: usize) -> u32 {
+        let u = &self.units[j];
+        let base = u.t.morale_eff();
+        if !u.t.has(Trait::Staya) {
+            return base;
+        }
+        let side = u.side;
+        let hive = (0..self.units.len()).any(|k| self.units[k].side == side && self.units[k].present() && self.units[k].t.has(Trait::HiveMind));
+        base + if hive { 4 } else { self.allies_adjacent(j).min(4) as u32 }
+    }
+
+    /// Free spot for a unit of `size` near `(x, y)`, closest first.
+    fn free_spot_near(&self, side: u8, size: u32, x: i32, y: i32, radius: i32) -> Option<(i32, i32)> {
+        let mut best: Option<(i32, i32, i32)> = None;
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                let (nx, ny) = (x + dx, y + dy);
+                if self.grid.can_place(side, size, nx, ny) {
+                    let d = dx * dx + dy * dy;
+                    if best.map_or(true, |b| d < b.0) {
+                        best = Some((d, nx, ny));
+                    }
+                }
+            }
+        }
+        best.map(|b| (b.1, b.2))
+    }
+
+    fn spawn(&mut self, side: u8, t: Template, x: i32, y: i32) -> Option<usize> {
+        let (nx, ny) = self.free_spot_near(side, t.size, x, y, 2)?;
+        let id = self.place(side, t, nx, ny);
+        self.ev(Event::Summon { u: id });
+        Some(id)
     }
 
     pub fn dist(&self, i: usize, j: usize) -> i32 {
@@ -338,12 +414,92 @@ impl Battle {
 
     // ---------------------------------------------------------------- movement
     fn movement(&mut self) {
-        for step in 1..=3u32 {
+        if self.round == 1 {
             for i in 0..self.units.len() {
-                if self.units[i].present() && self.units[i].t.speed >= step {
-                    self.step_unit(i);
+                if self.units[i].present() && self.units[i].t.has(Trait::Leap) {
+                    self.leap(i);
+                }
+                if self.units[i].present() && self.units[i].t.has(Trait::Changeling) {
+                    let side = self.units[i].side;
+                    if let Some(w) = (0..self.units.len()).find(|&k| {
+                        self.units[k].side == side && self.units[k].present() && self.units[k].t.size == 1 && !self.units[k].t.has(Trait::Leader)
+                    }) {
+                        self.leap(w);
+                    }
                 }
             }
+        }
+        for step in 1..=3u32 {
+            for i in 0..self.units.len() {
+                if !self.units[i].present() || self.units[i].t.speed < step {
+                    continue;
+                }
+                if self.units[i].t.has(Trait::Flyer) && !self.units[i].fleeing {
+                    if step == 1 {
+                        self.fly(i);
+                    }
+                    continue;
+                }
+                self.step_unit(i);
+            }
+        }
+    }
+
+    /// Jump next to the farthest enemy within 6 cells (into the back rows).
+    fn leap(&mut self, i: usize) {
+        let Some(tj) = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 6).max_by_key(|&j| (self.dist(i, j), Reverse(j))) else { return };
+        let (side, size, x, y, f) = {
+            let u = &self.units[i];
+            (u.side, u.t.size, u.x, u.y, u.fp())
+        };
+        let (tx, ty, tf) = (self.units[tj].x, self.units[tj].y, self.units[tj].fp());
+        self.grid.sub(size, x, y);
+        let mut best: Option<(i32, i32, i32)> = None;
+        for ny in ty - f..=ty + tf {
+            for nx in tx - f..=tx + tf {
+                if rect_dist(nx, ny, f, tx, ty, tf) == 1 && self.grid.can_place(side, size, nx, ny) {
+                    let d = center_d2(nx, ny, f, tx, ty, tf);
+                    if best.map_or(true, |b| d < b.0) {
+                        best = Some((d, nx, ny));
+                    }
+                }
+            }
+        }
+        match best {
+            Some((_, nx, ny)) => self.move_to(i, nx, ny),
+            None => self.grid.add(side, size, x, y),
+        }
+    }
+
+    /// Flyers go over everyone: archers and leaders first, otherwise the nearest enemy.
+    fn fly(&mut self, i: usize) {
+        if self.enemies_of(i).any(|j| self.dist(i, j) <= 1) {
+            return;
+        }
+        let pri = |b: &Battle, j: usize| b.units[j].t.range > 1 || b.units[j].t.has(Trait::Leader);
+        let Some(tj) = self.enemies_of(i).min_by_key(|&j| (!pri(self, j), self.dist(i, j), j)) else { return };
+        let (side, size, x, y, f, speed) = {
+            let u = &self.units[i];
+            (u.side, u.t.size, u.x, u.y, u.fp(), u.t.speed as i32)
+        };
+        let (tx, ty, tf) = (self.units[tj].x, self.units[tj].y, self.units[tj].fp());
+        self.grid.sub(size, x, y);
+        let mut best = (rect_dist(x, y, f, tx, ty, tf), center_d2(x, y, f, tx, ty, tf), x, y);
+        for dy in -speed..=speed {
+            for dx in -speed..=speed {
+                let (nx, ny) = (x + dx, y + dy);
+                if self.grid.can_place(side, size, nx, ny) {
+                    let key = (rect_dist(nx, ny, f, tx, ty, tf), center_d2(nx, ny, f, tx, ty, tf));
+                    if key < (best.0, best.1) {
+                        best = (key.0, key.1, nx, ny);
+                    }
+                }
+            }
+        }
+        if (best.2, best.3) != (x, y) {
+            self.move_to(i, best.2, best.3);
+        } else {
+            self.grid.add(side, size, x, y);
         }
     }
 
@@ -426,7 +582,7 @@ impl Battle {
         if !u.present() || u.fleeing {
             return;
         }
-        let morale = u.t.morale_eff();
+        let morale = self.morale_of(j);
         if self.rng.die(die) > morale {
             self.units[j].fleeing = true;
             self.ev(Event::Flee { t: j });
@@ -454,6 +610,9 @@ impl Battle {
                     self.units[i].stunned = false;
                     continue;
                 }
+                if (u.born == self.round && self.round > 0) || u.blind_until >= self.round || u.curled {
+                    continue;
+                }
                 self.act(i, &mut hits);
             }
             for h in hits {
@@ -478,16 +637,45 @@ impl Battle {
                         let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
                         for v in victims {
                             let raw = self.rng.damage(die, bonus);
-                            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy: false });
+                            hits.push(Hit { attacker: i, target: v, raw, dmg, ..Default::default() });
                         }
                         return;
+                    }
+                }
+                Ability::Flash { every } if round % every == 0 => {
+                    let adj = self.adjacent_enemies(i);
+                    if !adj.is_empty() {
+                        for j in adj {
+                            self.units[j].blind_until = round + 1;
+                            self.ev(Event::Blind { t: j });
+                        }
+                        return;
+                    }
+                }
+                Ability::Brood { every, n } if round % every == 0 => {
+                    let (side, x, y) = (self.units[i].side, self.units[i].x, self.units[i].y);
+                    for _ in 0..n {
+                        let mut larva = crate::data::rabochaya();
+                        larva.name = "Личинка".into();
+                        self.spawn(side, larva, x, y);
+                    }
+                }
+                Ability::Mark { every } if round % every == 0 => {
+                    let side = self.units[i].side as usize;
+                    let target = self.enemies_of(i).max_by_key(|&j| {
+                        let t = &self.units[j].t;
+                        (t.die as i32 + 2 * t.bonus, Reverse(j))
+                    });
+                    self.mark[side] = target;
+                    if let Some(t) = target {
+                        self.ev(Event::Mark { t });
                     }
                 }
                 Ability::Bolt { every, die, bonus, dmg, range } if round % every == 0 => {
                     let target = if range <= 1 { self.melee_target(i) } else { self.ranged_target(i, range) };
                     if let Some(tj) = target {
                         let raw = self.rng.damage(die, bonus);
-                        hits.push(Hit { attacker: i, target: tj, raw, dmg, probivnoy: false });
+                        hits.push(Hit { attacker: i, target: tj, raw, dmg, ..Default::default() });
                         return;
                     }
                 }
@@ -508,7 +696,14 @@ impl Battle {
 
     fn melee_target(&self, i: usize) -> Option<usize> {
         let adj = self.adjacent_enemies(i);
-        adj.iter().copied().find(|&j| self.units[j].t.has(Trait::Zaslon)).or(adj.first().copied())
+        let mark = self.mark[self.units[i].side as usize];
+        let flyer = self.units[i].t.has(Trait::Flyer);
+        adj.iter()
+            .copied()
+            .find(|&j| self.units[j].t.has(Trait::Zaslon))
+            .or_else(|| adj.iter().copied().find(|&j| Some(j) == mark))
+            .or_else(|| if flyer { adj.iter().copied().find(|&j| self.units[j].t.range > 1 || self.units[j].t.has(Trait::Leader)) } else { None })
+            .or(adj.first().copied())
     }
 
     fn ranged_target(&self, i: usize, range: u32) -> Option<usize> {
@@ -516,7 +711,7 @@ impl Battle {
         self.enemies_of(i)
             .map(|j| (j, self.dist(i, j)))
             .filter(|&(_, d)| d <= range as i32)
-            .min_by_key(|&(j, d)| (if far { -d } else { d }, self.units[j].hp, j))
+            .min_by_key(|&(j, d)| (!self.units[j].t.has(Trait::Glow), if far { -d } else { d }, self.units[j].hp, j))
             .map(|(j, _)| j)
     }
 
@@ -532,12 +727,12 @@ impl Battle {
                 if self.units[i].t.has_ability(|a| *a == Ability::PointBlank) {
                     for &j in adj.iter().take(3) {
                         let raw = self.rng.damage(die, bonus);
-                        hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy });
+                        hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy, melee: true, ..Default::default() });
                     }
                 } else {
                     // secondary weapon: half power, blunt
                     let raw = (self.rng.damage(die, bonus) + 1) / 2;
-                    hits.push(Hit { attacker: i, target: adj[0], raw, dmg: Dmg::Blunt, probivnoy });
+                    hits.push(Hit { attacker: i, target: adj[0], raw, dmg: Dmg::Blunt, probivnoy, melee: true, ..Default::default() });
                 }
                 return;
             }
@@ -547,11 +742,16 @@ impl Battle {
             if far_half && !self.units[i].t.has(Trait::Navodka) {
                 raw = (raw + 1) / 2;
             }
-            hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy });
+            let (venom, infect) = self.blow_effects(i);
+            hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy, venom, infect, ..Default::default() });
             return;
         }
         let Some(j) = self.melee_target(i) else { return };
         self.melee_blow(i, j, hits);
+        if self.units[i].t.has(Trait::TwinBlades) {
+            let j2 = self.adjacent_enemies(i).into_iter().find(|&x| x != j).unwrap_or(j);
+            self.melee_blow(i, j2, hits);
+        }
         if self.units[i].t.has_ability(|a| *a == Ability::Flail) {
             if let Some(&j2) = self.adjacent_enemies(i).iter().find(|&&x| x != j) {
                 self.melee_blow(i, j2, hits);
@@ -573,10 +773,30 @@ impl Battle {
         } else {
             vec![j]
         };
-        for v in victims {
-            let raw = self.rng.damage(die, bonus);
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy });
+        let mut extra = 0;
+        if self.units[i].t.has(Trait::Stroy) && self.allies_adjacent(i) >= 3 {
+            extra += 1;
         }
+        if Some(j) == self.mark[self.units[i].side as usize] {
+            extra += 1;
+        }
+        extra += 2 * self.units[i].growth as i32;
+        let charge = self.units[i].t.has(Trait::Charge) && !self.units[i].charged;
+        self.units[i].charged = true;
+        let (venom, infect) = self.blow_effects(i);
+        for v in victims {
+            let mut raw = self.rng.damage(die, bonus + extra);
+            if charge {
+                raw = raw * 3 / 2;
+            }
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect });
+        }
+    }
+
+    fn blow_effects(&self, i: usize) -> (u32, bool) {
+        let t = &self.units[i].t;
+        let venom = t.traits.iter().find_map(|x| if let Trait::Venom { die } = x { Some(*die) } else { None }).unwrap_or(0);
+        (venom, t.has(Trait::Infects))
     }
 
     fn repair(&mut self, i: usize, amount: i32) -> bool {
@@ -630,11 +850,40 @@ impl Battle {
         }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
+        let a = h.attacker;
+        if d > 0 && !self.units[t].t.has(Trait::PoisonImmune) {
+            if h.venom > 0 {
+                self.units[t].poison += self.rng.die(h.venom) as i32;
+            }
+            if h.infect {
+                self.units[t].infected = Some(self.units[a].side);
+            }
+        }
+        if h.melee && self.units[a].present() {
+            if let Some(die) = self.units[t].t.traits.iter().find_map(|x| if let Trait::Thorns { die } = x { Some(*die) } else { None }) {
+                let raw = self.rng.damage(die, 0);
+                let back = self.calc(a, raw, Dmg::Pierce, false);
+                self.units[a].hp -= back;
+                self.ev(Event::Hit { a: t, t: a, dmg: back });
+                if self.units[a].hp <= 0 {
+                    self.kill(a);
+                }
+            }
+        }
         let crushing = d * 2 > self.units[t].t.hp;
         if self.units[t].hp <= 0 {
             self.kill(t);
-        } else if crushing && self.units[t].t.size <= self.units[h.attacker].t.size && !self.units[t].t.has(Trait::Unstoppable) {
-            self.knockback(t, h.attacker);
+            self.on_kill(a);
+        } else {
+            let pushable = self.units[t].t.size <= self.units[a].t.size && !self.units[t].t.has(Trait::Unstoppable);
+            if (crushing || h.knock) && pushable {
+                self.knockback(t, a);
+            }
+            let u = &self.units[t];
+            if u.t.has(Trait::CurlUp) && !u.curled && u.hp * 2 < u.t.hp {
+                self.units[t].curled = true;
+                self.units[t].armor += 3;
+            }
         }
         if crushing {
             let side = self.units[t].side;
@@ -666,14 +915,71 @@ impl Battle {
         self.grid.add(side, size, x, y);
     }
 
+    /// The killer eats («Пожирание») and the Devourer grows.
+    fn on_kill(&mut self, a: usize) {
+        if !self.units[a].present() {
+            return;
+        }
+        let round = self.round;
+        let u = &mut self.units[a];
+        u.last_meal = round;
+        if u.t.has(Trait::Devour) {
+            u.hp = (u.hp + (u.t.hp / 4).max(1)).min(u.t.hp);
+        }
+        if u.t.has(Trait::Grows) {
+            u.kills += 1;
+            if u.kills % 2 == 0 && u.growth < 2 {
+                u.growth += 1;
+                let gain = u.t.hp * 2 / 5;
+                u.t.hp += gain;
+                u.hp += gain;
+            }
+        }
+    }
+
     fn kill(&mut self, t: usize) {
         let u = &self.units[t];
-        let (size, x, y) = (u.t.size, u.x, u.y);
+        if !u.alive {
+            return;
+        }
+        let (size, x, y, side) = (u.t.size, u.x, u.y, u.side);
         if u.on_field {
             self.grid.sub(size, x, y);
         }
         self.units[t].alive = false;
         self.ev(Event::Kill { t });
+        // a barrel bursts with acid on everyone adjacent
+        if let Some(die) = self.units[t].t.traits.iter().find_map(|x| if let Trait::BurstAcid { die } = x { Some(*die) } else { None }) {
+            let near: Vec<usize> = (0..self.units.len()).filter(|&k| k != t && self.units[k].present() && self.dist(k, t) <= 1).collect();
+            for k in near {
+                let raw = self.rng.damage(die, 0);
+                let d = self.calc(k, raw, Dmg::Acid, false);
+                let strip = self.units[k].t.armor_type.acid_strip();
+                self.units[k].armor = (self.units[k].armor - strip).max(0);
+                self.units[k].hp -= d;
+                self.ev(Event::Hit { a: t, t: k, dmg: d });
+                if self.units[k].hp <= 0 {
+                    self.kill(k);
+                }
+            }
+        }
+        // larvae hatch from an infected body
+        if let Some(by) = self.units[t].infected {
+            for _ in 0..2 {
+                let mut larva = crate::data::rabochaya();
+                larva.name = "Личинка".into();
+                self.spawn(by, larva, x, y);
+            }
+        }
+        // a swarm without its leader panics
+        if self.units[t].t.has(Trait::Leader) {
+            let panicking: Vec<usize> = (0..self.units.len())
+                .filter(|&k| self.units[k].side == side && self.units[k].present() && self.units[k].t.has(Trait::Staya))
+                .collect();
+            for k in panicking {
+                self.fear_check(k, 9);
+            }
+        }
     }
 
     // ---------------------------------------------------------------- lasting effects
@@ -688,6 +994,26 @@ impl Battle {
                 }
             }
         }
+        for j in 0..self.units.len() {
+            if self.units[j].present() && self.units[j].poison > 0 {
+                let d = ((self.units[j].poison + 9) / 10).max(1).min(self.units[j].poison);
+                self.units[j].poison -= d;
+                self.units[j].hp -= d;
+                self.ev(Event::Poison { t: j, dmg: d });
+                if self.units[j].hp <= 0 {
+                    self.kill(j);
+                }
+            }
+            // the Devourer starves without a kill for 3 rounds
+            if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.round >= self.units[j].last_meal + 3 {
+                let loss = (self.units[j].t.hp / 10).max(1);
+                self.units[j].hp -= loss;
+                if self.units[j].hp <= 0 {
+                    self.kill(j);
+                }
+            }
+        }
+        let n = self.units.len();
         for j in 0..n {
             if self.units[j].present() && self.units[j].burn > 0 {
                 self.units[j].burn -= 1;

@@ -4,7 +4,7 @@ use crate::model::{Ability, ArmorType, Dmg, Template, Trait};
 
 fn golem(name: &'static str, size: u32, hp: i32, die: u32, bonus: i32, init: u32, armor: i32, speed: u32) -> Template {
     Template {
-        name,
+        name: name.into(),
         size,
         hp,
         die,
@@ -62,7 +62,7 @@ pub fn otets_kolossa() -> Template {
 
 fn human_leader(name: &'static str, size: u32, hp: i32, die: u32, bonus: i32, dmg: Dmg, init: u32, morale: u32, speed: u32) -> Template {
     Template {
-        name,
+        name: name.into(),
         size,
         hp,
         die,
@@ -114,7 +114,7 @@ pub fn golova_katapulta() -> Ability {
 // ---------------------------------------------------------------- the Swarm and others
 fn creature(name: &'static str, size: u32, hp: i32, die: u32, bonus: i32, dmg: Dmg, init: u32, armor: i32, morale: u32, speed: u32, at: ArmorType) -> Template {
     Template {
-        name,
+        name: name.into(),
         size,
         hp,
         die,
@@ -226,4 +226,189 @@ pub fn etalon_types() -> Vec<Template> {
 pub fn etalon(n: usize) -> Vec<Template> {
     let types = etalon_types();
     (0..n).map(|i| types[i % types.len()].clone()).collect()
+}
+
+// ---------------------------------------------------------------- the Swarm: castes × forms
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Caste {
+    Worker,
+    Soldier,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Form {
+    Ant,
+    Wasp,
+    Scorpion,
+    Barrel,
+    Beetle,
+    Isopod,
+    Grasshopper,
+    Mantis,
+    Firefly,
+}
+
+pub const FORMS: [Form; 9] = [
+    Form::Ant,
+    Form::Wasp,
+    Form::Scorpion,
+    Form::Barrel,
+    Form::Beetle,
+    Form::Isopod,
+    Form::Grasshopper,
+    Form::Mantis,
+    Form::Firefly,
+];
+
+impl Form {
+    pub fn name(self) -> &'static str {
+        match self {
+            Form::Ant => "Муравей",
+            Form::Wasp => "Оса",
+            Form::Scorpion => "Скорпион",
+            Form::Barrel => "Бочонок",
+            Form::Beetle => "Жук",
+            Form::Isopod => "Мокрица",
+            Form::Grasshopper => "Кузнечик",
+            Form::Mantis => "Богомол",
+            Form::Firefly => "Светляк",
+        }
+    }
+}
+
+/// Health of each form by caste (see the `swarm` tool for what each is worth).
+pub const SWARM_HP: [[i32; 9]; 2] = [
+    // Ant Wasp Scorp Barrel Beetle Isopod Grass Mantis Firefly
+    [8, 8, 8, 11, 8, 8, 8, 7, 8],
+    [14, 11, 14, 19, 12, 11, 14, 11, 14],
+];
+
+pub fn swarm(c: Caste, f: Form) -> Template {
+    let ci = (c == Caste::Soldier) as usize;
+    let fi = FORMS.iter().position(|&x| x == f).unwrap();
+    let (size, die, bonus, dmg, init, armor, morale, speed) = match c {
+        Caste::Worker => (1, 4, 1, Dmg::Pierce, 8, 0, 6, 3),
+        Caste::Soldier => (2, 8, 0, Dmg::Slash, 6, 2, 9, 2),
+    };
+    let mut t = creature("", size, SWARM_HP[ci][fi], die, bonus, dmg, init, armor, morale, speed, ArmorType::Chitin);
+    t.name = format!("{} ({})", f.name(), if ci == 0 { "рабочая" } else { "солдат" }).into();
+    t.traits = vec![Trait::Staya, Trait::Devour];
+    let big = ci == 1;
+    match f {
+        Form::Ant => t.traits.push(Trait::Stroy),
+        Form::Wasp => {
+            t.traits.push(Trait::Flyer);
+            t.speed += 1;
+            t.dmg = Dmg::Pierce;
+        }
+        Form::Scorpion => {
+            t.traits.push(Trait::Venom { die: if big { 6 } else { 4 } });
+            t.dmg = Dmg::Pierce;
+            t.speed = (t.speed - 1).max(1);
+        }
+        Form::Barrel => {
+            t.range = 3;
+            t.die += 2;
+            t.dmg = Dmg::Acid;
+            t.armor_type = ArmorType::Soft;
+            t.traits.push(Trait::BurstAcid { die: if big { 6 } else { 4 } });
+        }
+        Form::Beetle => {
+            t.armor_type = ArmorType::HeavyChitin;
+            t.dmg = Dmg::Blunt;
+            t.speed = (t.speed - 1).max(1);
+            t.traits.push(Trait::Charge);
+        }
+        Form::Isopod => {
+            t.armor_type = ArmorType::HeavyChitin;
+            t.armor += 1;
+            t.bonus -= 1;
+            t.speed = (t.speed - 1).max(1);
+            t.traits.push(Trait::Thorns { die: if big { 3 } else { 2 } });
+            t.traits.push(Trait::CurlUp);
+        }
+        Form::Grasshopper => t.traits.push(Trait::Leap),
+        Form::Mantis => {
+            t.traits.retain(|x| *x != Trait::Staya);
+            t.traits.push(Trait::TwinBlades);
+            t.dmg = Dmg::Slash;
+            t.init += 2;
+        }
+        Form::Firefly => {
+            t.traits.push(Trait::Glow);
+            t.bonus -= 1;
+            t.abilities.push(Ability::Flash { every: 3 });
+        }
+    }
+    t
+}
+
+// ---------------------------------------------------------------- the Swarm: leaders
+fn swarm_leader(name: &'static str, size: u32, hp: i32, die: u32, bonus: i32, dmg: Dmg, init: u32, armor: i32, morale: u32, speed: u32, at: ArmorType) -> Template {
+    let mut t = creature(name, size, hp, die, bonus, dmg, init, armor, morale, speed, at);
+    t.traits = vec![Trait::Leader, Trait::Devour];
+    t
+}
+
+pub fn matka() -> Template {
+    swarm_leader("Матка", 6, 80, 6, 2, Dmg::Slash, 4, 2, 14, 1, ArmorType::Chitin).with(Ability::Brood { every: 3, n: 2 })
+}
+
+pub fn razum() -> Template {
+    swarm_leader("Разум улья", 4, 22, 4, 0, Dmg::Pierce, 6, 0, 12, 1, ArmorType::Soft)
+        .with_trait(Trait::HiveMind)
+        .with(Ability::Mark { every: 2 })
+}
+
+pub fn pozhiratel() -> Template {
+    swarm_leader("Пожиратель", 5, 41, 8, 2, Dmg::Slash, 5, 2, 14, 2, ArmorType::HeavyChitin).with_trait(Trait::Grows)
+}
+
+pub fn kukushka() -> Template {
+    swarm_leader("Кукушка", 3, 12, 6, 0, Dmg::Pierce, 7, 1, 11, 2, ArmorType::Chitin)
+        .with_trait(Trait::Infects)
+        .with_trait(Trait::Changeling)
+}
+
+// ---------------------------------------------------------------- the Swarm: starting armies
+// The Swarm's limit is counted in points: a worker 1, a soldier 3 (1 point ≈ 0.33 of a reference
+// fighter). A start is 30 points plus the leader.
+fn mix(parts: &[(Caste, Form, usize)]) -> Vec<Template> {
+    let mut v = vec![];
+    for &(c, f, n) in parts {
+        v.extend(vec![swarm(c, f); n]);
+    }
+    v
+}
+
+pub fn start_matka() -> Vec<Template> {
+    use Caste::*;
+    use Form::*;
+    let mut v = mix(&[(Worker, Ant, 12), (Worker, Wasp, 3), (Worker, Scorpion, 3), (Soldier, Ant, 2), (Soldier, Beetle, 1), (Soldier, Isopod, 1)]);
+    v.push(matka());
+    v
+}
+
+pub fn start_razum() -> Vec<Template> {
+    use Caste::*;
+    use Form::*;
+    let mut v = mix(&[(Worker, Ant, 9), (Worker, Firefly, 3), (Soldier, Ant, 3), (Soldier, Mantis, 2), (Soldier, Scorpion, 1)]);
+    v.push(razum());
+    v
+}
+
+pub fn start_pozhiratel() -> Vec<Template> {
+    use Caste::*;
+    use Form::*;
+    let mut v = mix(&[(Worker, Ant, 15), (Worker, Grasshopper, 3), (Soldier, Ant, 2)]);
+    v.push(pozhiratel());
+    v
+}
+
+pub fn start_kukushka() -> Vec<Template> {
+    use Caste::*;
+    use Form::*;
+    let mut v = mix(&[(Worker, Ant, 15), (Worker, Scorpion, 3), (Worker, Barrel, 3), (Soldier, Ant, 3)]);
+    v.push(kukushka());
+    v
 }

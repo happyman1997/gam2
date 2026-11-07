@@ -60,15 +60,26 @@ fn main() {
         ("Молот и Орудие против 25 рабочих", vec![molot(), orudie()], workers(25)),
         ("Страж и Механик против 25 рабочих", vec![strazh(), mekhanik()], workers(25)),
         ("Страж и Механик: рабочие, жуки, кислотники", vec![strazh(), mekhanik()], metal_answer),
-        ("Старт Отца колосса против роя", start_otets(), swarm_start()),
-        ("Старт Изобретателя против роя", start_izobretatel(), swarm_start()),
-        ("Старт Маньяка против роя", start_manyak(), swarm_start()),
-        ("Старт Зодчего против роя", start_zodchiy(), swarm_start()),
         ("Старт Отца колосса против 8 воинов", start_otets(), humans_squad()),
         ("Старт Изобретателя против 8 воинов", start_izobretatel(), humans_squad()),
         ("Старт Маньяка против 8 воинов", start_manyak(), humans_squad()),
         ("Старт Зодчего против 8 воинов", start_zodchiy(), humans_squad()),
-        ("Для сравнения: рой старта против 8 воинов", swarm_start(), humans_squad()),
+        ("Старт Отца колосса против старта Матки", start_otets(), start_matka()),
+        ("Старт Отца колосса против старта Разума улья", start_otets(), start_razum()),
+        ("Старт Отца колосса против старта Пожирателя", start_otets(), start_pozhiratel()),
+        ("Старт Отца колосса против старта Кукушки", start_otets(), start_kukushka()),
+        ("Старт Изобретателя против старта Матки", start_izobretatel(), start_matka()),
+        ("Старт Изобретателя против старта Разума улья", start_izobretatel(), start_razum()),
+        ("Старт Изобретателя против старта Пожирателя", start_izobretatel(), start_pozhiratel()),
+        ("Старт Изобретателя против старта Кукушки", start_izobretatel(), start_kukushka()),
+        ("Старт Маньяка против старта Матки", start_manyak(), start_matka()),
+        ("Старт Маньяка против старта Разума улья", start_manyak(), start_razum()),
+        ("Старт Маньяка против старта Пожирателя", start_manyak(), start_pozhiratel()),
+        ("Старт Маньяка против старта Кукушки", start_manyak(), start_kukushka()),
+        ("Старт Зодчего против старта Матки", start_zodchiy(), start_matka()),
+        ("Старт Зодчего против старта Разума улья", start_zodchiy(), start_razum()),
+        ("Старт Зодчего против старта Пожирателя", start_zodchiy(), start_pozhiratel()),
+        ("Старт Зодчего против старта Кукушки", start_zodchiy(), start_kukushka()),
     ];
     println!("{} боёв на сценарий\n", n);
     println!("| Сценарий | Литейщик | Противник | Ничья | Раундов | Осталось прочности у победившего Литейщика |");
@@ -92,7 +103,10 @@ fn main() {
         ("Старт Изобретателя", start_izobretatel()),
         ("Старт Маньяка", start_manyak()),
         ("Старт Зодчего", start_zodchiy()),
-        ("Стартовый рой", swarm_start()),
+        ("Старт Матки", start_matka()),
+        ("Старт Разума улья", start_razum()),
+        ("Старт Пожирателя", start_pozhiratel()),
+        ("Старт Кукушки", start_kukushka()),
     ];
     let m = (n / 4).max(100);
     for (name, a) in armies {
