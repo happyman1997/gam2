@@ -21,6 +21,20 @@ cargo run --release --bin trace -- molot_orudie 1
 ```
 
 `balance` прогоняет все сценарии и ищет равный бой, `trace` печатает один бой по раундам.
+`snapshot` выдаёт состояние боя после нужного раунда, а `tools/sprites/sim_shot.py` рисует по нему
+кадр спрайтами:
+
+```bash
+cargo run --release --bin snapshot -- zodchiy 3 3 > tools/sprites/out/shot.json
+```
+
+```bash
+python3 tools/sprites/sim_shot.py tools/sprites/out/shot.json
+```
+
+![Кадр из симуляции](images/sim_shot.png)
+
+Числа над юнитами — урон за раунд: красные — по убитым, серые — удар не пробил броню.
 Числа лежат в `sim/src/data.rs`.
 
 ## Что уже умеет

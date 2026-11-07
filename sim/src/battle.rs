@@ -262,26 +262,31 @@ impl Battle {
     // ---------------------------------------------------------------- the round
     pub fn run(&mut self) -> Outcome {
         loop {
-            self.round += 1;
-            self.ev(Event::Round(self.round));
-            if self.round > MAX_ROUNDS {
-                return self.outcome(None);
-            }
-            self.exhaustion();
-            if let Some(o) = self.check_end() {
-                return o;
-            }
-            self.movement();
-            self.fear();
-            self.attacks();
-            if let Some(o) = self.check_end() {
-                return o;
-            }
-            self.persistent();
-            if let Some(o) = self.check_end() {
+            if let Some(o) = self.step() {
                 return o;
             }
         }
+    }
+
+    /// One round; `Some` when the battle is over.
+    pub fn step(&mut self) -> Option<Outcome> {
+        self.round += 1;
+        self.ev(Event::Round(self.round));
+        if self.round > MAX_ROUNDS {
+            return Some(self.outcome(None));
+        }
+        self.exhaustion();
+        if let Some(o) = self.check_end() {
+            return Some(o);
+        }
+        self.movement();
+        self.fear();
+        self.attacks();
+        if let Some(o) = self.check_end() {
+            return Some(o);
+        }
+        self.persistent();
+        self.check_end()
     }
 
     fn outcome(&self, winner: Option<u8>) -> Outcome {
