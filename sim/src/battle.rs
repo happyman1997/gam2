@@ -681,8 +681,9 @@ impl Battle {
         let n = self.units.len();
         for i in 0..n {
             if self.units[i].present() && self.units[i].t.has(Trait::ZharGorna) {
+                // one adjacent enemy per round: the first that is not burning yet
                 let adj = self.adjacent_enemies(i);
-                for j in adj {
+                if let Some(&j) = adj.iter().find(|&&j| self.units[j].burn == 0).or(adj.first()) {
                     self.units[j].burn = 3;
                 }
             }

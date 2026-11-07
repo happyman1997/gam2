@@ -91,7 +91,7 @@ pub enum Trait {
     Zaslon,
     /// Blows ignore half of the target's armor (Молот).
     Probivnoy,
-    /// Adjacent enemies burn (Горн).
+    /// Each round sets one adjacent enemy on fire (Горн).
     ZharGorna,
     /// Ranged: aims at the far rows and loses nothing at long range (Орудие).
     Navodka,

@@ -83,31 +83,27 @@ fn main() {
 
     // How many enemies make the fight even (side 0 wins about half)?
     println!("\nРавный бой: сколько врагов нужно, чтобы армия выигрывала около половины боёв\n");
-    println!("| Армия | Рабочих | Солдат | Воинов |");
+    println!("| Армия | Эталонов | Рабочих | Солдат |");
     println!("|---|---|---|---|");
     let armies: Vec<(&str, Vec<Template>)> = vec![
-        ("Страж", vec![strazh()]),
-        ("Молот", vec![molot()]),
-        ("Горн", vec![gorn()]),
-        ("Орудие", vec![orudie()]),
         ("Молот и Орудие (лидерство 10)", vec![molot(), orudie()]),
-        ("Страж и Механик (лидерство 10)", vec![strazh(), mekhanik()]),
+        ("Страж и Механик (лидерство 10)", vec![strazh(), mekhanik().with(remont())]),
         ("Старт Отца колосса", start_otets()),
         ("Старт Изобретателя", start_izobretatel()),
         ("Старт Маньяка", start_manyak()),
         ("Старт Зодчего", start_zodchiy()),
+        ("Стартовый рой", swarm_start()),
     ];
     let m = (n / 4).max(100);
     for (name, a) in armies {
-        let even = |t: fn() -> Template, cap: usize| -> String {
-            // smallest k with win rate <= 50%
+        let even = |make: &dyn Fn(usize) -> Vec<Template>, cap: usize| -> String {
             let (mut lo, mut hi) = (1usize, cap);
-            if run("", &a, &many(t(), hi), m).a_win > 50.0 {
+            if run("", &a, &make(hi), m).a_win > 50.0 {
                 return format!("больше {}", cap);
             }
             while lo < hi {
                 let mid = (lo + hi) / 2;
-                if run("", &a, &many(t(), mid), m).a_win > 50.0 {
+                if run("", &a, &make(mid), m).a_win > 50.0 {
                     lo = mid + 1;
                 } else {
                     hi = mid;
@@ -115,6 +111,12 @@ fn main() {
             }
             format!("{}", lo)
         };
-        println!("| {} | {} | {} | {} |", name, even(rabochaya, 300), even(soldat, 160), even(voin, 80));
+        println!(
+            "| {} | {} | {} | {} |",
+            name,
+            even(&|k| etalon(k), 84),
+            even(&|k| many(rabochaya(), k), 300),
+            even(&|k| many(soldat(), k), 160)
+        );
     }
 }

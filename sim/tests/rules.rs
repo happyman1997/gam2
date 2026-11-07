@@ -22,15 +22,15 @@ fn same_seed_same_battle() {
 fn armor_and_resistance() {
     let mut bt = Battle::new(1);
     let s = bt.place(0, strazh(), 2, 2);
-    // a worker's bite (pierce) against armor 6 and cast metal (holds pierce)
+    // a worker's bite (pierce) against armor 4 and cast metal (holds pierce)
     assert_eq!(bt.calc(s, 4, Dmg::Pierce, false), 0);
-    assert_eq!(bt.calc(s, 8, Dmg::Pierce, false), 1); // (8 - 6) / 2
-    assert_eq!(bt.calc(s, 8, Dmg::Blunt, false), 2); // blunt is not held
-    assert_eq!(bt.calc(s, 8, Dmg::Blunt, true), 5); // Пробивной: half armor
+    assert_eq!(bt.calc(s, 8, Dmg::Pierce, false), 2); // (8 - 4) / 2
+    assert_eq!(bt.calc(s, 8, Dmg::Blunt, false), 4); // blunt is not held
+    assert_eq!(bt.calc(s, 8, Dmg::Blunt, true), 6); // Пробивной: half armor
     // fire ignores armor, the Foundry takes a quarter, at least 1
     assert_eq!(bt.calc(s, 3, Dmg::Fire, false), 1);
     // metal conducts lightning
-    assert_eq!(bt.calc(s, 10, Dmg::Shock, false), 6); // (10 - 6) * 1.5
+    assert_eq!(bt.calc(s, 10, Dmg::Shock, false), 9); // (10 - 4) * 1.5
 }
 
 #[test]

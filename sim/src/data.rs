@@ -24,25 +24,25 @@ fn golem(name: &'static str, size: u32, hp: i32, die: u32, bonus: i32, init: u32
 
 // ---------------------------------------------------------------- the Foundry: frames
 pub fn strazh() -> Template {
-    golem("Страж", 6, 140, 6, 4, 3, 6, 1).with_trait(Trait::Zaslon)
+    golem("Страж", 6, 100, 6, 3, 3, 4, 1).with_trait(Trait::Zaslon)
 }
 
 pub fn molot() -> Template {
-    golem("Молот", 5, 90, 10, 10, 2, 4, 1).with_trait(Trait::Probivnoy)
+    golem("Молот", 5, 60, 8, 3, 2, 3, 1).with_trait(Trait::Probivnoy)
 }
 
 pub fn gorn() -> Template {
-    golem("Горн", 5, 100, 6, 2, 3, 5, 1).with_trait(Trait::ZharGorna)
+    golem("Горн", 5, 50, 6, 1, 3, 2, 1).with_trait(Trait::ZharGorna)
 }
 
 pub fn orudie() -> Template {
-    let mut t = golem("Орудие", 5, 70, 12, 4, 4, 3, 1).with_trait(Trait::Navodka);
+    let mut t = golem("Орудие", 5, 55, 10, 3, 4, 2, 1).with_trait(Trait::Navodka);
     t.range = 3;
     t
 }
 
 pub fn mekhanik() -> Template {
-    let mut t = golem("Механик", 4, 50, 0, 0, 0, 3, 2)
+    let mut t = golem("Механик", 4, 35, 0, 0, 0, 2, 2)
         .with_trait(Trait::Naladka)
         .with_trait(Trait::NoAttack);
     t.dmg = Dmg::Blunt;
@@ -55,7 +55,7 @@ pub fn kamenshchik() -> Template {
 
 // ---------------------------------------------------------------- the Foundry: leaders
 pub fn otets_kolossa() -> Template {
-    golem("Отец колосса", 7, 320, 12, 18, 1, 7, 1)
+    golem("Отец колосса", 7, 160, 8, 2, 1, 3, 1)
         .with_trait(Trait::Unstoppable)
         .with_trait(Trait::Fear { die: 9, radius: 3 })
 }
@@ -100,7 +100,7 @@ pub fn mortira() -> Ability {
 }
 
 pub fn remont() -> Ability {
-    Ability::Repair { every: 2, amount: 10 }
+    Ability::Repair { every: 2, amount: 4 }
 }
 
 pub fn grozovaya_katushka() -> Ability {
