@@ -192,3 +192,39 @@ impl Template {
         }
     }
 }
+
+/// Damage that gets through: vulnerability, stun, armor (halved by Пробивной), resistance,
+/// elemental resistance, metal conducting lightning. The order of docs/CONCEPT.md.
+pub fn mitigate(raw: i32, dmg: Dmg, t: &Template, armor_now: i32, stunned: bool, probivnoy: bool) -> i32 {
+    let at = t.armor_type;
+    if at.immune(dmg) || (dmg == Dmg::Poison && t.has(Trait::PoisonImmune)) {
+        return 0;
+    }
+    let mut d = raw;
+    if at.weak_to(dmg) {
+        d *= 2;
+    }
+    if stunned {
+        d += 1;
+    }
+    if dmg != Dmg::Fire && dmg != Dmg::Poison {
+        let mut arm = armor_now.max(0);
+        if probivnoy {
+            arm /= 2;
+        }
+        d -= arm;
+    }
+    if d <= 0 {
+        return 0;
+    }
+    if at.resists(dmg) {
+        d /= 2;
+    }
+    if dmg == Dmg::Fire && t.has(Trait::FireResist75) {
+        d = (d / 4).max(1);
+    }
+    if dmg == Dmg::Shock && at.metal() {
+        d = d * 3 / 2;
+    }
+    d.max(0)
+}

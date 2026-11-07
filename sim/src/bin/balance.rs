@@ -1,6 +1,7 @@
 //! Runs every scenario many times and prints win rates.
 //! `cargo run --release --bin balance -- 2000`
 
+use rayon::prelude::*;
 use sim::data::*;
 use sim::fight;
 use sim::model::Template;
@@ -16,8 +17,8 @@ struct Row {
 
 fn run(name: &str, a: &[Template], b: &[Template], n: u64) -> Row {
     let (mut wa, mut wb, mut dr, mut rounds, mut hp) = (0u64, 0u64, 0u64, 0u64, 0f32);
-    for seed in 0..n {
-        let o = fight(a, b, seed);
+    let outcomes: Vec<_> = (0..n).into_par_iter().map(|seed| fight(a, b, seed)).collect();
+    for o in outcomes {
         match o.winner {
             Some(0) => {
                 wa += 1;

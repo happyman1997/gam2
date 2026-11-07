@@ -196,3 +196,34 @@ pub fn swarm_start() -> Vec<Template> {
 pub fn humans_squad() -> Vec<Template> {
     many(voin(), 8)
 }
+
+// ---------------------------------------------------------------- the reference squad (the yardstick)
+// Neutral humans of size 3 with every physical damage type and armor type, so no class profits
+// from the yardstick itself. A unit's strength is how many of them it beats half of the time.
+pub fn kopeyshchik() -> Template {
+    creature("Копейщик", 3, 12, 6, 1, Dmg::Pierce, 6, 2, 10, 2, ArmorType::Chain)
+}
+
+pub fn mechnik() -> Template {
+    creature("Мечник", 3, 12, 6, 1, Dmg::Slash, 6, 2, 10, 2, ArmorType::Leather)
+}
+
+pub fn bulavshchik() -> Template {
+    creature("Булавщик", 3, 12, 6, 1, Dmg::Blunt, 5, 3, 10, 2, ArmorType::Plate)
+}
+
+pub fn luchnik() -> Template {
+    let mut t = creature("Лучник", 3, 10, 6, 0, Dmg::Pierce, 6, 1, 9, 2, ArmorType::Leather);
+    t.range = 4;
+    t
+}
+
+pub fn etalon_types() -> Vec<Template> {
+    vec![kopeyshchik(), mechnik(), bulavshchik(), luchnik()]
+}
+
+/// `n` fighters of the reference squad: spear, sword, mace, bow, spear, sword…
+pub fn etalon(n: usize) -> Vec<Template> {
+    let types = etalon_types();
+    (0..n).map(|i| types[i % types.len()].clone()).collect()
+}

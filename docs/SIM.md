@@ -21,6 +21,7 @@ cargo run --release --bin trace -- molot_orudie 1
 ```
 
 `balance` прогоняет все сценарии и ищет равный бой, `trace` печатает один бой по раундам.
+`cost` меряет силу юнитов в эталонах и подбирает кривую стоимости — см. [BALANCE.md](BALANCE.md).
 `snapshot` выдаёт состояние боя после нужного раунда, а `tools/sprites/sim_shot.py` рисует по нему
 кадр спрайтами:
 

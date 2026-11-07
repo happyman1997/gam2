@@ -595,37 +595,7 @@ impl Battle {
     /// Damage after vulnerability, stun, armor, resistance and elemental resistance.
     pub fn calc(&self, target: usize, raw: i32, dmg: Dmg, probivnoy: bool) -> i32 {
         let t = &self.units[target];
-        let at = t.t.armor_type;
-        if at.immune(dmg) || (dmg == Dmg::Poison && t.t.has(Trait::PoisonImmune)) {
-            return 0;
-        }
-        let mut d = raw;
-        if at.weak_to(dmg) {
-            d *= 2;
-        }
-        if t.stunned {
-            d += 1;
-        }
-        if dmg != Dmg::Fire && dmg != Dmg::Poison {
-            let mut arm = t.armor.max(0);
-            if probivnoy {
-                arm /= 2;
-            }
-            d -= arm;
-        }
-        if d <= 0 {
-            return 0;
-        }
-        if at.resists(dmg) {
-            d /= 2;
-        }
-        if dmg == Dmg::Fire && t.t.has(Trait::FireResist75) {
-            d = (d / 4).max(1);
-        }
-        if dmg == Dmg::Shock && at.metal() {
-            d = d * 3 / 2;
-        }
-        d.max(0)
+        crate::model::mitigate(raw, dmg, &t.t, t.armor, t.stunned, probivnoy)
     }
 
     fn apply(&mut self, h: Hit) {

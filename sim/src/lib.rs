@@ -4,6 +4,7 @@
 pub mod battle;
 pub mod data;
 pub mod model;
+pub mod power;
 pub mod rng;
 
 pub use battle::{fight, Battle, Event, Outcome};

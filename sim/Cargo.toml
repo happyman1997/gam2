@@ -5,3 +5,4 @@ edition = "2021"
 description = "Deterministic battle simulation: two armies and a seed in, an outcome and an event list out."
 
 [dependencies]
+rayon = "1"
