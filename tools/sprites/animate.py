@@ -4,7 +4,8 @@ Poses are numbers (humanoid.ATTACKS), so in-between frames are interpolated: the
 travel on an arc round the shoulder, a stepping foot lifts, the maul head leaves a motion trail
 between frames. Every frame goes through the clipping check.
 
-    python3 tools/sprites/animate.py            -> out/guard_attacks.gif
+    python3 tools/sprites/animate.py            -> out/guard_attack.gif (the Guard's attack, close up and at battle size)
+    python3 tools/sprites/animate.py all        -> out/guard_attacks.gif (all three attack poses side by side)
 """
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -218,64 +219,69 @@ def to_screen(p, k):
 KINDS = (("slam", "А · удар сверху"), ("sweep", "Б · размах понизу"), ("ram", "В · удар щитом"))
 
 
-def main(k=3.0, S=2):
-    PW, PH = 330, 300
-    WW, HH = PW * len(KINDS), PH + 40
+def main(panels, name, S=2, PH=300):
+    """panels: (kind, scale, label, width) side by side, all on one timeline."""
+    WW, HH = sum(p[3] for p in panels), PH + 40
     bg = Scene(WW, HH)
     n = value_noise(WW, HH, 14, 95) * 0.6 + value_noise(WW, HH, 5, 96) * 0.4
     th = BAYER[bg.yy % 4, bg.xx % 4]
     lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
     for i, col in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
         bg.rgb[lv == i] = hexc(col)
-    lines = {kind: timeline(kind) for kind, _ in KINDS}
-    nfr = len(lines["slam"])
-    bug = W.build((), 0.02, "idle", True, k=k / 2.2, genes=W.genes_for(7))
+    lines = {kind: timeline(kind) for kind, _, _, _ in panels}
+    nfr = len(lines[panels[0][0]])
     frames, durs = [], []
     for fi in range(nfr):
         sc = Scene(WW, HH)
         sc.rgb[:] = bg.rgb
-        for pi, (kind, _) in enumerate(KINDS):
+        x0 = 0
+        for kind, k, _, pw in panels:
             A, dur, ft, tr, seg = lines[kind][fi]
             G, info = frame_parts(A, ft, tr, seg, kind)
             bad = report(G, H.ALLOWED, skip=("fx", "sparks"))
             if bad:
                 print(kind, fi, "clipping:", [(a, b, round(v, 2)) for v, a, b in bad])
             spr = sprite_of(G, k)
-            cx, by = pi * PW + 120, PH - 30
-            e = ((sc.xx - cx - 6) / 70) ** 2 + ((sc.yy - by) / 12) ** 2
+            cx, by = x0 + int(pw * 0.36), PH - 52
+            e = ((sc.xx - cx - 6) / (23 * k)) ** 2 + ((sc.yy - by) / (4 * k)) ** 2
             sc.rgb[e <= 1] *= 0.62
-            # the target stands where the blow lands
-            X = H.ATTACKS[kind]
+            X = H.ATTACKS[kind]                        # the target stands where the blow lands
             _, xinfo = H.pose_parts(X, fx=False)
             hit = xinfo["face"] if kind == "slam" else (xinfo["hc"] if kind == "sweep" else
                                                           xinfo["sc"] + xinfo["R"] @ H.arr((3.2, 0, 0)))
             dx, dy = to_screen((hit[0] + (1.5 if kind != "ram" else 2.0), 0.0, hit[2]), k)
-            b = bug
-            push = 0
+            bug = W.build((), 0.02, "idle", True, k=k / 2.2, genes=W.genes_for(7))
+            b, push = bug, 0
             if ft == 0.0:
                 b = flash(bug, 0.75)
             elif ft == 1.0:
-                b, push = flash(bug, 0.3), 5
+                b, push = flash(bug, 0.3), int(round(1.6 * k))
             bx, byy = int(cx + dx + push), int(by + dy)
-            e = ((sc.xx - bx) / 10) ** 2 + ((sc.yy - byy) / 3) ** 2
+            e = ((sc.xx - bx) / (3.3 * k)) ** 2 + ((sc.yy - byy) / k) ** 2
             sc.rgb[e <= 1] *= 0.62
             put(sc, b, bx, byy, mirror=True)
             sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
+            x0 += pw
         img = sc.image(S)
         d = ImageDraw.Draw(img)
         fh = ImageFont.truetype(font("PTSerif-Bold.ttf"), 22)
-        for pi, (_, label) in enumerate(KINDS):
-            x = (pi * PW + PW // 2) * S
+        x0 = 0
+        for _, _, label, pw in panels:
+            x = (x0 + pw // 2) * S
             d.text((x - d.textlength(label, font=fh) / 2, (PH + 6) * S), label, font=fh, fill=(226, 186, 106))
+            x0 += pw
         frames.append(img)
-        durs.append(lines["slam"][fi][1])
-        print("frame", fi, "done")
+        durs.append(lines[panels[0][0]][fi][1])
     pal = [f.convert("P", palette=Image.Palette.ADAPTIVE, colors=255) for f in frames]
-    path = out("guard_attacks.gif")
+    path = out(name)
     pal[0].save(path, save_all=True, append_images=pal[1:], duration=durs, loop=0, disposal=2, optimize=False)
     print(path, frames[0].size, len(frames), "frames")
     return frames, durs
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.argv[1:] == ["all"]:
+        main([(kind, 3.0, label, 330) for kind, label in KINDS], "guard_attacks.gif")
+    else:
+        main([("slam", 3.6, "Страж · атака", 400), ("slam", 2.2, "в размере боя", 240)], "guard_attack.gif", PH=320)

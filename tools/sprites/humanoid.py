@@ -458,7 +458,8 @@ def place_upper(G, R, t):
 
 
 # Attack poses — the frame shown at the moment a blow lands (Conquest of Elysium swaps idle for attack
-# on every hit), so each is the instant of contact, not a stance.
+# on every hit), so each is the instant of contact, not a stance. The Guard's attack is "slam";
+# "sweep" and "ram" are kept as a reserve for other frames and for module attacks.
 # hand/shield: wrist targets relative to the shoulder; poles: where the elbow points;
 # haft: direction from the fist to the maul head; face: where the striking face looks.
 ATTACKS = {
@@ -657,12 +658,11 @@ if __name__ == "__main__":
     from paths import font, out
     import frames as F
     import swarm1 as W
-    poses = ("idle", "slam", "sweep", "ram")
-    for pose in poses:
+    for pose in ("idle", "attack"):
         bad = check(pose)
         print(pose, "clipping:", "none" if not bad else ", ".join(f"{a}×{b} {v:.2f}" for v, a, b in bad))
     S = 2
-    WW, HH = 960, 660
+    WW, HH = 960, 640
     sc = Scene(WW, HH)
     n = value_noise(WW, HH, 14, 91) * 0.6 + value_noise(WW, HH, 5, 92) * 0.4
     th = BAYER[sc.yy % 4, sc.xx % 4]
@@ -675,23 +675,25 @@ if __name__ == "__main__":
         sc.rgb[e <= 1] *= 0.62
         sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
 
-    xs = (120, 350, 590, 830)
-    for x, pose in zip(xs, poses):
-        put(build(pose, 3.6), x, 345, 70)
-    by = 600
-    for x, pose in zip(xs, poses):
-        put(build(pose), x - 30, by, 46)
-    put(W.build((), 0.0, "idle", False, k=1.0), xs[1] + 46, by, 8)
+    put(build("idle", 4.6), 220, 380, 92)
+    put(build("attack", 4.6), 640, 380, 92)
+    by = 590
+    put(F.build("Страж", "idle"), 100, by, 52)
+    put(build("idle"), 300, by, 46)
+    put(build("attack"), 520, by, 46)
+    put(W.build((), 0.0, "idle", False, k=1.0), 740, by, 8)
+    put(W.build((), 0.05, "idle", True, k=1.0), 800, by, 12)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 28)
     fh = ImageFont.truetype(font("PTSerif-Bold.ttf"), 21)
     fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 17)
-    d.text((24, 12), "Страж: кадр атаки — момент удара. Три варианта", font=ft, fill=(236, 226, 200))
-    d.text((24, 52), "Сверху крупно, снизу в размере боя (рядом рабочая роя для масштаба). Во всех позах — без пересечений.",
-           font=fr, fill=(190, 182, 164))
-    labels = ("покой", "А · удар сверху", "Б · размах понизу", "В · удар щитом")
-    for x, t in zip(xs, labels):
-        d.text((x * S - d.textlength(t, font=fh) / 2, 392 * S), t, font=fh, fill=(226, 186, 106))
-    img.save(out("humanoid_trial.png"))
+    d.text((24, 12), "Страж — человекоподобная машина: покой и атака", font=ft, fill=(236, 226, 200))
+    d.text((24, 52), "Атака — момент удара: молот с плеча по дуге в цель перед собой. Внизу — в размере боя, "
+                     "рядом прежний Страж и рой.", font=fr, fill=(190, 182, 164))
+    for x, t in ((220, "покой"), (640, "атака · удар сверху")):
+        d.text((x * S - d.textlength(t, font=fh) / 2, 410 * S), t, font=fh, fill=(226, 186, 106))
+    for x, t in ((100, "было"), (300, "покой"), (520, "атака"), (770, "рабочая и солдат роя")):
+        d.text((x * S - d.textlength(t, font=fr) / 2, (by + 12) * S), t, font=fr, fill=(190, 182, 164))
+    img.save(out("guard_humanoid.png"))
     print(img.size)
