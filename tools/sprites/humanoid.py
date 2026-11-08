@@ -155,8 +155,8 @@ def arm(G, key, sh, elbow, wrist, s, P, ram_side="back"):
     """Upper arm with a ram, elbow gear, a heavy gauntlet with a heat conduit."""
     g, rm = G[key], G[key + ".ram"]
     sh, elbow, wrist = arr(sh), arr(elbow), arr(wrist)
-    g.ell(sh, (2.9, 2.9, 2.9), M_DIRON)
-    block(g, sh, elbow, (3.4, 3.4), (3.0, 3.0), M_DIRON)
+    G[key + ".ball"].ell(sh, (2.9, 2.9, 2.9), M_DIRON)                                        # shoulder socket
+    block(g, sh + unit(elbow - sh) * 2.0, elbow, (3.4, 3.4), (3.0, 3.0), M_DIRON)             # from the socket's rim
     block(g, lerp(sh, elbow, 0.32), lerp(sh, elbow, 0.86), (3.6, 1.1), (3.0, 1.1), P, off=(0, 0, 2.15 * s))
     axle(g, elbow, 2.0, 4.0, s)
     gear(g, elbow + (0, 0, 2.0 * s), 1.6, s, teeth=9)
@@ -457,23 +457,44 @@ def place_upper(G, R, t):
     return lambda p: R @ (arr(p) - piv) + piv + t
 
 
-# Attack poses. hand/shield: wrist targets relative to the shoulder; poles: where the elbow points;
+# Attack poses — the frame shown at the moment a blow lands (Conquest of Elysium swaps idle for attack
+# on every hit), so each is the instant of contact, not a stance.
+# hand/shield: wrist targets relative to the shoulder; poles: where the elbow points;
 # haft: direction from the fist to the maul head; face: where the striking face looks.
 ATTACKS = {
-    "smash": dict(name="удар сверху", lean=-0.25, twist=0.0, t=(0.6, -1.6, 0.0),
-                  ankles=((-4.0, 3.6, HZ + 1.0), (6.5, 3.6, -HZ - 0.8)),
-                  hand=(13.35, -9.35, -0.5), hand_pole=(0.0, 0.3, 1.0), haft=(-0.276, -0.961, 0), face=(1.0, 0.0, 0),
-                  shield=(6.0, -8.0, -1.5), shield_pole=(0.6, -1.0, -0.6), shield_rot=0.55, fx="ground", ram="front"),
-    "windup": dict(name="замах", lean=0.08, twist=0.25, t=(-0.4, -0.6, 0.0),
-                   ankles=((-3.4, 3.6, HZ + 1.6), (4.8, 3.6, -HZ - 1.4)),
-                   hand=(0.6, 12.6, -1.6), hand_pole=(-1.0, 0.0, 0.5), haft=(-0.75, 0.66, 0), face=(0.66, 0.75, 0),
-                   shield=(8.0, -5.5, 1.0), shield_pole=(0.0, -1.0, -0.4), shield_rot=0.25, fx=None, ram="front"),
-    "bash": dict(name="толчок щитом", lean=-0.18, twist=0.32, t=(1.4, -1.6, 0.0),
-                 ankles=((-6.0, 3.6, HZ + 1.2), (7.4, 3.6, -HZ - 0.6)),
-                 hand=(-2.6, 7.0, 0.6), hand_pole=(-0.4, -1.0, 0.6), haft=(-0.574, 0.819, 0), face=(0.819, 0.574, 0),
-                 shield=(10.0, -1.5, 2.5), shield_pole=(0.0, -1.0, -0.5), shield_rot=0.05, fx="shield"),
+    "slam": dict(name="удар сверху", lean=-0.3, twist=-0.15, t=(1.2, -2.0, 0.0),
+                 ankles=((-5.0, 3.6, HZ + 1.0), (6.5, 3.6, -HZ - 0.8)),
+                 hand=(8.4, -10.8, -1.3), hand_pole=(0.3, 1.0, 0.8), haft=(0.95, -0.312, 0), face=(-0.312, -0.95, 0),
+                 shield=(-5.0, -12.5, -3.0), shield_pole=(0.3, -1.0, -0.6), shield_rot=-2.6, fx="slam", ram="front"),
+    "sweep": dict(name="размах понизу", lean=-0.2, twist=-0.32, t=(0.8, -2.4, 0.0),
+                  ankles=((2.5, 3.6, HZ + 2.6), (-4.5, 3.6, -HZ - 1.6)),
+                  hand=(6.44, -14.04, -6.17), hand_pole=(0.3, 1.0, 0.8), haft=(0.97, -0.214, -0.096), face=(0.004, 0.0, -1.0),
+                  shield=(-5.0, -12.5, -3.0), shield_pole=(0.3, -1.0, -0.6), shield_rot=-2.6, fx="sweep", ram="front"),
+    "ram": dict(name="удар щитом", lean=-0.22, twist=0.35, t=(1.6, -1.8, 0.0),
+                ankles=((-6.5, 3.6, HZ + 1.2), (7.5, 3.6, -HZ - 0.6)),
+                hand=(0.1, -14.1, 2.6), hand_pole=(0.6, 0.0, 0.6), haft=(-0.987, -0.165, 0), face=(0.165, -0.987, 0),
+                shield=(10.5, -2.0, 3.0), shield_pole=(0.0, -1.0, -0.5), shield_rot=0.0, fx="ram", ram="back"),
 }
-ATTACK = "smash"                 # what pose="attack" means
+SMEAR = Mat(ramp("#2a2e38", "#4a505e", "#6e7686", "#98a0b2", "#c8ced8"), dither=True)
+
+
+def smear(m, c, r, a0, a1, plane, width, depth, n=8):
+    """A dithered motion trail along an arc of radius r about c: plane 'xy' (an overhead swing) or 'xz' (a sweep)."""
+    c = arr(c)
+    pt = (lambda a: c + r * arr((np.cos(a), np.sin(a), 0))) if plane == "xy" else \
+         (lambda a: c + r * arr((np.cos(a), 0, np.sin(a))))
+    for i in range(n):
+        t0, t1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n
+        p0, p1 = pt(t0), pt(t1)
+        tv = unit(p1 - p0)
+        ax = arr((0, 0, 1.0)) if plane == "xy" else arr((0, 1.0, 0))
+        R = np.column_stack([tv, ax, np.cross(tv, ax)]) if plane == "xz" else np.column_stack([tv, np.cross(ax, tv), ax])
+        k = 0.25 + 0.75 * (i + 1) / n
+        size = (np.linalg.norm(p1 - p0) * 1.1, depth * k, width * k) if plane == "xz" else (np.linalg.norm(p1 - p0) * 1.1, width * k, depth * k)
+        m.box((p0 + p1) / 2, size, SMEAR, R)
+
+
+ATTACK = "slam"                  # what pose="attack" means
 
 
 def guard_parts(pose="idle", P=None):
@@ -486,7 +507,7 @@ def guard_parts(pose="idle", P=None):
         leg(G, "leg_f", (-0.8, HIP, -HZ), (-1.0, 10.8, -HZ - 0.6), (-4.6, 3.6, -HZ - 0.8), -1, P)
         # the maul carried on the shoulder: the haft rests on top of the pauldron, head behind
         el = SH + (1.4, -7.6, 2.0)
-        w = arm(G, "arm_n", SH, el, SH + (WX, WY, 1.6), 1, P)
+        w = arm(G, "arm_n", SH, el, SH + (WX, WY, WZ), 1, P)
         rest = arr((-0.8, RY, 10.4))
         u = grip_on(w, w - el, rest, 1)
         hand, _, u = fist(G, "hand_n", w, w - el, u, 1, P)
@@ -518,35 +539,53 @@ def guard_parts(pose="idle", P=None):
     bracket(G, fc, uf, back, R)
     fx = G["fx"]
     tf = unit(arr(A["face"]) - u * (arr(A["face"]) @ u))
-    if A["fx"] == "ground":       # the face meets the ground: sparks, a hot ring, flying grit, dust
-        p0 = arr((hc[0], 0.25, hc[2]))
-        fx.ell(p0, (5.5, 0.25, 4.5), emissive("fire", 0, 0))
-        fx.ell(p0 + (0, 0.1, 0), (3.6, 0.3, 3.0), emissive("fire", 18, 0.8))
-        for i, d in enumerate(((2.6, 2.2, 1.8), (-1.8, 3.0, 2.6), (3.6, 4.4, -1.2), (0.6, 5.6, -2.4), (-3.0, 1.6, -2.0))):
-            fx.ell(p0 + arr(d), (0.6 - 0.06 * i,) * 3, emissive("fire", 6 if i < 2 else 0, 0.7))
-        for d in ((4.2, 1.4, 3.0), (-3.6, 1.0, -2.6), (5.0, 2.6, -1.0)):
-            fx.box(p0 + arr(d), (0.9, 0.7, 0.8), M_IRON, rot_z(0.7))
-        for i, d in enumerate(((-4.5, 1.6, 3.5), (5.5, 1.8, 2.5), (-1.0, 2.2, -5.0))):
-            fx.ell(p0 + arr(d), (2.2 + i * 0.3, 1.4, 1.8), M_PUFF)
-    elif A["fx"] == "shield":     # the shield's face strikes: a flash and sparks off its front, dust at the front foot
+    if A["fx"] in ("slam", "sweep"):
+        for i, d in enumerate((9.6, 11.2, 13.2)):                          # the steam ram fires: a jet out of the back
+            fx.ell(hc - tf * d, (1.3 + 0.6 * i,) * 3, M_PUFF)
+        for i, d in enumerate(((1.2, 0.0, 0.0), (2.4, 1.8, 1.4), (2.0, -1.6, -1.2), (3.6, 0.6, -0.4), (1.6, 2.6, -2.0))):
+            fx.ell(face + tf * d[0] + arr((0, d[1], d[2])) * (0.6 if i else 0), (0.75 - 0.08 * i,) * 3,
+                   emissive("fire", 16 if i == 0 else 4, 0.85))
+    if A["fx"] == "slam":         # the arc of the blow from over the shoulder, grit and dust where it lands
+        v = hc - sh
+        smear(fx, sh, np.linalg.norm(v[:2]), np.radians(115), np.arctan2(v[1], v[0]) + 0.32, "xy", 4.0, 3.6)
+        fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 22, 0.9))                     # the flash of contact
+        g = arr((face[0], 0.3, face[2]))
+        for i, d in enumerate(((-3.0, 1.4, 2.4), (3.2, 1.6, 2.0), (0.5, 2.0, -2.6))):
+            fx.ell(g + arr(d), (2.0 + 0.3 * i, 1.3, 1.7), M_PUFF)
+        for d in ((2.6, 3.4, 1.6), (-2.2, 4.2, -1.0), (3.8, 2.0, -1.8)):
+            fx.box(g + arr(d), (0.8, 0.7, 0.8), M_IRON, rot_z(0.7))
+    elif A["fx"] == "sweep":      # a flat arc low along the ground from the near side to the front, dust behind it
+        r = np.linalg.norm(hc[[0, 2]])
+        smear(fx, (0, hc[1], 0), r, np.radians(78), np.arctan2(hc[2], hc[0]) + 0.22, "xz", 4.2, 3.6)
+        fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 20, 0.9))                     # the flash of contact
+        for i, d in enumerate(((-2.0, -2.4, 3.0), (-5.0, -2.6, 5.0), (-8.5, -2.8, 7.0))):
+            fx.ell(arr((hc[0], 0.0, hc[2])) + arr((d[0], 1.2, d[2])), (2.0 + 0.4 * i, 1.2, 1.8), M_PUFF)
+    elif A["fx"] == "ram":        # the shield's face strikes: a flash, sparks, speed lines behind its edges, dust
         front = sc + R @ arr((1.6, 0, 0))
-        fx.ell(front + R @ arr((0.8, 2.0, 0)), (1.2, 2.2, 2.2), emissive("fire", 16, 0.75))
-        for i, d in enumerate(((2.4, 4.0, 2.0), (3.2, 0.5, -2.5), (2.0, -3.0, 3.0), (4.0, 2.2, 0.0))):
-            fx.ell(front + R @ arr(d), (0.6 - 0.08 * i,) * 3, emissive("fire", 5 if i == 0 else 0, 0.7))
+        fx.ell(front + R @ arr((0.9, 1.5, 0)), (1.4, 3.0, 3.0), emissive("fire", 20, 0.85))
+        for i, d in enumerate(((2.6, 5.0, 2.6), (3.4, 0.5, -3.2), (2.2, -4.0, 3.4), (4.4, 2.6, 0.0), (3.0, -1.5, -4.8))):
+            fx.ell(front + R @ arr(d), (0.6 - 0.06 * i,) * 3, emissive("fire", 5 if i == 0 else 0, 0.7))
+        for y in (-7.0, 0.0, 7.0):
+            for zz in (-7.2, 7.2):
+                p = sc + R @ arr((-2.5, y, zz))
+                fx.box(p, (5.0, 0.35, 0.35), SMEAR)
         f = arr(A["ankles"][1]) + arr((2.0, -2.4, 0))
-        for i, d in enumerate(((1.5, 1.2, 1.5), (3.0, 1.6, -1.0), (-0.5, 1.0, -2.5))):
+        for i, d in enumerate(((1.5, 1.2, 1.5), (3.2, 1.6, -1.0), (-0.5, 1.0, -2.5), (-3.0, 1.0, 1.0))):
             fx.ell(f + arr(d), (1.8 + i * 0.3, 1.2, 1.6), M_PUFF)
     return G
 
 
-WX, WY, RY = 6.8, 0.4, 40.1      # idle: wrist of the carrying arm, height where the haft rests on the pauldron
+WX, WY, WZ, RY = 6.4, 0.8, 2.4, 39.9      # idle: wrist of the carrying arm, height where the haft rests on the pauldron
 SHIELD_GAP = 4.6                 # from the grip to the shield's back face
 BUTT = 3.2                       # haft beyond the fist on the little-finger side
 
 
 ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("leg_f", "leg_f.ram"),
            ("spine", "pelvis"), ("spine", "chest"), ("chest", "boiler"), ("chest", "head"),
-           ("chest", "pauldron_n"), ("chest", "pauldron_f"), ("chest", "arm_n"), ("chest", "arm_f"),
+           ("chest", "pauldron_n"), ("chest", "pauldron_f"),
+           ("chest", "arm_n.ball"), ("chest", "arm_f.ball"), ("pauldron_n", "arm_n.ball"), ("pauldron_f", "arm_f.ball"),
+           ("arm_n", "arm_n.ball"), ("arm_f", "arm_f.ball"), ("arm_n.ram", "arm_n.ball"), ("arm_f.ram", "arm_f.ball"),
+           ("hose", "arm_n.ball"), ("head", "arm_n.ball"), ("head", "arm_f.ball"),
            ("boiler", "stacks"), ("boiler", "hose"), ("hose", "pauldron_n"), ("hose", "arm_n"),
            ("pauldron_n", "arm_n"), ("pauldron_f", "arm_f"), ("arm_n", "arm_n.ram"), ("arm_f", "arm_f.ram"),
            ("arm_n", "hand_n"), ("arm_f", "hand_f"), ("hand_n", "hammer"), ("hand_f", "bracket"),
@@ -579,7 +618,7 @@ if __name__ == "__main__":
     from paths import font, out
     import frames as F
     import swarm1 as W
-    poses = ("idle", "smash", "windup", "bash")
+    poses = ("idle", "slam", "sweep", "ram")
     for pose in poses:
         bad = check(pose)
         print(pose, "clipping:", "none" if not bad else ", ".join(f"{a}×{b} {v:.2f}" for v, a, b in bad))
@@ -609,10 +648,10 @@ if __name__ == "__main__":
     ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 28)
     fh = ImageFont.truetype(font("PTSerif-Bold.ttf"), 21)
     fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 17)
-    d.text((24, 12), "Страж: три варианта атаки — выбери", font=ft, fill=(236, 226, 200))
+    d.text((24, 12), "Страж: кадр атаки — момент удара. Три варианта", font=ft, fill=(236, 226, 200))
     d.text((24, 52), "Сверху крупно, снизу в размере боя (рядом рабочая роя для масштаба). Во всех позах — без пересечений.",
            font=fr, fill=(190, 182, 164))
-    labels = ("покой", "А · удар сверху", "Б · замах", "В · толчок щитом")
+    labels = ("покой", "А · удар сверху", "Б · размах понизу", "В · удар щитом")
     for x, t in zip(xs, labels):
         d.text((x * S - d.textlength(t, font=fh) / 2, 392 * S), t, font=fh, fill=(226, 186, 106))
     img.save(out("humanoid_trial.png"))
