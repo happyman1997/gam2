@@ -432,15 +432,58 @@ def torso(G, P):
         pd.box(c + (0.5, -0.7, 3.9 * s), (2.6, 1.4, 0.2), M_PLATE)
 
 
+UPPER = ("pelvis", "spine", "chest", "boiler", "stacks", "hose", "head", "pauldron_n", "pauldron_f")
+LT, LS = 9.75, 7.25              # thigh and shin
+LU, LF = 8.0, 9.0                # upper arm and forearm
+
+
+def ik(a, target, L1, L2, pole):
+    """Two-bone chain from a towards target: the middle joint bends towards `pole`. Returns (joint, end)."""
+    a, target = arr(a), arr(target)
+    v = target - a
+    d = min(np.linalg.norm(v), (L1 + L2) * 0.995)
+    v = unit(v)
+    x = (L1 * L1 - L2 * L2 + d * d) / (2 * d)
+    hgt = np.sqrt(max(L1 * L1 - x * x, 0.0))
+    p = arr(pole) - v * (arr(pole) @ v)
+    return a + v * x + unit(p) * hgt, a + v * d
+
+
+def place_upper(G, R, t):
+    """Lean, twist and lower the whole upper body about the hips; returns the same map for points."""
+    piv, t = arr((0, HIP, 0)), arr(t)
+    for k in UPPER:
+        G[k] = pivot(G[k], R, piv).transformed(I3, t)
+    return lambda p: R @ (arr(p) - piv) + piv + t
+
+
+# Attack poses. hand/shield: wrist targets relative to the shoulder; poles: where the elbow points;
+# haft: direction from the fist to the maul head; face: where the striking face looks.
+ATTACKS = {
+    "smash": dict(name="удар сверху", lean=-0.25, twist=0.0, t=(0.6, -1.6, 0.0),
+                  ankles=((-4.0, 3.6, HZ + 1.0), (6.5, 3.6, -HZ - 0.8)),
+                  hand=(13.35, -9.35, -0.5), hand_pole=(0.0, 0.3, 1.0), haft=(-0.276, -0.961, 0), face=(1.0, 0.0, 0),
+                  shield=(6.0, -8.0, -1.5), shield_pole=(0.6, -1.0, -0.6), shield_rot=0.55, fx="ground", ram="front"),
+    "windup": dict(name="замах", lean=0.08, twist=0.25, t=(-0.4, -0.6, 0.0),
+                   ankles=((-3.4, 3.6, HZ + 1.6), (4.8, 3.6, -HZ - 1.4)),
+                   hand=(0.6, 12.6, -1.6), hand_pole=(-1.0, 0.0, 0.5), haft=(-0.75, 0.66, 0), face=(0.66, 0.75, 0),
+                   shield=(8.0, -5.5, 1.0), shield_pole=(0.0, -1.0, -0.4), shield_rot=0.25, fx=None, ram="front"),
+    "bash": dict(name="толчок щитом", lean=-0.18, twist=0.32, t=(1.4, -1.6, 0.0),
+                 ankles=((-6.0, 3.6, HZ + 1.2), (7.4, 3.6, -HZ - 0.6)),
+                 hand=(-2.6, 7.0, 0.6), hand_pole=(-0.4, -1.0, 0.6), haft=(-0.574, 0.819, 0), face=(0.819, 0.574, 0),
+                 shield=(10.0, -1.5, 2.5), shield_pole=(0.0, -1.0, -0.5), shield_rot=0.05, fx="shield"),
+}
+ATTACK = "smash"                 # what pose="attack" means
+
+
 def guard_parts(pose="idle", P=None):
     P = Mat(PAINT) if P is None else P
-    atk = pose == "attack"
     G = Parts()
-    leg(G, "leg_n", (0.4, HIP, HZ), (3.6, 10.8, HZ + 0.5), (2.8, 3.6, HZ + 0.7), 1, P)
-    leg(G, "leg_f", (-0.8, HIP, -HZ), (-1.0, 10.8, -HZ - 0.6), (-4.6, 3.6, -HZ - 0.8), -1, P)
     torso(G, P)
     far = SH * (1, 1, -1)
-    if not atk:
+    if pose == "idle":
+        leg(G, "leg_n", (0.4, HIP, HZ), (3.6, 10.8, HZ + 0.5), (2.8, 3.6, HZ + 0.7), 1, P)
+        leg(G, "leg_f", (-0.8, HIP, -HZ), (-1.0, 10.8, -HZ - 0.6), (-4.6, 3.6, -HZ - 0.8), -1, P)
         # the maul carried on the shoulder: the haft rests on top of the pauldron, head behind
         el = SH + (1.4, -7.6, 2.0)
         w = arm(G, "arm_n", SH, el, SH + (WX, WY, 1.6), 1, P)
@@ -454,34 +497,51 @@ def guard_parts(pose="idle", P=None):
         R = rot_y(0.5)
         back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
         bracket(G, fc, uf, back, R)
-    else:
-        el = SH + EL_A                                  # an overhand blow across the body
-        w = arm(G, "arm_n", SH, el, SH + WR_A, 1, P, ram_side="front")
-        u = unit(arr(UA))
-        hand, _, u = fist(G, "hand_n", w, w - el, u, 1, P)
-        tf = unit(arr((-UA[1], UA[0], 0)))
-        face, _ = maul(G, hand, u, P, tf, reach=13.0)
-        sp = G["sparks"]
-        for i, dd in enumerate(((1.0, 0.0, 0.0), (2.6, 1.6, 0.9), (2.2, -1.4, -1.0), (3.8, 0.5, 0.2))):
-            sp.ell(face + tf * dd[0] + arr((0, dd[1], dd[2])), (1.0 - 0.15 * i,) * 3,
-                   emissive("fire", 11 if i == 0 else 0, 0.8))
-        elf = far + (1.8, -7.8, -1.6)
-        w = arm(G, "arm_f", far, elf, far + (7.2, -9.0, -2.0), -1, P)
-        fc, hf, uf = fist(G, "hand_f", w, w - elf, (0, 1, 0), -1, P)
-        R = rot_y(0.3)
-        back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
-        bracket(G, fc, uf, back, R)
-        for k in list(G):
-            if not k.startswith("leg_"):
-                G[k] = pivot(G[k], rot_z(-0.14), (0, HIP, 0))
+        return G
+    A = ATTACKS[ATTACK if pose == "attack" else pose]
+    X = place_upper(G, rot_z(A["lean"]) @ rot_y(A["twist"]), A["t"])
+    for key, hip, ank, s in (("leg_n", (0.4, HIP, HZ), A["ankles"][0], 1), ("leg_f", (-0.8, HIP, -HZ), A["ankles"][1], -1)):
+        h = X(hip)
+        kn, an = ik(h, ank, LT, LS, (1.0, 0.25, 0.0))
+        leg(G, key, h, kn, an, s, P)
+    sh, fs = X(SH), X(far)
+    el, w = ik(sh, sh + arr(A["hand"]), LU, LF, A["hand_pole"])
+    arm(G, "arm_n", sh, el, w, 1, P, ram_side=A.get("ram", "back"))
+    hand, _, u = fist(G, "hand_n", w, w - el, A["haft"], 1, P)
+    face, hc = maul(G, hand, u, P, A["face"], reach=13.0)
+    elf, wf = ik(fs, fs + arr(A["shield"]), LU, LF, A["shield_pole"])
+    arm(G, "arm_f", fs, elf, wf, -1, P)
+    fc, hf, uf = fist(G, "hand_f", wf, wf - elf, (0, 1, 0), -1, P)
+    R = rot_y(A["shield_rot"])
+    sc = fc + R @ arr((SHIELD_GAP + 0.75, 0, 0))
+    back = shield(G, sc, R, P)
+    bracket(G, fc, uf, back, R)
+    fx = G["fx"]
+    tf = unit(arr(A["face"]) - u * (arr(A["face"]) @ u))
+    if A["fx"] == "ground":       # the face meets the ground: sparks, a hot ring, flying grit, dust
+        p0 = arr((hc[0], 0.25, hc[2]))
+        fx.ell(p0, (5.5, 0.25, 4.5), emissive("fire", 0, 0))
+        fx.ell(p0 + (0, 0.1, 0), (3.6, 0.3, 3.0), emissive("fire", 18, 0.8))
+        for i, d in enumerate(((2.6, 2.2, 1.8), (-1.8, 3.0, 2.6), (3.6, 4.4, -1.2), (0.6, 5.6, -2.4), (-3.0, 1.6, -2.0))):
+            fx.ell(p0 + arr(d), (0.6 - 0.06 * i,) * 3, emissive("fire", 6 if i < 2 else 0, 0.7))
+        for d in ((4.2, 1.4, 3.0), (-3.6, 1.0, -2.6), (5.0, 2.6, -1.0)):
+            fx.box(p0 + arr(d), (0.9, 0.7, 0.8), M_IRON, rot_z(0.7))
+        for i, d in enumerate(((-4.5, 1.6, 3.5), (5.5, 1.8, 2.5), (-1.0, 2.2, -5.0))):
+            fx.ell(p0 + arr(d), (2.2 + i * 0.3, 1.4, 1.8), M_PUFF)
+    elif A["fx"] == "shield":     # the shield's face strikes: a flash and sparks off its front, dust at the front foot
+        front = sc + R @ arr((1.6, 0, 0))
+        fx.ell(front + R @ arr((0.8, 2.0, 0)), (1.2, 2.2, 2.2), emissive("fire", 16, 0.75))
+        for i, d in enumerate(((2.4, 4.0, 2.0), (3.2, 0.5, -2.5), (2.0, -3.0, 3.0), (4.0, 2.2, 0.0))):
+            fx.ell(front + R @ arr(d), (0.6 - 0.08 * i,) * 3, emissive("fire", 5 if i == 0 else 0, 0.7))
+        f = arr(A["ankles"][1]) + arr((2.0, -2.4, 0))
+        for i, d in enumerate(((1.5, 1.2, 1.5), (3.0, 1.6, -1.0), (-0.5, 1.0, -2.5))):
+            fx.ell(f + arr(d), (1.8 + i * 0.3, 1.2, 1.6), M_PUFF)
     return G
 
 
 WX, WY, RY = 6.8, 0.4, 40.1      # idle: wrist of the carrying arm, height where the haft rests on the pauldron
-UA = (0.5, -0.87, 0.0)          # attack: direction of the haft
 SHIELD_GAP = 4.6                 # from the grip to the shield's back face
 BUTT = 3.2                       # haft beyond the fist on the little-finger side
-EL_A, WR_A = (5.0, -4.0, 0.4), (11.0, -5.0, -4.0)   # attack: elbow and wrist from the shoulder
 
 
 ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("leg_f", "leg_f.ram"),
@@ -490,7 +550,7 @@ ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("l
            ("boiler", "stacks"), ("boiler", "hose"), ("hose", "pauldron_n"), ("hose", "arm_n"),
            ("pauldron_n", "arm_n"), ("pauldron_f", "arm_f"), ("arm_n", "arm_n.ram"), ("arm_f", "arm_f.ram"),
            ("arm_n", "hand_n"), ("arm_f", "hand_f"), ("hand_n", "hammer"), ("hand_f", "bracket"),
-           ("bracket", "shield"), ("pauldron_n", "pauldron_f")]
+           ("bracket", "shield"), ("pauldron_n", "pauldron_f"), ("arm_f", "bracket")]
 
 
 def guard(pose="idle", P=None):
@@ -498,8 +558,8 @@ def guard(pose="idle", P=None):
 
 
 def build(pose="idle", k=2.2, P=None, yaw=None):
-    w, h = int(70 * k), int(64 * k)
-    ox, oy = int(30 * k), int(58 * k)
+    w, h = int(82 * k), int(80 * k)
+    ox, oy = int(36 * k), int(72 * k)
     opts = dict(STYLE1)
     if yaw is not None:
         opts["yaw"] = yaw
@@ -510,7 +570,7 @@ def build(pose="idle", k=2.2, P=None, yaw=None):
 
 def check(pose):
     from clipcheck import report
-    return report(guard_parts(pose), ALLOWED, skip=("sparks",))
+    return report(guard_parts(pose), ALLOWED, skip=("sparks", "fx"))
 
 
 if __name__ == "__main__":
@@ -519,11 +579,12 @@ if __name__ == "__main__":
     from paths import font, out
     import frames as F
     import swarm1 as W
-    for pose in ("idle", "attack"):
+    poses = ("idle", "smash", "windup", "bash")
+    for pose in poses:
         bad = check(pose)
         print(pose, "clipping:", "none" if not bad else ", ".join(f"{a}×{b} {v:.2f}" for v, a, b in bad))
     S = 2
-    WW, HH = 960, 580
+    WW, HH = 960, 660
     sc = Scene(WW, HH)
     n = value_noise(WW, HH, 14, 91) * 0.6 + value_noise(WW, HH, 5, 92) * 0.4
     th = BAYER[sc.yy % 4, sc.xx % 4]
@@ -536,22 +597,23 @@ if __name__ == "__main__":
         sc.rgb[e <= 1] *= 0.62
         sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
 
-    put(build("idle", 5.0), 200, 318, 90)
-    put(build("attack", 5.0), 600, 318, 90)
-    by = 540
-    put(F.build("Страж", "idle"), 110, by, 52)
-    put(build("idle"), 300, by, 46)
-    put(build("attack"), 470, by, 46)
-    put(W.build((), 0.0, "idle", False, k=1.0), 640, by, 8)
-    put(W.build((), 0.05, "idle", True, k=1.0), 700, by, 12)
+    xs = (120, 350, 590, 830)
+    for x, pose in zip(xs, poses):
+        put(build(pose, 3.6), x, 345, 70)
+    by = 600
+    for x, pose in zip(xs, poses):
+        put(build(pose), x - 30, by, 46)
+    put(W.build((), 0.0, "idle", False, k=1.0), xs[1] + 46, by, 8)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 28)
+    fh = ImageFont.truetype(font("PTSerif-Bold.ttf"), 21)
     fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 17)
-    d.text((24, 12), "Проба 4: Страж — кулак держит молот, удар наискось через корпус", font=ft, fill=(236, 226, 200))
-    d.text((24, 52), "Крупно — покой и атака. Внизу — в размере боя: старый Страж, новый, и рой для масштаба.",
+    d.text((24, 12), "Страж: три варианта атаки — выбери", font=ft, fill=(236, 226, 200))
+    d.text((24, 52), "Сверху крупно, снизу в размере боя (рядом рабочая роя для масштаба). Во всех позах — без пересечений.",
            font=fr, fill=(190, 182, 164))
-    for x, t in ((110, "было"), (300, "стало · покой"), (470, "стало · атака"), (670, "рабочая и солдат роя")):
-        d.text((x * S - d.textlength(t, font=fr) / 2, (by + 10) * S), t, font=fr, fill=(226, 186, 106))
+    labels = ("покой", "А · удар сверху", "Б · замах", "В · толчок щитом")
+    for x, t in zip(xs, labels):
+        d.text((x * S - d.textlength(t, font=fh) / 2, 392 * S), t, font=fh, fill=(226, 186, 106))
     img.save(out("humanoid_trial.png"))
     print(img.size)
