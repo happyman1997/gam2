@@ -30,6 +30,19 @@ ELYTRA = ramp("#1e0c1a", "#4a1430", "#7a2a3a", "#b4543e", "#e8a060")
 CRIMSON = ramp("#1e060c", "#480e1a", "#7a1c28", "#b0343a", "#e06a5a")
 
 TRAITS = ("wings", "stinger", "acid", "horn", "carapace", "jumper", "scythes", "firefly")
+CHIMERAS = ("iron", "boil", "hand", "face", "bones", "quills", "snout", "slime", "worm")
+CHIMERA_NAMES = dict(iron="Железный панцирь", boil="Кипящая кровь", hand="Человеческая рука", face="Человеческое лицо",
+                     bones="Чужие кости", quills="Иглы", snout="Волчий нюх", slime="Слизистая кожа", worm="Червь внутри")
+
+M_IRONV = Mat(IRON)
+M_HOT = Mat(ramp("#3a0806", "#7a160c", "#c03a14", "#f07a2a", "#ffd080"), emissive=hexc("#ff6a20"), glow_r=7, glow_k=0.55)
+M_STEAM = Mat(ramp("#3a3a44", "#55555f", "#74747e", "#9a9aa4", "#c4c4cc"))
+M_STEAM.smoke = True
+M_SKIN = Mat(ramp("#3a2216", "#6a4028", "#a06a44", "#cc9a6a", "#ecc8a0"))
+M_FUR = Mat(ramp("#1a1410", "#352a20", "#544434", "#76624e", "#9c866e"))
+M_SLIME = Mat(ramp("#0c2a2a", "#145a50", "#2a9a80", "#6ad8b8", "#d0fff0"), emissive=hexc("#60e0c0"), glow_r=4, glow_k=0.25)
+M_SLIME_FILM = Mat(ramp("#0e2a2c", "#1a4a48", "#2a6e66", "#4aa894", "#9ae0cc"), dither=True)
+M_WORM = Mat(ramp("#3a1418", "#6a2a30", "#a04a50", "#d07a78", "#f4b0a8"))
 NAMES = dict(wings="Крылья", stinger="Жало", acid="Кислотная железа", horn="Рог", carapace="Панцирь",
              jumper="Прыгучие ноги", scythes="Серпы", firefly="Светлячок", giant="Гигантизм")
 PLANS = dict(wings="Оса", stinger="Скорпион", acid="Бочонок", horn="Жук", carapace="Мокрица",
@@ -399,14 +412,88 @@ def add_parts(m, mc, a, traits, pose):
         m.ell(a["tip"] + (0.6, 0.6, 0), (1.9, 1.7, 1.8), M_LANTERN)
 
 
-def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None):
+def add_chimera(m, mc, a, kind, pose):
+    """Foreign traits grown from eaten enemies — only living parts."""
+    hc, hs, gc, gr, y0 = a["hc"], a["hs"], a["gc"], a["gr"], a["y0"]
+    if kind == "iron":                       # iron veins in the chitin, like the scaly-foot snail
+        for t in (-0.55, 0.0, 0.55):
+            x = gc[0] + t * gr * 1.2
+            r = gr * np.sqrt(max(0.15, 1 - t * t * 0.7)) * 1.03
+            m.cyl((x - 0.6, gc[1], 0), (x + 0.6, gc[1], 0), r, M_IRONV, seg=12)
+        for (x, y) in a["back"][-2:]:
+            m.box((x, y - 0.2, 0), (2.2, 0.8, 2.6), M_IRONV)
+    elif kind == "boil":                     # boiling blood, like the bombardier beetle
+        for d in ((0.6, 0.3, 0.8), (-1.4, -0.4, 0.7), (0.2, -1.0, 0.75)):
+            m.ell(gc + np.array((d[0] * gr * 0.5, d[1] * gr * 0.5, d[2] * gr)), (gr * 0.35, gr * 0.22, 0.4), M_HOT)
+        for i, d in enumerate(((-0.5, 1.3, 0), (0.6, 2.4, 0.4), (-1.2, 3.4, -0.3))):
+            m.ell(gc + np.array((d[0] * gr, gr + d[1], d[2])), (1.1 + 0.3 * i, 0.9 + 0.25 * i, 1.0 + 0.3 * i), M_STEAM)
+    elif kind == "hand":                     # a human arm grows out of the belly
+        s0 = gc + np.array((gr * 0.3, gr * 0.1, gr * 0.75))
+        up = 0.0 if pose == "idle" else 2.5
+        elbow = s0 + np.array((-1.0, 4.2 + up, 2.2))
+        hand = elbow + np.array((4.2, 1.6 + up, 0.6))
+        m.cyl(s0, elbow, 1.3, M_SKIN, r1=1.05, seg=6)
+        m.ell(elbow, (1.1, 1.1, 1.1), M_SKIN)
+        m.cyl(elbow, hand, 1.0, M_SKIN, r1=0.85, seg=6)
+        m.ell(hand, (1.4, 1.0, 1.2), M_SKIN)
+        for k in range(4):
+            m.cyl(hand + (0.7, 0.2, -0.75 + 0.5 * k), hand + (2.3, 0.9, -0.9 + 0.6 * k), 0.32, M_SKIN, seg=4)
+        m.cyl(hand + (0.0, 0.6, 1.0), hand + (0.8, 1.6, 1.7), 0.34, M_SKIN, seg=4)
+    elif kind == "face":                     # a human face on the belly
+        fc = gc + np.array((0.0, 0.3, gr * 0.78))
+        m.ell(fc, (gr * 0.72, gr * 0.85, 1.4), M_SKIN)
+        for dx in (-0.42, 0.42):
+            m.ell(fc + np.array((dx * gr * 0.8, gr * 0.25, 1.0)), (0.75, 0.5, 0.4), M_DARKEYE)
+            m.box(fc + np.array((dx * gr * 0.8, gr * 0.5, 1.1)), (1.5, 0.35, 0.3), M_DARKEYE)
+        m.ell(fc + np.array((0, -gr * 0.02, 1.3)), (0.45, 0.6, 0.4), M_SKIN)
+        m.ell(fc + np.array((0, -gr * 0.42, 1.0)), (gr * 0.32, 0.32, 0.35), M_DARKEYE)
+    elif kind == "bones":                    # foreign bones stick out of the chitin
+        for t in (-0.6, -0.2, 0.2):
+            x = gc[0] + t * gr
+            for z in (1, -1):
+                m.cyl((x, gc[1] + gr * 0.5, z * gr * 0.5), (x - 0.6, gc[1] - gr * 0.2, z * gr * 1.15), 0.45, M_BONE, r1=0.3, seg=5)
+        for (x, y) in a["back"]:
+            spike(m, (x, y - 0.4, 0), (x - 1.6, y + 3.6, 0), 0.7)
+    elif kind == "quills":                   # a back bristling with quills
+        pts = a["back"] + [(gc[0] + gr * dx, gc[1] + gr * 0.8) for dx in (-0.6, -0.1, 0.4)]
+        for i, (x, y) in enumerate(pts):
+            for z in (-0.8, 0.0, 0.8):
+                L = 5.5 + (i % 3)
+                m.cyl((x, y - 0.3, z), (x - L * 0.75, y + L * 0.65, z * 1.6), 0.32, M_BONE, r1=0.06, seg=4)
+    elif kind == "snout":                    # a wolf's muzzle and ears
+        tip = hc + np.array((3.6 * hs, -0.5 * hs, 0))
+        m.cyl(hc + (0.8 * hs, 0, 0), tip, 1.3 * hs, M_FUR, r1=0.75 * hs, seg=8)
+        m.ell(tip + (0.2, 0.15, 0), (0.55 * hs, 0.45 * hs, 0.5 * hs), M_DARKEYE)
+        for z in (0.9, -0.9):
+            m.cyl(hc + (-0.4 * hs, 1.4 * hs, z * hs), hc + (-0.9 * hs, 3.0 * hs, z * hs * 1.1), 0.7 * hs, M_FUR, r1=0.1, seg=4)
+    elif kind == "slime":                    # wet glistening skin, dripping
+        m.ell(gc + np.array((0, gr * 0.05, 0)), (gr * 1.36, gr * 1.04, gr * 1.04), M_SLIME_FILM, rot_z(0.25))
+        for d in ((0.3, 0.7, 0.75), (-0.6, 0.5, 0.85), (0.0, -0.2, 0.95), (0.7, -0.1, 0.8)):
+            m.ell(gc + np.array((d[0] * gr, d[1] * gr * 0.6, d[2] * gr)), (1.0, 0.7, 0.5), M_SLIME)
+        for x in (gc[0] - gr * 0.4, gc[0] + gr * 0.3, a["hc"][0] - 3.0):
+            m.ell((x, max(1.2, y0 - 3.4), 0.8), (0.7, 1.6, 0.7), M_SLIME)
+        m.ell(hc + (0.4 * hs, 1.2 * hs, 0.8), (0.9, 0.6, 0.6), M_SLIME)
+    elif kind == "worm":                     # a worm squirms out of the belly
+        base = gc + np.array((0.3 * gr, gr * 0.7, 0.3 * gr))
+        wig = 0.0 if pose == "idle" else 0.8
+        for i in range(7):
+            p = base + np.array((1.0 * i, 1.3 * i - 0.14 * i * i, np.sin(i * 1.2 + wig) * 1.1))
+            m.ell(p, (1.25 - 0.07 * i, 1.1 - 0.06 * i, 1.1 - 0.06 * i), M_WORM)
+        m.ell(base + np.array((7.0, 2.9, np.sin(8.4 + wig) * 1.1)), (0.45, 0.4, 0.4), M_DARKEYE)
+
+
+def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=None):
+    """traits[0] decides the body plan; "ant" as the first trait keeps the ant body for detail traits."""
     traits = tuple(t for t in traits if t != "giant")
     g = genes or genes_for(int(abs(hue) * 1000) + 7 * len(traits))
     mc = Mat(chitin(hue))
     m = Model()
-    primary = traits[0] if traits and not soldier else None
+    primary = traits[0] if traits and traits[0] != "ant" else None
+    traits = tuple(t for t in traits if t != "ant")
     a = PLAN_FN[primary](m, mc, g, pose, soldier)
     add_parts(m, mc, a, traits, pose)
+    if chimera:
+        add_chimera(m, mc, a, chimera, pose)
     hover = 6.0 if ("wings" in traits) else 0.0
     if primary == "wings":
         hover = 5.0
@@ -431,11 +518,11 @@ def scale_for(size):
     return {1: 1.0, 2: 1.45, 3: 1.9, 4: 2.3}[size]
 
 
-def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None):
+def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None):
     """k multiplies the in-game scale (use >1 for close-up sheets)."""
     s = scale_for(size_of(traits, soldier)) * k
-    w, h, ox, oy = int(64 * s), int(56 * s), int(30 * s), int(48 * s)
-    spr = render(body(hue, traits, pose, soldier, genes).scaled(s), w, h, ox, oy, **STYLE1)
+    w, h, ox, oy = int(64 * s), int(60 * s), int(30 * s), int(52 * s)
+    spr = render(body(hue, traits, pose, soldier, genes, chimera).scaled(s), w, h, ox, oy, **STYLE1)
     spr.ox, spr.oy = ox, oy
     return spr
 

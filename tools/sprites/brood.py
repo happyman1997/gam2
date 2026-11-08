@@ -1,4 +1,4 @@
-"""Mock-up of the swarm's between-battles screen: brood, queen, evolution of a form, natural selection."""
+"""Mock-up of the swarm's between-battles screen: three clutches, one is chosen; biomass spending."""
 from PIL import ImageFont
 from kit import *
 import swarm1 as W
@@ -8,14 +8,17 @@ from paths import font, out
 S = 2
 WW, HH = 960, 540
 INK, MUTED, GOLD, BIO = (236, 226, 204), (176, 166, 150), (226, 186, 106), (150, 230, 110)
+BADGE = {"гигант": (196, 150, 236), "новая форма": (226, 186, 106), "химера": (236, 120, 96)}
 
 
 def frame(sc, x0, y0, x1, y1, hi=False, col=None):
     sc.rgb[y0:y1, x0:x1] = hexc("#16121e")
     rim = hexc(col) if col else (hexc("#e2b968") if hi else hexc("#6c7083"))
     dark = rim * 0.5
-    sc.rgb[y0, x0:x1] = rim; sc.rgb[y1 - 1, x0:x1] = dark
-    sc.rgb[y0:y1, x0] = rim; sc.rgb[y0:y1, x1 - 1] = dark
+    sc.rgb[y0, x0:x1] = rim
+    sc.rgb[y1 - 1, x0:x1] = dark
+    sc.rgb[y0:y1, x0] = rim
+    sc.rgb[y0:y1, x1 - 1] = dark
     for (cx, cy) in ((x0, y0), (x1 - 3, y0), (x0, y1 - 3), (x1 - 3, y1 - 3)):
         sc.rgb[cy:cy + 3, cx:cx + 3] = hexc("#7a5aa0")
     sc.occ[y0:y1, x0:x1] = True
@@ -29,13 +32,27 @@ def put(sc, spr, cx, by, sw=0):
     sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
 
 
-OFFSPRING = [(("horn", "wings"), 0.01, "Жук с крыльями", "оса × жук", "рог, крылья · размер 1"),
-             (("wings", "carapace", "giant"), -0.02, "Огромная оса", "оса × мокрица", "крылья, панцирь · гигантизм"),
-             (("acid", "scythes"), 0.05, "Бочонок с серпами", "бочонок × богомол", "кислота, серпы · размер 1")]
-EVOLVE = [(("wings",), -0.08, "Осы × 12", "жало пробивает броню", 15),
-          (("horn",), 0.12, "Жуки × 5", "рог отбрасывает на 2 клетки", 12),
-          ((), 0.0, "Муравьи × 31", "+1 к скорости", 10)]
-SELECTION = [("жало", 23), ("рог", 11), ("кислота", 7), ("серпы", 4)]
+# one offspring: (traits, soldier, chimera, hue, label, badge)
+CLUTCHES = [
+    dict(name="Линия жала", parents=((("stinger",), True, None, -0.1), (("ant",), False, None, 0.05)),
+         parents_txt="скорпион-солдат × муравей", hint="отбор: жало +",
+         kids=[(("stinger",), False, None, -0.08, "скорпион", None), (("stinger",), False, None, -0.03, "скорпион", None),
+               (("stinger",), True, None, -0.1, "скорпион-солдат", None), (("ant", "stinger"), False, None, 0.04, "муравей с жалом", None)]),
+    dict(name="Линия рога", parents=((("horn",), False, None, 0.12), (("wings",), False, None, -0.05)),
+         parents_txt="жук × оса", hint="отбор: рог +",
+         kids=[(("horn", "wings"), False, None, 0.1, "жук с крыльями", None), (("horn",), True, None, 0.12, "жук-солдат", None),
+               (("wings", "horn"), False, None, -0.04, "оса с рогом", None), (("horn", "giant"), False, None, 0.14, "жук", "гигант")]),
+    dict(name="Линия химер", parents=((("acid",), False, None, 0.02), (("ant",), True, "hand", -0.02)),
+         parents_txt="бочонок × муравей с рукой", hint="съели людей: чужие черты",
+         kids=[(("acid",), False, None, 0.03, "бочонок", None), (("acid",), False, "hand", 0.0, "бочонок с рукой", "химера"),
+               (("ant",), True, "hand", -0.03, "муравей с рукой", "химера"), (("scythes",), False, None, 0.06, "богомол", "новая форма")]),
+]
+SELECTION = (("жало", 23), ("рог", 11), ("кислота", 7), ("серпы", 4))
+
+
+def points(kid):
+    traits, soldier = kid[0], kid[1]
+    return (3 if soldier else 1) * (2 if "giant" in traits else 1)
 
 
 def build():
@@ -45,99 +62,68 @@ def build():
     lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
     for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
         sc.rgb[lv == i] = hexc(c)
-    sc.glow(150, 330, 200, hexc("#7ae040"), 0.25)       # the nest glows faintly
     frame(sc, 0, 0, WW, 30)
-    # queen in her nest
-    frame(sc, 10, 40, 300, 430)
-    e = ((sc.xx - 150) / 132) ** 2 + ((sc.yy - 300) / 30) ** 2
-    sc.rgb[(e <= 1)] = sc.rgb[(e <= 1)] * 0.6 + hexc("#3a2a40") * 0.4
-    put(sc, W.queen(0.0, "idle", k=0.82), 190, 300)
-    for (ex, ey) in ((50, 316), (62, 322), (44, 326), (250, 318), (262, 312)):
-        egg = W.Model()
-        egg.ell((0, 1.2, 0), (1.6, 1.2, 1.2), W.M_EGG)
-        spr = W.render(egg.scaled(2.2), 16, 12, 8, 10, **W.STYLE1)
-        sc.blit(spr, ex - 8, ey - 10)
-    sc.rgb[352:360, 30:280] = hexc("#2a2232")
-    sc.rgb[352:360, 30:30 + int(250 * 64 / 80)] = hexc("#6ac040")
-    frame(sc, 30, 380, 280, 418, hi=False, col="#6ac040")
-    # offspring cards
-    for i, (t, hue, *_rest) in enumerate(OFFSPRING):
-        x0 = 312 + i * 112
-        frame(sc, x0, 40, x0 + 104, 300, hi=(i == 0))
-        sc.rgb[52:150, x0 + 8:x0 + 96] = hexc("#1e1828")
-        put(sc, W.build(t, hue, "idle", k=1.6 if "giant" not in t else 1.15), x0 + 52, 138)
-    frame(sc, 312, 312, 640, 346, col="#6ac040")
-    # evolution of a form
-    frame(sc, 652, 40, 950, 250)
-    for i, (t, hue, *_r) in enumerate(EVOLVE):
-        y = 76 + i * 58
-        frame(sc, 662, y, 940, y + 50, hi=(i == 0))
-        put(sc, W.build(t, hue, "idle", k=1.05), 692, y + 42)
-    # natural selection
-    frame(sc, 652, 262, 950, 430)
-    for i, (name, kills) in enumerate(SELECTION):
-        y = 300 + i * 30
-        sc.rgb[y + 8:y + 16, 760:930] = hexc("#2a2232")
-        sc.rgb[y + 8:y + 16, 760:760 + int(170 * kills / 23)] = hexc("#b04a3a") if i == 0 else hexc("#7a5a8a")
-    # bottom
-    frame(sc, 0, 444, WW, HH)
-    for (x0, x1, hi) in ((16, 216, False), (230, 470, False), (784, 944, True)):
-        frame(sc, x0, 476, x1, 516, hi)
+    for i, cl in enumerate(CLUTCHES):
+        x0 = 12 + i * 314
+        frame(sc, x0, 40, x0 + 302, 384, hi=(i == 0))
+        sc.glow(x0 + 151, 260, 120, hexc("#7ae040"), 0.10)
+        for (traits, soldier, chim, hue), px in zip(cl["parents"], (x0 + 92, x0 + 210)):
+            put(sc, W.build(traits, hue, "idle", soldier, k=1.15, chimera=chim), px, 128, 14)
+        for j, (traits, soldier, chim, hue, _, _) in enumerate(cl["kids"]):
+            cx = x0 + (82 if j % 2 == 0 else 222)
+            by = 236 if j < 2 else 330
+            sw = 16 if not soldier and "giant" not in traits else 22
+            put(sc, W.build(traits, hue, "idle", soldier, k=1.5, chimera=chim, genes=W.genes_for(i * 10 + j)), cx, by, sw)
+    frame(sc, 12, 394, 948, 432)
+    for i, (_, kills) in enumerate(SELECTION):
+        x = 250 + i * 176
+        sc.rgb[410:418, x + 70:x + 160] = hexc("#2a2232")
+        sc.rgb[410:418, x + 70:x + 70 + int(90 * kills / 23)] = hexc("#b04a3a") if i == 0 else hexc("#7a5a8a")
+    frame(sc, 0, 442, WW, HH)
+    for (x0, x1) in ((12, 236), (246, 470), (480, 704), (714, 948)):
+        frame(sc, x0, 452, x1, 488, col="#6ac040")
+    for (x0, x1, hi) in ((12, 236, False), (246, 470, False), (714, 948, True)):
+        frame(sc, x0, 496, x1, 532, hi)
     return sc
 
 
 def overlay(img):
     d = ImageDraw.Draw(img)
     f = lambda b, s: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s)
-    d.text((20, 12), "Выводок · после боя 4 из 12", font=f(1, 24), fill=INK)
-    t = "Биомасса: 37  (+14 за съеденных врагов)"
+    d.text((20, 12), "Выводок · после боя 5 из 14 · выбери одну кладку", font=f(1, 24), fill=INK)
+    t = "Биомасса 34   ·   Предел роя 41 / 45 очков"
     d.text((WW * S - 24 - d.textlength(t, font=f(1, 21)), 15), t, font=f(1, 21), fill=BIO)
-    d.text((40, 54 * S), "Матка", font=f(1, 22), fill=INK)
-    d.text((40, 54 * S + 32), "лидер роя, размер 6", font=f(0, 15), fill=MUTED)
-    d.text((60, 334 * S), "Предел численности: 64 / 80", font=f(0, 16), fill=INK)
-    t = "Скормить · 10 биомассы даёт +8 к пределу"
-    d.text((155 * S - d.textlength(t, font=f(1, 16)) / 2, 390 * S), t, font=f(1, 16), fill=BIO)
-    for i, (_, _, name, parents, traits) in enumerate(OFFSPRING):
-        cx = (312 + i * 112 + 52) * S
-        tag = "ВЫВЕСТИ" if i == 0 else "яйцо"
-        d.text((cx - d.textlength(tag, font=f(1, 14)) / 2, 160 * S), tag, font=f(1, 14), fill=GOLD if i == 0 else MUTED)
-        for j, (txt, fnt, col) in enumerate(((name, f(1, 17), INK), (parents, f(0, 14), MUTED))):
-            words, line, lines = txt.split(" "), "", []
-            for w in words:
-                tt = (line + " " + w).strip()
-                if d.textlength(tt, font=fnt) > 96 * S and line:
-                    lines.append(line); line = w
-                else:
-                    line = tt
-            lines.append(line)
-            for k, ln in enumerate(lines):
-                d.text((cx - d.textlength(ln, font=fnt) / 2, (182 + j * 34) * S + k * 22), ln, font=fnt, fill=col)
-        for k, part in enumerate(traits.split(" · ")):
-            d.text((cx - d.textlength(part, font=f(0, 14)) / 2, 254 * S + k * 20), part, font=f(0, 14), fill=(200, 190, 170))
-    t = "Ещё одно яйцо · 8 биомассы"
-    d.text((476 * S - d.textlength(t, font=f(1, 17)) / 2, 321 * S), t, font=f(1, 17), fill=BIO)
-    d.text((316 * S, 360 * S), "Потомство — от соседей, переживших бой.", font=f(0, 16), fill=MUTED)
-    d.text((316 * S, 360 * S + 24), "Выбери одно, остальных съест матка.", font=f(0, 16), fill=MUTED)
-    d.text((664 * S, 52 * S), "Эволюция формы — для всех сразу", font=f(1, 19), fill=INK)
-    for i, (_, _, name, what, cost) in enumerate(EVOLVE):
-        y = (76 + i * 58) * S
-        d.text((720 * S, y + 12), name, font=f(1, 17), fill=INK)
-        d.text((720 * S, y + 38), what, font=f(0, 15), fill=MUTED)
-        t = f"{cost}"
-        d.text((928 * S - d.textlength(t, font=f(1, 18)), y + 24), t, font=f(1, 18), fill=BIO)
-    d.text((664 * S, 274 * S), "Естественный отбор", font=f(1, 19), fill=INK)
-    d.text((664 * S, 274 * S + 28), "черты, что чаще убивают, чаще наследуются", font=f(0, 14), fill=MUTED)
+    for i, cl in enumerate(CLUTCHES):
+        x0 = 12 + i * 314
+        cx = (x0 + 151) * S
+        d.text(((x0 + 12) * S, 48 * S), cl["name"], font=f(1, 22), fill=GOLD if i == 0 else INK)
+        pts = sum(points(k) for k in cl["kids"])
+        t = f"{len(cl['kids'])} особи · +{pts} очков"
+        d.text(((x0 + 290) * S - d.textlength(t, font=f(0, 16)), 52 * S), t, font=f(0, 16), fill=MUTED)
+        d.text((cx - d.textlength("×", font=f(1, 26)) / 2, 100 * S), "×", font=f(1, 26), fill=MUTED)
+        t = "родители: " + cl["parents_txt"]
+        d.text((cx - d.textlength(t, font=f(0, 15)) / 2, 138 * S), t, font=f(0, 15), fill=MUTED)
+        for j, (_, _, _, _, label, badge) in enumerate(cl["kids"]):
+            kx = (x0 + (82 if j % 2 == 0 else 222)) * S
+            ky = (242 if j < 2 else 336) * S
+            d.text((kx - d.textlength(label, font=f(0, 14)) / 2, ky), label, font=f(0, 14), fill=INK)
+            if badge:
+                d.text((kx - d.textlength(badge, font=f(1, 14)) / 2, ky + 22), badge, font=f(1, 14), fill=BADGE[badge])
+        d.text((cx - d.textlength(cl["hint"], font=f(1, 15)) / 2, 160 * S), cl["hint"], font=f(1, 15), fill=(150, 220, 120))
+    d.text((24, 404 * S), "Естественный отбор — убийства по чертам:", font=f(1, 16), fill=INK)
     for i, (name, kills) in enumerate(SELECTION):
-        y = (300 + i * 30) * S
-        d.text((668 * S, y + 6), name, font=f(0, 16), fill=INK)
-        t = str(kills)
-        d.text((934 * S - d.textlength(t, font=f(1, 14)), y - 14), t, font=f(1, 14), fill=MUTED)
-    btn = [(16, 216, "Автовыбор"), (230, 470, "Пропустить · +6 биомассы"), (784, 944, "В бой")]
-    for x0_, x1_, t in btn:
-        w = d.textlength(t, font=f(1, 20))
-        d.text(((x0_ + x1_) * S / 2 - w / 2, 486 * S), t, font=f(1, 20), fill=INK if t != "В бой" else (250, 226, 160))
-    d.text((20, 452 * S), "Пожирание: каждый съеденный в бою враг даёт биомассу. Обычно на выводок уходит 15–30 секунд.",
-           font=f(0, 16), fill=MUTED)
+        x = (250 + i * 176) * S
+        d.text((x + 12, 403 * S), name, font=f(0, 16), fill=INK)
+        d.text((x + 330, 403 * S), str(kills), font=f(1, 14), fill=MUTED)
+    spend = [(12, 236, "Кормление · 10: кладка +1"), (246, 470, "Эволюция формы · 15"),
+             (480, 704, "Вторая кладка · 10"), (714, 948, "Перебросить · 5")]
+    for x0, x1, t in spend:
+        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 17)) / 2, 461 * S), t, font=f(1, 17), fill=BIO)
+    for x0, x1, t in ((12, 236, "Автовыбор"), (246, 470, "Пропустить · +10 биомассы"), (714, 948, "В бой")):
+        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 505 * S), t, font=f(1, 19),
+               fill=(250, 226, 160) if t == "В бой" else INK)
+    t = "Потомки сверх предела съедаются и дают биомассу."
+    d.text(((480 + 704) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 506 * S), t, font=f(0, 15), fill=MUTED)
 
 
 if __name__ == "__main__":
