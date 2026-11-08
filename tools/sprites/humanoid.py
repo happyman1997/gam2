@@ -113,58 +113,57 @@ class Parts(dict):
 def leg(G, key, hipj, knee, ankle, s, P):
     g, rm = G[key], G[key + ".ram"]
     hipj, knee, ankle = arr(hipj), arr(knee), arr(ankle)
-    axle(g, hipj, 2.2, 3.0, s)
-    gear(g, hipj + (0, 0, 1.5 * s), 2.0, s)
-    Rt = block(g, hipj, knee, (3.0, 3.0), (2.8, 2.8), M_DIRON)                                   # thigh beam
-    block(g, lerp(hipj, knee, 0.22), lerp(hipj, knee, 0.86), (1.2, 3.4), (1.2, 3.0), P, off=(1.95, 0, 0))   # front plate
-    block(g, lerp(hipj, knee, 0.38), lerp(hipj, knee, 0.84), (3.2, 1.0), (2.8, 1.0), P, off=(0.2, 0, 1.85 * s))  # outer plate
-    conduit(g, lerp(hipj, knee, 0.42) + (0, 0, 2.75 * s), lerp(hipj, knee, 0.8) + (0, 0, 2.75 * s))
-    axle(g, knee, 1.8, 3.4, s)
-    gear(g, knee + (0, 0, 1.7 * s), 1.5, s, teeth=8)
-    g.ell(knee + Rt @ arr((2.0, 0.0, 0)), (1.2, 1.8, 1.7), P)                                     # knee cap
-    rivets(g, [knee + Rt @ arr((3.1, 0.0, 0))])
-    Rs = block(g, knee, ankle, (2.6, 2.6), (2.6, 2.6), M_DIRON, off=(-0.3, 0, 0))                 # shin beam
-    block(g, lerp(knee, ankle, 0.1), lerp(knee, ankle, 0.92), (3.4, 3.8), (3.8, 4.2), P, off=(0.6, 0, 0))   # greave
-    block(g, lerp(knee, ankle, 0.16), lerp(knee, ankle, 0.82), (1.0, 1.2), (1.0, 1.4), M_DIRON, off=(2.75, 0, 0))  # ridge
-    rivets(g, [lerp(knee, ankle, t) + Rs @ arr((0.8, 0, 0)) + (0, 0, 2.15 * s) for t in (0.3, 0.55, 0.8)])
+    axle(g, hipj, 2.6, 3.4, s)
+    gear(g, hipj + (0, 0, 1.7 * s), 2.3, s, teeth=11)
+    Rt = block(g, hipj, knee, (3.8, 3.8), (3.4, 3.4), M_DIRON)                                   # thigh beam
+    block(g, lerp(hipj, knee, 0.2), lerp(hipj, knee, 0.86), (1.4, 4.4), (1.4, 3.9), P, off=(2.4, 0, 0))     # front plate
+    block(g, lerp(hipj, knee, 0.36), lerp(hipj, knee, 0.84), (4.0, 1.1), (3.6, 1.1), P, off=(0.3, 0, 2.3 * s))  # outer plate
+    conduit(g, lerp(hipj, knee, 0.42) + (0, 0, 3.3 * s), lerp(hipj, knee, 0.8) + (0, 0, 3.3 * s), r=0.5)
+    axle(g, knee, 2.2, 4.2, s)
+    gear(g, knee + (0, 0, 2.1 * s), 1.8, s, teeth=9)
+    g.ell(knee + Rt @ arr((2.5, 0.0, 0)), (1.5, 2.2, 2.2), P)                                     # knee cap
+    rivets(g, [knee + Rt @ arr((3.9, 0.0, 0))], r=0.35)
+    Rs = block(g, knee, ankle, (3.2, 3.2), (3.2, 3.2), M_DIRON, off=(-0.3, 0, 0))                 # shin beam
+    block(g, lerp(knee, ankle, 0.1), lerp(knee, ankle, 0.92), (4.4, 4.8), (5.0, 5.4), P, off=(0.7, 0, 0))   # greave
+    block(g, lerp(knee, ankle, 0.16), lerp(knee, ankle, 0.82), (1.1, 1.4), (1.1, 1.6), M_DIRON, off=(3.4, 0, 0))  # ridge
+    rivets(g, [lerp(knee, ankle, t) + Rs @ arr((1.0, 0, 0)) + (0, 0, 2.75 * s) for t in (0.3, 0.55, 0.8)], r=0.35)
     # thigh ram: from the back of the thigh across the knee to the back of the shin, on lugs
     bt, bs = -Rt[:, 0], -Rs[:, 0]
-    A = lerp(hipj, knee, 0.3) + bt * 3.0
-    B = lerp(knee, ankle, 0.28) + bs * 2.9
-    g.cyl(A, A - bt * 1.7, 0.5, M_DIRON, seg=6)
-    g.cyl(B, B - bs * 1.8, 0.5, M_DIRON, seg=6)
-    ram(rm, A, B, 0.7)
+    A = lerp(hipj, knee, 0.3) + bt * 3.5
+    B = lerp(knee, ankle, 0.28) + bs * 3.4
+    g.cyl(A, A - bt * 2.0, 0.6, M_DIRON, seg=6)
+    g.cyl(B, B - bs * 2.0, 0.6, M_DIRON, seg=6)
+    ram(rm, A, B, 0.85)
     # ankle and an articulated foot: heel, hinge, toe block, toe cap, claws
-    axle(g, ankle, 1.3, 3.2, s)
-    g.box(ankle + (-1.3, -2.2, 0), (3.6, 2.0, 4.0), M_IRON)
-    toe = ankle + (2.9, -2.5, 0)
-    g.cyl(ankle + (0.9, -2.3, -2.1), ankle + (0.9, -2.3, 2.1), 0.9, M_DIRON, seg=8)
-    g.box(toe, (4.4, 1.6, 4.2), M_IRON)
-    tbox(g, toe + (0.4, 1.05, 0), (3.4, 4.2), (2.6, 3.6), 0.5, P)
-    for z in (-1.4, 0, 1.4):
-        g.box(toe + (2.5, -0.2, z), (0.9, 1.1, 1.0), M_DIRON)
+    axle(g, ankle, 1.6, 3.8, s)
+    g.box(ankle + (-1.5, -2.1, 0), (4.4, 2.2, 5.0), M_IRON)
+    toe = ankle + (3.4, -2.4, 0)
+    g.cyl(ankle + (1.0, -2.2, -2.6), ankle + (1.0, -2.2, 2.6), 1.0, M_DIRON, seg=8)
+    g.box(toe, (5.2, 1.8, 5.2), M_IRON)
+    tbox(g, toe + (0.4, 1.15, 0), (4.0, 5.2), (3.0, 4.4), 0.5, P)
+    for z in (-1.7, 0, 1.7):
+        g.box(toe + (2.95, -0.2, z), (1.0, 1.3, 1.2), M_DIRON)
     # ankle ram: shin back to the heel
-    C = lerp(knee, ankle, 0.48) + bs * 2.8
-    D = ankle + (-3.4, -1.0, 0)
-    g.cyl(C, C - bs * 1.7, 0.45, M_DIRON, seg=6)
-    ram(rm, C, D, 0.5)
+    C = lerp(knee, ankle, 0.48) + bs * 3.3
+    D = ankle + (-4.0, -1.0, 0)
+    g.cyl(C, C - bs * 1.9, 0.5, M_DIRON, seg=6)
+    ram(rm, C, D, 0.6)
 
 
 # ---------------------------------------------------------------- arms and hands
 def arm(G, key, sh, elbow, wrist, s, P, ram_side="back"):
-    """Upper arm with a triceps ram on a lever, elbow gear, a gauntlet with a heat conduit."""
+    """Upper arm with a ram, elbow gear, a heavy gauntlet with a heat conduit."""
     g, rm = G[key], G[key + ".ram"]
     sh, elbow, wrist = arr(sh), arr(elbow), arr(wrist)
-    g.ell(sh, (2.4, 2.4, 2.4), M_DIRON)
-    block(g, sh, elbow, (2.6, 2.6), (2.4, 2.4), M_DIRON)
-    block(g, lerp(sh, elbow, 0.32), lerp(sh, elbow, 0.86), (2.8, 1.0), (2.4, 1.0), P, off=(0, 0, 1.7 * s))
-    axle(g, elbow, 1.6, 3.2, s)
-    gear(g, elbow + (0, 0, 1.6 * s), 1.3, s, teeth=8)
-    Rf = block(g, elbow, wrist, (3.2, 3.2), (4.0, 3.8), P)                                      # gauntlet
-    block(g, lerp(elbow, wrist, 0.78), wrist, (4.5, 4.3), (4.5, 4.3), M_DIRON)                  # cuff
-    conduit(g, lerp(elbow, wrist, 0.22) + (0, 0, 2.3 * s), lerp(elbow, wrist, 0.7) + (0, 0, 2.3 * s), r=0.4)
-    rivets(g, [lerp(elbow, wrist, t) + Rf @ arr((1.75, 0, 0)) for t in (0.3, 0.55)])
-    # triceps: a ram along the back of the upper arm to a lever on the outside of the elbow
+    g.ell(sh, (2.9, 2.9, 2.9), M_DIRON)
+    block(g, sh, elbow, (3.4, 3.4), (3.0, 3.0), M_DIRON)
+    block(g, lerp(sh, elbow, 0.32), lerp(sh, elbow, 0.86), (3.6, 1.1), (3.0, 1.1), P, off=(0, 0, 2.15 * s))
+    axle(g, elbow, 2.0, 4.0, s)
+    gear(g, elbow + (0, 0, 2.0 * s), 1.6, s, teeth=9)
+    Rf = block(g, elbow, wrist, (4.2, 4.2), (5.4, 5.0), P)                                      # gauntlet
+    block(g, lerp(elbow, wrist, 0.78), wrist, (6.0, 5.6), (6.0, 5.6), M_DIRON)                  # cuff
+    conduit(g, lerp(elbow, wrist, 0.22) + (0, 0, 2.95 * s), lerp(elbow, wrist, 0.7) + (0, 0, 2.95 * s), r=0.45)
+    rivets(g, [lerp(elbow, wrist, t) + Rf @ arr((2.35, 0, 0)) for t in (0.3, 0.55)], r=0.35)
     U, F = unit(sh - elbow), unit(wrist - elbow)
     out = -(U + F)
     out[2] = 0.0                                                     # arms bend in their own plane
@@ -176,19 +175,19 @@ def arm(G, key, sh, elbow, wrist, s, P, ram_side="back"):
     nb[2] = 0.0
     nb = unit(nb)                                                    # the back of the upper arm
     if ram_side == "back":       # triceps ram to a lever behind the elbow
-        A = lerp(sh, elbow, 0.4) + nb * 2.2
-        B = elbow + unit(out * 0.6 + nb) * 2.7
-        g.cyl(A, A - nb * 1.2, 0.45, M_DIRON, seg=6)
-        g.cyl(elbow, B, 0.65, M_IRON, seg=6)
+        A = lerp(sh, elbow, 0.5) + nb * 2.7
+        B = elbow + unit(out * 0.6 + nb) * 3.3
+        g.cyl(A, A - nb * 1.4, 0.5, M_DIRON, seg=6)
+        g.cyl(elbow, B, 0.8, M_IRON, seg=6)
     else:                        # a raised, nearly straight arm: biceps ram under the arm
         nf = -nb - F * (-nb @ F)
         nf[2] = 0.0
         nf = unit(nf)
-        A = lerp(sh, elbow, 0.45) - nb * 2.2
-        B = lerp(elbow, wrist, 0.45) + nf * 2.5
-        g.cyl(A, A + nb * 1.2, 0.45, M_DIRON, seg=6)
-        g.cyl(B, B - nf * 1.3, 0.45, M_DIRON, seg=6)
-    ram(rm, A, B, 0.6)
+        A = lerp(sh, elbow, 0.72) - nb * 2.7
+        B = lerp(elbow, wrist, 0.62) + nf * 3.3
+        g.cyl(A, A + nb * 1.4, 0.5, M_DIRON, seg=6)
+        g.cyl(B, B - nf * 1.4, 0.5, M_DIRON, seg=6)
+    ram(rm, A, B, 0.75)
     return wrist
 
 
@@ -200,12 +199,12 @@ def fist(G, key, wrist, along, grip, P):
     gr = unit(gr - d * (gr @ d))
     side = np.cross(d, gr)
     R = np.column_stack([d, gr, side])
-    c = w + d * 1.6
-    g.box(c, (3.0, 3.2, 3.0), M_IRON, R)
+    c = w + d * 2.0
+    g.box(c, (3.8, 4.0, 3.8), M_IRON, R)
     for i in range(4):
-        g.box(c + d * 1.0 + gr * (-1.2 + i * 0.8) + side * 1.2, (1.0, 0.7, 1.1), M_DIRON, R)
-    g.box(c - side * 1.25 + d * 0.5, (1.2, 1.2, 0.9), M_DIRON, R)
-    g.box(c - d * 0.2 + side * 1.6, (2.4, 2.8, 0.4), P, R)                                   # knuckle guard
+        g.box(c + d * 1.3 + gr * (-1.5 + i * 1.0) + side * 1.5, (1.2, 0.85, 1.4), M_DIRON, R)
+    g.box(c - side * 1.6 + d * 0.6, (1.5, 1.5, 1.1), M_DIRON, R)
+    g.box(c - d * 0.3 + side * 2.05, (3.0, 3.6, 0.5), P, R)                                  # knuckle guard
     return c
 
 
@@ -214,29 +213,29 @@ def maul(G, hand, u, P, t_fwd, reach):
     """Steam maul: haft with a feed line, head with a hot striking face and a steam ram at the back."""
     g = G["hammer"]
     hand, u = arr(hand), unit(u)
-    butt, top = hand - u * 1.3, hand + u * reach
-    g.cyl(butt, top, 0.7, M_DIRON, seg=6)
-    g.cyl(butt - u * 0.5, butt, 0.95, M_IRON, seg=6)
-    for k in (reach - 5.0, reach - 2.4):
+    butt, top = hand - u * 1.6, hand + u * reach
+    g.cyl(butt, top, 0.85, M_DIRON, seg=6)
+    g.cyl(butt - u * 0.6, butt, 1.15, M_IRON, seg=6)
+    for k in (reach - 5.6, reach - 2.8):
         p = hand + u * k
-        g.cyl(p, p + u * 0.8, 1.0, M_IRON, seg=6)
+        g.cyl(p, p + u * 0.9, 1.2, M_IRON, seg=6)
     R, _ = basis(top - u, top + u, t_fwd)
     side = R[:, 2]
-    g.cyl(hand + u * 3.2 + side * 1.0, top + u * 0.3 + side * 1.0, 0.35, M_HOSE, seg=5)        # feed line
-    hc = top + u * 2.4
+    g.cyl(hand + u * 3.8 + side * 1.25, top + u * 0.3 + side * 1.25, 0.4, M_HOSE, seg=5)        # feed line
+    hc = top + u * 2.8
     at = lambda x, y=0.0, z=0.0: hc + R @ arr((x, y, z))
-    g.box(hc, (8.4, 4.6, 4.6), M_IRON, R)
-    g.box(hc, (2.0, 5.2, 5.2), P, R)
-    g.box(at(4.5), (0.8, 5.0, 5.0), M_DIRON, R)
-    g.box(at(5.0), (0.3, 4.0, 4.0), emissive("fire", 9, 0.5), R)                                # hot striking face
-    g.cyl(at(-4.2), at(-6.2), 1.6, M_DIRON, seg=10)                                              # steam ram housing
-    g.cyl(at(-6.2), at(-6.6), 1.9, M_IRON, seg=10)
-    g.cyl(at(-6.6), at(-7.6), 0.7, M_STEEL, seg=6)
-    for zz in (2.35, -2.35):
-        for x in (-2.8, -1.9, 1.9, 2.8):
-            g.box(at(x, 0, zz), (0.35, 2.6, 0.15), M_HOLE, R)                                  # vents
-        rivets(g, [at(0, dy, zz * 1.13) for dy in (-1.4, 1.4)])
-    return at(5.2), hc
+    g.box(hc, (9.8, 5.6, 5.6), M_IRON, R)
+    g.box(hc, (2.4, 6.2, 6.2), P, R)
+    g.box(at(5.3), (0.9, 6.0, 6.0), M_DIRON, R)
+    g.box(at(5.85), (0.3, 4.8, 4.8), emissive("fire", 10, 0.5), R)                              # hot striking face
+    g.cyl(at(-4.9), at(-7.2), 1.9, M_DIRON, seg=10)                                              # steam ram housing
+    g.cyl(at(-7.2), at(-7.7), 2.25, M_IRON, seg=10)
+    g.cyl(at(-7.7), at(-8.8), 0.8, M_STEEL, seg=6)
+    for zz in (2.85, -2.85):
+        for x in (-3.3, -2.3, 2.3, 3.3):
+            g.box(at(x, 0, zz), (0.4, 3.2, 0.15), M_HOLE, R)                                    # vents
+        rivets(g, [at(0, dy, zz * 1.1) for dy in (-1.7, 1.7)], r=0.35)
+    return at(6.05), hc
 
 
 def shield(G, C, R, P):
@@ -244,131 +243,131 @@ def shield(G, C, R, P):
     g = G["shield"]
     C = arr(C)
     at = lambda x, y=0.0, z=0.0: C + R @ arr((x, y, z))
-    g.box(C, (1.3, 19.0, 11.0), M_DIRON, R)
-    g.box(at(0.45, 4.7), (1.0, 8.8, 9.6), P, R)
-    g.box(at(0.45, -4.85), (1.0, 8.4, 9.6), P, R)
-    g.box(at(1.0, 6.8), (0.3, 0.9, 5.0), M_HOLE, R)                                               # vision slit
-    g.box(at(1.0, 6.8, 2.0), (0.32, 0.6, 0.6), emissive("fire", 3, 0.3), R)                       # an optic behind it
-    g.box(at(1.0, -1.5), (0.3, 11.0, 1.0), M_DIRON, R)
-    g.ell(at(1.2, -1.5), (0.9, 1.8, 1.8), M_IRON, R)
-    for y in (-8.4, -1.0, 1.6, 8.2):
-        rivets(g, [at(1.05, y, z) for z in (-4.4, 4.4)])
-    for z in (-3.4, 3.4):
-        spike(g, at(0, -9.5, z), at(0.4, -11.4, z), 0.7, M_IRON)                                  # ground spikes
-    for y in (-6.0, 0.0, 6.0):
-        g.cyl(at(-0.2, y - 1.0, -5.7), at(-0.2, y + 1.0, -5.7), 0.6, M_IRON, seg=6)              # edge hinges
-    g.box(at(1.0, -6.0, 2.6), (0.2, 2.4, 0.35), M_RUST, R)
-    return at(-0.65)
+    g.box(C, (1.5, 21.5, 13.0), M_DIRON, R)
+    g.box(at(0.5, 5.3), (1.1, 10.0, 11.4), P, R)
+    g.box(at(0.5, -5.45), (1.1, 9.6, 11.4), P, R)
+    g.box(at(1.1, 7.7), (0.3, 1.0, 6.0), M_HOLE, R)                                               # vision slit
+    g.box(at(1.1, 7.7, 2.4), (0.32, 0.7, 0.7), emissive("fire", 3, 0.3), R)                       # an optic behind it
+    g.box(at(1.1, -1.7), (0.3, 12.5, 1.2), M_DIRON, R)
+    g.ell(at(1.3, -1.7), (1.0, 2.1, 2.1), M_IRON, R)
+    for y in (-9.6, -1.2, 1.8, 9.4):
+        rivets(g, [at(1.15, y, z) for z in (-5.3, 5.3)], r=0.35)
+    for z in (-4.0, 4.0):
+        spike(g, at(0, -10.75, z), at(0.5, -13.0, z), 0.8, M_IRON)                                # ground spikes
+    for y in (-7.0, 0.0, 7.0):
+        g.cyl(at(-0.2, y - 1.1, -6.7), at(-0.2, y + 1.1, -6.7), 0.7, M_IRON, seg=6)              # edge hinges
+    g.box(at(1.1, -6.8, 3.0), (0.2, 2.8, 0.4), M_RUST, R)
+    return at(-0.75)
 
 
 def bracket(G, fist_c, d, back_c, R):
     """Hinged bracket from the gauntlet to the shield's back."""
     g = G["bracket"]
-    f = arr(fist_c) + unit(d) * 1.5
-    for y in (-2.4, 2.4):
+    f = arr(fist_c) + unit(d) * 1.9
+    for y in (-2.8, 2.8):
         a = f + R @ arr((0, y * 0.5, 0))
         b = arr(back_c) + R @ arr((0, y, 0))
-        g.cyl(a, b, 0.45, M_DIRON, seg=6)
-    g.cyl(arr(back_c) + R @ arr((-0.4, -3.2, 0)), arr(back_c) + R @ arr((-0.4, 3.2, 0)), 0.6, M_IRON, seg=8)
+        g.cyl(a, b, 0.55, M_DIRON, seg=6)
+    g.cyl(arr(back_c) + R @ arr((-0.45, -3.7, 0)), arr(back_c) + R @ arr((-0.45, 3.7, 0)), 0.7, M_IRON, seg=8)
 
 
 # ---------------------------------------------------------------- body
-HIP = 21.0
-SH = arr((-0.4, 34.6, 8.2))                 # near shoulder; the far one mirrors in z
-CY = 31.0
+HIP = 20.0
+HZ = 4.4                                    # half the hip spread
+SH = arr((-0.6, 34.2, 10.0))                # near shoulder; the far one mirrors in z
+CY = 30.6
 
 
 def chest_front(y):
     """x of the painted chest layer's front face at height y."""
-    return 0.6 + 3.3 + 1.2 * (y - 27.7) / 7.4
+    return 0.7 + 3.9 + 1.4 * (y - 26.9) / 8.2
 
 
 def chest_side(y):
     """z of the dark chest frame's flank at height y."""
-    return 3.5 + 3.8 * (y - 26.8) / 8.4
+    return 4.3 + 5.1 * (y - 26.0) / 9.2
 
 
 def torso(G, P):
     # pelvis: a gearbox with a centre plate
     pl = G["pelvis"]
-    tbox(pl, (-0.2, HIP + 1.4, 0), (5.4, 7.4), (6.0, 8.4), 3.2, M_DIRON)
-    tbox(pl, (3.15, HIP - 0.4, 0), (0.9, 2.4), (1.1, 2.8), 3.4, P, rot_z(-0.2))
-    pl.box((2.7, HIP + 1.4, 0), (0.6, 1.0, 3.0), M_DIRON)
+    tbox(pl, (-0.2, HIP + 1.4, 0), (6.4, 9.0), (7.0, 10.0), 3.2, M_DIRON)
+    tbox(pl, (3.75, HIP - 0.5, 0), (1.0, 2.8), (1.2, 3.2), 3.8, P, rot_z(-0.2))
+    pl.box((3.3, HIP + 1.4, 0), (0.7, 1.2, 3.4), M_DIRON)
     # waist: an open spine — rings with the furnace showing between them, rams and cables
     sp = G["spine"]
-    for i, y in enumerate((24.0, 25.2, 26.4)):
-        sp.cyl((-0.8, y, 0), (-0.8, y + 0.9, 0), 2.5 + 0.15 * i, M_DIRON, seg=10)
-        sp.cyl((-0.8, y + 0.9, 0), (-0.8, y + 1.2, 0), 2.0, emissive("fire", 6, 0.35), seg=10)
-    for zz in (3.0, -3.0):
-        ram(sp, (0.6, 23.6, zz), (0.9, 27.6, zz), 0.5)
-    for z in (-0.8, 0.8):
-        sp.cyl((2.5, 23.6, z), (3.1, 27.4, z), 0.45, M_HOSE, seg=5)
-    # chest: a V-shaped furnace — dark frame, painted shell, breastplate, grate, gauges, fins
+    for i, y in enumerate((23.0, 24.1, 25.2)):
+        sp.cyl((-0.8, y, 0), (-0.8, y + 0.8, 0), 3.0 + 0.15 * i, M_DIRON, seg=12)
+        sp.cyl((-0.8, y + 0.8, 0), (-0.8, y + 1.1, 0), 2.5, emissive("fire", 6, 0.35), seg=12)
+    for zz in (3.7, -3.7):
+        ram(sp, (0.8, 23.3, zz), (1.1, 26.8, zz), 0.55)
+    for z in (-0.9, 0.9):
+        sp.cyl((3.2, 22.6, z), (3.8, 26.4, z), 0.5, M_HOSE, seg=5)
+    # chest: a broad furnace — dark frame, painted shell, breastplate, grate, gauges, fins
     ch = G["chest"]
-    tbox(ch, (0.0, CY, 0), (7.0, 7.0), (9.6, 14.6), 8.4, M_DIRON)
-    tbox(ch, (0.6, CY + 0.4, 0), (6.6, 6.4), (9.0, 13.8), 7.4, P)
-    for y0, y1, w0, w1 in ((32.0, 34.9, 9.6, 12.4), (28.0, 29.0, 4.0, 4.6)):
+    tbox(ch, (0.0, CY, 0), (8.2, 8.6), (11.2, 18.8), 9.2, M_DIRON)
+    tbox(ch, (0.7, 31.0, 0), (7.8, 8.0), (10.6, 18.0), 8.2, P)
+    for y0, y1, w0, w1 in ((31.8, 34.9, 12.4, 16.0), (27.2, 28.4, 5.0, 5.8)):
         f0, f1 = chest_front(y0), chest_front(y1)
-        tbox(ch, ((f0 + f1) / 2 + 0.25, (y0 + y1) / 2, 0), (0.6, w0), (0.6, w1), y1 - y0, P,
+        tbox(ch, ((f0 + f1) / 2 + 0.3, (y0 + y1) / 2, 0), (0.7, w0), (0.7, w1), y1 - y0, P,
              rot_z(-np.arctan2(f1 - f0, y1 - y0)))                                              # breastplate bands
-    fy = CY - 0.6
+    fy = 30.0
     fx = chest_front(fy)
-    ch.box((fx + 0.3, fy, 0), (1.2, 4.4, 5.6), M_DIRON)                                         # furnace mouth
-    ch.ell((fx + 0.5, fy, 0), (0.6, 1.9, 2.4), emissive("fire", 13, 0.7))
-    for z in (-1.8, -0.6, 0.6, 1.8):
-        ch.box((fx + 1.05, fy, z), (0.4, 4.2, 0.4), M_DIRON)
-    ch.box((fx + 1.05, fy + 2.3, 0), (0.6, 0.5, 5.8), M_IRON)
-    for y in (33.6,):
-        rivets(ch, [(chest_front(y) + 0.55, y, z) for z in (-4.6, -2.3, 0, 2.3, 4.6)])
-    g = arr((chest_front(32.6) + 0.55, 32.6, 3.4))                                             # pressure gauge
-    ch.cyl(g - (0.3, 0, 0), g + (0.4, 0, 0), 1.0, M_STEEL, seg=10)
-    ch.ell(g + (0.45, 0, 0), (0.15, 0.75, 0.75), M_GLASS)
-    ch.box((chest_front(32.4) + 0.6, 32.4, -3.4), (0.3, 1.1, 2.2), M_PLATE)                    # serial plate
-    for z, lamp in ((-2.0, LAMP_G), (-1.2, emissive("fire", 3, 0.4))):
-        ch.ell((chest_front(26.9) + 0.3, 27.6, z), (0.3, 0.3, 0.3), lamp)                         # indicator lamps
-    for y in (28.0, 29.2, 30.4, 31.6):                                                          # cooling fins on the flanks
+    ch.box((fx + 0.35, fy, 0), (1.4, 5.2, 6.8), M_DIRON)                                        # furnace mouth
+    ch.ell((fx + 0.6, fy, 0), (0.7, 2.3, 2.9), emissive("fire", 14, 0.7))
+    for z in (-2.4, -1.2, 0.0, 1.2, 2.4):
+        ch.box((fx + 1.2, fy, z), (0.45, 5.0, 0.45), M_DIRON)
+    ch.box((fx + 1.2, fy + 2.7, 0), (0.7, 0.6, 7.0), M_IRON)
+    rivets(ch, [(chest_front(33.8) + 0.65, 33.8, z) for z in (-5.6, -2.8, 0, 2.8, 5.6)], r=0.35)
+    g = arr((chest_front(32.4) + 0.65, 32.4, 4.4))                                             # pressure gauge
+    ch.cyl(g - (0.3, 0, 0), g + (0.45, 0, 0), 1.2, M_STEEL, seg=10)
+    ch.ell(g + (0.5, 0, 0), (0.15, 0.9, 0.9), M_GLASS)
+    ch.box((chest_front(32.2) + 0.7, 32.2, -4.4), (0.3, 1.3, 2.6), M_PLATE)                    # serial plate
+    for z, lamp in ((-2.4, LAMP_G), (-1.4, emissive("fire", 3, 0.4))):
+        ch.ell((chest_front(27.0) + 0.35, 27.8, z), (0.35, 0.35, 0.35), lamp)                     # indicator lamps
+    for y in (27.0, 28.2, 29.4, 30.6):                                                          # cooling fins on the flanks
         for s in (1, -1):
-            ch.box((-0.6, y, s * (chest_side(y) + 0.42)), (4.2, 0.35, 0.9), M_IRON)
+            ch.box((-0.6, y, s * (chest_side(y) + 0.45)), (5.0, 0.4, 1.0), M_IRON)
     # back: a boiler with rust bands, a fan housing, a valve wheel on the near end cap
     bo = G["boiler"]
-    bo.cyl((-5.2, 30.5, -4.4), (-5.2, 30.5, 4.4), 3.0, M_IRON, seg=14)
-    for z in (-3.0, 2.4):
-        bo.cyl((-5.2, 30.5, z), (-5.2, 30.5, z + 0.6), 3.25, M_RUST, seg=14)
-    bo.cyl((-7.9, 29.8, 0), (-9.0, 29.8, 0), 2.0, M_DIRON, seg=12)
+    bo.cyl((-6.2, 30.0, -5.4), (-6.2, 30.0, 5.4), 3.6, M_IRON, seg=14)
+    for z in (-3.8, 3.0):
+        bo.cyl((-6.2, 30.0, z), (-6.2, 30.0, z + 0.7), 3.85, M_RUST, seg=14)
+    bo.cyl((-9.6, 29.4, 0), (-10.9, 29.4, 0), 2.4, M_DIRON, seg=12)
     for a in (0.0, np.pi / 3, 2 * np.pi / 3):
-        bo.box((-9.05, 29.8, 0), (0.2, 3.6, 0.35), M_STEEL, rot_x(a))
-    bo.ell((-9.1, 29.8, 0), (0.25, 0.6, 0.6), M_IRON)
-    wc = arr((-5.2, 30.5, 4.4))
-    bo.cyl(wc, wc + (0, 0, 0.9), 0.35, M_STEEL, seg=6)
+        bo.box((-10.95, 29.4, 0), (0.2, 4.4, 0.4), M_STEEL, rot_x(a))
+    bo.ell((-11.0, 29.4, 0), (0.25, 0.7, 0.7), M_IRON)
+    wc = arr((-6.2, 30.0, 5.4))
+    bo.cyl(wc, wc + (0, 0, 1.0), 0.4, M_STEEL, seg=6)
     for i in range(8):
         a0, a1 = 2 * np.pi * i / 8, 2 * np.pi * (i + 1) / 8
-        p0 = wc + (np.cos(a0) * 1.5, np.sin(a0) * 1.5, 0.9)
-        p1 = wc + (np.cos(a1) * 1.5, np.sin(a1) * 1.5, 0.9)
-        bo.cyl(p0, p1, 0.25, M_RUST if i % 2 else M_IRON, seg=5)
+        p0 = wc + (np.cos(a0) * 1.8, np.sin(a0) * 1.8, 1.0)
+        p1 = wc + (np.cos(a1) * 1.8, np.sin(a1) * 1.8, 1.0)
+        bo.cyl(p0, p1, 0.3, M_RUST if i % 2 else M_IRON, seg=5)
     for a in (0.0, np.pi / 2):
-        bo.box(wc + (0, 0, 0.9), (3.0, 0.3, 0.3), M_IRON, rot_z(a))
+        bo.box(wc + (0, 0, 1.0), (3.6, 0.35, 0.35), M_IRON, rot_z(a))
     st = G["stacks"]
-    for z, h in ((2.2, 8.0), (-2.2, 6.4)):
-        b0 = arr((-6.0, 32.6, z))
-        top = b0 + (-0.8, h, 0)
-        st.cyl(b0, top, 1.0, M_DIRON, seg=8)
-        st.cyl(top, top + (0, 0.7, 0), 1.4, M_IRON, seg=8)
-        st.cyl(lerp(b0, top, 0.5), lerp(b0, top, 0.5) + (0, 0.5, 0), 1.25, M_RUST, seg=8)
-        for i, d in enumerate(((0.0, 2.4, 0), (-1.2, 4.8, 0.4))):
-            st.ell(top + arr(d), (1.5 + i * 0.8, 1.2 + i * 0.6, 1.3 + i * 0.6), M_PUFF)
+    for z, h in ((2.6, 9.0), (-2.6, 7.4)):
+        b0 = arr((-7.0, 32.6, z))
+        top = b0 + (-0.9, h, 0)
+        st.cyl(b0, top, 1.2, M_DIRON, seg=8)
+        st.cyl(top, top + (0, 0.8, 0), 1.7, M_IRON, seg=8)
+        st.cyl(lerp(b0, top, 0.5), lerp(b0, top, 0.5) + (0, 0.6, 0), 1.5, M_RUST, seg=8)
+        for i, d in enumerate(((0.0, 2.6, 0), (-1.3, 5.2, 0.4))):
+            st.ell(top + arr(d), (1.7 + i * 0.9, 1.4 + i * 0.7, 1.5 + i * 0.7), M_PUFF)
     ho = G["hose"]
-    pts = [arr(p) for p in ((-5.0, 32.4, 4.0), (-6.0, 34.6, 7.2), (-2.6, 35.0, 8.8))]
+    pts = [arr(p) for p in ((-6.0, 32.6, 4.8), (-7.8, 34.6, 9.4), (-3.6, 34.9, 10.8))]
     for p0, p1 in zip(pts[:-1], pts[1:]):
-        ho.cyl(p0, p1, 0.55, M_HOSE, seg=6)
-    # neck and helm: gorget, a neck of rings, cables, a helm with twin optics and ear vents
+        ho.cyl(p0, p1, 0.6, M_HOSE, seg=6)
+    # neck and helm: a short neck between the shoulders, a helm with twin optics
     hd = G["head"]
-    tbox(hd, (0.4, 35.6, 0), (6.6, 8.0), (4.6, 5.4), 1.6, M_DIRON)
-    hd.cyl((0.6, 35.6, 0), (1.6, 38.6, 0), 1.3, M_DIRON, seg=8)
-    for i in range(3):
-        hd.cyl((0.8 + 0.3 * i, 36.3 + i * 0.8, 0), (0.8 + 0.3 * i, 36.7 + i * 0.8, 0), 1.6, M_STEEL, seg=8)
-    for z in (-1.0, 1.0):
-        hd.cyl((-0.4, 38.5, z), (-2.2, 35.6, z * 1.6), 0.4, M_HOSE, seg=5)
-    hc = arr((2.0, 41.0, 0))
+    tbox(hd, (0.4, 35.4, 0), (8.0, 9.6), (5.6, 6.6), 1.8, M_DIRON)                              # gorget
+    hd.cyl((0.6, 35.4, 0), (1.6, 37.8, 0), 1.6, M_DIRON, seg=8)
+    for i in range(2):
+        hd.cyl((0.9 + 0.35 * i, 36.2 + i * 0.8, 0), (0.9 + 0.35 * i, 36.6 + i * 0.8, 0), 1.9, M_STEEL, seg=8)
+    for z in (-1.1, 1.1):
+        hd.cyl((-0.4, 37.6, z), (-2.4, 35.2, z * 1.7), 0.45, M_HOSE, seg=5)
+    hc = arr((2.2, 40.0, 0))
     tbox(hd, hc, (4.8, 4.2), (4.0, 3.6), 5.2, P)
     tbox(hd, hc + (0.2, 2.9, 0), (4.0, 3.6), (2.6, 2.0), 1.0, P)
     hd.box(hc + (0.0, 3.6, 0), (4.4, 0.8, 0.7), M_DIRON)                                        # low crest
@@ -389,58 +388,64 @@ def torso(G, P):
     hd.cyl(hc + (-1.4, 1.2, -0.8), hc + (-2.0, 4.6, -0.8), 0.35, M_IRON, seg=6)                 # whistle pipe
     hd.cyl(hc + (-2.0, 4.6, -0.8), hc + (-2.05, 5.1, -0.8), 0.55, M_STEEL, seg=6)
     rivets(hd, [hc + (0.2, 0.0, 2.05), hc + (0.2, 0.0, -2.05), hc + (-1.0, 0.6, 2.0)])
-    # pauldrons
+    # pauldrons: big layered plates over the shoulder sockets
     for s, key in ((1, "pauldron_n"), (-1, "pauldron_f")):
         pd = G[key]
-        c = SH * (1, 1, s) + (0, 1.0, 0)
-        pd.ell(c, (3.8, 2.4, 3.2), P)
-        tbox(pd, c + (0, -1.8, 0.7 * s), (5.6, 2.6), (6.4, 3.0), 1.4, P, rot_x(-0.35 * s))
-        pd.ell(c + (0, 0.8, 0), (3.0, 1.2, 2.6), M_DIRON)
-        rivets(pd, [c + (x, 1.4, 2.3 * s) for x in (-1.8, 0.0, 1.8)])
-        pd.box(c + (0.4, -0.6, 3.1 * s), (2.2, 1.2, 0.2), M_PLATE)
+        c = SH * (1, 1, s) + (0, 1.2, 0)
+        pd.ell(c, (4.8, 3.0, 4.0), P)
+        tbox(pd, c + (0, -2.2, 0.9 * s), (7.0, 3.2), (8.0, 3.6), 1.6, P, rot_x(-0.35 * s))
+        tbox(pd, c + (0, -3.4, 1.5 * s), (6.0, 3.0), (6.8, 3.2), 1.2, P, rot_x(-0.5 * s))
+        pd.ell(c + (0, 1.0, 0), (3.8, 1.5, 3.3), M_DIRON)
+        rivets(pd, [c + (x, 1.8, 2.9 * s) for x in (-2.4, 0.0, 2.4)], r=0.35)
+        pd.box(c + (0.5, -0.7, 3.9 * s), (2.6, 1.4, 0.2), M_PLATE)
 
 
 def guard_parts(pose="idle", P=None):
     P = Mat(PAINT) if P is None else P
     atk = pose == "attack"
     G = Parts()
-    leg(G, "leg_n", (0.4, HIP, 3.6), (3.4, 11.6, 4.0), (2.6, 3.3, 4.2), 1, P)
-    leg(G, "leg_f", (-0.8, HIP, -3.6), (-1.2, 11.6, -4.2), (-4.4, 3.3, -4.4), -1, P)
+    leg(G, "leg_n", (0.4, HIP, HZ), (3.6, 10.8, HZ + 0.5), (2.8, 3.6, HZ + 0.7), 1, P)
+    leg(G, "leg_f", (-0.8, HIP, -HZ), (-1.0, 10.8, -HZ - 0.6), (-4.6, 3.6, -HZ - 0.8), -1, P)
     torso(G, P)
     far = SH * (1, 1, -1)
     if not atk:
         # the maul carried on the shoulder: the haft rests on top of the pauldron, head behind
-        el = SH + (1.2, -7.2, 1.8)
-        w = arm(G, "arm_n", SH, el, SH + (5.4, 0.0, 1.4), 1, P)
-        rest = arr((-0.6, 39.55, 8.6))
+        el = SH + (1.4, -7.6, 2.0)
+        w = arm(G, "arm_n", SH, el, SH + (WX, WY, 1.6), 1, P)
+        rest = arr((-0.8, RY, 10.4))
         hand = fist(G, "hand_n", w, w - el, rest - w, P)
-        maul(G, hand, rest - hand, P, (0, 1, 0), reach=12.0)
-        elf = far + (0.6, -7.6, -1.4)
-        w = arm(G, "arm_f", far, elf, far + (5.0, -9.6, -1.8), -1, P)
+        maul(G, hand, rest - hand, P, (0, 1, 0), reach=13.0)
+        elf = far + (0.8, -8.0, -1.6)
+        w = arm(G, "arm_f", far, elf, far + (5.8, -10.0, -2.0), -1, P)
         fc = fist(G, "hand_f", w, w - elf, (0, 1, 0), P)
         R = rot_y(0.5)
-        back = shield(G, fc + R @ arr((1.5 + 1.8 + 0.65, 0, 0)), R, P)
+        back = shield(G, fc + R @ arr((1.9 + 2.0 + 0.75, 0, 0)), R, P)
         bracket(G, fc, w - elf, back, R)
     else:
-        el = SH + (4.8, -0.4, 1.4)
-        w = arm(G, "arm_n", SH, el, SH + (10.4, 0.2, 1.0), 1, P, ram_side="front")
-        u = unit(arr((0.56, -0.83, 0)))
+        el = SH + (5.4, -0.4, 1.6)
+        w = arm(G, "arm_n", SH, el, SH + (11.8, 0.2, 1.2), 1, P, ram_side="front")
+        u = unit(arr(UA))
         hand = fist(G, "hand_n", w, w - el, u, P)
-        face, _ = maul(G, hand, u, P, (0.83, 0.56, 0), reach=13.0)
+        tf = unit(arr((-UA[1], UA[0], 0)))
+        face, _ = maul(G, hand, u, P, tf, reach=13.0)
         sp = G["sparks"]
-        for i, dd in enumerate(((1.0, 0.0, 0.0), (2.4, 1.4, 0.8), (2.0, -1.2, -0.9), (3.4, 0.4, 0.2))):
-            sp.ell(face + unit(arr((0.83, 0.56, 0))) * dd[0] + arr((0, dd[1], dd[2])), (0.9 - 0.15 * i,) * 3,
-                   emissive("fire", 10 if i == 0 else 0, 0.8))
-        elf = far + (1.6, -7.4, -1.4)
-        w = arm(G, "arm_f", far, elf, far + (6.4, -8.6, -1.8), -1, P)
+        for i, dd in enumerate(((1.0, 0.0, 0.0), (2.6, 1.6, 0.9), (2.2, -1.4, -1.0), (3.8, 0.5, 0.2))):
+            sp.ell(face + tf * dd[0] + arr((0, dd[1], dd[2])), (1.0 - 0.15 * i,) * 3,
+                   emissive("fire", 11 if i == 0 else 0, 0.8))
+        elf = far + (1.8, -7.8, -1.6)
+        w = arm(G, "arm_f", far, elf, far + (7.2, -9.0, -2.0), -1, P)
         fc = fist(G, "hand_f", w, w - elf, (0, 1, 0), P)
         R = rot_y(0.3)
-        back = shield(G, fc + R @ arr((1.5 + 1.8 + 0.65, 0, 0)), R, P)
+        back = shield(G, fc + R @ arr((1.9 + 2.0 + 0.75, 0, 0)), R, P)
         bracket(G, fc, w - elf, back, R)
         for k in list(G):
             if not k.startswith("leg_"):
                 G[k] = pivot(G[k], rot_z(-0.14), (0, HIP, 0))
     return G
+
+
+WX, WY, RY = 6.8, 0.4, 40.1      # idle: wrist of the carrying arm, height where the haft rests on the pauldron
+UA = (0.56, -0.83, 0.0)          # attack: direction of the haft
 
 
 ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("leg_f", "leg_f.ram"),
@@ -457,8 +462,8 @@ def guard(pose="idle", P=None):
 
 
 def build(pose="idle", k=2.2, P=None, yaw=None):
-    w, h = int(64 * k), int(62 * k)
-    ox, oy = int(28 * k), int(56 * k)
+    w, h = int(70 * k), int(64 * k)
+    ox, oy = int(30 * k), int(58 * k)
     opts = dict(STYLE1)
     if yaw is not None:
         opts["yaw"] = yaw
@@ -507,7 +512,7 @@ if __name__ == "__main__":
     d = ImageDraw.Draw(img)
     ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 28)
     fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 17)
-    d.text((24, 12), "Проба 2: Страж — человекоподобная машина, технологичнее, без пересечений", font=ft, fill=(236, 226, 200))
+    d.text((24, 12), "Проба 3: Страж массивнее — шире плечи и грудь, толще руки и ноги", font=ft, fill=(236, 226, 200))
     d.text((24, 52), "Крупно — покой и атака. Внизу — в размере боя: старый Страж, новый, и рой для масштаба.",
            font=fr, fill=(190, 182, 164))
     for x, t in ((110, "было"), (300, "стало · покой"), (470, "стало · атака"), (670, "рабочая и солдат роя")):
