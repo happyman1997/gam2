@@ -14,20 +14,36 @@ from r3d import Model, Mat, render, rot_z, rot_y, rot_x, I3
 STYLE1 = dict(amb=0.40, dif=0.60, gradient=False, edges=False, outline_tint=0.22)
 
 M_BONE = Mat(BONE)
-M_EYE = Mat(GLOWG, emissive=hexc("#9af060"), glow_r=5, glow_k=0.4)
+M_EYE = Mat(ramp("#3a0604", "#7a0c08", "#c41e10", "#ff5a2a", "#ffc0a0"), emissive=hexc("#ff3a1a"), glow_r=6, glow_k=0.6)
+M_FANG = Mat(ramp("#120c0a", "#2e241c", "#6a5a46", "#b4a688", "#ece2c8"))
+M_ICHOR = Mat(ramp("#1a2a06", "#3a5a0e", "#6a9a1a", "#a8d040", "#e8ff9a"), emissive=hexc("#9ae030"), glow_r=4, glow_k=0.4)
+M_SHEEN = Mat(ramp("#2a2236", "#4a3e5e", "#6e6488", "#9a92b4", "#cfc8e6"))
 M_DARKEYE = Mat(ramp("#08060a", "#141018", "#221c2a", "#3a3046", "#8a7aa0"))
-M_WING = Mat(ramp("#2e2a48", "#4c4874", "#76729e", "#a6a2cc", "#d4d0ee"), dither=True)
-M_WING_NEAR = Mat(ramp("#3a3658", "#5c5888", "#8a86b8", "#b8b4de", "#e2def8"))
+M_WING = Mat(ramp("#1a1620", "#2c2634", "#463e4e", "#6a6070", "#9a90a0"), dither=True)
+M_WING_NEAR = Mat(ramp("#221c28", "#3a3242", "#5a5064", "#86798c", "#b8aabc"))
 M_VEIN = Mat(ramp("#1c1830", "#2c2848", "#403c64", "#56527e", "#6e6a98"))
 M_ACID = Mat(GLOWG, emissive=hexc("#8af04a"), glow_r=9, glow_k=0.55)
-M_ACID_BELLY = Mat(ramp("#1e3a14", "#2e6a20", "#4aa030", "#86d050", "#cff59a"), emissive=hexc("#7ae040"), glow_r=16, glow_k=0.45)
+M_ACID_BELLY = Mat(ramp("#0a1204", "#18280a", "#2e4a12", "#527422", "#90ae40"), emissive=hexc("#6a9a20"), glow_r=10, glow_k=0.22)
 M_ACID_SPIT = Mat(GLOWG, emissive=hexc("#a8ff60"), glow_r=12, glow_k=0.8)
 M_LANTERN = Mat(ramp("#4a4410", "#8a7a18", "#d0b830", "#f4e870", "#fffcd0"), emissive=hexc("#f0e060"), glow_r=15, glow_k=0.75)
 M_EGG = Mat(ramp("#2a3a20", "#4a6a2e", "#76a040", "#a8d060", "#e0f6a0"), emissive=hexc("#80d040"), glow_r=0, glow_k=0)
-M_MEMBRANE = Mat(ramp("#2a1e34", "#45304f", "#664a6e", "#8a6a90", "#b08eb4"))
-AMBER = ramp("#2a1606", "#5a3008", "#9a5c10", "#d8962a", "#f6d070")
-ELYTRA = ramp("#1e0c1a", "#4a1430", "#7a2a3a", "#b4543e", "#e8a060")
-CRIMSON = ramp("#1e060c", "#480e1a", "#7a1c28", "#b0343a", "#e06a5a")
+M_MEMBRANE = Mat(ramp("#12060e", "#2a0e1c", "#461828", "#6a2838", "#9a4a56"))   # swollen veined flesh
+AMBER = ramp("#140a04", "#3a2008", "#74420c", "#b4741a", "#e2b048")      # dirty warning yellow
+ELYTRA = ramp("#0a0408", "#24080e", "#4a1016", "#7e2220", "#c0603a")     # dried blood
+CRIMSON = ramp("#14040a", "#3a0a14", "#6a1420", "#a02a2e", "#d65a4a")
+
+
+def chitin(hue_shift=0.0):
+    """Dark oily chitin: near-black, desaturated, a cold sheen on top; hue shifted for inheritance."""
+    import colorsys
+    base = ["#07050a", "#170d1a", "#2c1628", "#4a2840", "#86708e"]
+    out = []
+    for c in base:
+        r, g, b = (hexc(c) / 255).tolist()
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        r, g, b = colorsys.hls_to_rgb((h + hue_shift) % 1.0, l, s * 0.85)
+        out.append(np.array([r * 255, g * 255, b * 255], dtype=np.float32))
+    return out
 
 TRAITS = ("wings", "stinger", "acid", "horn", "carapace", "jumper", "scythes", "firefly")
 CHIMERAS = ("iron", "boil", "hand", "face", "bones", "quills", "snout", "slime", "worm")
@@ -78,9 +94,13 @@ def leg_pairs(m, mc, y0, xs, spread, length, lift, pose, skip=(), fore_lift=Fals
                 foot = np.array((x + 6.0, y0 + 2.2, 4.2 * side))
             m.limb([hip, knee], 1, mc, band=band)
             m.limb([knee, foot], 1, mc, band=band - 1 if side > 0 else 1)
+            # a spine at the knee and a hooked claw at the foot
+            m.limb([knee, knee + np.array((-0.9, 1.6, 0.5 * side))], 1, M_FANG, band=2)
+            m.limb([foot, foot + np.array((0.9, -0.2, 0.3 * side))], 1, M_FANG, band=2)
 
 
 def antennae(m, mc, a0, back=False, long=1.0):
+    long *= 1.3
     for z in (0.5, -0.5):
         p0 = a0 + np.array((0, 0, z))
         if back:
@@ -91,11 +111,17 @@ def antennae(m, mc, a0, back=False, long=1.0):
 
 
 def mandibles(m, mat, hc, hs, jaw):
+    """Big hooked fangs with teeth on the inner edge."""
     for z in (1.0, -1.0):
-        base = hc + (1.6 * hs, -0.9 * hs, z * 0.5 * hs)
-        L = 2.3 * hs
-        tip = base + np.array((np.cos(jaw) * L, -0.5, np.sign(z) * np.sin(jaw) * L * 0.8))
-        m.cyl(base, tip, 0.55 * hs, mat, r1=0.12, seg=4)
+        base = hc + (1.5 * hs, -0.9 * hs, z * 0.6 * hs)
+        L = 3.2 * hs
+        mid = base + np.array((np.cos(jaw) * L * 0.6, -0.6, np.sign(z) * np.sin(jaw) * L * 0.55))
+        tip = mid + np.array((L * 0.45, -0.2, -np.sign(z) * L * 0.28))
+        m.cyl(base, mid, 0.75 * hs, M_FANG, r1=0.5 * hs, seg=5)
+        m.cyl(mid, tip, 0.5 * hs, M_FANG, r1=0.08, seg=4)
+        for t in (0.35, 0.7):
+            p = base + (mid - base) * t
+            spike(m, p, p + np.array((0.3, -0.5, -np.sign(z) * 0.8)) * hs, 0.25 * hs, M_FANG)
 
 
 def rings(m, center, R, length, radius, mat, n=3):
@@ -482,6 +508,20 @@ def add_chimera(m, mc, a, kind, pose):
         m.ell(base + np.array((7.0, 2.9, np.sin(8.4 + wig) * 1.1)), (0.45, 0.4, 0.4), M_DARKEYE)
 
 
+def menace(m, mc, a, pose):
+    """What makes every bug frightening: clustered red eyes, bristles, an oily glint, dripping ichor."""
+    hc, hs, gc, gr = a["hc"], a["hs"], a["gc"], a["gr"]
+    for dx, dy, z in ((-0.2, 1.0, 1.25), (0.5, 0.15, 1.4), (0.5, 0.15, -1.35)):
+        m.ell(hc + np.array((dx * hs, dy * hs, z * hs)), (0.32, 0.32, 0.32), M_EYE)
+    for (x, y) in a["back"][:4]:
+        m.limb([np.array((x, y - 0.2, 0.4)), np.array((x - 0.8, y + 1.8, 0.9))], 1, mc, band=1)
+    m.ell(gc + np.array((gr * 0.25, gr * 0.78, gr * 0.3)), (gr * 0.32, gr * 0.07, gr * 0.16), M_SHEEN, rot_z(0.3))
+    if pose == "attack":
+        mouth = hc + np.array((2.2 * hs, -1.4 * hs, 0))
+        m.ell(mouth, (0.45, 0.6, 0.45), M_ICHOR)
+        m.ell(mouth + (0.2, -1.6, 0), (0.3, 0.45, 0.3), M_ICHOR)
+
+
 def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=None):
     """traits[0] decides the body plan; "ant" as the first trait keeps the ant body for detail traits."""
     traits = tuple(t for t in traits if t != "giant")
@@ -491,12 +531,15 @@ def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=Non
     primary = traits[0] if traits and traits[0] != "ant" else None
     traits = tuple(t for t in traits if t != "ant")
     a = PLAN_FN[primary](m, mc, g, pose, soldier)
+    menace(m, mc, a, pose)
     add_parts(m, mc, a, traits, pose)
     if chimera:
         add_chimera(m, mc, a, chimera, pose)
     hover = 6.0 if ("wings" in traits) else 0.0
     if primary == "wings":
         hover = 5.0
+    if pose == "idle" and not hover:
+        m = pivot(m, rot_z(-0.07), (0, 4.0, 0))
     if hover:
         m = m.transformed(I3, (0, hover, 0))
     if pose == "attack":
@@ -545,9 +588,13 @@ def queen(hue=0.0, pose="idle", k=1.0):
     jaw = 0.25 if pose == "idle" else 0.8
     for z in (1.4, -1.4):
         m.ell(hc + (1.2, 0.7, z), (0.7, 0.7, 0.7), M_EYE)
+        m.ell(hc + (0.6, 1.5, z * 0.8), (0.45, 0.45, 0.45), M_EYE)
+        m.ell(hc + (1.6, 0.0, z * 1.1), (0.4, 0.4, 0.4), M_EYE)
         base = hc + (2.1, -1.0, z * 0.5)
-        tip = base + np.array((np.cos(jaw) * 2.8, -0.6, np.sign(z) * np.sin(jaw) * 2.4))
-        m.cyl(base, tip, 0.6, M_BONE, r1=0.12, seg=4)
+        mid = base + np.array((np.cos(jaw) * 2.6, -0.8, np.sign(z) * np.sin(jaw) * 2.2))
+        tip = mid + np.array((1.6, -0.3, -np.sign(z) * 1.2))
+        m.cyl(base, mid, 0.85, M_FANG, r1=0.55, seg=5)
+        m.cyl(mid, tip, 0.55, M_FANG, r1=0.08, seg=4)
         a0 = hc + (1.0, 1.6, z * 0.4)
         m.limb([a0, a0 + (0.2, 3.6, z * 0.5), a0 + (3.8, 4.4, z * 1.4)], 1, mc, band=3 if z > 0 else 1)
     if pose == "attack":
