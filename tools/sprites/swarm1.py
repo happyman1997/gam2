@@ -14,7 +14,7 @@ from r3d import Model, Mat, render, rot_z, rot_y, rot_x, I3
 STYLE1 = dict(amb=0.40, dif=0.60, gradient=False, edges=False, outline_tint=0.22)
 
 M_BONE = Mat(BONE)
-M_EYE = Mat(ramp("#3a0604", "#7a0c08", "#c41e10", "#ff5a2a", "#ffc0a0"), emissive=hexc("#ff3a1a"), glow_r=6, glow_k=0.6)
+M_EYE = Mat(ramp("#3a0604", "#7a0c08", "#c41e10", "#ff5a2a", "#ffc0a0"), emissive=hexc("#ff3a1a"), glow_r=3, glow_k=0.35)
 M_FANG = Mat(ramp("#120c0a", "#2e241c", "#6a5a46", "#b4a688", "#ece2c8"))
 M_ICHOR = Mat(ramp("#1a2a06", "#3a5a0e", "#6a9a1a", "#a8d040", "#e8ff9a"), emissive=hexc("#9ae030"), glow_r=4, glow_k=0.4)
 M_SHEEN = Mat(ramp("#2a2236", "#4a3e5e", "#6e6488", "#9a92b4", "#cfc8e6"))
@@ -33,10 +33,20 @@ ELYTRA = ramp("#0a0408", "#24080e", "#4a1016", "#7e2220", "#c0603a")     # dried
 CRIMSON = ramp("#14040a", "#3a0a14", "#6a1420", "#a02a2e", "#d65a4a")
 
 
-def chitin(hue_shift=0.0):
-    """Dark oily chitin: near-black, desaturated, a cold sheen on top; hue shifted for inheritance."""
+# every form keeps its own colour key so the forms read apart at a glance; all stay dark and oily
+FORM_CHITIN = {
+    None: ["#07050a", "#180e1c", "#30182c", "#523048", "#9a84a2"],        # ant: violet-black
+    "stinger": ["#080404", "#1e0a08", "#3a1410", "#5e2618", "#a8603e"],   # scorpion: rust-black
+    "jumper": ["#060804", "#151b0c", "#283216", "#424e22", "#808e4a"],    # grasshopper: rotten olive
+    "scythes": ["#0a0c08", "#20281c", "#3a4630", "#5e6c52", "#a4b294"],   # mantis: pale sickly green
+    "firefly": ["#080604", "#1c120a", "#322010", "#50361a", "#927040"],   # firefly: dark amber
+}
+
+
+def chitin(hue_shift=0.0, form=None):
+    """Dark oily chitin with a cold sheen on top; the form sets the colour key, hue shifts it for inheritance."""
     import colorsys
-    base = ["#07050a", "#170d1a", "#2c1628", "#4a2840", "#86708e"]
+    base = FORM_CHITIN.get(form, FORM_CHITIN[None])
     out = []
     for c in base:
         r, g, b = (hexc(c) / 255).tolist()
@@ -264,7 +274,7 @@ def plan_beetle(m, mc, g, pose, soldier):
 def plan_isopod(m, mc, g, pose, soldier):
     y0 = 3.6
     gs, hs = g["gs"], g["hsz"]
-    plate = Mat(chitin_shift(mc, -0.18, sat=0.55))
+    plate = Mat(chitin_shift(mc, -0.18, sat=0.55, light=1.35))   # slate plates, a shade lighter
     back = []
     for i in range(7):
         x = 3.2 - i * 2.2
@@ -511,7 +521,7 @@ def add_chimera(m, mc, a, kind, pose):
 def menace(m, mc, a, pose):
     """What makes every bug frightening: clustered red eyes, bristles, an oily glint, dripping ichor."""
     hc, hs, gc, gr = a["hc"], a["hs"], a["gc"], a["gr"]
-    for dx, dy, z in ((-0.2, 1.0, 1.25), (0.5, 0.15, 1.4), (0.5, 0.15, -1.35)):
+    for dx, dy, z in ((-0.2, 1.0, 1.25),):
         m.ell(hc + np.array((dx * hs, dy * hs, z * hs)), (0.32, 0.32, 0.32), M_EYE)
     for (x, y) in a["back"][:4]:
         m.limb([np.array((x, y - 0.2, 0.4)), np.array((x - 0.8, y + 1.8, 0.9))], 1, mc, band=1)
@@ -526,9 +536,9 @@ def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=Non
     """traits[0] decides the body plan; "ant" as the first trait keeps the ant body for detail traits."""
     traits = tuple(t for t in traits if t != "giant")
     g = genes or genes_for(int(abs(hue) * 1000) + 7 * len(traits))
-    mc = Mat(chitin(hue))
     m = Model()
     primary = traits[0] if traits and traits[0] != "ant" else None
+    mc = Mat(chitin(hue, primary))
     traits = tuple(t for t in traits if t != "ant")
     a = PLAN_FN[primary](m, mc, g, pose, soldier)
     menace(m, mc, a, pose)
@@ -561,11 +571,31 @@ def scale_for(size):
     return {1: 1.0, 2: 1.45, 3: 1.9, 4: 2.3}[size]
 
 
+def rim_light(spr, col="#c0b0d0", k=0.65):
+    """A thin cold rim just under the top outline: dark bodies stay readable on dark ground."""
+    a = spr.a
+    above = np.zeros_like(a)
+    above[1:] = a[:-1]
+    top = a & ~above                       # the top outline pixels
+    rim = np.zeros_like(a)
+    rim[1:] = top[:-1]
+    rim &= a & ~top
+    left = np.zeros_like(a)
+    left[:, 1:] = a[:, :-1]
+    side = np.zeros_like(a)
+    side[:, 1:] = (a & ~left)[:, :-1]
+    side &= a & ~(a & ~left) & ~rim
+    c = hexc(col)
+    spr.rgb[rim] = spr.rgb[rim] * (1 - k) + c * k
+    spr.rgb[side] = spr.rgb[side] * (1 - k * 0.5) + c * k * 0.5
+    return spr
+
+
 def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None):
     """k multiplies the in-game scale (use >1 for close-up sheets)."""
     s = scale_for(size_of(traits, soldier)) * k
     w, h, ox, oy = int(64 * s), int(60 * s), int(30 * s), int(52 * s)
-    spr = render(body(hue, traits, pose, soldier, genes, chimera).scaled(s), w, h, ox, oy, **STYLE1)
+    spr = rim_light(render(body(hue, traits, pose, soldier, genes, chimera).scaled(s), w, h, ox, oy, **STYLE1))
     spr.ox, spr.oy = ox, oy
     return spr
 
@@ -608,7 +638,7 @@ def queen(hue=0.0, pose="idle", k=1.0):
             m.limb([hip, knee, foot], 1, mc, band=3 if side > 0 else 1)
     s = 2.6 * k
     w, h, ox, oy = int(88 * s), int(56 * s), int(48 * s), int(50 * s)
-    spr = render(m.scaled(s), w, h, ox, oy, **STYLE1)
+    spr = rim_light(render(m.scaled(s), w, h, ox, oy, **STYLE1))
     spr.ox, spr.oy = ox, oy
     return spr
 
