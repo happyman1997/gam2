@@ -2,9 +2,18 @@
 from kit import *
 from r3d import Model, Mat, render, rot_z, rot_y, rot_x, I3
 
-M_IRON = Mat(IRON)
-M_DIRON = Mat(DIRON)
-M_BRONZE = Mat(BRONZE)
+# mature, worked metals: gunmetal, blackened steel, aged brass — no toy orange
+IRON2 = ramp("#101114", "#1f2126", "#33363e", "#4f535e", "#7d828f")
+DIRON2 = ramp("#09090b", "#131418", "#1f2127", "#30333b", "#4b4f59")
+BRASS2 = ramp("#1a100a", "#352214", "#573a22", "#7e5a34", "#ae8a56")
+M_IRON = Mat(IRON2)
+M_DIRON = Mat(DIRON2)
+M_BRONZE = Mat(BRASS2)
+M_STEEL = Mat(ramp("#1a1c22", "#3a3e48", "#6a707e", "#a6acb8", "#e2e6ee"))     # polished rods, rivet heads
+M_RUST = Mat(ramp("#1a0a06", "#3a160a", "#5e2810", "#82401c", "#a8622e"))
+M_HOSE = Mat(ramp("#08080a", "#121216", "#1c1c22", "#2a2a32", "#3e3e48"))
+M_GLASS = Mat(ramp("#1e2a26", "#3a524a", "#6a8a7c", "#a8c8b8", "#e8fff4"))
+M_PLATE = Mat(ramp("#3a3630", "#5a554a", "#7e786a", "#a6a090", "#cec8b6"))     # stamped serial plate
 M_HOLE = Mat([hexc("#07060a")] * 2 + [hexc("#120f18")] * 3)
 SMOKE = ramp("#2a2a33", "#3d3d48", "#5a5a66", "#7c7c88", "#a4a4ae")
 M_SMOKE = Mat(SMOKE)
@@ -25,6 +34,14 @@ def pivot(m, R, p):
 
 def spike(m, base, tip, r=1.0, mat=M_IRON):
     m.cyl(base, tip, r, mat, r1=0.15, seg=6)
+
+
+def tbox(m, c, bot, top, h, mat, R=I3):
+    bx, bz, tx, tz = bot[0] / 2, bot[1] / 2, top[0] / 2, top[1] / 2
+    v = [(-bx, -h / 2, -bz), (bx, -h / 2, -bz), (bx, -h / 2, bz), (-bx, -h / 2, bz),
+         (-tx, h / 2, -tz), (tx, h / 2, -tz), (tx, h / 2, tz), (-tx, h / 2, tz)]
+    c = np.array(c, float)
+    m.solid([c + R @ np.array(p) for p in v], [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]], mat)
 
 
 def hip_of(legs):
@@ -74,10 +91,47 @@ def legs_springs(m, hip, t):
 
 # ---------------------------------------------------------------- torso, armour, core
 def torso(m, hip):
-    m.box((0, hip + 9, 0), (15, 18, 18), M_BRONZE)
-    m.box((7.6, hip + 10.5, 0), (2.8, 12, 13), M_BRONZE)
-    m.box((0, hip + 3, 0), (16, 2.2, 19), M_DIRON)
-    m.box((-0.5, hip + 18.6, 0), (11, 3, 13), M_IRON)
+    """A wedge: narrow waist, broad armoured chest."""
+    tbox(m, (0, hip + 9, 0), (13.5, 15.5), (16, 19), 18, M_BRONZE)
+    tbox(m, (7.4, hip + 10.5, 0), (2.4, 11.5), (3.0, 13.5), 12, M_IRON)
+    m.box((0, hip + 3, 0), (16, 2.2, 17), M_DIRON)
+    m.box((-0.5, hip + 18.6, 0), (12, 3, 15), M_IRON)
+
+
+def tech(m, hip, t):
+    """What makes a golem read as a machine: rivets, seams, pistons, hoses, stacks, a gauge, a serial plate."""
+    for x in (-5, -2.5, 0, 2.5, 5):                          # rivet rows on the flank
+        m.ell((x, hip + 15.6, 9.25), (0.45, 0.45, 0.3), M_STEEL)
+    for x in (-4, -1, 2, 5):
+        m.ell((x, hip + 5.0, 8.3), (0.45, 0.45, 0.3), M_STEEL)
+    for y in (hip + 6.0, hip + 14.5):                        # rivets on the chest plate
+        for z in (-4.5, 4.5):
+            m.ell((8.9, y, z), (0.3, 0.45, 0.45), M_STEEL)
+    m.box((-1.6, hip + 10.0, 8.95), (0.35, 11.0, 0.2), M_HOLE)          # panel seams
+    m.box((1.5, hip + 11.5, 9.05), (8.5, 0.3, 0.2), M_HOLE)
+    for x in (-2.5, 2.5):                                    # rust streaks under the rivets
+        m.box((x, hip + 13.9, 9.3), (0.35, 2.6, 0.12), M_RUST)
+    m.box((-4.8, hip + 9.0, 9.05), (3.2, 1.7, 0.2), M_PLATE)            # stamped serial plate
+    for i in range(3):
+        m.box((-5.9 + i * 1.1, hip + 9.0, 9.18), (0.5, 0.8, 0.06), M_HOLE)
+    g = np.array((8.85, hip + 16.2, -3.6))                   # a pressure gauge on the chest
+    m.cyl(g, g + (0.7, 0, 0), 1.45, M_STEEL, seg=10)
+    m.ell(g + (0.75, 0, 0), (0.2, 1.1, 1.1), M_GLASS)
+    m.box(g + (0.85, 0.3, 0.35), (0.12, 0.9, 0.18), M_HOLE, rot_x(0.6))
+    for s in (1, -1):                                        # shoulder pistons
+        a = np.array((-6.2, hip + 18.6, 6.3 * s))
+        b = np.array((-3.0, hip + 17.4, 8.9 * s))
+        m.cyl(a, b, 0.95, M_DIRON, seg=6)
+        m.cyl(b, b + np.array((2.2, -0.6, 1.0 * s)), 0.45, M_STEEL, seg=5)
+    hose = [np.array(p) for p in ((-6.0, hip + 14.5, 8.6), (-7.8, hip + 10.0, 10.4), (-6.6, hip + 5.2, 9.4), (-3.4, hip + 3.6, 8.8))]
+    for p0, p1 in zip(hose[:-1], hose[1:]):                  # a fuel hose looping down the flank
+        m.cyl(p0, p1, 0.75, M_HOSE, seg=6)
+    for s, h_ in ((1, 9.5), (-1, 7.5)):                      # exhaust stacks on the back
+        b0 = np.array((-6.6, hip + 16.5, 3.6 * s))
+        top = b0 + np.array((-0.6, h_, 0))
+        m.cyl(b0, top, 1.15, M_DIRON, seg=8)
+        m.cyl(top, top + (0, 0.9, 0), 1.6, M_IRON, seg=8)
+        m.cyl(b0 + (-0.2, h_ * 0.45, 0), b0 + (-0.25, h_ * 0.45 + 0.7, 0), 1.45, M_RUST, seg=8)
 
 
 def armour(m, hip, t):
@@ -117,15 +171,17 @@ def head_visor(m, hip, kind, t):
     m.box((2.5, y, 0), (9, 8, 9), M_IRON)
     m.box((1.5, y + 5, 0), (7, 2, 2.6), M_BRONZE)
     m.box((7.2, y + 0.5, 0), (0.8, 1.4, 6.5), emissive(kind, 8 + 3 * (t - 1), 0.5))
-    if t >= 2:   # horns
+    m.box((4.6, y + 3.2, 0), (5.6, 1.4, 9.6), M_DIRON)             # a heavy brow over the slit
+    for s in (1, -1):                                               # breathing vents on the jaw
+        for i in range(3):
+            m.box((6.9, y - 2.4 + i * 0.9, 2.6 * s), (0.4, 0.4, 2.2), M_HOLE)
+    if t >= 2:   # armoured cheek plates and a cable to the back
         for s in (1, -1):
-            m.cyl((1, y + 3, 4 * s), (-1, y + 7, 5.6 * s), 1.4, M_BRONZE, r1=0.8, seg=6)
-            m.cyl((-1, y + 7, 5.6 * s), (-4, y + 10.5, 6.2 * s), 0.8, M_BRONZE, r1=0.15, seg=6)
-    if t >= 3:   # crown of spikes and cheek plates
-        for x in (-1, 2, 5):
-            spike(m, (x, y + 6, 0), (x - 0.5, y + 10, 0), 1.0, M_BRONZE)
-        for s in (1, -1):
-            m.box((5, y - 2.5, 4.8 * s), (5, 3, 0.8), M_BRONZE)
+            m.box((4.5, y - 1.5, 4.9 * s), (5.5, 4.5, 0.9), M_BRONZE)
+        m.cyl((-2.0, y + 1.0, -2.5), (-4.5, y - 3.5, -3.0), 0.6, M_HOSE, seg=5)
+    if t >= 3:   # a low crest of short blades
+        for x in (-1, 1.5, 4):
+            spike(m, (x, y + 3.8, 0), (x - 1.2, y + 6.4, 0), 0.8, M_IRON)
 
 
 def head_sensor(m, hip, kind, t):

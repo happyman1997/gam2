@@ -126,6 +126,6 @@ def augmented(aug, pose="idle"):
 
 
 def render_model(m, k, w=104, h=120, ox=42, oy=96):
-    spr = render(m.scaled(k), int(w * k), int(h * k), int(ox * k), int(oy * k), **STYLE1)
+    spr = rim_light(render(m.scaled(k), int(w * k), int(h * k), int(ox * k), int(oy * k), **STYLE1), col="#b8bcc6", k=0.55)
     spr.ox, spr.oy = int(ox * k), int(oy * k)
     return spr

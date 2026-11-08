@@ -89,12 +89,12 @@ def draw_arm(m, S, Hn, kind, t, side, tool):
         for a, b in ((S, E1), (E1, E2), (E2, Hn)):
             m.cyl(a, b, r, M_IRON, seg=6)
         for e in (E1, E2):
-            m.ell(e, (r + 0.9, r + 0.9, r + 0.9), M_BRONZE)
+            m.cyl(e + (0, 0, -(r + 0.9)), e + (0, 0, r + 0.9), r + 0.6, M_DIRON, seg=8)
         if t >= 2:
             m.cyl(S + (E1 - S) * 0.2, S + (E1 - S) * 0.8, r + 0.6, M_BRONZE, seg=6)
         if t >= 3:
             spike(m, E2, E2 + np.array((-1, 3.5, 0)), 0.8, M_BRONZE)
-        m.ell(S + (0, 1.5, 0), (3.8, 3.0, 3.6), M_BRONZE)
+        G6.tbox(m, S + (0, 1.8, 0), (8.5, 8.0), (6.0, 5.5), 5.0, M_BRONZE)
         return Hn, Hn - E2
     E = (S + Hn) / 2 + np.array((-1.5, -2.5, 0))
     if kind == "piston":
@@ -108,7 +108,9 @@ def draw_arm(m, S, Hn, kind, t, side, tool):
             m.cyl(E + (Hn - E) * 0.35, E + (Hn - E) * 0.8, r + 0.6, M_BRONZE)
         if t >= 3:
             m.cyl(S + (-1.6, -1.2, 0), E + (-1.6, 1.2, 0), 0.8, M_IRON, seg=6)
-        m.ell(S + (0, 2, 0), (4.6, 3.8, 4.2), M_BRONZE)
+        G6.tbox(m, S + (0, 2.4, 0), (10.0, 9.0), (7.0, 6.0), 6.0, M_BRONZE)
+        for dx in (-2.5, 0.0, 2.5):
+            m.ell(S + (dx, 5.3, 0), (0.4, 0.3, 0.4), G6.M_STEEL)
     else:  # heavy
         w = (6.8, 7.4, 7.9)[t - 1]
         tbox(m, S + (0, 1.6, side * 0.8), (10.5, 10.5), (8, 7.5), 8.5, M_BRONZE, rot_x(-0.18 * side))
@@ -138,7 +140,7 @@ def tool_hammer(m, Hn, fdir, pose, core_k, t):
             for dy, dz in ((0, 0), (2.2, 2.2), (-2.2, -2.2), (2.2, -2.2), (-2.2, 2.2))[: 1 if t == 2 else 5]:
                 spike(m, top + R @ np.array((sgn * hs[0] / 2, dy, dz)),
                       top + R @ np.array((sgn * (hs[0] / 2 + (3 if t == 2 else 2.4)), dy, dz)), 1.1 if t == 2 else 0.9)
-    m.ell(Hn, (2.7, 2.7, 2.7), M_BRONZE)
+    m.cyl(Hn - sd * 1.6, Hn + sd * 1.6, 2.2, M_DIRON, seg=8)      # a grip collar instead of a ball
 
 
 def tool_shield(m, Hn, fdir, pose, core_k, t, side=1):
@@ -219,6 +221,7 @@ def model(cfg, lv=1, pose="idle"):
     debris = Model()
     G6.torso(up, hip)
     G6.armour(up, hip, L["armour"])
+    G6.tech(up, hip, L["armour"])
     if broken:
         c = np.array((9.9, hip + 10.5, 0))
         up.cyl(c + (-1.1, 0, 0), c + (-0.1, 0, 0), 4.4, M_DIRON)
@@ -226,7 +229,10 @@ def model(cfg, lv=1, pose="idle"):
         up.box(c + (0.9, 0.4, 0), (0.5, 6.0, 0.6), M_HOLE, rot_x(0.5))
     else:
         G6.core(up, hip, cfg["core"], L["core"])
-    G6.HEADS[cfg["head"]](up, hip, cfg["core"], L["head"])
+    head = Model()
+    G6.HEADS[cfg["head"]](head, hip, cfg["core"], L["head"])
+    neck = np.array((2.0, hip + 20.0, 0))                    # an adult head: smaller, sunk between the shoulders
+    up.extend(head.transformed(I3, -neck).scaled(0.8).transformed(I3, neck + np.array((0.6, -1.2, 0))))
     S_far = None
     for slot, side, z in (("far", -1, -12.5), ("near", 1, 12.0)):
         S = np.array((0.5, hip + 14, z))
@@ -263,11 +269,16 @@ def dims(k):
     return int(104 * k), int(104 * k), int(round(40 * k)), int(round(82 * k))
 
 
-def build(cfg, lv=1, pose="idle", k=2.0, **kw):
+def build(cfg, lv=1, pose="idle", k=2.0, paint=None, **kw):
+    """paint: a colour ramp that replaces the frame's brass (each role frame has its own)."""
     w, h, ox, oy = dims(k)
     opts = dict(STYLE1)
     opts.update(kw)
-    spr = render(model(cfg, lv, pose).scaled(k), w, h, ox, oy, **opts)
+    m = model(cfg, lv, pose)
+    if paint is not None:
+        new = Mat(paint)
+        m.ops = [tuple(new if x is G6.M_BRONZE else x for x in op) for op in m.ops]
+    spr = rim_light(render(m.scaled(k), w, h, ox, oy, **opts), col="#b8bcc6", k=0.55)
     spr.ox, spr.oy = ox, oy
     return spr
 

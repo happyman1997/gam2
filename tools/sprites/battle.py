@@ -4,6 +4,7 @@ from PIL import ImageFont
 from kit import *
 from r3d import rot_x, rot_z, render
 import golem7 as G
+import frames as F
 import architect as AR
 import swarm1 as W
 from golem7 import cfg
@@ -117,20 +118,20 @@ def build():
     rnd = random.Random(8)
 
     # ---------------- foundry
-    golems = [  # (col, row, size, cfg, level, pose, dx)
-        (5, 6, 6, cfg(legs="pillars", arms=("heavy", "heavy"), tools=("hammer", "shield")), 3, "attack", 16),
-        (6, 0, 5, cfg(arms=("heavy", "piston"), tools=("hammer", "shield")), 2, "attack", 14),
-        (6, 11, 5, cfg(legs="spider", arms=("long", "long"), tools=("hammer", "claw")), 2, "idle", 0),
-        (6, 2, 5, cfg(arms=("piston", "heavy"), tools=("claw", "shield")), 1, "broken", 6),
-        (3, 2, 5, cfg(head="sensor", core="volt", tools=("cannon", "shield")), 2, "attack", 0),
-        (3, 9, 4, cfg(legs="springs", head="sensor", core="volt", tools=("cannon", "claw")), 1, "attack", 0),
-        (4, 12, 4, cfg(legs="springs", tools=("hammer", "shield")), 1, "idle", 0),
+    golems = [  # (col, row, size, frame, pose, dx)
+        (5, 6, 6, "Страж", "attack", 16),
+        (6, 0, 5, "Молот", "attack", 14),
+        (6, 11, 5, "Горн", "attack", 0),
+        (6, 2, 5, "Молот", "broken", 6),
+        (3, 2, 5, "Орудие", "attack", 0),
+        (3, 9, 4, "Механик", "attack", 0),
+        (4, 12, 4, "Механик", "idle", 0),
     ]
-    for (c, r, size, gcfg, lv, pose, dx) in golems:
+    for (c, r, size, frame, pose, dx) in golems:
         n = CELLS[size]
         fx = X0 + (c + n / 2) * CW + dx
         fy = Y0 + (r + n * 0.72) * CH
-        spr = G.build(gcfg, lv, pose, k=GK[size])
+        spr = F.build(frame, pose, k=GK[size])
         def f(spr=spr, fx=fx, fy=fy, size=size, c=c, r=r, n=n):
             footprint(sc, c, r, n)
             shadow(sc, fx + 2, fy, 22 * n + 14, 6 + 3 * n)
@@ -185,7 +186,7 @@ def build():
 
     for _, f in sorted(items, key=lambda t: t[0]):
         f()
-    for (x, y, col) in ((260, 128, "volt"), (300, 374, "volt"), (232, 140, "volt")):
+    for (x, y, col) in ((312, 122, "fire"), (290, 136, "fire")):
         bolt(sc, x, y, col)
     for (x, y, big) in ((452, 296, True), (432, 66, True), (470, 274, False), (425, 86, False)):
         spark(sc, x, y, big)

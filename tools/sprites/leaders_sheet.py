@@ -6,6 +6,7 @@ import inventor as IV
 import maniac as MN
 import colossus as CL
 import golem7 as G7
+import frames as F
 import swarm1 as SW
 from noise import value_noise
 from paths import font, out
@@ -86,8 +87,8 @@ def overview():
     yb = 50 + 2 * QH + 210
     r = 1.15 / 1.8
     row = [(CL.build("idle", 1.15), "Отец колосса · 7", 70),
-           (G7.build(G7.cfg(legs="pillars", arms=("heavy", "heavy"), tools=("hammer", "shield")), 3, "idle", k=2.2 * r), "большой голем · 6", 36),
-           (G7.build(G7.cfg(), 1, "idle", k=1.6 * r), "средний голем · 5", 24),
+           (F.build("Страж", "idle", k=2.2 * r), "Страж · 6", 36),
+           (F.build("Молот", "idle", k=1.6 * r), "Молот · 5", 24),
            (IV.render_model(IV.inventor("idle"), 1.9 * r * 1.55, w=56, h=60, ox=24, oy=48), "Изобретатель · 3", 10),
            (SW.build((), 0.0, "idle", k=r), "рабочая роя · 1", 6)]
     xs = [150, 360, 520, 650, 770]

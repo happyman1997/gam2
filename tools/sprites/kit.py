@@ -271,3 +271,24 @@ def chit2(kind="brown"):
         "black": ["#08090c", "#121419", "#1e2128", "#2e323c", "#464b58"],
     }[kind]
     return ramp(*base)
+
+
+def rim_light(spr, col="#c0b0d0", k=0.65):
+    """A thin rim just under the top outline (and weaker on the left): dark bodies stay readable on dark ground."""
+    a = spr.a
+    above = np.zeros_like(a)
+    above[1:] = a[:-1]
+    top = a & ~above
+    rim = np.zeros_like(a)
+    rim[1:] = top[:-1]
+    rim &= a & ~top
+    left = np.zeros_like(a)
+    left[:, 1:] = a[:, :-1]
+    edge_l = a & ~left
+    side = np.zeros_like(a)
+    side[:, 1:] = edge_l[:, :-1]
+    side &= a & ~edge_l & ~rim
+    c = hexc(col)
+    spr.rgb[rim] = spr.rgb[rim] * (1 - k) + c * k
+    spr.rgb[side] = spr.rgb[side] * (1 - k * 0.5) + c * k * 0.5
+    return spr

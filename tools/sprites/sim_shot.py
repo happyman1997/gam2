@@ -9,6 +9,7 @@ import sys
 from PIL import ImageFont
 from kit import *
 import golem7 as G
+import frames as F
 import architect as AR
 import colossus as CL
 import inventor as IV
@@ -24,15 +25,6 @@ WW, HH = 960, 540
 FW, FH = 18, 14                     # field size in cells (sim/src/battle.rs)
 CW, CH, X0, Y0 = 50, 34, 30, 50
 ZONE = 6
-
-GOLEMS = {  # name: (config, level, scale)
-    "Страж": (cfg(legs="pillars", arms=("heavy", "heavy"), tools=("hammer", "shield")), 2, 2.2),
-    "Молот": (cfg(arms=("heavy", "heavy"), tools=("hammer", "hammer")), 2, 1.6),
-    "Горн": (cfg(core="fire", arms=("heavy", "piston"), tools=("hammer", "claw")), 2, 1.6),
-    "Орудие": (cfg(legs="spider", head="sensor", tools=("cannon", "cannon")), 2, 1.6),
-    "Механик": (cfg(legs="spider", head="sensor", arms=("long", "long"), tools=("claw", "claw")), 1, 1.15),
-}
-
 
 def footprint_n(size):
     return 1 if size <= 4 else {5: 2, 6: 3}.get(size, 4)
@@ -79,9 +71,8 @@ def hp_bar(sc, x, y, w, frac):
 
 def unit_sprite(u, pose):
     name = u["name"]
-    if name in GOLEMS:
-        c, lv, k = GOLEMS[name]
-        return G.build(c, lv, pose, k=k)
+    if name in F.FRAMES:
+        return F.build(name, pose)
     if name == "Каменщик":
         if pose == "broken":
             return G.build(cfg(legs="springs", tools=("claw", "claw")), 1, "broken", k=0.8)

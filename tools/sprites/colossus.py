@@ -110,7 +110,7 @@ def colossus(pose="idle"):
 
 def build(pose="idle", k=1.0):
     w, h, ox, oy = int(150 * k), int(140 * k), int(60 * k), int(112 * k)
-    spr = render(colossus(pose).scaled(k), w, h, ox, oy, **STYLE1)
+    spr = rim_light(render(colossus(pose).scaled(k), w, h, ox, oy, **STYLE1), col="#b8bcc6", k=0.55)
     spr.ox, spr.oy = ox, oy
     return spr
 
