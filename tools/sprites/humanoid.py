@@ -191,21 +191,50 @@ def arm(G, key, sh, elbow, wrist, s, P, ram_side="back"):
     return wrist
 
 
-def fist(G, key, wrist, along, grip, P):
-    """A gauntleted hand closed around a haft along `grip`: palm, four knuckles, a thumb, a guard."""
+def hand_frame(along, grip, s):
+    """Axes of a fist holding a haft along `grip`: h — from the wrist to the knuckles (as close to the
+    forearm as the grip allows), u — the haft, n — the back of the hand, facing outwards."""
+    d, u = unit(along), unit(grip)
+    h = unit(d - u * (d @ u))
+    n = np.cross(h, u)
+    if n[2] * s < 0:
+        n = -n
+    return h, u, n
+
+
+def fist(G, key, wrist, along, grip, s, P):
+    """A gauntleted hand closed round a haft. The haft runs through the fist from the thumb to the
+    little finger; four finger rolls wrap its front, the fingertips tuck in on the inner side, the thumb
+    closes over it, a riveted plate guards the back of the hand. Returns the grip point and the axes."""
     g = G[key]
-    w = arr(wrist)
-    d, gr = unit(along), unit(grip)
-    gr = unit(gr - d * (gr @ d))
-    side = np.cross(d, gr)
-    R = np.column_stack([d, gr, side])
-    c = w + d * 2.0
-    g.box(c, (3.8, 4.0, 3.8), M_IRON, R)
-    for i in range(4):
-        g.box(c + d * 1.3 + gr * (-1.5 + i * 1.0) + side * 1.5, (1.2, 0.85, 1.4), M_DIRON, R)
-    g.box(c - side * 1.6 + d * 0.6, (1.5, 1.5, 1.1), M_DIRON, R)
-    g.box(c - d * 0.3 + side * 2.05, (3.0, 3.6, 0.5), P, R)                                  # knuckle guard
-    return c
+    W = arr(wrist)
+    h, u, n = hand_frame(along, grip, s)
+    R = np.column_stack([h, u, n])
+    Gp = W + h * 2.4
+    g.ell(W + unit(along) * 0.3, (1.8, 1.8, 1.8), M_DIRON)                                    # wrist joint
+    g.box(Gp - h * 1.7 + n * 0.3, (1.6, 3.4, 3.0), M_IRON, R)                                  # palm
+    g.box(Gp + h * 0.3 + n * 0.35, (3.0, 3.9, 3.1), M_IRON, R)                                 # the closed fist
+    for i in range(4):                                                                         # fingers round the haft
+        p = Gp + u * (-1.5 + i * 1.0)
+        g.box(p + h * 2.0 + n * 0.2, (1.0, 0.78, 3.4), M_IRON, R)                             # rolls over the front
+        g.box(p + h * 1.2 - n * 1.5, (1.6, 0.74, 0.7), M_DIRON, R)                            # tips on the inner side
+        g.box(p + h * 1.25 + n * 2.15, (1.3, 0.8, 0.75), P, R)                                # knuckle plates
+        rivets(g, [p + h * 1.25 + n * 2.55], r=0.22)
+    g.box(Gp + u * 2.4 + h * 0.6 - n * 0.4, (2.8, 1.0, 1.8), M_IRON, R)                       # thumb over the haft
+    g.box(Gp + u * 2.4 + h * 1.95 - n * 0.85, (1.0, 1.0, 1.0), M_DIRON, R)                    # thumb tip
+    g.box(Gp - h * 0.9 + n * 2.05, (2.4, 3.7, 0.45), P, R)                                     # back-of-hand plate
+    rivets(g, [Gp - h * 0.9 + n * 2.3 + u * dy for dy in (-1.2, 1.2)], r=0.3)
+    return Gp, h, u
+
+
+def grip_on(W, along, target, s, rounds=3):
+    """Grip point and haft direction for a fist at W whose haft points at `target`."""
+    u = unit(arr(target) - arr(W))
+    for _ in range(rounds):
+        h, u2, _ = hand_frame(along, u, s)
+        Gp = arr(W) + h * 2.4
+        u = unit(arr(target) - Gp)
+    return u
 
 
 # ---------------------------------------------------------------- weapons
@@ -213,9 +242,12 @@ def maul(G, hand, u, P, t_fwd, reach):
     """Steam maul: haft with a feed line, head with a hot striking face and a steam ram at the back."""
     g = G["hammer"]
     hand, u = arr(hand), unit(u)
-    butt, top = hand - u * 1.6, hand + u * reach
+    butt, top = hand - u * BUTT, hand + u * reach
     g.cyl(butt, top, 0.85, M_DIRON, seg=6)
     g.cyl(butt - u * 0.6, butt, 1.15, M_IRON, seg=6)
+    for k in (2.95, -2.35):                                         # steel grip bands either side of the fist
+        p = hand + u * k
+        g.cyl(p, p + u * 0.45 * np.sign(k), 1.05, M_STEEL, seg=6)
     for k in (reach - 5.6, reach - 2.8):
         p = hand + u * k
         g.cyl(p, p + u * 0.9, 1.2, M_IRON, seg=6)
@@ -260,15 +292,15 @@ def shield(G, C, R, P):
     return at(-0.75)
 
 
-def bracket(G, fist_c, d, back_c, R):
-    """Hinged bracket from the gauntlet to the shield's back."""
+def bracket(G, grip, u, back_c, R):
+    """A handle bar through the far fist and two struts to a hinge on the shield's back."""
     g = G["bracket"]
-    f = arr(fist_c) + unit(d) * 1.9
-    for y in (-2.8, 2.8):
-        a = f + R @ arr((0, y * 0.5, 0))
-        b = arr(back_c) + R @ arr((0, y, 0))
-        g.cyl(a, b, 0.55, M_DIRON, seg=6)
-    g.cyl(arr(back_c) + R @ arr((-0.45, -3.7, 0)), arr(back_c) + R @ arr((-0.45, 3.7, 0)), 0.7, M_IRON, seg=8)
+    grip, u, back_c = arr(grip), unit(u), arr(back_c)
+    a0, a1 = grip - u * 2.9, grip + u * 2.9
+    g.cyl(a0, a1, 0.7, M_IRON, seg=8)
+    for a, y in ((a0, -2.9), (a1, 2.9)):
+        g.cyl(a, back_c + R @ arr((0, y, 0)), 0.55, M_DIRON, seg=6)
+    g.cyl(back_c + R @ arr((-0.45, -3.7, 0)), back_c + R @ arr((-0.45, 3.7, 0)), 0.7, M_IRON, seg=8)
 
 
 # ---------------------------------------------------------------- body
@@ -413,19 +445,20 @@ def guard_parts(pose="idle", P=None):
         el = SH + (1.4, -7.6, 2.0)
         w = arm(G, "arm_n", SH, el, SH + (WX, WY, 1.6), 1, P)
         rest = arr((-0.8, RY, 10.4))
-        hand = fist(G, "hand_n", w, w - el, rest - w, P)
-        maul(G, hand, rest - hand, P, (0, 1, 0), reach=13.0)
+        u = grip_on(w, w - el, rest, 1)
+        hand, _, u = fist(G, "hand_n", w, w - el, u, 1, P)
+        maul(G, hand, u, P, (0, 1, 0), reach=13.0)
         elf = far + (0.8, -8.0, -1.6)
         w = arm(G, "arm_f", far, elf, far + (5.8, -10.0, -2.0), -1, P)
-        fc = fist(G, "hand_f", w, w - elf, (0, 1, 0), P)
+        fc, hf, uf = fist(G, "hand_f", w, w - elf, (0, 1, 0), -1, P)
         R = rot_y(0.5)
-        back = shield(G, fc + R @ arr((1.9 + 2.0 + 0.75, 0, 0)), R, P)
-        bracket(G, fc, w - elf, back, R)
+        back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
+        bracket(G, fc, uf, back, R)
     else:
-        el = SH + (5.4, -0.4, 1.6)
-        w = arm(G, "arm_n", SH, el, SH + (11.8, 0.2, 1.2), 1, P, ram_side="front")
+        el = SH + EL_A                                  # an overhand blow across the body
+        w = arm(G, "arm_n", SH, el, SH + WR_A, 1, P, ram_side="front")
         u = unit(arr(UA))
-        hand = fist(G, "hand_n", w, w - el, u, P)
+        hand, _, u = fist(G, "hand_n", w, w - el, u, 1, P)
         tf = unit(arr((-UA[1], UA[0], 0)))
         face, _ = maul(G, hand, u, P, tf, reach=13.0)
         sp = G["sparks"]
@@ -434,10 +467,10 @@ def guard_parts(pose="idle", P=None):
                    emissive("fire", 11 if i == 0 else 0, 0.8))
         elf = far + (1.8, -7.8, -1.6)
         w = arm(G, "arm_f", far, elf, far + (7.2, -9.0, -2.0), -1, P)
-        fc = fist(G, "hand_f", w, w - elf, (0, 1, 0), P)
+        fc, hf, uf = fist(G, "hand_f", w, w - elf, (0, 1, 0), -1, P)
         R = rot_y(0.3)
-        back = shield(G, fc + R @ arr((1.9 + 2.0 + 0.75, 0, 0)), R, P)
-        bracket(G, fc, w - elf, back, R)
+        back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
+        bracket(G, fc, uf, back, R)
         for k in list(G):
             if not k.startswith("leg_"):
                 G[k] = pivot(G[k], rot_z(-0.14), (0, HIP, 0))
@@ -445,7 +478,10 @@ def guard_parts(pose="idle", P=None):
 
 
 WX, WY, RY = 6.8, 0.4, 40.1      # idle: wrist of the carrying arm, height where the haft rests on the pauldron
-UA = (0.56, -0.83, 0.0)          # attack: direction of the haft
+UA = (0.5, -0.87, 0.0)          # attack: direction of the haft
+SHIELD_GAP = 4.6                 # from the grip to the shield's back face
+BUTT = 3.2                       # haft beyond the fist on the little-finger side
+EL_A, WR_A = (5.0, -4.0, 0.4), (11.0, -5.0, -4.0)   # attack: elbow and wrist from the shoulder
 
 
 ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("leg_f", "leg_f.ram"),
@@ -512,7 +548,7 @@ if __name__ == "__main__":
     d = ImageDraw.Draw(img)
     ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 28)
     fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 17)
-    d.text((24, 12), "Проба 3: Страж массивнее — шире плечи и грудь, толще руки и ноги", font=ft, fill=(236, 226, 200))
+    d.text((24, 12), "Проба 4: Страж — кулак держит молот, удар наискось через корпус", font=ft, fill=(236, 226, 200))
     d.text((24, 52), "Крупно — покой и атака. Внизу — в размере боя: старый Страж, новый, и рой для масштаба.",
            font=fr, fill=(190, 182, 164))
     for x, t in ((110, "было"), (300, "стало · покой"), (470, "стало · атака"), (670, "рабочая и солдат роя")):
