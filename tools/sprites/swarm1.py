@@ -162,6 +162,10 @@ def plan_ant(m, mc, g, pose, soldier):
     if soldier:
         m.box(hc + (0, 1.5 * hs, 0), (3.2, 0.8, 2.6), M_BONE, rot_z(-0.2))
     leg_pairs(m, mc, y0, ((-1.6, -3.2), (0.4, 0.3), (2.4, 3.4)), 1.25 if soldier else 1.0, g["leg"], 0, pose, fore_lift=True)
+    for z in (0.7, -0.7):                                    # propodeal spines, as real ants have
+        spike(m, (-1.4, y0 + 1.6, z), (-3.4, y0 + 4.6, z * 1.6), 0.55, mc)
+    tipp = gc + (-5.2 * gs, -1.4, 0)
+    spike(m, tipp + (0.8, 0.4, 0), tipp + (-2.6, -1.6, 0), 1.0, M_FANG)
     return dict(y0=y0, hc=hc, hs=hs, tip=gc + (-5.2 * gs, -1.4, 0), gc=gc, gr=3.9 * gs,
                 back=[(-9.0, y0 + 3.9 * gs), (-6.6, y0 + 4.3 * gs), (-4.2, y0 + 3.8 * gs), (-0.4, y0 + 3), (1.8, y0 + 2.8)],
                 wing=np.array((0.8, y0 + 2.6, 0)), hind=np.array((-1.4, y0 - 1.0, 0)), fore=np.array((2.4, y0 + 0.2, 0)),
@@ -176,15 +180,16 @@ def plan_wasp(m, mc, g, pose, soldier):
     m.cyl((-2.0, y0 + 0.6, 0), (-4.4, y0 - 0.4, 0), 0.55, mc, seg=6)
     R = rot_z(0.42 if pose == "idle" else 0.9)
     gc = np.array((-9.0, y0 - 1.6, 0))
-    m.ell(gc, (5.8 * gs, 2.6 * gs, 2.6 * gs), stripe, R)
-    rings(m, gc, R, 5.8 * gs, 2.6 * gs, mc, n=4)
+    m.ell(gc, (6.8 * gs, 2.5 * gs, 2.5 * gs), stripe, R)
+    rings(m, gc, R, 6.8 * gs, 2.5 * gs, mc, n=4)
     hc = np.array((4.5, y0 + 1.6, 0))
     m.ell(hc, (2.0 * hs, 2.1 * hs, 2.3 * hs), mc)
     for z in (1.4, -1.4):
         m.ell(hc + (0.5, 0.6, z * hs), (1.1, 1.4, 0.8), M_DARKEYE)
     mandibles(m, Mat(AMBER), hc, hs * 0.8, 0.3 if pose == "idle" else 0.7)
     antennae(m, mc, hc + (0.6, 1.6 * hs, 0), long=1.2)
-    tip = gc + R @ np.array((-5.8 * gs, 0, 0))
+    tip = gc + R @ np.array((-6.8 * gs, 0, 0))
+    m.cyl(tip + R @ np.array((0.8, 0, 0)), tip + R @ np.array((-3.4, -0.4, 0)), 0.9, M_FANG, r1=0.08, seg=5)
     leg_pairs(m, mc, y0, ((-1.2, -2.0), (0.6, 0.2), (2.2, 2.6)), 0.9, 0.9, y0 - 4.5, pose)
     return dict(y0=y0, hc=hc, hs=hs, tip=tip, gc=gc, gr=2.6 * gs, back=[(-6, y0 + 1.5), (-2, y0 + 3.2), (1, y0 + 3.4)],
                 wing=np.array((0.8, y0 + 2.9, 0)), hind=np.array((-1.2, y0 - 0.8, 0)), fore=np.array((2.2, y0 + 0.4, 0)),
@@ -203,18 +208,21 @@ def plan_scorpion(m, mc, g, pose, soldier):
     # pincers
     for z in (2.0, -2.0):
         a = hc + (0.5, -0.2, z)
-        b = a + (3.4, 0.6, np.sign(z) * 1.6)
-        m.cyl(a, b, 0.7, mc, seg=5)
-        m.ell(b + (1.2, 0.2, 0), (1.6, 1.0, 1.0), M_BONE)
-        spike(m, b + (2.2, 0.4, 0), b + (3.6, 0.2, -np.sign(z) * 0.6), 0.35)
-    pts = [(-5.5, y0 + 1.6), (-8.0, y0 + 3.8), (-9.4, y0 + 6.8), (-8.8, y0 + 9.8), (-6.6, y0 + 11.6), (-4.0, y0 + 12.0)]
+        b = a + (4.0, 1.0, np.sign(z) * 1.8)
+        m.cyl(a, b, 0.8, mc, seg=5)
+        m.ell(b + (1.6, 0.3, 0), (2.4, 1.4, 1.3), M_BONE)
+        spike(m, b + (3.0, 0.9, 0), b + (5.6, 1.0, -np.sign(z) * 0.6), 0.6, M_FANG)
+        spike(m, b + (3.0, -0.1, 0), b + (5.0, -0.6, -np.sign(z) * 0.4), 0.45, M_FANG)
+    pts = [(-5.5, y0 + 1.8), (-8.4, y0 + 4.4), (-10.0, y0 + 8.0), (-9.4, y0 + 11.6), (-6.8, y0 + 13.8), (-3.6, y0 + 14.4)]
     tm = Model()
     for i, (x, y) in enumerate(pts):
         r = 2.0 - i * 0.16
         tm.ell((x, y, 0), (r, r, r), tail)
-    bulb = np.array((-2.6, y0 + 11.4, 0))
-    tm.ell(bulb, (1.6, 1.3, 1.3), Mat(CRIMSON))
-    tm.cyl(bulb + (0.8, -0.4, 0), bulb + (3.0, -2.6, 0), 0.8, M_BONE, r1=0.12, seg=5)
+    bulb = np.array((-2.0, y0 + 13.6, 0))
+    tm.ell(bulb, (1.9, 1.5, 1.5), Mat(CRIMSON))
+    hook = bulb + np.array((2.2, -1.0, 0))
+    tm.cyl(bulb + (0.8, -0.2, 0), hook, 0.9, M_FANG, r1=0.5, seg=5)
+    tm.cyl(hook, hook + np.array((0.8, -2.6, 0)), 0.5, M_FANG, r1=0.06, seg=4)
     if pose == "attack":
         tm = pivot(tm, rot_z(-0.75), (-5.0, y0 + 1.4, 0))
     m.extend(tm)
@@ -252,15 +260,19 @@ def plan_beetle(m, mc, g, pose, soldier):
     m.ell((-4.0, y0 + 2.0, 0), (6.6 * gs, 3.9 * gs, 4.9 * gs), ely)
     m.box((-4.0, y0 + 2.0 + 3.85 * gs, 0), (11.5 * gs, 0.5, 0.45), Mat(ramp("#0c0408", "#1a0810", "#2a0e18", "#3a1420", "#4a1a28")))
     m.ell((2.6, y0 + 2.0, 0), (2.6, 2.6, 3.8), mc)                  # pronotum
+    for z in (1.4, -1.4):                                            # pointed tips of the wing cases
+        spike(m, (-9.0 * gs, y0 + 2.4, z), (-12.6 * gs, y0 + 0.6, z * 1.2), 1.0, ely)
     hc = np.array((5.4, y0 + 1.2, 0))
     m.ell(hc, (1.6 * hs, 1.5 * hs, 1.9 * hs), mc)
     for z in (1.2, -1.2):
         m.ell(hc + (0.7, 0.4, z * hs), (0.4, 0.4, 0.4), M_EYE)
     # rhinoceros horn, curving back, plus a short horn on the pronotum
     hr = Model()
-    hr.cyl(hc + (0.8, 0.8, 0), hc + (3.4, 4.4, 0), 1.6 * hs, M_BONE, r1=1.0 * hs, seg=6)
-    hr.cyl(hc + (3.4, 4.4, 0), hc + (3.0, 7.6, 0), 1.0 * hs, M_BONE, r1=0.2, seg=6)
-    hr.cyl((3.4, y0 + 4.2, 0), (6.0, y0 + 6.0, 0), 1.0, M_BONE, r1=0.15, seg=5)
+    hr.cyl(hc + (0.8, 0.8, 0), hc + (4.2, 5.4, 0), 1.7 * hs, M_BONE, r1=1.0 * hs, seg=6)
+    hr.cyl(hc + (4.2, 5.4, 0), hc + (3.2, 9.4, 0), 1.0 * hs, M_BONE, r1=0.15, seg=6)
+    hr.cyl((3.4, y0 + 4.2, 0), (7.0, y0 + 7.0, 0), 1.0, M_BONE, r1=0.15, seg=5)
+    for z in (1.6, -1.6):
+        spike(hr, (2.6, y0 + 3.6, z), (3.6, y0 + 6.2, z * 1.5), 0.6, M_BONE)
     if pose == "attack":
         hr = pivot(hr, rot_z(-0.55), hc)
     m.extend(hr)
@@ -288,7 +300,9 @@ def plan_isopod(m, mc, g, pose, soldier):
         m.ell(hc + (0.6, 0.5, z * hs), (0.4, 0.4, 0.4), M_EYE)
     antennae(m, mc, hc + (0.8, 0.6, 0), long=1.3)
     for z in (1.4, -1.4):   # tail prongs
-        spike(m, (-12.6, y0 + 0.6, z), (-15.0, y0 + 0.2, z * 1.6), 0.45, plate)
+        spike(m, (-12.6, y0 + 0.6, z), (-17.0, y0 + 0.4, z * 1.8), 0.6, plate)
+    for (x, y) in back:     # a serrated back
+        spike(m, (x, y - 0.3, 0), (x - 1.4, y + 1.8, 0), 0.7, plate)
     xs = tuple((3.0 - i * 2.2, 0.4) for i in range(6))
     leg_pairs(m, mc, y0, xs, 1.4, 0.55, 0, pose)
     return dict(y0=y0, hc=hc, hs=hs, tip=np.array((-12.6, y0 + 0.8, 0)), gc=np.array((-4, y0, 0)), gr=2.8 * gs,
@@ -311,17 +325,21 @@ def plan_grasshopper(m, mc, g, pose, soldier):
     for z in (1.2, -1.2):
         m.ell(hc + (0.6, 1.2, z * hs), (0.7, 0.9, 0.5), M_EYE)
     mandibles(m, mc, hc + (0, -1.2, 0), hs * 0.7, 0.3)
-    antennae(m, mc, hc + (0.6, 2.4 * hs, 0), back=True, long=1.3)
+    antennae(m, mc, hc + (0.6, 2.4 * hs, 0), back=True, long=1.8)
     leg_pairs(m, mc, y0, ((0.4, 0.8), (2.2, 2.4)), 1.0, 0.85, 0, pose)
     for side in (1, -1):    # the huge hind legs are the body plan here
         hip = np.array((-1.6, y0 - 0.4, 1.6 * side))
         if pose == "idle":
-            knee, foot = np.array((-7.0, y0 + 8.0, 3.0 * side)), np.array((-10.4, 0.2, 3.8 * side))
+            knee, foot = np.array((-7.6, y0 + 11.0, 3.0 * side)), np.array((-11.6, 0.2, 3.8 * side))
         else:
             knee, foot = np.array((-7.5, y0 - 1.0, 2.8 * side)), np.array((-12.5, y0 - 5.5, 3.4 * side))
         m.cyl(hip, knee, 2.3, mc, r1=1.1, seg=6)
         m.ell(knee, (1.1, 1.1, 1.1), M_BONE)
+        spike(m, knee, knee + np.array((-1.0, 2.4, 0)), 0.6, M_FANG)
         m.cyl(knee, foot, 0.6, mc, r1=0.4, seg=5)
+        for f in (0.3, 0.55, 0.8):                     # spines along the shin
+            p = knee + (foot - knee) * f
+            spike(m, p, p + np.array((-1.0, 0.5, 0.3 * side)), 0.22, M_FANG)
     return dict(y0=y0, hc=hc, hs=hs, tip=gc + (-6.4 * gs, 0, 0), gc=gc, gr=2.2 * gs,
                 back=[(-8, y0 + 3.4), (-4, y0 + 3.6), (0, y0 + 4.2)], wing=np.array((0.8, y0 + 3.8, 0)),
                 hind=None, fore=np.array((2.2, y0 + 0.4, 0)), length=17, has_jumper=True)
@@ -335,7 +353,7 @@ def plan_mantis(m, mc, g, pose, soldier):
     m.ell(gc, (5.8 * gs, 2.3 * gs, 2.3 * gs), mc, rot_z(-0.08))
     m.ell((-5.4, y0 + 2.2, 0), (5.2 * gs, 0.9, 2.2), jade, rot_z(-0.05))   # leaf-like folded wings
     m.ell((-0.4, y0 + 0.8, 0), (2.0, 1.6, 1.5), mc)
-    neck_top = np.array((3.2, y0 + 9.0, 0))
+    neck_top = np.array((3.4, y0 + 10.8, 0))
     m.cyl((-0.2, y0 + 1.2, 0), neck_top, 1.25, mc, r1=1.0, seg=6)
     hc = neck_top + (1.0, 1.6, 0)
     m.solid([hc + (1.2 * hs, -1.8 * hs, 0), hc + (-0.8, 0.9 * hs, 2.4 * hs), hc + (-0.8, 0.9 * hs, -2.4 * hs),
@@ -346,13 +364,14 @@ def plan_mantis(m, mc, g, pose, soldier):
     for side in (1, -1):    # raptorial forelegs
         base = neck_top + (-1.0, -2.6, 1.0 * side)
         if pose == "idle":
-            elbow, tip = base + (2.4, 1.2, 0.6 * side), base + (3.2, -4.0, 0.8 * side)
+            elbow, tip = base + (3.2, 2.6, 0.6 * side), base + (4.4, -5.6, 0.8 * side)
         else:
-            elbow, tip = base + (3.4, 2.4, 0.6 * side), base + (8.5, 0.6, 0.8 * side)
-        m.cyl(base, elbow, 0.85, jade, seg=5)
-        m.cyl(elbow, tip, 1.0, M_BONE, r1=0.15, seg=4)
-        for f in (0.35, 0.6):
-            spike(m, elbow + (tip - elbow) * f, elbow + (tip - elbow) * f + np.array((-0.7, 0.3, 0)), 0.25)
+            elbow, tip = base + (4.2, 3.6, 0.6 * side), base + (11.0, 0.8, 0.8 * side)
+        m.cyl(base, elbow, 1.0, jade, seg=5)
+        m.cyl(elbow, tip, 1.3, M_BONE, r1=0.12, seg=4)
+        for f in (0.25, 0.45, 0.65, 0.82):
+            p = elbow + (tip - elbow) * f
+            spike(m, p, p + np.array((-1.0, 0.4, 0)), 0.3, M_FANG)
     leg_pairs(m, mc, y0, ((-2.6, -3.6), (-0.6, 1.8)), 1.2, 1.25, 0, pose)
     return dict(y0=y0, hc=hc, hs=hs, tip=gc + (-5.8 * gs, -0.4, 0), gc=gc, gr=2.3 * gs,
                 back=[(-9, y0 + 3.0), (-6, y0 + 3.2), (-3, y0 + 3.0)], wing=np.array((-0.4, y0 + 2.4, 0)),
@@ -377,7 +396,8 @@ def plan_firefly(m, mc, g, pose, soldier):
     m.ell(hc, (1.4 * hs, 1.3 * hs, 1.6 * hs), mc)
     for z in (1.0, -1.0):
         m.ell(hc + (0.6, 0.3, z * hs), (0.55, 0.55, 0.55), M_DARKEYE)
-    antennae(m, mc, hc + (0.6, 0.8, 0), long=1.5)
+    antennae(m, mc, hc + (0.6, 0.8, 0), long=2.0)
+    m.ell(shield + (1.6, 0.4, 0), (2.4, 1.0, 3.0), mc, rot_z(-0.3))      # a hood over the head
     leg_pairs(m, mc, y0, ((-2.4, -2.4), (-0.2, 0.2), (2.0, 2.4)), 1.15, g["leg"] * 0.85, 0, pose)
     return dict(y0=y0, hc=hc, hs=hs, tip=lan, gc=np.array((-4, y0, 0)), gr=2.2,
                 back=[(-7, y0 + 4.0), (-4, y0 + 4.4), (-1, y0 + 4.0)], wing=np.array((-1.0, y0 + 3.6, 0)),
