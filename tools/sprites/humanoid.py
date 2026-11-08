@@ -471,8 +471,8 @@ ATTACKS = {
                   hand=(6.44, -14.04, -6.17), hand_pole=(0.3, 1.0, 0.8), haft=(0.97, -0.214, -0.096), face=(0.004, 0.0, -1.0),
                   shield=(-5.0, -12.5, -3.0), shield_pole=(0.3, -1.0, -0.6), shield_rot=-2.6, fx="sweep", ram="front"),
     "ram": dict(name="удар щитом", lean=-0.22, twist=0.35, t=(1.6, -1.8, 0.0),
-                ankles=((-6.5, 3.6, HZ + 1.2), (7.5, 3.6, -HZ - 0.6)),
-                hand=(0.1, -14.1, 2.6), hand_pole=(0.6, 0.0, 0.6), haft=(-0.987, -0.165, 0), face=(0.165, -0.987, 0),
+                ankles=((-2.0, 3.6, HZ + 1.0), (7.5, 3.6, -HZ - 0.6)),
+                hand=(6.4, 0.8, 2.4), hand_pole=(1.4, -7.6, 2.0), haft=None, face=(0.0, 1.0, 0.0), carry=1.0,
                 shield=(10.5, -2.0, 3.0), shield_pole=(0.0, -1.0, -0.5), shield_rot=0.0, fx="ram", ram="back"),
 }
 SMEAR = Mat(ramp("#2a2e38", "#4a505e", "#6e7686", "#98a0b2", "#c8ced8"), dither=True)
@@ -497,6 +497,88 @@ def smear(m, c, r, a0, a1, plane, width, depth, n=8):
 ATTACK = "slam"                  # what pose="attack" means
 
 
+def pose_parts(A, P=None, fx=True):
+    """Build the Guard from a pose given as numbers (see ATTACKS). Returns the parts and where things are."""
+    P = Mat(PAINT) if P is None else P
+    G = Parts()
+    torso(G, P)
+    far = SH * (1, 1, -1)
+    X = place_upper(G, rot_z(A["lean"]) @ rot_y(A["twist"]), A["t"])
+    for key, hip, ank, s in (("leg_n", (0.4, HIP, HZ), A["ankles"][0], 1), ("leg_f", (-0.8, HIP, -HZ), A["ankles"][1], -1)):
+        h = X(hip)
+        kn, an = ik(h, ank, LT, LS, (1.0, 0.25, 0.0))
+        leg(G, key, h, kn, an, s, P)
+    sh, fs = X(SH), X(far)
+    c = float(A.get("carry", 0.0))                       # carried (1): the arm and maul turn with the body
+    Rb = rot_z(A["lean"]) @ rot_y(A["twist"])
+    body = lambda v: arr(v) * (1 - c) + (Rb @ arr(v)) * c
+    el, w = ik(sh, sh + body(A["hand"]), LU, LF, body(A["hand_pole"]))
+    arm(G, "arm_n", sh, el, w, 1, P, ram_side=A.get("ram", "back"))
+    hand, _, u = fist(G, "hand_n", w, w - el, unit(body(A["haft"])), 1, P)
+    face, hc = maul(G, hand, u, P, body(A["face"]), reach=13.0)
+    elf, wf = ik(fs, fs + arr(A["shield"]), LU, LF, A["shield_pole"])
+    arm(G, "arm_f", fs, elf, wf, -1, P)
+    fc, hf, uf = fist(G, "hand_f", wf, wf - elf, (0, 1, 0), -1, P)
+    R = rot_y(A["shield_rot"])
+    sc = fc + R @ arr((SHIELD_GAP + 0.75, 0, 0))
+    back = shield(G, sc, R, P)
+    bracket(G, fc, uf, back, R)
+    tf = unit(body(A["face"]) - u * (body(A["face"]) @ u))
+    info = dict(sh=sh, hc=hc, face=face, tf=tf, u=u, sc=sc, R=R, fs=fs)
+    if fx:
+        impact(G["fx"], A, A.get("ft", 0.0), info)
+    return G, info
+
+
+def impact(fx, A, ft, info):
+    """Effects of the blow landing. ft = 0 at the instant of contact, 1 a moment later (flash gone,
+    sparks flown further, dust spread)."""
+    sh, hc, face, tf, u, sc, R = (info[k] for k in ("sh", "hc", "face", "tf", "u", "sc", "R"))
+    near = ft < 0.5
+    spread, grow = 1.0 + 1.2 * ft, 1.0 + 0.5 * ft
+    if A["fx"] in ("slam", "sweep"):
+        for i, d in enumerate((9.6, 11.2, 13.2)):                          # the steam ram fires: a jet out of the back
+            fx.ell(hc - tf * (d + 2.0 * ft), (1.3 + 0.6 * i,) * 3 * np.array(grow), M_PUFF)
+        for i, d in enumerate(((1.2, 0.0, 0.0), (2.4, 1.8, 1.4), (2.0, -1.6, -1.2), (3.6, 0.6, -0.4), (1.6, 2.6, -2.0))):
+            if i == 0 and not near:
+                continue
+            fx.ell(face + tf * d[0] * spread + arr((0, d[1], d[2])) * (0.6 if i else 0) * spread, ((0.75 - 0.08 * i) / grow,) * 3,
+                   emissive("fire", 16 if i == 0 else 4, 0.85))
+    if A["fx"] == "slam":         # the arc of the blow from over the shoulder, grit and dust where it lands
+        v = hc - sh
+        if near and A.get("smear", True):
+            smear(fx, sh, np.linalg.norm(v[:2]), np.radians(115), np.arctan2(v[1], v[0]) + 0.32, "xy", 4.0, 3.6)
+        if near:
+            fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 22, 0.9))                 # the flash of contact
+        g = arr((face[0], 0.3, face[2]))
+        for i, d in enumerate(((-3.0, 1.4, 2.4), (3.2, 1.6, 2.0), (0.5, 2.0, -2.6))):
+            fx.ell(g + arr(d) * spread, (2.0 + 0.3 * i, 1.3, 1.7) * np.array(grow), M_PUFF)
+        for d in ((2.6, 3.4, 1.6), (-2.2, 4.2, -1.0), (3.8, 2.0, -1.8)):
+            fx.box(g + arr(d) * (1.0 + 1.6 * ft), (0.8, 0.7, 0.8), M_IRON, rot_z(0.7 + 2.0 * ft))
+    elif A["fx"] == "sweep":      # a flat arc low along the ground from the near side to the front, dust behind it
+        r = np.linalg.norm(hc[[0, 2]])
+        if near and A.get("smear", True):
+            smear(fx, (0, hc[1], 0), r, np.radians(78), np.arctan2(hc[2], hc[0]) + 0.22, "xz", 4.2, 3.6)
+        if near:
+            fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 20, 0.9))                 # the flash of contact
+        for i, d in enumerate(((-2.0, -2.4, 3.0), (-5.0, -2.6, 5.0), (-8.5, -2.8, 7.0))):
+            fx.ell(arr((hc[0], 0.0, hc[2])) + arr((d[0], 1.2, d[2])) * np.array((1, 1, spread)), (2.0 + 0.4 * i, 1.2, 1.8) * np.array(grow), M_PUFF)
+    elif A["fx"] == "ram":        # the shield's face strikes: a flash, sparks, speed lines behind its edges, dust
+        front = sc + R @ arr((1.6, 0, 0))
+        if near:
+            fx.ell(front + R @ arr((0.9, 1.5, 0)), (1.4, 3.0, 3.0), emissive("fire", 20, 0.85))
+        for i, d in enumerate(((2.6, 5.0, 2.6), (3.4, 0.5, -3.2), (2.2, -4.0, 3.4), (4.4, 2.6, 0.0), (3.0, -1.5, -4.8))):
+            fx.ell(front + R @ (arr(d) * spread), ((0.6 - 0.06 * i) / grow,) * 3, emissive("fire", 5 if i == 0 else 0, 0.7))
+        if near and A.get("smear", True):
+            for y in (-7.0, 0.0, 7.0):
+                for zz in (-7.2, 7.2):
+                    p = sc + R @ arr((-2.5, y, zz))
+                    fx.box(p, (5.0, 0.35, 0.35), SMEAR)
+        f = arr(A["ankles"][1]) + arr((2.0, -2.4, 0))
+        for i, d in enumerate(((1.5, 1.2, 1.5), (3.2, 1.6, -1.0), (-0.5, 1.0, -2.5), (-3.0, 1.0, 1.0))):
+            fx.ell(f + arr(d) * spread, (1.8 + i * 0.3, 1.2, 1.6) * np.array(grow), M_PUFF)
+
+
 def guard_parts(pose="idle", P=None):
     P = Mat(PAINT) if P is None else P
     G = Parts()
@@ -519,59 +601,7 @@ def guard_parts(pose="idle", P=None):
         back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
         bracket(G, fc, uf, back, R)
         return G
-    A = ATTACKS[ATTACK if pose == "attack" else pose]
-    X = place_upper(G, rot_z(A["lean"]) @ rot_y(A["twist"]), A["t"])
-    for key, hip, ank, s in (("leg_n", (0.4, HIP, HZ), A["ankles"][0], 1), ("leg_f", (-0.8, HIP, -HZ), A["ankles"][1], -1)):
-        h = X(hip)
-        kn, an = ik(h, ank, LT, LS, (1.0, 0.25, 0.0))
-        leg(G, key, h, kn, an, s, P)
-    sh, fs = X(SH), X(far)
-    el, w = ik(sh, sh + arr(A["hand"]), LU, LF, A["hand_pole"])
-    arm(G, "arm_n", sh, el, w, 1, P, ram_side=A.get("ram", "back"))
-    hand, _, u = fist(G, "hand_n", w, w - el, A["haft"], 1, P)
-    face, hc = maul(G, hand, u, P, A["face"], reach=13.0)
-    elf, wf = ik(fs, fs + arr(A["shield"]), LU, LF, A["shield_pole"])
-    arm(G, "arm_f", fs, elf, wf, -1, P)
-    fc, hf, uf = fist(G, "hand_f", wf, wf - elf, (0, 1, 0), -1, P)
-    R = rot_y(A["shield_rot"])
-    sc = fc + R @ arr((SHIELD_GAP + 0.75, 0, 0))
-    back = shield(G, sc, R, P)
-    bracket(G, fc, uf, back, R)
-    fx = G["fx"]
-    tf = unit(arr(A["face"]) - u * (arr(A["face"]) @ u))
-    if A["fx"] in ("slam", "sweep"):
-        for i, d in enumerate((9.6, 11.2, 13.2)):                          # the steam ram fires: a jet out of the back
-            fx.ell(hc - tf * d, (1.3 + 0.6 * i,) * 3, M_PUFF)
-        for i, d in enumerate(((1.2, 0.0, 0.0), (2.4, 1.8, 1.4), (2.0, -1.6, -1.2), (3.6, 0.6, -0.4), (1.6, 2.6, -2.0))):
-            fx.ell(face + tf * d[0] + arr((0, d[1], d[2])) * (0.6 if i else 0), (0.75 - 0.08 * i,) * 3,
-                   emissive("fire", 16 if i == 0 else 4, 0.85))
-    if A["fx"] == "slam":         # the arc of the blow from over the shoulder, grit and dust where it lands
-        v = hc - sh
-        smear(fx, sh, np.linalg.norm(v[:2]), np.radians(115), np.arctan2(v[1], v[0]) + 0.32, "xy", 4.0, 3.6)
-        fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 22, 0.9))                     # the flash of contact
-        g = arr((face[0], 0.3, face[2]))
-        for i, d in enumerate(((-3.0, 1.4, 2.4), (3.2, 1.6, 2.0), (0.5, 2.0, -2.6))):
-            fx.ell(g + arr(d), (2.0 + 0.3 * i, 1.3, 1.7), M_PUFF)
-        for d in ((2.6, 3.4, 1.6), (-2.2, 4.2, -1.0), (3.8, 2.0, -1.8)):
-            fx.box(g + arr(d), (0.8, 0.7, 0.8), M_IRON, rot_z(0.7))
-    elif A["fx"] == "sweep":      # a flat arc low along the ground from the near side to the front, dust behind it
-        r = np.linalg.norm(hc[[0, 2]])
-        smear(fx, (0, hc[1], 0), r, np.radians(78), np.arctan2(hc[2], hc[0]) + 0.22, "xz", 4.2, 3.6)
-        fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 20, 0.9))                     # the flash of contact
-        for i, d in enumerate(((-2.0, -2.4, 3.0), (-5.0, -2.6, 5.0), (-8.5, -2.8, 7.0))):
-            fx.ell(arr((hc[0], 0.0, hc[2])) + arr((d[0], 1.2, d[2])), (2.0 + 0.4 * i, 1.2, 1.8), M_PUFF)
-    elif A["fx"] == "ram":        # the shield's face strikes: a flash, sparks, speed lines behind its edges, dust
-        front = sc + R @ arr((1.6, 0, 0))
-        fx.ell(front + R @ arr((0.9, 1.5, 0)), (1.4, 3.0, 3.0), emissive("fire", 20, 0.85))
-        for i, d in enumerate(((2.6, 5.0, 2.6), (3.4, 0.5, -3.2), (2.2, -4.0, 3.4), (4.4, 2.6, 0.0), (3.0, -1.5, -4.8))):
-            fx.ell(front + R @ arr(d), (0.6 - 0.06 * i,) * 3, emissive("fire", 5 if i == 0 else 0, 0.7))
-        for y in (-7.0, 0.0, 7.0):
-            for zz in (-7.2, 7.2):
-                p = sc + R @ arr((-2.5, y, zz))
-                fx.box(p, (5.0, 0.35, 0.35), SMEAR)
-        f = arr(A["ankles"][1]) + arr((2.0, -2.4, 0))
-        for i, d in enumerate(((1.5, 1.2, 1.5), (3.2, 1.6, -1.0), (-0.5, 1.0, -2.5), (-3.0, 1.0, 1.0))):
-            fx.ell(f + arr(d), (1.8 + i * 0.3, 1.2, 1.6), M_PUFF)
+    G, _ = pose_parts(ATTACKS[ATTACK if pose == "attack" else pose], P)
     return G
 
 
@@ -590,6 +620,15 @@ ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("l
            ("pauldron_n", "arm_n"), ("pauldron_f", "arm_f"), ("arm_n", "arm_n.ram"), ("arm_f", "arm_f.ram"),
            ("arm_n", "hand_n"), ("arm_f", "hand_f"), ("hand_n", "hammer"), ("hand_f", "bracket"),
            ("bracket", "shield"), ("pauldron_n", "pauldron_f"), ("arm_f", "bracket")]
+
+
+def carry_haft():
+    """Haft direction of the maul resting on the shoulder (idle), for poses that keep carrying it."""
+    el, w = ik(SH, SH + arr((WX, WY, WZ)), LU, LF, (1.4, -7.6, 2.0))
+    return tuple(grip_on(w, w - el, arr((-0.8, RY, 10.4)), 1))
+
+
+ATTACKS["ram"]["haft"] = carry_haft()
 
 
 def guard(pose="idle", P=None):
