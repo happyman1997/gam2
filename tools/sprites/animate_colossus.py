@@ -70,8 +70,9 @@ def slerp(a, b, s):
     return unit((np.sin((1 - s) * w) * a + np.sin(s * w) * b) / np.sin(w))
 
 
-def blend(A0, A1, s, way_hand, way_mace):
-    """Numbers between two poses: the hand and the mace turn round the shoulder the given ways."""
+def blend(A0, A1, s, way_hand, way_mace, arcs=("n",)):
+    """Numbers between two poses: the hands in `arcs` (and the mace) turn round the shoulder the given ways,
+    the other hand moves straight."""
     L = lambda k: tuple(np.asarray(A0[k], float) + (np.asarray(A1[k], float) - np.asarray(A0[k], float)) * s)
     A = dict(A1 if s >= 0.5 else A0)
     for k in ("lean", "twist"):
@@ -86,16 +87,18 @@ def blend(A0, A1, s, way_hand, way_mace):
             p[1] += 3.0 * bump                                         # a stepping foot lifts
         ank.append(tuple(p))
     A["ank"] = tuple(ank)
-    A["hand_n"] = tuple(arc_lerp(A0["hand_n"], A1["hand_n"], s, "xy", way_hand))
-    A["mace_dir"] = tuple(unit(arc_lerp(A0["mace_dir"], A1["mace_dir"], s, "xy", way_mace)))
+    for side in ("n", "f"):
+        k = "hand_" + side
+        A[k] = tuple(arc_lerp(A0[k], A1[k], s, "xy", way_hand)) if side in arcs else L(k)
+    if "mace_dir" in A0 and "mace_dir" in A1:
+        A["mace_dir"] = tuple(unit(arc_lerp(A0["mace_dir"], A1["mace_dir"], s, "xy", way_mace)))
     for k in ("pole_n", "pole_f"):
         A[k] = tuple(unit(L(k)))
-    A["hand_f"] = L("hand_f")
     A["fx"] = None
     return A
 
 
-def timeline():
+def timeline(HIT=HIT):
     """(numbers, duration ms, ft or None, gun firing) for every frame. The mace is held the same way all
     through (thumb up, as at rest): the wrist only bends, evenly, from cocked back to driving the head down."""
     n_i, th_i = grip_of(IDLE)
@@ -122,7 +125,7 @@ def timeline():
 def frame_parts(A, ft, fire, burst):
     G, info = GH.creature_parts(S, A, fx=False)
     if ft is not None:
-        GH.col_mace_fx(G["fx"], info, ft)
+        GH.col_mace_fx(G["fx"], info, ft, ground=A.get("ground", True))
     if fire:
         GH.col_gun_fx(G["fx"], info, 0.0 if ft is None else ft, burst=burst)
     return G, info

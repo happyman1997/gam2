@@ -327,6 +327,15 @@ def molot_fx(fx, A, info, S, ft):
     mid = (faces[0] + faces[1]) / 2
     g = arr((mid[0], 0.3, mid[2]))
     near = ft < 0.5
+    if not A.get("ground", True):        # struck into a body, not the ground: flashes, sparks, armour chips
+        d = unit(info["n"]["d"] + info["f"]["d"])
+        for p in faces:
+            if near:
+                fx.ell(p + d * 0.6, (1.8, 1.8, 1.8), emissive("fire", 18, 0.85))
+            sparks(fx, p + d * 0.6, n=5, spread=2.8, ft=ft, seed=int(p[2] * 10) % 7, big=False)
+        for i, o in enumerate(((2.0, -1.0, 2.4), (-1.6, -2.4, -1.8), (2.6, 1.0, -2.6), (-0.6, -3.0, 2.8))):
+            fx.box(mid + d * 1.5 + arr(o) * (1.0 + 1.5 * ft) - (0, 2.0 * ft, 0), (0.8, 0.7, 0.8), M_IRON, rot_z(0.6 + 1.8 * ft + i))
+        return
     if near:
         fx.ell(g + (0, 0.1, 0), (6.5, 0.25, 6.0), emissive("fire", 0, 0))
         fx.ell(g + (0, 0.2, 0), (3.8, 0.3, 3.4), emissive("fire", 20, 0.85))
@@ -349,7 +358,13 @@ MOLOT = dict(
         attack=dict(lean=-0.38, t=(1.4, -1.6, 0.0), ank=((4.5, 3.6, 6.0), (-5.5, 3.6, -5.8)),
                     hand_n=(12.5, -14.0, -3.0), pole_n=(0.0, 0.6, 1.0), hand_f=(12.5, -14.0, 3.0), pole_f=(0.0, 0.6, -1.0),
                     ram_n="front", ram_f="front", fx=True),
+        # against a much bigger enemy (size +2 and more): both fists driven up into its belly
+        attack_high=dict(lean=-0.02, twist=-0.02, t=(1.68, -0.9, 0.0), ank=((5.0, 3.6, 5.5), (-5.56, 3.6, -6.7)),
+                         hand_n=(14.4, 7.25, -1.84), pole_n=(0.05, -0.18, 0.44), hand_f=(13.94, 8.38, 2.76), pole_f=(-0.2, -0.59, -0.85),
+                         ram_n="front", ram_f="front", fx=True, ground=False),
     ),
+    bands=dict(low="attack", high="attack_high"),
+    strike=lambda info: (info["n"]["face"] + info["f"]["face"]) / 2,
 )
 
 # ---------------------------------------------------------------- Горн: a stocky furnace with a tall chimney
@@ -1004,11 +1019,12 @@ def minigun(G, side, sh, el, w, s, P, A, S):
 
 
 def col_fx(fx, A, info, S, ft):
-    col_mace_fx(fx, info, ft)
+    col_mace_fx(fx, info, ft, ground=A.get("ground", True))
     col_gun_fx(fx, info, ft)
 
 
-def col_mace_fx(fx, info, ft):
+def col_mace_fx(fx, info, ft, ground=True):
+    """The mace lands: lightning out of the head; on the ground — a scorched ring and dust."""
     mc = info["n"]
     head, u = mc["head"], mc["u"]
     near = ft < 0.5
@@ -1019,13 +1035,16 @@ def col_mace_fx(fx, info, ft):
         for i in range(9):
             a = rnd.uniform(0, 2 * np.pi)
             p = head + arr((np.cos(a), rnd.uniform(-0.6, 1.0), np.sin(a))) * rnd.uniform(4.0, 8.0)
-            p[1] = max(p[1], 0.3)
+            if ground:
+                p[1] = max(p[1], 0.3)
             q = lerp(head, p, 0.5) + arr((rnd.uniform(-1.4, 1.4), rnd.uniform(-1.0, 1.0), rnd.uniform(-1.4, 1.4)))
             fx.cyl(head, q, 0.26, ARC, seg=4)
             fx.cyl(q, p, 0.2, ARC, seg=4)
-        fx.ell(g + (0, 0.1, 0), (7.0, 0.2, 6.0), Mat(ramp("#0e1a22", "#18303c", "#245060", "#3a7a8e", "#6ab8c8"), dither=True))
-    sparks(fx, head, n=6, spread=3.4, ft=ft, seed=5, big=False)
-    puffs(fx, g, n=4, r=2.6, spread=4.6, ft=ft, seed=3)
+        if ground:
+            fx.ell(g + (0, 0.1, 0), (7.0, 0.2, 6.0), Mat(ramp("#0e1a22", "#18303c", "#245060", "#3a7a8e", "#6ab8c8"), dither=True))
+    sparks(fx, head, n=6 if ground else 9, spread=3.4, ft=ft, seed=5, big=False)
+    if ground:
+        puffs(fx, g, n=4, r=2.6, spread=4.6, ft=ft, seed=3)
 
 
 def col_gun_fx(fx, info, ft, burst=0):
@@ -1065,7 +1084,14 @@ COLOSSUS = dict(
                     hand_n=(10.5, -18.2, 2.5), pole_n=(0.03, -0.24, 0.95), mace_dir=(0.88, -0.16, -0.44), grip_least=48.0,
                     ram_n="front",
                     hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True),
+        # against an enemy of about its own size: the same blow, the head into the chest
+        attack_level=dict(lean=-0.22, twist=-0.217, t=(1.08, -2.45, 0.0), ank=((6.45, 3.6, 9.5), (-5.92, 3.6, -9.98)),
+                          hand_n=(16.05, -13.66, -3.76), pole_n=(0.65, 0.17, 0.74), mace_dir=(0.893, 0.272, -0.358), grip_least=48.0,
+                          ram_n="back", hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True,
+                          ground=False),
     ),
+    bands=dict(low="attack", level="attack_level"),
+    strike=lambda info: info["n"]["head"],
 )
 
 
@@ -1234,7 +1260,7 @@ if __name__ == "__main__":
     from noise import value_noise
     from paths import font, out
     for S in ROSTER:
-        for pose in ("idle", "attack", "broken"):
+        for pose in ("idle", "attack", "broken") + tuple(v for v in S.get("bands", {}).values() if v != "attack"):
             bad = check(S, pose)
             print(S["name"], pose, "clipping:", "none" if not bad else [(a, b, round(v, 2)) for v, a, b in bad])
     # a close-up sheet of every Foundry creature: idle above, attack below
