@@ -591,28 +591,49 @@ BROKEN = dict(lean=-0.5, twist=0.12, t=(1.4, -8.0, 0.0), ankles=((-5.4, 2.4, HZ 
               shield=(3.0, -15.6, -4.5), shield_pole=(0.3, 0.0, -1.0), shield_rot=1.0, fx=None, ram="back")
 
 
-def guard_parts(pose="idle", P=None):
+IDLE_LEGS = (((0.4, HIP, HZ), (3.6, 10.8, HZ + 0.5), (2.8, 3.6, HZ + 0.7), 1),
+             ((-0.8, HIP, -HZ), (-1.0, 10.8, -HZ - 0.6), (-4.6, 3.6, -HZ - 0.8), -1))
+
+
+def guard_idle(P=None, legs=True, weapon=True, near_arm=None):
+    """The Guard at rest, and where its parts are (for modules mounted on it). legs/weapon=False leave the legs or
+    the maul out, for modules that replace them; near_arm=(elbow, wrist) offsets from the shoulder pose that arm."""
     P = Mat(PAINT) if P is None else P
     G = Parts()
     torso(G, P)
     far = SH * (1, 1, -1)
-    if pose == "idle":
-        leg(G, "leg_n", (0.4, HIP, HZ), (3.6, 10.8, HZ + 0.5), (2.8, 3.6, HZ + 0.7), 1, P)
-        leg(G, "leg_f", (-0.8, HIP, -HZ), (-1.0, 10.8, -HZ - 0.6), (-4.6, 3.6, -HZ - 0.8), -1, P)
-        # the maul carried on the shoulder: the haft rests on top of the pauldron, head behind
-        el = SH + (1.4, -7.6, 2.0)
-        w = arm(G, "arm_n", SH, el, SH + (WX, WY, WZ), 1, P)
-        rest = arr((-0.8, RY, 10.4))
-        u = grip_on(w, w - el, rest, 1)
+    info = dict(sh=arr(SH), fs=arr(far), legs=[tuple(arr(v) for v in l[:3]) + (l[3],) for l in IDLE_LEGS])
+    if legs:
+        for (key, (h, k, a, s)) in zip(("leg_n", "leg_f"), IDLE_LEGS):
+            leg(G, key, h, k, a, s, P)
+    # the maul carried on the shoulder: the haft rests on top of the pauldron, head behind
+    el = SH + (1.4, -7.6, 2.0) if near_arm is None else SH + arr(near_arm[0])
+    w = arm(G, "arm_n", SH, el, SH + ((WX, WY, WZ) if near_arm is None else arr(near_arm[1])), 1, P)
+    rest = arr((-0.8, RY, 10.4))
+    u = grip_on(w, w - el, rest, 1)
+    if weapon:
         hand, _, u = fist(G, "hand_n", w, w - el, u, 1, P)
-        maul(G, hand, u, P, (0, 1, 0), reach=13.0)
-        elf = far + (0.8, -8.0, -1.6)
-        w = arm(G, "arm_f", far, elf, far + (5.8, -10.0, -2.0), -1, P)
-        fc, hf, uf = fist(G, "hand_f", w, w - elf, (0, 1, 0), -1, P)
-        R = rot_y(0.5)
-        back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
-        bracket(G, fc, uf, back, R)
-        return G
+        face, hc = maul(G, hand, u, P, (0, 1, 0), reach=13.0)
+        info.update(face=face, hc=hc)
+    else:
+        hand = w
+    info.update(hand=hand, u=u, el=el, w=w)
+    elf = far + (0.8, -8.0, -1.6)
+    w = arm(G, "arm_f", far, elf, far + (5.8, -10.0, -2.0), -1, P)
+    fc, hf, uf = fist(G, "hand_f", w, w - elf, (0, 1, 0), -1, P)
+    R = rot_y(0.5)
+    sc = fc + R @ arr((SHIELD_GAP + 0.75, 0, 0))
+    back = shield(G, sc, R, P)
+    bracket(G, fc, uf, back, R)
+    info.update(sc=sc, R=R, fc=fc, elf=elf, wf=w)
+    return G, info
+
+
+def guard_parts(pose="idle", P=None):
+    P = Mat(PAINT) if P is None else P
+    if pose == "idle":
+        return guard_idle(P)[0]
+    G = Parts()
     if pose == "broken":
         G, info = pose_parts(BROKEN, P, fx=False)
         X = lambda p: rot_z(BROKEN["lean"]) @ rot_y(BROKEN["twist"]) @ (arr(p) - (0, HIP, 0)) + (0, HIP, 0) + arr(BROKEN["t"])
