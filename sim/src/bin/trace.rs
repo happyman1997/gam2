@@ -5,13 +5,13 @@ use sim::{Battle, Event};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let which = args.get(1).map(String::as_str).unwrap_or("molot_orudie");
+    let which = args.get(1).map(String::as_str).unwrap_or("strazh_mudrets");
     let seed: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(1);
     let (a, b) = match which {
         "strazh" => (vec![strazh(), mekhanik()], many(rabochaya(), 25)),
         "otets" => (start_otets(), swarm_start()),
         "gorn" => (vec![gorn()], many(rabochaya(), 10)),
-        _ => (vec![molot(), orudie()], many(rabochaya(), 25)),
+        _ => (vec![strazh(), mudrets()], many(rabochaya(), 25)),
     };
     let mut bt = Battle::new(seed).with_log();
     bt.add_army(0, &a);

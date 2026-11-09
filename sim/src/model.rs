@@ -90,8 +90,15 @@ impl ArmorType {
 pub enum Trait {
     /// Adjacent enemies must hit this unit first (Страж).
     Zaslon,
-    /// Blows ignore half of the target's armor (Молот).
+    /// Blows ignore half of the target's armor (a module: no frame has it now).
     Probivnoy,
+    /// A mage: its weapon is a spell — no far-half loss, no secondary weapon; with an enemy adjacent
+    /// the spell goes off one time in four (Мудрец).
+    Caster,
+    /// Adjacent allied golems recharge their fire and lightning modules a round sooner (Мудрец).
+    Pitanie,
+    /// Acid shorts the windings: silent for 2 rounds after an acid hit (Мудрец).
+    Zamykanie,
     /// Each round sets one adjacent enemy on fire (Горн).
     ZharGorna,
     /// Ranged: aims at the far rows and loses nothing at long range (Орудие).
@@ -171,6 +178,11 @@ pub enum Ability {
     Brood { every: u32, n: u32 },
     /// Every `every` rounds: marks the most dangerous enemy; allies who reach it hit it first, +1 (Разум улья).
     Mark { every: u32 },
+    /// Every `every` rounds, instead of the spell: an adjacent allied golem hits twice as hard this round (Перегрузка).
+    Overload { every: u32 },
+    /// Every `every` rounds, instead of the spell: a fireball within `range` — the cell and its neighbours,
+    /// fire, sets them burning (Огненный шар).
+    Fireball { every: u32, die: u32, bonus: i32, range: u32 },
 }
 
 #[derive(Clone, Debug)]

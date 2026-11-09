@@ -13,7 +13,7 @@ fn main() {
         "otets" => ("Старт Отца колосса против роя", start_otets(), swarm_start()),
         "izobretatel" => ("Старт Изобретателя против роя", start_izobretatel(), swarm_start()),
         "manyak" => ("Старт Маньяка против роя", start_manyak(), swarm_start()),
-        "molot_orudie" => ("Молот и Орудие против 25 рабочих", vec![molot(), orudie()], many(rabochaya(), 25)),
+        "strazh_mudrets" => ("Страж и Мудрец против 25 рабочих", vec![strazh(), mudrets()], many(rabochaya(), 25)),
         _ => ("Старт Зодчего против роя", start_zodchiy(), swarm_start()),
     };
     let mut bt = Battle::new(seed).with_log();

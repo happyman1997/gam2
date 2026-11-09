@@ -1,11 +1,11 @@
 use sim::battle::{fight, Battle};
 use sim::data::*;
-use sim::model::Dmg;
+use sim::model::{Dmg, Trait};
 use sim::Event;
 
 #[test]
 fn same_seed_same_battle() {
-    let a = vec![molot(), orudie()];
+    let a = vec![strazh(), mudrets()];
     let b = many(rabochaya(), 25);
     let run = |seed| {
         let mut bt = Battle::new(seed).with_log();
@@ -44,13 +44,15 @@ fn chitin_breaks_under_blunt() {
 #[test]
 fn trample_hits_the_whole_cell() {
     let mut bt = Battle::new(3).with_log();
-    bt.place(0, molot(), 5, 5);
+    let mut g = gorn(); // a size-5 melee golem; without its fire, so only blows count
+    g.traits.retain(|t| *t != Trait::ZharGorna);
+    bt.place(0, g, 5, 5);
     for _ in 0..4 {
         bt.place(1, rabochaya(), 7, 5);
     }
     let _ = bt.run();
     let log = bt.log.unwrap();
-    // first blow of Молот (unit 0) in the battle hits all four workers in the cell
+    // the golem's first blow in the battle hits all four workers in the cell
     let first_round_hits = log
         .iter()
         .skip_while(|e| !matches!(e, Event::Hit { a: 0, .. }))
@@ -65,4 +67,22 @@ fn exhaustion_ends_every_battle() {
     // two sides that never attack still finish before the round limit
     let o = fight(&[mekhanik()], &[mekhanik()], 5);
     assert!(o.rounds < sim::battle::MAX_ROUNDS);
+}
+
+#[test]
+fn caster_spell_and_short_circuit() {
+    // the mage fires at range at full power; acid silences it for 2 rounds
+    let mut bt = Battle::new(2).with_log();
+    let m = bt.place(0, mudrets(), 2, 5);
+    bt.place(1, zhuk(), 8, 5); // slow: after its 2 steps it is 3 cells off, in the spell's range of 4
+    let _ = bt.step();
+    let log = bt.log.clone().unwrap();
+    assert!(log.iter().any(|e| matches!(e, Event::Hit { a, .. } if *a == m)), "the spell reaches 4 cells");
+    let mut bt = Battle::new(2);
+    let m = bt.place(0, mudrets(), 2, 5);
+    bt.place(1, kislotnik(), 7, 5); // a spitter: it comes within its range of 2 and spits acid
+    for _ in 0..3 {
+        let _ = bt.step();
+    }
+    assert!(bt.units[m].silenced_until > 0, "acid shorts the windings");
 }

@@ -54,7 +54,7 @@ fn main() {
         (manyak(), None),
         (zodchiy(), None),
         (orudie(), Some(5)),
-        (molot(), Some(5)),
+        (mudrets(), Some(5)),
         (gorn(), Some(5)),
         (strazh(), Some(7)),
         (otets_kolossa(), None),

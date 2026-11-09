@@ -27,8 +27,15 @@ pub fn strazh() -> Template {
     golem("Страж", 6, 100, 6, 3, 3, 4, 1).with_trait(Trait::Zaslon)
 }
 
-pub fn molot() -> Template {
-    golem("Молот", 5, 60, 8, 3, 2, 3, 1).with_trait(Trait::Probivnoy)
+/// Мудрец, the mage: the spell Разряд (lightning 1–8 +1, range 4), Питание, Замыкание.
+pub fn mudrets() -> Template {
+    let mut t = golem("Мудрец", 5, 40, 8, 1, 5, 2, 1)
+        .with_trait(Trait::Caster)
+        .with_trait(Trait::Pitanie)
+        .with_trait(Trait::Zamykanie);
+    t.dmg = Dmg::Shock;
+    t.range = 4;
+    t
 }
 
 pub fn gorn() -> Template {
@@ -107,6 +114,14 @@ pub fn grozovaya_katushka() -> Ability {
     Ability::Bolt { every: 2, die: 6, bonus: 0, dmg: Dmg::Shock, range: 1 }
 }
 
+pub fn peregruzka() -> Ability {
+    Ability::Overload { every: 2 }
+}
+
+pub fn ognenny_shar() -> Ability {
+    Ability::Fireball { every: 3, die: 4, bonus: 0, range: 5 }
+}
+
 pub fn golova_katapulta() -> Ability {
     Ability::Bolt { every: 2, die: 6, bonus: 2, dmg: Dmg::Blunt, range: 3 }
 }
@@ -166,20 +181,20 @@ pub fn start_otets() -> Vec<Template> {
     vec![otets_kolossa().with(Ability::Plates(3)).with(Ability::Flail), mekhanik().with(remont())]
 }
 
-/// Изобретатель: small Молот (Гусеницы, Пружинный рывок — not yet), small Орудие with Мортира
+/// Изобретатель: small Мудрец with Перегрузка and Грозовая катушка, small Орудие with Мортира
 /// and Грозовая катушка, small Механик with Ремонт (Отражатель — not yet).
 pub fn start_izobretatel() -> Vec<Template> {
     vec![
-        molot().smaller(),
+        mudrets().smaller().with(peregruzka()).with(grozovaya_katushka()),
         orudie().smaller().with(mortira()).with(grozovaya_katushka()),
         mekhanik().smaller().with(remont()),
         izobretatel(),
     ]
 }
 
-/// Маньяк: Молот (Ноги-пилы, Отбойник — not yet), Орудие with Голова-катапульта and Картечь.
+/// Маньяк: Мудрец with Огненный шар (Ноги-пилы — not yet), Орудие with Голова-катапульта and Картечь.
 pub fn start_manyak() -> Vec<Template> {
-    vec![molot(), orudie().with(golova_katapulta()).with(Ability::PointBlank), manyak()]
+    vec![mudrets().with(ognenny_shar()), orudie().with(golova_katapulta()).with(Ability::PointBlank), manyak()]
 }
 
 /// Зодчий: Страж with Перехват (Щит-стена — not yet), Механик with Ремонт, two masons.

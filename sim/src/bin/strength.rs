@@ -1,6 +1,6 @@
 //! Strength of one unit in reference fighters, with stat overrides — for tuning numbers.
 //!
-//! `cargo run --release --bin strength -- molot hp=63 die=8 bonus=4 armor=3 [+plates] [+flail] [+remont] [pair=strazh] [m=400]`
+//! `cargo run --release --bin strength -- mudrets hp=40 die=6 bonus=0 armor=2 [+plates] [+flail] [+remont] [pair=strazh] [m=400]`
 //! With `pair=X` it prints the contribution: strength(X + unit) − strength(X).
 
 use rayon::prelude::*;
@@ -13,7 +13,7 @@ const MAX_N: usize = 84;
 
 fn base(key: &str) -> Template {
     match key {
-        "molot" => molot(),
+        "mudrets" => mudrets(),
         "orudie" => orudie(),
         "gorn" => gorn(),
         "strazh" => strazh(),
@@ -56,7 +56,7 @@ fn strength(group: &[Template], m: u64) -> f64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let mut t = base(args.first().map(String::as_str).unwrap_or("molot"));
+    let mut t = base(args.first().map(String::as_str).unwrap_or("mudrets"));
     let mut m = 400u64;
     let mut pair: Option<Template> = None;
     for a in &args[1..] {

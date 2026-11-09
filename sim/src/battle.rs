@@ -73,6 +73,10 @@ pub struct Unit {
     /// Side whose larvae hatch from this unit when it dies (Кукушка).
     pub infected: Option<u8>,
     pub curled: bool,
+    /// Silent (no spells, no modules) up to and including this round (Замыкание).
+    pub silenced_until: u32,
+    /// Hits twice as hard in this round (Перегрузка).
+    pub overloaded: u32,
 }
 
 impl Unit {
@@ -177,6 +181,7 @@ struct Hit {
     knock: bool,
     venom: u32,
     infect: bool,
+    ignite: bool,
 }
 
 pub struct Battle {
@@ -274,6 +279,8 @@ impl Battle {
             last_meal: self.round,
             infected: None,
             curled: false,
+            silenced_until: 0,
+            overloaded: 0,
         });
         id
     }
@@ -622,17 +629,51 @@ impl Battle {
         }
     }
 
+    /// An adjacent ally with Питание: fire and lightning modules recharge a round sooner.
+    fn powered(&self, i: usize) -> bool {
+        let side = self.units[i].side;
+        (0..self.units.len()).any(|k| {
+            k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.has(Trait::Pitanie) && self.dist(i, k) <= 1
+        })
+    }
+
     fn act(&mut self, i: usize, hits: &mut Vec<Hit>) {
         let round = self.round;
+        if self.units[i].silenced_until >= round {
+            return; // Замыкание: the windings are shorted
+        }
+        let powered = self.powered(i);
+        let every_of = |every: u32, dmg: Dmg| if powered && matches!(dmg, Dmg::Fire | Dmg::Shock) { (every - 1).max(1) } else { every };
         let abilities = self.units[i].t.abilities.clone();
         for ab in abilities {
             match ab {
+                Ability::Overload { every } if round % every == 0 => {
+                    let side = self.units[i].side;
+                    let ally = (0..self.units.len())
+                        .filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.golem)
+                        .filter(|&k| !self.units[k].t.has(Trait::NoAttack) && self.dist(i, k) <= 1)
+                        .max_by_key(|&k| (self.units[k].t.die as i32 + 2 * self.units[k].t.bonus, Reverse(k)));
+                    if let Some(k) = ally {
+                        self.units[k].overloaded = round;
+                        return;
+                    }
+                }
+                Ability::Fireball { every, die, bonus, range } if round % every_of(every, Dmg::Fire) == 0 => {
+                    if let Some(tj) = self.ranged_target(i, range) {
+                        let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
+                        for v in victims {
+                            let raw = self.rng.damage(die, bonus);
+                            hits.push(Hit { attacker: i, target: v, raw, dmg: Dmg::Fire, ignite: true, ..Default::default() });
+                        }
+                        return;
+                    }
+                }
                 Ability::Repair { every, amount } if round % every == 0 => {
                     if self.repair(i, amount) {
                         return;
                     }
                 }
-                Ability::Volley { every, die, bonus, dmg } if round % every == 0 => {
+                Ability::Volley { every, die, bonus, dmg } if round % every_of(every, dmg) == 0 => {
                     if let Some(tj) = self.ranged_target(i, self.units[i].t.range) {
                         let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
                         for v in victims {
@@ -671,7 +712,7 @@ impl Battle {
                         self.ev(Event::Mark { t });
                     }
                 }
-                Ability::Bolt { every, die, bonus, dmg, range } if round % every == 0 => {
+                Ability::Bolt { every, die, bonus, dmg, range } if round % every_of(every, dmg) == 0 => {
                     let target = if range <= 1 { self.melee_target(i) } else { self.ranged_target(i, range) };
                     if let Some(tj) = target {
                         let raw = self.rng.damage(die, bonus);
@@ -721,6 +762,16 @@ impl Battle {
             (t.die, t.bonus, t.dmg, t.range)
         };
         let probivnoy = self.units[i].t.has(Trait::Probivnoy);
+        if self.units[i].t.has(Trait::Caster) {
+            // a spell: no secondary weapon; in melee it goes off one time in four; full power at any range
+            if !self.adjacent_enemies(i).is_empty() && self.rng.die(4) != 1 {
+                return;
+            }
+            let Some(j) = self.ranged_target(i, range) else { return };
+            let raw = self.rng.damage(die, bonus);
+            hits.push(Hit { attacker: i, target: j, raw, dmg, ..Default::default() });
+            return;
+        }
         if range > 1 {
             let adj = self.adjacent_enemies(i);
             if !adj.is_empty() {
@@ -789,7 +840,7 @@ impl Battle {
             if charge {
                 raw = raw * 3 / 2;
             }
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect });
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false });
         }
     }
 
@@ -838,7 +889,8 @@ impl Battle {
                 t = k;
             }
         }
-        let mut d = self.calc(t, h.raw, h.dmg, h.probivnoy);
+        let raw = if self.units[h.attacker].overloaded == self.round { h.raw * 2 } else { h.raw };
+        let mut d = self.calc(t, raw, h.dmg, h.probivnoy);
         if d > 0 && self.units[t].plates > 0 {
             self.units[t].plates -= 1;
             d = 0;
@@ -847,6 +899,10 @@ impl Battle {
         if h.dmg == Dmg::Acid {
             let strip = self.units[t].t.armor_type.acid_strip();
             self.units[t].armor = (self.units[t].armor - strip).max(0);
+            self.short_circuit(t);
+        }
+        if h.ignite && !self.units[t].t.armor_type.immune(Dmg::Fire) {
+            self.units[t].burn = 3;
         }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
@@ -893,6 +949,13 @@ impl Battle {
             for k in neighbours {
                 self.fear_check(k, 7);
             }
+        }
+    }
+
+    /// Замыкание: acid on the windings silences the unit for 2 rounds.
+    fn short_circuit(&mut self, t: usize) {
+        if self.units[t].t.has(Trait::Zamykanie) {
+            self.units[t].silenced_until = self.round + 2;
         }
     }
 
@@ -956,6 +1019,7 @@ impl Battle {
                 let d = self.calc(k, raw, Dmg::Acid, false);
                 let strip = self.units[k].t.armor_type.acid_strip();
                 self.units[k].armor = (self.units[k].armor - strip).max(0);
+                self.short_circuit(k);
                 self.units[k].hp -= d;
                 self.ev(Event::Hit { a: t, t: k, dmg: d });
                 if self.units[k].hp <= 0 {

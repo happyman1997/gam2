@@ -51,13 +51,19 @@ fn main() {
     };
     let scenarios: Vec<(&str, Vec<Template>, Vec<Template>)> = vec![
         ("Страж против 10 рабочих", vec![strazh()], workers(10)),
-        ("Молот против 10 рабочих", vec![molot()], workers(10)),
+        ("Мудрец против 10 рабочих", vec![mudrets()], workers(10)),
         ("Горн против 10 рабочих", vec![gorn()], workers(10)),
         ("Орудие против 10 рабочих", vec![orudie()], workers(10)),
         ("Страж против 4 солдат", vec![strazh()], many(soldat(), 4)),
-        ("Молот против 4 солдат", vec![molot()], many(soldat(), 4)),
-        ("Молот против 4 воинов", vec![molot()], many(voin(), 4)),
-        ("Молот и Орудие против 25 рабочих", vec![molot(), orudie()], workers(25)),
+        ("Мудрец против 4 солдат", vec![mudrets()], many(soldat(), 4)),
+        ("Мудрец против 4 воинов", vec![mudrets()], many(voin(), 4)),
+        ("Страж и Мудрец против 25 рабочих", vec![strazh(), mudrets()], workers(25)),
+        ("Страж и Мудрец: рабочие, жуки, кислотники", vec![strazh(), mudrets()], {
+            let mut v = many(rabochaya(), 12);
+            v.extend(many(zhuk(), 6));
+            v.extend(many(kislotnik(), 4));
+            v
+        }),
         ("Страж и Механик против 25 рабочих", vec![strazh(), mekhanik()], workers(25)),
         ("Страж и Механик: рабочие, жуки, кислотники", vec![strazh(), mekhanik()], metal_answer),
         ("Старт Отца колосса против 8 воинов", start_otets(), humans_squad()),
@@ -97,7 +103,8 @@ fn main() {
     println!("| Армия | Эталонов | Рабочих | Солдат |");
     println!("|---|---|---|---|");
     let armies: Vec<(&str, Vec<Template>)> = vec![
-        ("Молот и Орудие (лидерство 10)", vec![molot(), orudie()]),
+        ("Мудрец и Орудие (лидерство 10)", vec![mudrets(), orudie()]),
+        ("Страж и Мудрец (лидерство 12)", vec![strazh(), mudrets()]),
         ("Страж и Механик (лидерство 10)", vec![strazh(), mekhanik().with(remont())]),
         ("Старт Отца колосса", start_otets()),
         ("Старт Изобретателя", start_izobretatel()),
