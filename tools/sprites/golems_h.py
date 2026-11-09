@@ -18,7 +18,7 @@ from humanoid import (arr, unit, lerp, basis, block, axle, gear, ram, conduit, r
                       grip_on, ik, place_upper, smear, SMEAR, LAMP_G)
 from frames import PAINT as FRAME_PAINT
 
-UPPER = ("pelvis", "spine", "chest", "back", "head", "pauldron_n", "pauldron_f")
+UPPER = ("pelvis", "spine", "chest", "back", "head", "pauldron_n", "pauldron_f", "robe")
 BASE_ALLOWED = [("leg_n", "pelvis"), ("leg_f", "pelvis"), ("leg_n", "leg_n.ram"), ("leg_f", "leg_f.ram"),
                 ("spine", "pelvis"), ("spine", "chest"), ("chest", "back"), ("chest", "head"), ("back", "head"),
                 ("chest", "pauldron_n"), ("chest", "pauldron_f"), ("pauldron_n", "pauldron_f"),
@@ -266,108 +266,179 @@ def sparks(fx, p, n=5, spread=2.4, ft=0.0, seed=1, big=True):
         fx.ell(arr(p) + d, ((0.6 - 0.05 * i) / (1 + 0.5 * ft),) * 3, emissive("fire", 5 if i == 0 else 0, 0.8))
 
 
-# ---------------------------------------------------------------- Молот: a brawler with hammer fists
-MOLOT_CORE = Core(17.5, ((6.8, 9.6), (7.4, 10.6)), (0.8, 27.4, (8.6, 9.4), (12.4, 21.0), 8.8), ring_r=3.2)
+# ---------------------------------------------------------------- Мудрец: the Foundry's mage, a power plant on legs
+SAGE_P = ramp("#170c08", "#32190f", "#542c18", "#7e4626", "#ab6c3c")          # old copper
+PORC = Mat(ramp("#5a5a62", "#8e8e98", "#bcbcc6", "#dcdce4", "#f6f6fa"))        # porcelain insulators
+SAGE_CORE = Core(19.0, ((5.8, 8.2), (6.4, 9.0)), (0.0, 28.6, (7.0, 7.6), (9.4, 14.4), 8.2), ring_r=2.6)
+SAGE_REACH = 36.0                      # how far ahead the spell's target stands (model units, about 4 cells)
 
 
-def molot_torso(G, P, S):
-    C = MOLOT_CORE
-    C.build(G, P, grate=True, fins=3)
-    # a low, armoured hump on the back with two short stacks raked backwards
+def insulator(m, a, b, r, n=3):
+    """A stack of porcelain sheds on a rod from a to b."""
+    a, b = arr(a), arr(b)
+    m.cyl(a, b, r * 0.42, M_DIRON, seg=8)
+    for i in range(n):
+        p = lerp(a, b, (i + 0.5) / n)
+        m.cyl(p - unit(b - a) * 0.28, p + unit(b - a) * 0.28, r, PORC, seg=10)
+
+
+def sage_torso(G, P, S):
+    C = SAGE_CORE
+    C.build(G, P, grate=False, fins=3, gauge=False)
+    ch = G["chest"]
+    top = C.cy + C.h / 2
+    # a round firebox window in the breast: an iron ring, a brass bezel, the fire behind it, two bars
+    fy = C.sy + 0.3
+    fx_ = C.front(fy)
+    ch.cyl((fx_ - 0.4, fy, 0), (fx_ + 0.6, fy, 0), 2.9, M_DIRON, seg=16)
+    ch.cyl((fx_ + 0.4, fy, 0), (fx_ + 0.8, fy, 0), 3.2, BRASS, seg=16)
+    ch.ell((fx_ + 0.7, fy, 0), (0.4, 2.3, 2.3), emissive("fire", 14, 0.7))
+    for a in (0.785, -0.785):
+        ch.box((fx_ + 1.0, fy, 0), (0.4, 5.0, 0.45), M_DIRON, rot_x(a))
+    # the robe: overlapping copper coat-tails hanging from the waist at the back and sides
+    rb = G["robe"]
+    for z, w, x, y, hgt, ang in ((0.0, 4.4, -6.6, 12.4, 11.6, 0.26), (10.2, 2.6, -2.2, 16.2, 5.2, 0.0), (-10.2, 2.6, -2.4, 16.2, 5.2, 0.0)):
+        rot = rot_z(ang) if z == 0 else rot_x(-0.18 * np.sign(z))
+        tbox(rb, (x, y, z), (0.7, w + 0.8), (0.7, w), hgt, P, rot)
+        rb.box(arr((x, y, z)) + rot @ arr((0.0, -hgt / 2 + 0.3, 0.0)), (0.8, 0.5, w + 0.8), M_DIRON, rot)
+        if z == 0:
+            rb.cyl(arr((-4.0, 18.0, 0)), arr((x, 17.6, 0)), 0.7, M_DIRON, seg=6)
+    tbox(rb, (C.front(18.0) - 1.4, 15.6, 0), (0.8, 4.0), (0.8, 3.8), 5.2, P, rot_z(-0.12))            # front apron
+    rivets(rb, [(C.front(18.0) - 0.9, 16.8, z) for z in (-1.1, 0.0, 1.1)], r=0.3)
+    # the back: the dynamo, a flywheel on the near side, two copper horns with a spark climbing between them
     bk = G["back"]
-    tbox(bk, (-4.6, 29.6, 0), (4.0, 13.0), (3.0, 11.0), 4.0, P, rot_z(0.35))
-    tbox(bk, (-4.2, 29.8, 0), (4.4, 6.0), (3.4, 5.0), 4.6, M_DIRON, rot_z(0.35))
-    for z in (3.2, -3.2):
-        b0 = arr((-5.2, 30.6, z))
-        top = b0 + (-3.0, 5.0, 0.6 * np.sign(z))
-        bk.cyl(b0, top, 1.3, M_DIRON, seg=8)
-        bk.cyl(top, top + unit(top - b0) * 0.8, 1.8, M_IRON, seg=8)
-        bk.cyl(lerp(b0, top, 0.45), lerp(b0, top, 0.55), 1.55, M_RUST, seg=8)
-        for i, d in enumerate(((-1.0, 2.2, 0), (-2.4, 4.4, 0.4))):
-            bk.ell(top + arr(d), (1.7 + i * 0.8, 1.3 + i * 0.6, 1.5 + i * 0.6), M_PUFF)
-    # a small head sunk low and forward between the shoulders: a slit visor, a heavy jaw
+    b0 = arr((-6.4, 27.4, 0))
+    bk.cyl(b0 + (0, 0, -3.8), b0 + (0, 0, 3.8), 3.4, M_DIRON, seg=16)                   # dynamo housing
+    for z in (-2.6, 0.0, 2.6):
+        bk.cyl(b0 + (0, 0, z - 0.4), b0 + (0, 0, z + 0.4), 3.6, COPPER, seg=16)
+    wc = b0 + (-0.4, -0.6, 4.6)
+    bk.cyl(wc - (0, 0, 0.5), wc + (0, 0, 0.5), 4.4, M_IRON, seg=20)                       # flywheel rim
+    bk.cyl(wc - (0, 0, 0.6), wc + (0, 0, 0.6), 3.6, M_HOLE, seg=20)
+    bk.cyl(wc - (0, 0, 0.9), wc + (0, 0, 0.9), 1.0, BRASS, seg=10)                         # hub
+    for a in np.linspace(0, np.pi, 4)[:-1] + 0.3:
+        bk.box(wc, (7.4, 0.6, 0.5), M_DIRON, rot_z(a))                                     # spokes
+    for zs in (1, -1):
+        r0 = b0 + (0.4, 3.0, 1.6 * zs)
+        r1 = r0 + (-1.4, 12.0, 2.6 * zs)
+        insulator(bk, r0, r0 + (-0.2, 2.6, 0.3 * zs), 1.1, n=2)
+        bk.cyl(r0 + (-0.2, 2.6, 0.3 * zs), r1, 0.5, COPPER, seg=8)                         # the horns
+        bk.ell(r1, (0.7, 0.7, 0.7), COPPER)
+    for i, y in enumerate((36.0, 39.6)):                                                   # the climbing spark
+        t = (y - (b0[1] + 3.0)) / 12.0
+        za = 1.6 + 2.6 * t + 0.2
+        pa, pb = b0 + (0.4 - 1.4 * t, y - b0[1], za), b0 + (0.4 - 1.4 * t, y - b0[1], -za)
+        mid = (pa + pb) / 2 + (0, 0.9 + 0.4 * i, 0)
+        bk.cyl(pa, mid + (0, 0, 0.6), 0.2, ARC, seg=4)
+        bk.cyl(mid + (0, 0, 0.6), mid - (0, 0, 0.7), 0.22, ARC, seg=4)
+        bk.cyl(mid - (0, 0, 0.7), pb, 0.2, ARC, seg=4)
+    # the head: a hood over a dark face with one cold lens, a crest of porcelain sheds on top
     hd = G["head"]
-    hc = arr((5.0, 34.4, 0))
-    tbox(hd, hc + (-0.6, -2.6, 0), (4.6, 5.0), (4.2, 4.6), 1.4, M_DIRON)                   # collar
-    tbox(hd, hc, (4.8, 4.4), (4.2, 3.8), 4.6, P)
-    tbox(hd, hc + (1.2, -1.4, 0), (2.6, 3.8), (2.2, 3.4), 2.2, M_IRON)
-    hd.box(hc + (2.15, 0.5, 0), (0.5, 0.6, 3.4), emissive("fire", 8, 0.6))
-    hd.box(hc + (1.8, 1.3, 0), (1.4, 0.9, 4.4), M_DIRON)
-    for i in range(2):
-        hd.box(hc + (2.4, -1.9 + i * 0.8, 0), (0.3, 0.25, 2.0), M_HOLE)
-    hd.box(hc + (-0.3, 2.4, 0), (3.6, 0.8, 0.8), M_DIRON)
-    for s, key in ((1, "pauldron_n"), (-1, "pauldron_f")):
-        pauldron(G, key, S["sh"] * arr((1, 1, s)) + (0, 1.5, 0), s, P, r=(5.0, 3.0, 4.2), layers=3)
+    hc = arr((2.4, top + 3.6, 0))
+    hd.cyl((0.6, top - 0.4, 0), hc + (-0.6, -1.6, 0), 1.6, M_DIRON, seg=8)                 # neck
+    hd.ell(hc + (-0.5, 0.4, 0), (3.6, 3.8, 3.3), P)                                         # the hood
+    tbox(hd, hc + (-1.6, 3.6, 0), (3.6, 4.0), (0.6, 0.8), 3.4, P, rot_z(0.55))              # its peak, swept back
+    hd.ell(hc + (2.2, -0.3, 0), (1.5, 2.6, 2.3), M_HOLE)                                     # the face in shadow
+    hd.ell(hc + (3.5, 0.2, 0), (0.6, 0.95, 0.95), ENERGY)                                   # the lens
+    hd.box(hc + (2.9, -1.9, 0), (0.5, 0.7, 2.4), M_DIRON)                                   # a grille for a mouth
+    for z in (-0.7, 0.0, 0.7):
+        hd.box(hc + (3.1, -1.9, z), (0.3, 0.5, 0.25), M_HOLE)
+    for s_, key in ((1, "pauldron_n"), (-1, "pauldron_f")):
+        c = S["sh"] * arr((1, 1, s_)) + (0, 1.3, 0)
+        pauldron(G, key, c, s_, P, r=(3.8, 2.4, 3.4), layers=1)
+        insulator(G[key], c + (0, 1.8, 1.0 * s_), c + (0, 4.4, 1.2 * s_), 0.9, n=2)
 
 
-def hammer_fist(G, side, sh, el, w, s, P, A, S):
-    """The forearm ends in a hammer head driven by two rams — a jackhammer fist."""
+def sage_staff(G, side, sh, el, w, s, P, A, S):
+    """A staff-electrode: an iron shaft, porcelain insulators, a copper coil and a copper ball on top."""
+    u = grip_dir(w - el, arr(A.get("staff_dir", (0.05, 1.0, 0.0))))
+    hand, h, u = fist(G, "hand_" + side, w, w - el, u, s, P, th=1.0)
     g = G["item_" + side]
+    L, f = 34.0, A.get("hold", 0.62)
+    butt, top = hand - u * (L * f), hand + u * (L * (1 - f))
+    g.cyl(butt, top, 0.55, M_DIRON, seg=8)
+    g.cyl(butt - u * 0.9, butt + u * 0.3, 0.75, M_IRON, r1=0.3, seg=8)                      # iron ferrule
+    insulator(g, top - u * 6.2, top - u * 3.6, 1.15, n=3)
+    for t in (1.0, 1.7, 2.4, 3.1):
+        g.cyl(top - u * t, top - u * (t - 0.35), 1.0, COPPER, seg=10)                       # the coil
+    tip = top + u * 1.7
+    g.ell(tip, (1.8, 1.8, 1.8), COPPER)                                                     # the ball
+    if not A.get("fx"):
+        g.ell(tip + u * 1.2, (0.45, 0.45, 0.45), ARC)                                       # a spark playing on it
+    return dict(tip=tip, u=u, hand=hand)
+
+
+def sage_focus(G, side, sh, el, w, s, P, A, S):
+    """The other hand is open, a copper coil round the wrist: it points at whatever the spell strikes."""
     d = unit(w - el)
-    R, _ = basis(w, w + d, (0, 0, 1) if abs(d[2]) < 0.9 else (1, 0, 0))
-    ex, ez = R[:, 0], R[:, 2]
-    hc = w + d * 4.4
-    at = lambda x, y, z=0.0: hc + R @ arr((x, y, z))
-    G["hand_" + side].ell(w + d * 0.4, (2.6, 2.6, 2.6), M_DIRON)                         # wrist joint
-    g.box(hc, (7.6, 6.4, 7.6), M_IRON, R)
-    g.box(at(0, -0.4), (8.2, 2.2, 8.2), P, R)
-    g.box(at(0, 1.9), (8.2, 0.5, 8.2), emissive("fire", 0, 0), R)                          # a glowing seam
-    g.box(at(0, 3.55), (7.2, 0.9, 7.2), M_DIRON, R)
-    g.box(at(0, 4.05), (5.6, 0.3, 5.6), emissive("fire", 10, 0.55), R)                     # hot striking face
-    for e in (ex, -ex):
-        a = w - d * 4.0 + e * 3.6
-        b = hc - d * 2.6 + e * 4.2
-        ram(G["hand_" + side], a, b, 0.75)
-    rivets(g, [at(x, -0.4, 4.15) for x in (-2.6, 0, 2.6)] + [at(x, -0.4, -4.15) for x in (-2.6, 0, 2.6)], r=0.35)
-    return dict(hc=hc, face=hc + d * 4.3, d=d)
+    g = G["item_" + side]
+    for t in (0.18, 0.32):
+        p = lerp(el, w, 1 - t)
+        g.cyl(p - d * 0.25, p + d * 0.25, 2.2, COPPER, seg=12)                              # coil bracer
+    up = arr((0, 1.0, 0)) - d * d[1]
+    up = unit(up) if np.linalg.norm(up) > 1e-6 else arr((1.0, 0, 0))
+    hand, h, u = fist(G, "hand_" + side, w, w - el, up, s, P, th=0.95)
+    reach = SAGE_REACH / max(0.25, np.hypot(d[0], d[2]))
+    return dict(w=w, d=d, palm=hand, target=w + d * reach)
 
 
-def molot_fx(fx, A, info, S, ft):
-    faces = [info["n"]["face"], info["f"]["face"]]
-    mid = (faces[0] + faces[1]) / 2
-    g = arr((mid[0], 0.3, mid[2]))
+def sage_fx(fx, A, info, S, ft):
+    """The Discharge: lightning from the ball of the staff to where the open hand points."""
+    tip, T = info["n"]["tip"], info["f"]["target"]
     near = ft < 0.5
-    if not A.get("ground", True):        # struck into a body, not the ground: flashes, sparks, armour chips
-        d = unit(info["n"]["d"] + info["f"]["d"])
-        for p in faces:
-            if near:
-                fx.ell(p + d * 0.6, (1.8, 1.8, 1.8), emissive("fire", 18, 0.85))
-            sparks(fx, p + d * 0.6, n=5, spread=2.8, ft=ft, seed=int(p[2] * 10) % 7, big=False)
-        for i, o in enumerate(((2.0, -1.0, 2.4), (-1.6, -2.4, -1.8), (2.6, 1.0, -2.6), (-0.6, -3.0, 2.8))):
-            fx.box(mid + d * 1.5 + arr(o) * (1.0 + 1.5 * ft) - (0, 2.0 * ft, 0), (0.8, 0.7, 0.8), M_IRON, rot_z(0.6 + 1.8 * ft + i))
-        return
+    ground = A.get("ground", True)
     if near:
-        fx.ell(g + (0, 0.1, 0), (6.5, 0.25, 6.0), emissive("fire", 0, 0))
-        fx.ell(g + (0, 0.2, 0), (3.8, 0.3, 3.4), emissive("fire", 20, 0.85))
-    for p in faces:
-        sparks(fx, p, n=4, ft=ft, seed=int(p[2] * 10) % 7, big=near)
-    puffs(fx, g, n=4, r=2.4, spread=5.0, ft=ft, seed=3)
-    for i, d in enumerate(((3.0, 3.2, 2.0), (-2.6, 4.0, -1.5), (4.2, 2.0, -2.6), (-1.0, 5.0, 2.8))):
-        fx.box(g + arr(d) * (1.0 + 1.5 * ft), (0.9, 0.8, 0.9), M_IRON, rot_z(0.6 + 1.8 * ft + i))
+        fx.ell(tip, (2.4, 2.4, 2.4), ENERGY)                                                # the ball flares
+        rnd = np.random.RandomState(23)
+        n = 10
+        pts = [tip]
+        for i in range(1, n):
+            k = 1.0 - abs(2.0 * i / n - 1.0) * 0.6
+            pts.append(lerp(tip, T, i / n) + arr(rnd.uniform(-1.8, 1.8, 3)) * k)
+        pts.append(T)
+        for a, b in zip(pts[:-1], pts[1:]):
+            fx.cyl(a, b, 0.36, ARC, seg=4)
+        for j in (3, 6):                                                                   # branches
+            q = pts[j] + arr((rnd.uniform(-1.0, 1.5), rnd.uniform(-2.5, 2.5), rnd.uniform(-2.5, 2.5)))
+            fx.cyl(pts[j], q, 0.2, ARC, seg=4)
+        fx.ell(T, (2.6, 2.6, 2.6), ENERGY)
+        palm = info["f"]["palm"]
+        fx.ell(palm + info["f"]["d"] * 1.6, (0.9, 0.9, 0.9), ENERGY)
+        if ground:
+            fx.ell(arr((T[0], 0.25, T[2])), (5.0, 0.2, 4.2),
+                   Mat(ramp("#0e1a22", "#18303c", "#245060", "#3a7a8e", "#6ab8c8"), dither=True))
+    sparks(fx, T, n=7, spread=3.0, ft=ft, seed=8, big=False)
+    if ground:
+        puffs(fx, arr((T[0], 0.6, T[2])), n=3, r=2.0, spread=3.4, ft=ft, seed=4)
 
 
-MOLOT = dict(
-    name="Молот", role="разрушитель · 5", k=1.6, paint=FRAME_PAINT["Молот"],
-    hip=17.5, hz=4.8, hipx=(0.4, -0.8), LT=8.6, LS=6.8, LU=9.0, LF=10.0, th_leg=1.05, th_arm=1.3,
-    sh=arr((0.8, 30.0, 12.2)), torso=molot_torso, item_n=hammer_fist, item_f=hammer_fist, fx=molot_fx,
-    hit=lambda info: (info["n"]["face"] + info["f"]["face"]) / 2 * arr((1, 0, 1)),
-    allow=[("arm_n", "item_n"), ("arm_f", "item_f")],
+SAGE = dict(
+    name="Мудрец", role="маг · 5", k=1.6, paint=SAGE_P, canvas=(104, 92, 38, 78),
+    hip=19.0, hz=4.4, hipx=(0.4, -0.8), LT=9.2, LS=7.0, LU=8.0, LF=8.4, th_leg=0.95, th_arm=0.95,
+    sh=arr((-0.4, 32.4, 8.8)), torso=sage_torso, item_n=sage_staff, item_f=sage_focus, fx=sage_fx,
+    hit=lambda info: info["f"]["target"] * arr((1, 0, 1)),
+    allow=[("hand_n", "item_n"), ("arm_f", "item_f"), ("hand_f", "item_f"), ("robe", "pelvis"), ("robe", "spine"),
+           ("robe", "chest")],
     poses=dict(
-        idle=dict(lean=-0.12, t=(0.4, -0.6, 0.0), ank=((2.4, 3.6, 5.7), (-3.6, 3.6, -5.7)),
-                  hand_n=(8.0, -12.5, 1.0), pole_n=(-0.4, -0.2, 1.0), hand_f=(7.0, -12.5, -1.0), pole_f=(-0.4, -0.2, -1.0)),
-        attack=dict(lean=-0.38, t=(1.4, -1.6, 0.0), ank=((4.5, 3.6, 6.0), (-5.5, 3.6, -5.8)),
-                    hand_n=(12.5, -14.0, -3.0), pole_n=(0.0, 0.6, 1.0), hand_f=(12.5, -14.0, 3.0), pole_f=(0.0, 0.6, -1.0),
-                    ram_n="front", ram_f="front", fx=True),
-        # against an enemy about its own height: both fists straight into its body at waist height
-        attack_level=dict(lean=-0.29, t=(0.83, -1.1, 0.0), ank=((4.08, 3.6, 6.24), (-3.78, 3.6, -5.77)), hand_n=(16.19, -7.5, -4.34), pole_n=(-0.23, -0.7, 0.86), hand_f=(15.35, -8.43, 2.86), pole_f=(-0.74, -0.42, -0.92), ram_n="front", ram_f="front", twist=-0.09, ground=False, fx=True),
-        # against a much bigger enemy: both fists driven up into its belly
-        attack_high=dict(lean=-0.02, twist=-0.02, t=(1.68, -0.9, 0.0), ank=((5.0, 3.6, 5.5), (-5.56, 3.6, -6.7)),
-                         hand_n=(14.4, 7.25, -1.84), pole_n=(0.05, -0.18, 0.44), hand_f=(13.94, 8.38, 2.76), pole_f=(-0.2, -0.59, -0.85),
-                         ram_n="front", ram_f="front", fx=True, ground=False),
+        idle=dict(lean=0.0, t=(0.0, 0.0, 0.0), ank=((2.6, 3.6, 5.4), (-3.6, 3.6, -5.4)),
+                  hand_n=(5.0, -8.0, 4.0), pole_n=(-0.6, -0.6, 1.0), staff_dir=(0.05, 1.0, 0.05), hold=0.46,
+                  hand_f=(5.0, -12.0, -1.2), pole_f=(-0.4, -0.2, -1.0)),
+        attack=dict(lean=-0.08, twist=-0.1, t=(0.4, -0.6, 0.0), ank=((4.4, 3.6, 5.6), (-4.4, 3.6, -5.6)),
+                    hand_n=(7.0, 2.0, 3.0), pole_n=(-0.4, -1.0, 0.6), staff_dir=(-0.1, 1.0, 0.1), hold=0.42,
+                    hand_f=(11.35, -9.72, -1.25), pole_f=(-0.6, -0.1, -0.91), ram_f="front", ram_n="back", fx=True),
+        # the spell goes where the open hand points: at a body of its own height, up into a giant
+        attack_level=dict(lean=-0.08, twist=-0.1, t=(0.4, -0.6, 0.0), ank=((4.4, 3.6, 5.6), (-4.4, 3.6, -5.6)),
+                          hand_n=(7.0, 2.0, 3.0), pole_n=(-0.4, -1.0, 0.6), staff_dir=(-0.1, 1.0, 0.1), hold=0.42,
+                          hand_f=(11.27, -7.45, -1.92), pole_f=(-0.66, -0.3, -0.73), ram_f="back", ram_n="back", fx=True,
+                          ground=False),
+        attack_high=dict(lean=-0.08, twist=-0.1, t=(0.4, -0.6, 0.0), ank=((4.4, 3.6, 5.6), (-4.4, 3.6, -5.6)),
+                         hand_n=(7.0, 2.0, 3.0), pole_n=(-0.4, -1.0, 0.6), staff_dir=(-0.1, 1.0, 0.1), hold=0.42,
+                         hand_f=(14.17, -1.75, -0.71), pole_f=(-0.5, -0.58, -0.54), ram_f="front", ram_n="back", fx=True,
+                         ground=False),
     ),
     bands=dict(low="attack", level="attack_level", high="attack_high"),
-    strike=lambda info: (info["n"]["face"] + info["f"]["face"]) / 2,
+    strike=lambda info: info["f"]["target"],
 )
+
 
 # ---------------------------------------------------------------- Горн: a stocky furnace with a tall chimney
 GORN_CORE = Core(16.0, ((6.2, 8.8), (6.8, 9.6)), (0.0, 25.0, (6.0, 6.0), (7.0, 8.0), 6.0), ring_r=3.0)
@@ -1270,7 +1341,7 @@ MANIAC = dict(
 )
 
 
-ROSTER = [MOLOT, GORN, ORUDIE, MEH, MASON, COLOSSUS, MANIAC]
+ROSTER = [SAGE, GORN, ORUDIE, MEH, MASON, COLOSSUS, MANIAC]
 for _S in ROSTER:
     _S["poses"]["broken"] = dict(broken_pose(_S), **_S.get("broken", {}))
 BY_NAME = {S["name"]: S for S in ROSTER}
@@ -1290,7 +1361,7 @@ if __name__ == "__main__":
     # a close-up sheet of every Foundry creature: idle above, attack below
     S2 = 2
     cols = [("Страж", "танк · 6", lambda p: H.build(p, 2.5)),
-            ("Молот", "разрушитель · 5", lambda p: build(MOLOT, p, 2.9)),
+            ("Мудрец", "маг · 5", lambda p: build(SAGE, p, 2.9)),
             ("Горн", "контроль · 5", lambda p: build(GORN, p, 2.7)),
             ("Орудие", "стрелок · 5", lambda p: build(ORUDIE, p, 2.6)),
             ("Механик", "поддержка · 4", lambda p: build(MEH, p, 2.7)),

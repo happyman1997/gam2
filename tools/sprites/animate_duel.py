@@ -11,7 +11,7 @@ placed by its silhouette so its front is where the blow lands; it lights up ther
 (the Father of the Colossus is not: he is unstoppable).
 
     python3 tools/sprites/animate_duel.py            -> out/bands_<creature>.gif for every attacker, out/attack_bands.png
-    python3 tools/sprites/animate_duel.py Молот      -> just one
+    python3 tools/sprites/animate_duel.py Мудрец     -> just one
 """
 import sys
 import numpy as np
@@ -150,15 +150,9 @@ def golem_check(S):
 
 
 # ---------------------------------------------------------------- the wind-ups
-MO, MS, MN = GH.MOLOT, GH.MASON, GH.MANIAC
-MO_I, MS_I, MN_I = MO["poses"]["idle"], MS["poses"]["idle"], MN["poses"]["idle"]
+MS, MN = GH.MASON, GH.MANIAC
+MS_I, MN_I = MS["poses"]["idle"], MN["poses"]["idle"]
 WIND = dict(
-    molot_low=dict(MO_I, lean=0.12, twist=0.0, t=(-0.6, -0.6, 0.0), hand_n=(1.5, 13.0, 3.5), hand_f=(0.5, 13.0, -3.5),
-                   pole_n=(-0.2, 0.3, 1.0), pole_f=(-0.2, 0.3, -1.0), ram_n="front", ram_f="front"),
-    molot_level=dict(MO_I, lean=0.06, twist=0.15, t=(-0.6, -0.6, 0.0), hand_n=(-5.0, -6.0, 5.0), hand_f=(-4.0, -8.0, -6.0),
-                     pole_n=(-0.6, 0.6, 1.0), pole_f=(-0.6, 0.6, -1.0), ram_n="back", ram_f="back"),
-    molot_high=dict(MO_I, lean=-0.2, twist=0.05, t=(0.0, -2.6, 0.0), hand_n=(-2.0, -14.5, 4.0), hand_f=(-3.0, -14.5, -4.0),
-                    pole_n=(-0.6, 0.2, 1.0), pole_f=(-0.6, 0.2, -1.0), ram_n="back", ram_f="back"),
     mason=dict(MS_I, lean=0.08, twist=0.18, t=(-0.4, -0.5, 0.0), hand_n=(-1.5, 10.0, 2.5), pole_n=(-0.6, 0.0, 1.0),
                hammer_dir=(-0.8, 0.3, 0.1), face=(0.2, 1.0, 0.0), hand_f=(3.0, -10.4, -3.4), ram_n="front"),
     maniac_over=dict(MN_I, lean=0.08, twist=0.18, t=(-0.4, -0.5, 0.0), hand_n=(1.0, 11.0, 3.0), pole_n=(-0.6, 0.0, 1.0),
@@ -206,9 +200,9 @@ ATTACKERS = {
                   check=lambda G: report(G, HM.ALLOWED, skip=("sparks", "fx")),
                   panels=[("low", "soldier", guard_line("slam")), ("level", "queen", guard_line("level")),
                           ("high", "colossus", guard_line("high"))]),
-    "Молот": dict(file="molot", S=MO, panels=[("low", "soldier", melee(MO, "low", "molot_low", -1, ("n", "f"))),
-                                              ("level", "queen", melee(MO, "level", "molot_level", 0, ("n", "f"))),
-                                              ("high", "colossus", melee(MO, "high", "molot_high", +1, ("n", "f")))]),
+    "Мудрец": dict(file="sage", S=GH.SAGE, panels=[("low", "soldier", gunner(GH.SAGE, "low", ("f",))),
+                                                   ("level", "queen", gunner(GH.SAGE, "level", ("f",))),
+                                                   ("high", "colossus", gunner(GH.SAGE, "high", ("f",)))]),
     "Горн": dict(file="gorn", S=GH.GORN, panels=[("low", "soldier", gunner(GH.GORN, "low", ("n",))),
                                                  ("level", "queen", gunner(GH.GORN, "level", ("n",))),
                                                  ("high", "colossus", gunner(GH.GORN, "high", ("n",)))]),
@@ -223,7 +217,7 @@ ATTACKERS = {
     "Отец колосса": dict(file="colossus", S=GH.COLOSSUS, frame=colossus_frame,
                          panels=[("low", "soldier", colossus_line("low")), ("level", "guard", colossus_line("level"))]),
 }
-SCALE = {"Страж": 2.2, "Молот": 1.6, "Горн": 1.6, "Орудие": 1.6, "Маньяк": 1.3, "Каменщик": 0.85, "Отец колосса": 3.5}
+SCALE = {"Страж": 2.2, "Мудрец": 1.6, "Горн": 1.6, "Орудие": 1.6, "Маньяк": 1.3, "Каменщик": 0.85, "Отец колосса": 3.5}
 
 
 # ---------------------------------------------------------------- the duel scene

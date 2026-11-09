@@ -1,4 +1,5 @@
-"""The Foundry's five frames: each with its own paint, its own silhouette parts and the modules of its role."""
+"""The Foundry's five frames: each with its own paint, its own silhouette parts and the modules of its role.
+PAINT keeps the old Molot's soot-black for the earlier box-bodied sheets (sheet_tiers)."""
 import numpy as np
 from kit import *
 from r3d import Model, Mat, render, rot_z, rot_y, rot_x, I3
@@ -13,13 +14,14 @@ PAINT = {   # every frame keeps its own colour key; all of them worked, scuffed 
     "Горн": ramp("#1a0806", "#3a120c", "#5a2014", "#823222", "#b0563a"),      # firebrick
     "Орудие": ramp("#10120a", "#1e2214", "#323820", "#4e5632", "#7a8452"),    # olive drab
     "Механик": ramp("#1a1206", "#3a280c", "#5e4214", "#8a6420", "#c49a3a"),   # workshop ochre
+    "Мудрец": ramp("#170c08", "#32190f", "#542c18", "#7e4626", "#ab6c3c"),    # old copper and porcelain
 }
 
 FRAMES = {   # cfg, module levels, scale (size 4 → 1.15, 5 → 1.6, 6 → 2.2), role
     "Страж": (cfg(legs="pillars", arms=("heavy", "heavy"), tools=("hammer", "shield")),
              dict(legs=2, head=2, core=2, armour=3, arm_far=2, arm_near=2, tool_far=1, tool_near=3), 2.2, "танк · 6"),
-    "Молот": (cfg(legs="tracks", arms=("heavy", "heavy"), tools=("hammer", "hammer")),
-             dict(legs=2, head=2, core=2, armour=2, arm_far=2, arm_near=2, tool_far=3, tool_near=3), 1.6, "разрушитель · 5"),
+    "Мудрец": (cfg(legs="pillars", head="sensor", core="volt", arms=("piston", "piston"), tools=("claw", "claw")),
+              2, 1.6, "маг · 5"),
     "Горн": (cfg(legs="tracks", core="fire", arms=("piston", "piston"), tools=("claw", "claw")),
             2, 1.6, "контроль · 5"),
     "Орудие": (cfg(legs="spider", head="sensor", arms=("piston", "piston"), tools=("cannon", "cannon")),
