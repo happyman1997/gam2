@@ -1004,6 +1004,11 @@ def minigun(G, side, sh, el, w, s, P, A, S):
 
 
 def col_fx(fx, A, info, S, ft):
+    col_mace_fx(fx, info, ft)
+    col_gun_fx(fx, info, ft)
+
+
+def col_mace_fx(fx, info, ft):
     mc = info["n"]
     head, u = mc["head"], mc["u"]
     near = ft < 0.5
@@ -1021,17 +1026,22 @@ def col_fx(fx, A, info, S, ft):
         fx.ell(g + (0, 0.1, 0), (7.0, 0.2, 6.0), Mat(ramp("#0e1a22", "#18303c", "#245060", "#3a7a8e", "#6ab8c8"), dither=True))
     sparks(fx, head, n=6, spread=3.4, ft=ft, seed=5, big=False)
     puffs(fx, g, n=4, r=2.6, spread=4.6, ft=ft, seed=3)
-    mg = info["f"]                                             # and the minigun pours fire
+
+
+def col_gun_fx(fx, info, ft, burst=0):
+    """The minigun pours fire; `burst` steps the flash, the tracers and the cases on (for animation)."""
+    mg = info["f"]
     mz, d, up, e = mg["muzzle"], mg["d"], mg["up"], mg["e"]
-    if near:
+    if ft < 0.5:
         fx.ell(mz + d * 1.8, (2.8, 2.2, 2.2), emissive("fire", 20, 0.9))
         for a in range(5):
-            r = up * np.cos(a * 1.26) + e * np.sin(a * 1.26)
+            a = a * 1.26 + burst * 0.63
+            r = up * np.cos(a) + e * np.sin(a)
             fx.cyl(mz + d * 0.6, mz + d * 3.2 + r * 2.0, 0.9, emissive("fire", 0, 0), r1=0.15, seg=6)
         for i in range(6):                                                    # a stream of tracers
-            p = mz + d * (6.0 + i * 4.2) + up * (0.6 if i % 2 else -0.6)
+            p = mz + d * (6.0 + i * 4.2 + (burst % 2) * 2.1) + up * (0.6 if (i + burst) % 2 else -0.6)
             fx.cyl(p, p + d * 2.4, 0.32, emissive("fire", 3, 0.6), seg=5)
-    rnd = np.random.RandomState(13)
+    rnd = np.random.RandomState(13 + burst)
     for i in range(5):                                                        # spent cases tumbling out
         p = mg["c"] + e * (2.6 + i * 0.9) - up * (1.0 + i * 1.6) + d * rnd.uniform(-1.0, 1.0)
         fx.box(p, (0.8, 0.45, 0.45), BRASS, rot_z(rnd.uniform(0, 3)))
