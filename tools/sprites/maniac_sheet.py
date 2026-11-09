@@ -1,72 +1,62 @@
-"""The Maniac: crazy modules, their attacks, Improvisation (a module turns into something else for a turn)."""
-from PIL import ImageFont
+"""The Maniac: his crazy constructs at rest and at work, the Maniac himself, Improvisation (a module of a neighbouring
+construct turns into something else for a turn)."""
 from kit import *
-import maniac as MN
-from noise import value_noise
-from paths import font, out
+import golems_h as GH
+import constructs as CN
+from leaders_sheet import canvas, put, fonts, S, GOLD, INK, MUT
+from paths import out
 
-S = 2
-WW, HH = 960, 820
-sc = Scene(WW, HH)
-n = value_noise(WW, HH, 12, 13) * 0.6 + value_noise(WW, HH, 4, 14) * 0.4
-th = BAYER[sc.yy % 4, sc.xx % 4]
-lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
-for i, c in enumerate(("#2a2232", "#2e2536", "#32283c", "#362b40")):
-    sc.rgb[lv == i] = hexc(c)
-
-
-def put(spr, cx, by, sw):
-    e = ((sc.xx - cx) / sw) ** 2 + ((sc.yy - by) / max(3, sw * 0.18)) ** 2
-    sc.rgb[e <= 1] *= 0.62
-    sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
-
-
+WW, HH = 960, 800
 K = 1.9
-MODS = [("saw", "Ноги-пилы", "постоянно: катится и режет всех на пути"),
-        ("catapult", "Голова-катапульта", "каждые 2 хода: лом через строй во 2-й ряд"),
-        ("spring", "Кулак на пружине", "каждые 3 хода: удар через клетку, отбрасывает"),
-        ("triple", "Рука-рука-рука", "каждый ход: молот, клешня и пушка по очереди"),
-        ("wheels", "Вверх ногами", "ходит на руках-колёсах, ноги машут молотами")]
-cw = WW // len(MODS)
-for i, (key, _, _) in enumerate(MODS):
-    put(MN.render_model(MN.construct(key, "idle"), K), cw // 2 + i * cw - 6, 230, 30)
-for i, key in enumerate(("saw", "catapult", "spring")):
-    put(MN.render_model(MN.construct(key, "attack"), K), 110 + i * 190, 450, 30)
-put(MN.render_model(MN.maniac("idle"), K * 1.55, w=60, h=70, ox=28, oy=60), 720, 450, 34)
-put(MN.render_model(MN.maniac("attack"), K * 1.55, w=60, h=70, ox=28, oy=60), 860, 450, 34)
-pairs = [("hammer", 90, 250), ("shield", 520, 680)]
-for which, x0, x1 in pairs:
-    put(MN.render_model(MN.improvised(which, False), K), x0, 730, 30)
-    put(MN.render_model(MN.improvised(which, True), K), x1, 730, 30)
+sc = canvas(WW, HH, 13)
+cells_ = list(CN.CONSTRUCTS) + ["maniac"]
+CW, RH, Y0 = 240, 235, 50
+caps = []
+for i, key in enumerate(cells_):
+    x0, y0 = (i % 4) * CW, Y0 + (i // 4) * RH
+    by = y0 + 165
+    if key == "maniac":
+        sprs = [GH.build(GH.MANIAC, "idle", K * 0.82), GH.build(GH.MANIAC, "attack", K * 0.82)]
+    else:
+        sprs = [CN.build(key, "idle", k=K), CN.build(key, "go", k=K)]
+    lows = []
+    for j, spr in enumerate(sprs):
+        put(sc, spr, x0 + 62 + j * 116, by, 26)
+        lows.append(int(np.nonzero(spr.a.any(axis=1))[0].max()) - spr.oy)
+    caps.append((x0, by + max(8, max(lows) + 4), key))
+yi = Y0 + 2 * RH + 225                                         # Improvisation: before -> after
+pairs = [("hammer", 90, 300), ("shield", 560, 770)]
+for which, xa, xb in pairs:
+    put(sc, CN.build_improvised(which, False, k=2.0), xa, yi, 40)
+    put(sc, CN.build_improvised(which, True, k=2.0), xb, yi, 40)
 
 img = sc.image(S)
 d = ImageDraw.Draw(img)
-ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 28)
-fh = ImageFont.truetype(font("PTSerif-Bold.ttf"), 22)
-fb = ImageFont.truetype(font("PTSerif-Bold.ttf"), 18)
-fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 15)
-GOLD, INK, MUT = (226, 186, 106), (236, 226, 200), (190, 182, 164)
-d.text((24, 16), "Маньяк: безумные модули и Импровизация", font=ft, fill=INK)
-d.text((24, 66), "Безумные модули — детали не на своих местах. Каждая — своя способность.", font=fh, fill=GOLD)
-for i, (_, name, txt) in enumerate(MODS):
-    cx = (cw // 2 + i * cw - 6) * S
-    d.text((cx - d.textlength(name, font=fb) / 2, 244 * S), name, font=fb, fill=INK)
-    d.text((cx - d.textlength(txt, font=fr) / 2, 244 * S + 26), txt, font=fr, fill=MUT)
-d.text((24, 300 * S), "Атака — отдельный спрайт", font=fh, fill=GOLD)
-d.text((640 * S, 300 * S), "Маньяк — лидер", font=fh, fill=GOLD)
-d.text((640 * S, 300 * S + 32), "на ходуле из хлама: пружина, колесо, деревяшка", font=fr, fill=MUT)
-for cx, t in ((720, "покой"), (860, "атака")):
-    d.text((cx * S - d.textlength(t, font=fr) / 2, 460 * S), t, font=fr, fill=MUT)
-d.text((24, 520 * S), "Импровизация: на один ход модуль соседнего конструкта становится другим", font=fh, fill=GOLD)
-d.text((24, 520 * S + 32), "Знак Импровизации — фиолетово-зелёные искры вокруг модуля и значок нового эффекта над ним.",
+ft, fh, fb, fbs, fr = fonts()
+d.text((24, 16), "Маньяк: безумные конструкты и Импровизация", font=ft, fill=INK)
+d.text((24, 60), "Свободная сборка: любой модуль на любой фрейм, а безумные модули — туда, где модулей не бывает. "
+                 "Каждая «незаконная» деталь —", font=fr, fill=MUT)
+d.text((24, 84), "своя способность; на ней знак Маньяка — фиолетово-зелёные искры. Слева покой, справа в деле.",
        font=fr, fill=MUT)
-for (which, x0, x1), (a, b) in zip(pairs, (("молот", "огненный молот: бьёт пламенем в обе стороны"),
+for x0, y, key in caps:
+    if key == "maniac":
+        name, frame, txt = "Маньяк", "лидер", "безумец в кабине-клетке: пила и бур"
+    else:
+        name, frame, txt, _ = CN.CONSTRUCTS[key]
+    cx = (x0 + CW / 2) * S
+    d.text((cx - d.textlength(name, font=fbs) / 2, y * S), name, font=fbs, fill=INK)
+    d.text((cx - d.textlength(frame, font=fr) / 2, y * S + 22), frame, font=fr, fill=GOLD)
+    d.text((cx - d.textlength(txt, font=fr) / 2, y * S + 42), txt, font=fr, fill=MUT)
+d.text((24, (yi - 150) * S), "Импровизация: на один ход модуль соседнего конструкта становится другим", font=fh, fill=GOLD)
+d.text((24, (yi - 150) * S + 32), "Знак — фиолетово-зелёные искры вокруг модуля и значок нового эффекта над ним.",
+       font=fr, fill=MUT)
+for (which, xa, xb), (a, b) in zip(pairs, (("молот", "молот изрыгает пламя в обе стороны"),
                                            ("щит", "щит раскрылся в пилу: режет соседей"))):
-    yy = 742 * S
-    d.text((x0 * S - d.textlength(a, font=fb) / 2, yy), a, font=fb, fill=INK)
-    d.text((x1 * S - d.textlength(b, font=fr) / 2, yy + 4), b, font=fr, fill=INK)
-    xa, xb, ya = (x0 + 55) * S, (x1 - 60) * S, 690 * S
-    d.line([(xa, ya), (xb, ya)], fill=(220, 110, 220), width=4)
-    d.polygon([(xb + 14, ya), (xb - 4, ya - 10), (xb - 4, ya + 10)], fill=(220, 110, 220))
+    yy = (yi + 10) * S
+    d.text((xa * S - d.textlength(a, font=fb) / 2, yy), a, font=fb, fill=INK)
+    d.text((xb * S - d.textlength(b, font=fr) / 2, yy + 4), b, font=fr, fill=INK)
+    ya, x1, x2 = (yi - 50) * S, (xa + 80) * S, (xb - 90) * S
+    d.line([(x1, ya), (x2, ya)], fill=(220, 110, 220), width=4)
+    d.polygon([(x2 + 14, ya), (x2 - 4, ya - 10), (x2 - 4, ya + 10)], fill=(220, 110, 220))
 img.save(out("maniac.png"))
 print(img.size)

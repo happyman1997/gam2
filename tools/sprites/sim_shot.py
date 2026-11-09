@@ -13,7 +13,6 @@ import frames as F
 import golems_h as GH
 import colossus as CL
 import leaders_h as LH
-import maniac as MN
 import swarm1 as W
 from golem7 import cfg
 from battle import shadow, put, flash, spark, dead_bug
