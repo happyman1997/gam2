@@ -1,7 +1,6 @@
 """Foundry leaders: an overview of all four, plus sheets for the Architect's and the Inventor's armies."""
 from PIL import ImageFont
 from kit import *
-import inventor as IV
 import maniac as MN
 import colossus as CL
 import golem7 as G7
@@ -182,24 +181,48 @@ def architect_sheet():
 
 
 def inventor_sheet():
-    WW, HH = 960, 300
+    """Augments: each on a small frame at rest and going off; below, the Inventor's starting army to scale."""
+    import augments as AU
+    WW, HH = 960, 500
     sc = canvas(WW, HH, 41)
-    augs = [("coil", "Грозовая катушка", "если рядом враг — каждые 2 хода бьёт его молнией"),
-            ("mirror", "Отражатель", "первый удар в бою отражается в атакующего"),
-            ("spring", "Пружинный рывок", "в начале боя прыгает к ближайшему врагу")]
-    for i, (key, _, _) in enumerate(augs):
+    small = 0.82                                                  # frames cast a size smaller
+    K = {"Мудрец": 1.6, "Горн": 1.6, "Орудие": 1.6, "Механик": 1.15}
+    augs = [("coil", "Орудие"), ("mirror", "Механик"), ("spring", "Горн")]
+    by = 236
+    caps = []
+    for i, (key, frame) in enumerate(augs):
         cx = 90 + i * 320
-        put(sc, IV.render_model(IV.augmented(key, "idle"), 1.6), cx, 210, 26)
-        put(sc, IV.render_model(IV.augmented(key, "attack"), 1.6), cx + 140, 210, 26)
+        k = 2.0                                                   # the same size for all three: the augment is what matters
+        for j, pose in enumerate(("idle", "active")):
+            put(sc, AU.build(frame, key, pose, k=k), cx + j * 130, by, 16 * k)
+        caps.append((cx + 65, key, frame))
+    yb = HH - 40
+    army = [(LH.INVENTOR, None, None, 0.9, "Изобретатель"),
+            ("Мудрец", "coil", "Мудрец", K["Мудрец"] * small, "малый Мудрец · катушка"),
+            ("Орудие", "coil", "Орудие", K["Орудие"] * small, "малое Орудие · катушка"),
+            ("Механик", "mirror", "Механик", K["Механик"] * small, "малый Механик · отражатель")]
+    xs = [150, 330, 520, 720]
+    f = 1.5
+    for (who, key, frame, k, _), x in zip(army, xs):
+        spr = GH.build(who, "idle", k * f) if key is None else AU.build(frame, key, "idle", k=k * f)
+        put(sc, spr, x, yb, 14 * k * f)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft, fh, fb, fbs, fr = fonts()
     d.text((24, 16), "Изобретатель: аугмент добавляет голему способность, а не цифры", font=ft, fill=INK)
-    d.text((24, 60), "Малые големы с аугментами. Слева покой, справа срабатывание.", font=fr, fill=MUT)
-    for i, (_, name, txt) in enumerate(augs):
-        cx = (90 + i * 320 + 70) * S
-        d.text((cx - d.textlength(name, font=fb) / 2, 226 * S), name, font=fb, fill=INK)
-        d.text((cx - d.textlength(txt, font=fr) / 2, 226 * S + 26), txt, font=fr, fill=MUT)
+    d.text((24, 60), "Аугмент встаёт на любой фрейм — место находится по силуэту голема. Латунный корпус и синяя лампа: "
+                     "аугменты держатся на Изобретателе,", font=fr, fill=MUT)
+    d.text((24, 84), "погибнет он — лампы погаснут (слабость «На проводах»). Слева покой, справа срабатывание.",
+           font=fr, fill=MUT)
+    for cx, key, frame in caps:
+        name, txt, _ = AU.AUGS[key]
+        d.text((cx * S - d.textlength(name, font=fb) / 2, (by + 14) * S), name, font=fb, fill=INK)
+        d.text((cx * S - d.textlength(txt, font=fr) / 2, (by + 14) * S + 26), txt, font=fr, fill=MUT)
+        sub = f"на малом фрейме: {frame}"
+        d.text((cx * S - d.textlength(sub, font=fr) / 2, (by + 14) * S + 48), sub, font=fr, fill=MUT)
+    d.text((24, (by + 64) * S), "Стартовая армия: малые фреймы с аугментами, в настоящем масштабе", font=fh, fill=GOLD)
+    for (_, _, _, _, label), x in zip(army, xs):
+        d.text((x * S - d.textlength(label, font=fr) / 2, (yb + 8) * S), label, font=fr, fill=INK)
     img.save(out("inventor.png"))
 
 
