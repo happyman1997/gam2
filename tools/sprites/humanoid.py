@@ -551,10 +551,7 @@ def impact(fx, A, ft, info):
                 continue
             fx.ell(face + tf * d[0] * spread + arr((0, d[1], d[2])) * (0.6 if i else 0) * spread, ((0.75 - 0.08 * i) / grow,) * 3,
                    emissive("fire", 16 if i == 0 else 4, 0.85))
-    if A["fx"] == "slam":         # the arc of the blow from over the shoulder, grit and dust where it lands
-        v = hc - sh
-        if near and A.get("smear", True):
-            smear(fx, sh, np.linalg.norm(v[:2]), np.radians(115), np.arctan2(v[1], v[0]) + 0.32, "xy", 4.0, 3.6)
+    if A["fx"] == "slam":         # grit and dust where the blow lands
         if near:
             fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 22, 0.9))                 # the flash of contact
         g = arr((face[0], 0.3, face[2]))
@@ -562,25 +559,17 @@ def impact(fx, A, ft, info):
             fx.ell(g + arr(d) * spread, (2.0 + 0.3 * i, 1.3, 1.7) * np.array(grow), M_PUFF)
         for d in ((2.6, 3.4, 1.6), (-2.2, 4.2, -1.0), (3.8, 2.0, -1.8)):
             fx.box(g + arr(d) * (1.0 + 1.6 * ft), (0.8, 0.7, 0.8), M_IRON, rot_z(0.7 + 2.0 * ft))
-    elif A["fx"] == "sweep":      # a flat arc low along the ground from the near side to the front, dust behind it
-        r = np.linalg.norm(hc[[0, 2]])
-        if near and A.get("smear", True):
-            smear(fx, (0, hc[1], 0), r, np.radians(78), np.arctan2(hc[2], hc[0]) + 0.22, "xz", 4.2, 3.6)
+    elif A["fx"] == "sweep":      # dust kicked up behind the low blow
         if near:
             fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 20, 0.9))                 # the flash of contact
         for i, d in enumerate(((-2.0, -2.4, 3.0), (-5.0, -2.6, 5.0), (-8.5, -2.8, 7.0))):
             fx.ell(arr((hc[0], 0.0, hc[2])) + arr((d[0], 1.2, d[2])) * np.array((1, 1, spread)), (2.0 + 0.4 * i, 1.2, 1.8) * np.array(grow), M_PUFF)
-    elif A["fx"] == "ram":        # the shield's face strikes: a flash, sparks, speed lines behind its edges, dust
+    elif A["fx"] == "ram":        # the shield's face strikes: a flash, sparks, dust
         front = sc + R @ arr((1.6, 0, 0))
         if near:
             fx.ell(front + R @ arr((0.9, 1.5, 0)), (1.4, 3.0, 3.0), emissive("fire", 20, 0.85))
         for i, d in enumerate(((2.6, 5.0, 2.6), (3.4, 0.5, -3.2), (2.2, -4.0, 3.4), (4.4, 2.6, 0.0), (3.0, -1.5, -4.8))):
             fx.ell(front + R @ (arr(d) * spread), ((0.6 - 0.06 * i) / grow,) * 3, emissive("fire", 5 if i == 0 else 0, 0.7))
-        if near and A.get("smear", True):
-            for y in (-7.0, 0.0, 7.0):
-                for zz in (-7.2, 7.2):
-                    p = sc + R @ arr((-2.5, y, zz))
-                    fx.box(p, (5.0, 0.35, 0.35), SMEAR)
         f = arr(A["ankles"][1]) + arr((2.0, -2.4, 0))
         for i, d in enumerate(((1.5, 1.2, 1.5), (3.2, 1.6, -1.0), (-0.5, 1.0, -2.5), (-3.0, 1.0, 1.0))):
             fx.ell(f + arr(d) * spread, (1.8 + i * 0.3, 1.2, 1.6) * np.array(grow), M_PUFF)
@@ -647,6 +636,12 @@ def carry_haft():
 
 
 ATTACKS["ram"]["haft"] = carry_haft()
+
+
+def hit_point():
+    """Where the Guard's attack lands (model coordinates, on the ground)."""
+    _, info = pose_parts(ATTACKS[ATTACK], fx=False)
+    return info["face"] * arr((1, 0, 1))
 
 
 def guard(pose="idle", P=None):

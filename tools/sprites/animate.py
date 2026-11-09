@@ -1,8 +1,7 @@
 """Animated attacks of the humanoid Guard: idle -> wind-up -> blow -> contact -> recovery -> idle.
 
 Poses are numbers (humanoid.ATTACKS), so in-between frames are interpolated: the hand and the haft
-travel on an arc round the shoulder, a stepping foot lifts, the maul head leaves a motion trail
-between frames. Every frame goes through the clipping check.
+travel on an arc round the shoulder, a stepping foot lifts. Every frame goes through the clipping check.
 
     python3 tools/sprites/animate.py            -> out/guard_attack.gif (the Guard's attack, close up and at battle size)
     python3 tools/sprites/animate.py all        -> out/guard_attacks.gif (all three attack poses side by side)
@@ -171,34 +170,10 @@ def timeline(kind):
     return f
 
 
-def trail(G, seg, s0, s1, kind):
-    """Dithered boxes along the path the maul head (or the shield, for the ram) took since the last frame."""
-    Wd, X, plane, way = seg
-    key = "sc" if kind == "ram" else "hc"
-    pts = []
-    for s in np.linspace(s0, s1, 6):
-        A = blend(Wd, X, s, plane, way) if s < 1 else X
-        _, info = H.pose_parts(A, fx=False)
-        pts.append(info[key])
-    fx = G["fx"]
-    for i, (p0, p1) in enumerate(zip(pts[:-1], pts[1:])):
-        L = np.linalg.norm(p1 - p0)
-        if L < 0.5:
-            continue
-        tv = H.unit(p1 - p0)
-        side = H.unit(np.cross(tv, (0, 0, 1.0))) if abs(tv[2]) < 0.9 else H.arr((0, 1.0, 0))
-        R = np.column_stack([tv, side, np.cross(tv, side)])
-        k = 0.35 + 0.65 * (i + 1) / (len(pts) - 1)
-        size = (L * 1.1, (9.0 if kind == "ram" else 4.6) * k, (5.0 if kind == "ram" else 4.6) * k)
-        fx.box((p0 + p1) / 2, size, H.SMEAR, R)
-
-
 def frame_parts(A, ft, tr, seg, kind):
     G, info = H.pose_parts(A, fx=False)
     if ft is not None:
         H.impact(G["fx"], A, ft, info)
-    if tr is not None:
-        trail(G, seg, tr[0], tr[1], kind)
     return G, info
 
 

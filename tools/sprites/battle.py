@@ -127,6 +127,7 @@ def build():
         (3, 9, 4, "Механик", "attack", 0),
         (4, 12, 4, "Механик", "idle", 0),
     ]
+    fronts, targets = [], []
     for (c, r, size, frame, pose, dx) in golems:
         n = CELLS[size]
         fx = X0 + (c + n / 2) * CW + dx
@@ -137,16 +138,50 @@ def build():
             shadow(sc, fx + 2, fy, 22 * n + 14, 6 + 3 * n)
             put(sc, spr, fx, fy)
         items.append((fy, f))
+        cols = np.nonzero(spr.a[: spr.oy + 2].max(axis=0))[0]          # the sprite's front edge
+        front = fx + cols.max() - spr.ox
+        if front > 380:                                                # golems in the front line hold the swarm back
+            fronts.append((front, fy - 6 * n - 8, fy + 8))
+        h = F.hit(frame) if pose == "attack" else None
+        if h is not None:
+            hx, hy = F.to_screen(h, GK[size])
+            targets.append([fx + hx, fy + hy, frame == "Орудие"])
     lx, ly = X0 + 2.5 * CW, Y0 + 6.8 * CH
     lead = AR.render_model(AR.architect("idle"), 1.55)
     items.append((ly, lambda: (shadow(sc, lx + 2, ly, 34, 7), put(sc, lead, lx, ly))))
 
-    # ---------------- swarm
+    # ---------------- swarm: pressed against the golems, the ones being hit stand where the blows land
     count = 0
     plans = (None,) * 4 + W.TRAITS
-    for c in range(8, 16):
+
+    def front_at(y):
+        xs = [x for (x, y0, y1) in fronts if y0 <= y <= y1]
+        return max(xs) if xs else None
+
+    def bug(traits, pose, soldier, x, y, hit=False):
+        spr = W.build(traits, rnd.uniform(-0.16, 0.16), pose, soldier, k=1.0, genes=W.genes_for(rnd.randrange(10 ** 6)))
+        if hit:
+            spr = flash(spr, 0.75)
+        def f(spr=spr, fx=x, fy=y):
+            shadow(sc, fx - 1, fy, 14, 3)
+            put(sc, spr, fx, fy, mirror=True)
+        items.append((y, f))
+
+    shots = []
+    for t in targets:                       # a gunner's shells fly over its neighbours into the swarm's front rank
+        if t[2]:
+            fr = front_at(t[1])
+            mz = (t[0] - 52, t[1] - 20)
+            t[0] = (fr if fr is not None else 420) + 10
+            shots.append((mz, (t[0], t[1] - 6)))
+    targets = [(t[0], t[1]) for t in targets]
+    for (tx, ty) in targets:
+        for ox, oy in ((0, 0), (12, -6), (10, 7)):
+            bug((rnd.choice(plans),) if rnd.random() < 0.5 else (), "attack", False, tx + ox, ty + oy, hit=(ox == 0))
+            count += 1
+    for c in range(7, 16):
         for r in range(14):
-            dens = {8: 0.8, 9: 0.9, 10: 0.85, 11: 0.7, 12: 0.55, 13: 0.45, 14: 0.3, 15: 0.2}[c]
+            dens = {7: 0.7, 8: 0.85, 9: 0.9, 10: 0.85, 11: 0.7, 12: 0.55, 13: 0.45, 14: 0.3, 15: 0.2}[c]
             if (c >= 13 and 5 <= r <= 9) or rnd.random() > dens:
                 continue
             soldiers = rnd.random() < 0.12
@@ -159,24 +194,27 @@ def build():
                     if all(abs(ox - a) > 12 or abs(oy - b) > 7 for a, b in spots):
                         break
                 spots.append((ox, oy))
+                fx, fy = cx + ox, cy + oy
+                fr = front_at(fy)
+                if fr is not None and fx < fr + 4:
+                    fx = fr + 4 + rnd.uniform(0, 14)
+                elif fr is None and c == 7:
+                    continue                     # no golem in this row: the swarm's front stays where it was
+                if any(abs(fx - tx) < 16 and abs(fy - ty) < 10 for (tx, ty) in targets):
+                    continue
                 primary = rnd.choice(plans)
                 extra = tuple(t for t in W.TRAITS if t != primary and rnd.random() < 0.1)[:1]
                 traits = ((primary,) if primary else ()) + extra
                 if rnd.random() < 0.06:
                     traits += ("giant",)
-                pose = "attack" if (c <= 9 and rnd.random() < 0.6) else "idle"
-                hue = rnd.uniform(-0.16, 0.16)
-                spr = W.build(traits, hue, pose, soldiers and primary is None, k=1.0, genes=W.genes_for(rnd.randrange(10 ** 6)))
-                if c == 8 and rnd.random() < 0.15:
-                    spr = flash(spr)
-                fx, fy = cx + ox, cy + oy
-                def f(spr=spr, fx=fx, fy=fy):
-                    shadow(sc, fx - 1, fy, 14, 3)
-                    put(sc, spr, fx, fy, mirror=True)
-                items.append((fy, f))
+                near_front = fr is not None and fx < fr + 30
+                pose = "attack" if (near_front or c <= 8) and rnd.random() < 0.7 else "idle"
+                bug(traits, pose, soldiers and primary is None, fx, fy)
                 count += 1
     for i in range(10):
-        x, y = rnd.uniform(395, 480), rnd.uniform(70, 510)
+        y = rnd.uniform(70, 510)
+        fr = front_at(y)
+        x = (fr if fr is not None else 432) + rnd.uniform(0, 20)
         spr = dead_bug(rnd.uniform(-0.15, 0.15), i)
         items.append((y - 3, lambda spr=spr, x=x, y=y: put(sc, spr, x, y, mirror=True)))
     qx, qy = X0 + 15.6 * CW, Y0 + 8.4 * CH
@@ -186,10 +224,13 @@ def build():
 
     for _, f in sorted(items, key=lambda t: t[0]):
         f()
-    for (x, y, col) in ((312, 122, "fire"), (290, 136, "fire")):
-        bolt(sc, x, y, col)
-    for (x, y, big) in ((452, 296, True), (432, 66, True), (470, 274, False), (425, 86, False)):
-        spark(sc, x, y, big)
+    for (tx, ty) in targets:
+        spark(sc, int(tx), int(ty) - 6, True)
+    for (a, b) in shots:                    # tracers along the shells' path
+        for f in (0.35, 0.7):
+            x = a[0] + (b[0] - a[0]) * f
+            y = a[1] + (b[1] - a[1]) * f
+            bolt(sc, int(x), int(y), "fire", 14)
     return sc, count, len(golems)
 
 

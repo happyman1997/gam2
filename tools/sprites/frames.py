@@ -108,6 +108,27 @@ def build(name, pose="idle", k=None):
     return GH.build(GH.BY_NAME[name], pose, k)
 
 
+def hit(name):
+    """Model-space point where the frame's attack lands, or None (the Mechanic repairs, it does not hit)."""
+    import humanoid as HM
+    import golems_h as GH
+    if name == "Страж":
+        return HM.hit_point()
+    if name == "Орудие":                 # shells go down-range: the target stands a few cells ahead
+        _, info = GH.creature_parts(GH.ORUDIE, GH.ORUDIE["poses"]["attack"], fx=False)
+        mz, d = info["n"]["muzzle"], info["n"]["d"]
+        h = np.array((d[0], 0.0, d[2] * 0.3))
+        return np.array((mz[0], 0.0, mz[2])) + h / np.linalg.norm(h) * 55.0
+    return GH.hit_point(GH.BY_NAME[name])
+
+
+def to_screen(p, k):
+    """Model point -> pixel offset from a sprite's ground origin, as r3d projects it."""
+    from r3d import rot_y, SA, CA, YAW
+    q = rot_y(YAW) @ np.array(p, float)
+    return q[0] * k, (q[2] * SA - q[1] * CA) * k
+
+
 def build_boxy(name, pose="idle", k=None):
     k = FRAMES[name][2] if k is None else k
     w, h, ox, oy = G.dims(k)

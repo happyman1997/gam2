@@ -83,7 +83,7 @@ def unit_sprite(u, pose):
     if name == "Изобретатель":
         return IV.render_model(IV.inventor("idle" if pose == "broken" else pose), 1.9, w=56, h=60, ox=24, oy=48)
     if name == "Маньяк":
-        return MN.render_model(MN.maniac("idle" if pose == "broken" else pose), 1.5, w=60, h=76, ox=28, oy=62)
+        return GH.build(GH.MANIAC, pose, 1.3)
     soldier = name == "Солдат"
     rnd = random.Random(u["id"] * 7919)
     return W.build((), rnd.uniform(-0.14, 0.14), "attack" if pose == "attack" else "idle", soldier, k=1.0,
@@ -138,6 +138,11 @@ def build(state):
             continue
         pose = "attack" if u["id"] in attackers else "idle"
         spr = unit_sprite(u, pose)
+        if n > 1:        # a big unit stands at the front of its square, so its blows reach the cell beyond
+            cols = np.nonzero(spr.a[: spr.oy + 2].max(axis=0))[0]
+            facing = -1 if mirror else 1
+            reach = (cols.max() - spr.ox) if facing > 0 else (spr.ox - cols.min())
+            fx += facing * max(0.0, n * CW / 2 - reach - 4)
         hit = dmg_to.get(u["id"], 0)
         if hit > 0:
             spr = flash(spr, 0.45)
