@@ -10,6 +10,7 @@ from PIL import ImageFont
 from kit import *
 import golem7 as G
 import frames as F
+import golems_h as GH
 import architect as AR
 import colossus as CL
 import inventor as IV
@@ -74,13 +75,11 @@ def unit_sprite(u, pose):
     if name in F.FRAMES:
         return F.build(name, pose)
     if name == "Каменщик":
-        if pose == "broken":
-            return G.build(cfg(legs="springs", tools=("claw", "claw")), 1, "broken", k=0.8)
-        return AR.render_model(AR.mason("attack" if pose == "attack" else "idle"), 0.8)
+        return GH.build(GH.MASON, pose, k=0.85)
     if name == "Зодчий":
         return AR.render_model(AR.architect("idle" if pose == "broken" else pose), 1.55)
     if name == "Отец колосса":
-        return CL.build("idle" if pose == "broken" else pose, 1.15)
+        return GH.colossus_build("idle" if pose == "broken" else pose, 3.5)
     if name == "Изобретатель":
         return IV.render_model(IV.inventor("idle" if pose == "broken" else pose), 1.9, w=56, h=60, ox=24, oy=48)
     if name == "Маньяк":

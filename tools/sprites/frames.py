@@ -98,6 +98,17 @@ def model(name, pose="idle"):
 
 
 def build(name, pose="idle", k=None):
+    """The frame's sprite. The frames are humanoid machines now (humanoid.py, golems_h.py);
+    build_boxy keeps the earlier box-bodied golems for reference."""
+    import humanoid as HM
+    import golems_h as GH
+    k = FRAMES[name][2] if k is None else k
+    if name == "Страж":
+        return HM.build(pose, k)
+    return GH.build(GH.BY_NAME[name], pose, k)
+
+
+def build_boxy(name, pose="idle", k=None):
     k = FRAMES[name][2] if k is None else k
     w, h, ox, oy = G.dims(k)
     h = int(h * 1.25)
@@ -112,7 +123,7 @@ if __name__ == "__main__":
     from noise import value_noise
     from paths import font, out
     S = 2
-    WW, HH = 960, 400
+    WW, HH = 960, 540
     sc = Scene(WW, HH)
     n = value_noise(WW, HH, 14, 81) * 0.6 + value_noise(WW, HH, 5, 82) * 0.4
     th = BAYER[sc.yy % 4, sc.xx % 4]
@@ -124,7 +135,7 @@ if __name__ == "__main__":
         cx = 88 + i * 192
         for j, pose in enumerate(("idle", "attack")):
             spr = build(name, pose, k=FRAMES[name][2] * 1.15)
-            by = 182 + j * 178
+            by = 250 + j * 250
             e = ((sc.xx - cx) / (36 * FRAMES[name][2])) ** 2 + ((sc.yy - by) / 7) ** 2
             sc.rgb[e <= 1] *= 0.62
             sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
@@ -134,11 +145,12 @@ if __name__ == "__main__":
     fh = ImageFont.truetype(font("PTSerif-Bold.ttf"), 22)
     fr = ImageFont.truetype(font("PTSerif-Regular.ttf"), 16)
     d.text((24, 12), "Литейщик: пять фреймов — свой цвет и свой силуэт у каждой роли", font=ft, fill=(236, 226, 200))
-    d.text((24, 52), "Сверху покой, снизу атака. В настоящем соотношении размеров.", font=fr, fill=(190, 182, 164))
+    d.text((24, 52), "Человекоподобные машины. Сверху покой, снизу атака — момент удара. В настоящем соотношении размеров.",
+           font=fr, fill=(190, 182, 164))
     for i, name in enumerate(names):
         cx = (88 + i * 192) * S
-        d.text((cx - d.textlength(name, font=fh) / 2, 196 * S), name, font=fh, fill=(226, 186, 106))
+        d.text((cx - d.textlength(name, font=fh) / 2, 272 * S), name, font=fh, fill=(226, 186, 106))
         sub = FRAMES[name][3]
-        d.text((cx - d.textlength(sub, font=fr) / 2, 196 * S + 28), sub, font=fr, fill=(190, 182, 164))
+        d.text((cx - d.textlength(sub, font=fr) / 2, 272 * S + 28), sub, font=fr, fill=(190, 182, 164))
     img.save(out("foundry_frames.png"))
     print(img.size)

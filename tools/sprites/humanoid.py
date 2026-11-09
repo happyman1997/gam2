@@ -110,60 +110,64 @@ class Parts(dict):
 
 
 # ---------------------------------------------------------------- legs
-def leg(G, key, hipj, knee, ankle, s, P):
+def leg(G, key, hipj, knee, ankle, s, P, th=1.0):
+    """th: thickness of the leg (1 — the Guard); lengths come from the joints."""
     g, rm = G[key], G[key + ".ram"]
     hipj, knee, ankle = arr(hipj), arr(knee), arr(ankle)
-    axle(g, hipj, 2.6, 3.4, s)
-    gear(g, hipj + (0, 0, 1.7 * s), 2.3, s, teeth=11)
-    Rt = block(g, hipj, knee, (3.8, 3.8), (3.4, 3.4), M_DIRON)                                   # thigh beam
-    block(g, lerp(hipj, knee, 0.2), lerp(hipj, knee, 0.86), (1.4, 4.4), (1.4, 3.9), P, off=(2.4, 0, 0))     # front plate
-    block(g, lerp(hipj, knee, 0.36), lerp(hipj, knee, 0.84), (4.0, 1.1), (3.6, 1.1), P, off=(0.3, 0, 2.3 * s))  # outer plate
-    conduit(g, lerp(hipj, knee, 0.42) + (0, 0, 3.3 * s), lerp(hipj, knee, 0.8) + (0, 0, 3.3 * s), r=0.5)
-    axle(g, knee, 2.2, 4.2, s)
-    gear(g, knee + (0, 0, 2.1 * s), 1.8, s, teeth=9)
-    g.ell(knee + Rt @ arr((2.5, 0.0, 0)), (1.5, 2.2, 2.2), P)                                     # knee cap
-    rivets(g, [knee + Rt @ arr((3.9, 0.0, 0))], r=0.35)
-    Rs = block(g, knee, ankle, (3.2, 3.2), (3.2, 3.2), M_DIRON, off=(-0.3, 0, 0))                 # shin beam
-    block(g, lerp(knee, ankle, 0.1), lerp(knee, ankle, 0.92), (4.4, 4.8), (5.0, 5.4), P, off=(0.7, 0, 0))   # greave
-    block(g, lerp(knee, ankle, 0.16), lerp(knee, ankle, 0.82), (1.1, 1.4), (1.1, 1.6), M_DIRON, off=(3.4, 0, 0))  # ridge
-    rivets(g, [lerp(knee, ankle, t) + Rs @ arr((1.0, 0, 0)) + (0, 0, 2.75 * s) for t in (0.3, 0.55, 0.8)], r=0.35)
+    T = lambda *v: tuple(x * th for x in v)
+    axle(g, hipj, 2.6 * th, 3.4 * th, s)
+    gear(g, hipj + (0, 0, 1.7 * th * s), 2.3 * th, s, teeth=11)
+    Rt = block(g, hipj, knee, T(3.8, 3.8), T(3.4, 3.4), M_DIRON)                                 # thigh beam
+    block(g, lerp(hipj, knee, 0.2), lerp(hipj, knee, 0.86), T(1.4, 4.4), T(1.4, 3.9), P, off=T(2.4, 0, 0))   # front plate
+    block(g, lerp(hipj, knee, 0.36), lerp(hipj, knee, 0.84), T(4.0, 1.1), T(3.6, 1.1), P, off=T(0.3, 0, 2.3 * s))  # outer plate
+    conduit(g, lerp(hipj, knee, 0.42) + (0, 0, 3.3 * th * s), lerp(hipj, knee, 0.8) + (0, 0, 3.3 * th * s), r=0.5 * th)
+    axle(g, knee, 2.2 * th, 4.2 * th, s)
+    gear(g, knee + (0, 0, 2.1 * th * s), 1.8 * th, s, teeth=9)
+    g.ell(knee + Rt @ arr(T(2.5, 0.0, 0)), T(1.5, 2.2, 2.2), P)                                  # knee cap
+    rivets(g, [knee + Rt @ arr(T(3.9, 0.0, 0))], r=0.35 * th)
+    Rs = block(g, knee, ankle, T(3.2, 3.2), T(3.2, 3.2), M_DIRON, off=T(-0.3, 0, 0))             # shin beam
+    block(g, lerp(knee, ankle, 0.1), lerp(knee, ankle, 0.92), T(4.4, 4.8), T(5.0, 5.4), P, off=T(0.7, 0, 0))   # greave
+    block(g, lerp(knee, ankle, 0.16), lerp(knee, ankle, 0.82), T(1.1, 1.4), T(1.1, 1.6), M_DIRON, off=T(3.4, 0, 0))  # ridge
+    rivets(g, [lerp(knee, ankle, t) + Rs @ arr(T(1.0, 0, 0)) + (0, 0, 2.75 * th * s) for t in (0.3, 0.55, 0.8)], r=0.35 * th)
     # thigh ram: from the back of the thigh across the knee to the back of the shin, on lugs
     bt, bs = -Rt[:, 0], -Rs[:, 0]
-    A = lerp(hipj, knee, 0.3) + bt * 3.5
-    B = lerp(knee, ankle, 0.28) + bs * 3.4
-    g.cyl(A, A - bt * 2.0, 0.6, M_DIRON, seg=6)
-    g.cyl(B, B - bs * 2.0, 0.6, M_DIRON, seg=6)
-    ram(rm, A, B, 0.85)
+    A = lerp(hipj, knee, 0.3) + bt * 3.5 * th
+    B = lerp(knee, ankle, 0.28) + bs * 3.4 * th
+    g.cyl(A, A - bt * 2.0 * th, 0.6 * th, M_DIRON, seg=6)
+    g.cyl(B, B - bs * 2.0 * th, 0.6 * th, M_DIRON, seg=6)
+    ram(rm, A, B, 0.85 * th)
     # ankle and an articulated foot: heel, hinge, toe block, toe cap, claws
-    axle(g, ankle, 1.6, 3.8, s)
-    g.box(ankle + (-1.5, -2.1, 0), (4.4, 2.2, 5.0), M_IRON)
-    toe = ankle + (3.4, -2.4, 0)
-    g.cyl(ankle + (1.0, -2.2, -2.6), ankle + (1.0, -2.2, 2.6), 1.0, M_DIRON, seg=8)
-    g.box(toe, (5.2, 1.8, 5.2), M_IRON)
-    tbox(g, toe + (0.4, 1.15, 0), (4.0, 5.2), (3.0, 4.4), 0.5, P)
+    axle(g, ankle, 1.6 * th, 3.8 * th, s)
+    g.box(ankle + T(-1.5, -2.1, 0), T(4.4, 2.2, 5.0), M_IRON)
+    toe = ankle + T(3.4, -2.4, 0)
+    g.cyl(ankle + T(1.0, -2.2, -2.6), ankle + T(1.0, -2.2, 2.6), 1.0 * th, M_DIRON, seg=8)
+    g.box(toe, T(5.2, 1.8, 5.2), M_IRON)
+    tbox(g, toe + T(0.4, 1.15, 0), T(4.0, 5.2), T(3.0, 4.4), 0.5 * th, P)
     for z in (-1.7, 0, 1.7):
-        g.box(toe + (2.95, -0.2, z), (1.0, 1.3, 1.2), M_DIRON)
+        g.box(toe + T(2.95, -0.2, z), T(1.0, 1.3, 1.2), M_DIRON)
     # ankle ram: shin back to the heel
-    C = lerp(knee, ankle, 0.48) + bs * 3.3
-    D = ankle + (-4.0, -1.0, 0)
-    g.cyl(C, C - bs * 1.9, 0.5, M_DIRON, seg=6)
-    ram(rm, C, D, 0.6)
+    C = lerp(knee, ankle, 0.48) + bs * 3.3 * th
+    D = ankle + T(-4.0, -1.0, 0)
+    g.cyl(C, C - bs * 1.9 * th, 0.5 * th, M_DIRON, seg=6)
+    ram(rm, C, D, 0.6 * th)
 
 
 # ---------------------------------------------------------------- arms and hands
-def arm(G, key, sh, elbow, wrist, s, P, ram_side="back"):
-    """Upper arm with a ram, elbow gear, a heavy gauntlet with a heat conduit."""
+def arm(G, key, sh, elbow, wrist, s, P, ram_side="back", th=1.0, cuff=True):
+    """Upper arm with a ram, elbow gear, a heavy gauntlet with a heat conduit. th: thickness."""
     g, rm = G[key], G[key + ".ram"]
     sh, elbow, wrist = arr(sh), arr(elbow), arr(wrist)
-    G[key + ".ball"].ell(sh, (2.9, 2.9, 2.9), M_DIRON)                                        # shoulder socket
-    block(g, sh + unit(elbow - sh) * 2.0, elbow, (3.4, 3.4), (3.0, 3.0), M_DIRON)             # from the socket's rim
-    block(g, lerp(sh, elbow, 0.32), lerp(sh, elbow, 0.86), (3.6, 1.1), (3.0, 1.1), P, off=(0, 0, 2.15 * s))
-    axle(g, elbow, 2.0, 4.0, s)
-    gear(g, elbow + (0, 0, 2.0 * s), 1.6, s, teeth=9)
-    Rf = block(g, elbow, wrist, (4.2, 4.2), (5.4, 5.0), P)                                      # gauntlet
-    block(g, lerp(elbow, wrist, 0.78), wrist, (6.0, 5.6), (6.0, 5.6), M_DIRON)                  # cuff
-    conduit(g, lerp(elbow, wrist, 0.22) + (0, 0, 2.95 * s), lerp(elbow, wrist, 0.7) + (0, 0, 2.95 * s), r=0.45)
-    rivets(g, [lerp(elbow, wrist, t) + Rf @ arr((2.35, 0, 0)) for t in (0.3, 0.55)], r=0.35)
+    T = lambda *v: tuple(x * th for x in v)
+    G[key + ".ball"].ell(sh, T(2.9, 2.9, 2.9), M_DIRON)                                       # shoulder socket
+    block(g, sh + unit(elbow - sh) * 2.0 * th, elbow, T(3.4, 3.4), T(3.0, 3.0), M_DIRON)      # from the socket's rim
+    block(g, lerp(sh, elbow, 0.32), lerp(sh, elbow, 0.86), T(3.6, 1.1), T(3.0, 1.1), P, off=(0, 0, 2.15 * th * s))
+    axle(g, elbow, 2.0 * th, 4.0 * th, s)
+    gear(g, elbow + (0, 0, 2.0 * th * s), 1.6 * th, s, teeth=9)
+    Rf = block(g, elbow, wrist, T(4.2, 4.2), T(5.4, 5.0), P)                                    # gauntlet
+    if cuff:
+        block(g, lerp(elbow, wrist, 0.78), wrist, T(6.0, 5.6), T(6.0, 5.6), M_DIRON)            # cuff
+    conduit(g, lerp(elbow, wrist, 0.22) + (0, 0, 2.95 * th * s), lerp(elbow, wrist, 0.7) + (0, 0, 2.95 * th * s), r=0.45 * th)
+    rivets(g, [lerp(elbow, wrist, t) + Rf @ arr(T(2.35, 0, 0)) for t in (0.3, 0.55)], r=0.35 * th)
     U, F = unit(sh - elbow), unit(wrist - elbow)
     out = -(U + F)
     out[2] = 0.0                                                     # arms bend in their own plane
@@ -175,19 +179,19 @@ def arm(G, key, sh, elbow, wrist, s, P, ram_side="back"):
     nb[2] = 0.0
     nb = unit(nb)                                                    # the back of the upper arm
     if ram_side == "back":       # triceps ram to a lever behind the elbow
-        A = lerp(sh, elbow, 0.5) + nb * 2.7
-        B = elbow + unit(out * 0.6 + nb) * 3.3
-        g.cyl(A, A - nb * 1.4, 0.5, M_DIRON, seg=6)
-        g.cyl(elbow, B, 0.8, M_IRON, seg=6)
+        A = lerp(sh, elbow, 0.5) + nb * 2.7 * th
+        B = elbow + unit(out * 0.6 + nb) * 3.3 * th
+        g.cyl(A, A - nb * 1.4 * th, 0.5 * th, M_DIRON, seg=6)
+        g.cyl(elbow, B, 0.8 * th, M_IRON, seg=6)
     else:                        # a raised, nearly straight arm: biceps ram under the arm
         nf = -nb - F * (-nb @ F)
         nf[2] = 0.0
         nf = unit(nf)
-        A = lerp(sh, elbow, 0.72) - nb * 2.7
-        B = lerp(elbow, wrist, 0.62) + nf * 3.3
-        g.cyl(A, A + nb * 1.4, 0.5, M_DIRON, seg=6)
-        g.cyl(B, B - nf * 1.4, 0.5, M_DIRON, seg=6)
-    ram(rm, A, B, 0.75)
+        A = lerp(sh, elbow, 0.72) - nb * 2.7 * th
+        B = lerp(elbow, wrist, 0.62) + nf * 3.3 * th
+        g.cyl(A, A + nb * 1.4 * th, 0.5 * th, M_DIRON, seg=6)
+        g.cyl(B, B - nf * 1.4 * th, 0.5 * th, M_DIRON, seg=6)
+    ram(rm, A, B, 0.75 * th)
     return wrist
 
 
@@ -202,7 +206,7 @@ def hand_frame(along, grip, s):
     return h, u, n
 
 
-def fist(G, key, wrist, along, grip, s, P):
+def fist(G, key, wrist, along, grip, s, P, th=1.0):
     """A gauntleted hand closed round a haft. The haft runs through the fist from the thumb to the
     little finger; four finger rolls wrap its front, the fingertips tuck in on the inner side, the thumb
     closes over it, a riveted plate guards the back of the hand. Returns the grip point and the axes."""
@@ -210,29 +214,30 @@ def fist(G, key, wrist, along, grip, s, P):
     W = arr(wrist)
     h, u, n = hand_frame(along, grip, s)
     R = np.column_stack([h, u, n])
-    Gp = W + h * 2.4
-    g.ell(W + unit(along) * 0.3, (1.8, 1.8, 1.8), M_DIRON)                                    # wrist joint
-    g.box(Gp - h * 1.7 + n * 0.3, (1.6, 3.4, 3.0), M_IRON, R)                                  # palm
-    g.box(Gp + h * 0.3 + n * 0.35, (3.0, 3.9, 3.1), M_IRON, R)                                 # the closed fist
+    T = lambda *v: tuple(x * th for x in v)
+    Gp = W + h * 2.4 * th
+    g.ell(W + unit(along) * 0.3 * th, T(1.8, 1.8, 1.8), M_DIRON)                              # wrist joint
+    g.box(Gp + (-h * 1.7 + n * 0.3) * th, T(1.6, 3.4, 3.0), M_IRON, R)                         # palm
+    g.box(Gp + (h * 0.3 + n * 0.35) * th, T(3.0, 3.9, 3.1), M_IRON, R)                         # the closed fist
     for i in range(4):                                                                         # fingers round the haft
-        p = Gp + u * (-1.5 + i * 1.0)
-        g.box(p + h * 2.0 + n * 0.2, (1.0, 0.78, 3.4), M_IRON, R)                             # rolls over the front
-        g.box(p + h * 1.2 - n * 1.5, (1.6, 0.74, 0.7), M_DIRON, R)                            # tips on the inner side
-        g.box(p + h * 1.25 + n * 2.15, (1.3, 0.8, 0.75), P, R)                                # knuckle plates
-        rivets(g, [p + h * 1.25 + n * 2.55], r=0.22)
-    g.box(Gp + u * 2.4 + h * 0.6 - n * 0.4, (2.8, 1.0, 1.8), M_IRON, R)                       # thumb over the haft
-    g.box(Gp + u * 2.4 + h * 1.95 - n * 0.85, (1.0, 1.0, 1.0), M_DIRON, R)                    # thumb tip
-    g.box(Gp - h * 0.9 + n * 2.05, (2.4, 3.7, 0.45), P, R)                                     # back-of-hand plate
-    rivets(g, [Gp - h * 0.9 + n * 2.3 + u * dy for dy in (-1.2, 1.2)], r=0.3)
+        p = Gp + u * (-1.5 + i * 1.0) * th
+        g.box(p + (h * 2.0 + n * 0.2) * th, T(1.0, 0.78, 3.4), M_IRON, R)                     # rolls over the front
+        g.box(p + (h * 1.2 - n * 1.5) * th, T(1.6, 0.74, 0.7), M_DIRON, R)                    # tips on the inner side
+        g.box(p + (h * 1.25 + n * 2.15) * th, T(1.3, 0.8, 0.75), P, R)                        # knuckle plates
+        rivets(g, [p + (h * 1.25 + n * 2.55) * th], r=0.22 * th)
+    g.box(Gp + (u * 2.4 + h * 0.6 - n * 0.4) * th, T(2.8, 1.0, 1.8), M_IRON, R)               # thumb over the haft
+    g.box(Gp + (u * 2.4 + h * 1.95 - n * 0.85) * th, T(1.0, 1.0, 1.0), M_DIRON, R)            # thumb tip
+    g.box(Gp + (-h * 0.9 + n * 2.05) * th, T(2.4, 3.7, 0.45), P, R)                            # back-of-hand plate
+    rivets(g, [Gp + (-h * 0.9 + n * 2.3 + u * dy) * th for dy in (-1.2, 1.2)], r=0.3 * th)
     return Gp, h, u
 
 
-def grip_on(W, along, target, s, rounds=3):
+def grip_on(W, along, target, s, rounds=3, th=1.0):
     """Grip point and haft direction for a fist at W whose haft points at `target`."""
     u = unit(arr(target) - arr(W))
     for _ in range(rounds):
         h, u2, _ = hand_frame(along, u, s)
-        Gp = arr(W) + h * 2.4
+        Gp = arr(W) + h * 2.4 * th
         u = unit(arr(target) - Gp)
     return u
 
@@ -449,11 +454,12 @@ def ik(a, target, L1, L2, pole):
     return a + v * x + unit(p) * hgt, a + v * d
 
 
-def place_upper(G, R, t):
+def place_upper(G, R, t, hip=None, keys=None):
     """Lean, twist and lower the whole upper body about the hips; returns the same map for points."""
-    piv, t = arr((0, HIP, 0)), arr(t)
-    for k in UPPER:
-        G[k] = pivot(G[k], R, piv).transformed(I3, t)
+    piv, t = arr((0, HIP if hip is None else hip, 0)), arr(t)
+    for k in (UPPER if keys is None else keys):
+        if k in G:
+            G[k] = pivot(G[k], R, piv).transformed(I3, t)
     return lambda p: R @ (arr(p) - piv) + piv + t
 
 
@@ -580,6 +586,11 @@ def impact(fx, A, ft, info):
             fx.ell(f + arr(d) * spread, (1.8 + i * 0.3, 1.2, 1.6) * np.array(grow), M_PUFF)
 
 
+BROKEN = dict(lean=-0.5, twist=0.12, t=(1.4, -8.0, 0.0), ankles=((-5.4, 2.4, HZ + 1.0), (-7.3, 2.4, -HZ - 1.2)),
+              hand=(5.0, -16.0, 2.6), hand_pole=(-0.6, 0.0, 1.0), haft=(0.6, -0.2, 0.75), face=(0.0, 1.0, 0.0),
+              shield=(3.0, -15.6, -4.5), shield_pole=(0.3, 0.0, -1.0), shield_rot=1.0, fx=None, ram="back")
+
+
 def guard_parts(pose="idle", P=None):
     P = Mat(PAINT) if P is None else P
     G = Parts()
@@ -601,6 +612,12 @@ def guard_parts(pose="idle", P=None):
         R = rot_y(0.5)
         back = shield(G, fc + R @ arr((SHIELD_GAP + 0.75, 0, 0)), R, P)
         bracket(G, fc, uf, back, R)
+        return G
+    if pose == "broken":
+        G, info = pose_parts(BROKEN, P, fx=False)
+        X = lambda p: rot_z(BROKEN["lean"]) @ rot_y(BROKEN["twist"]) @ (arr(p) - (0, HIP, 0)) + (0, HIP, 0) + arr(BROKEN["t"])
+        for i, d in enumerate(((2.0, 33.0, 0.0), (0.5, 37.0, 1.4), (-1.5, 41.5, -0.6))):
+            G["fx"].ell(X(d), (2.2 + i * 1.0, 1.8 + i * 0.8, 2.0 + i * 0.9), M_PUFF)
         return G
     G, _ = pose_parts(ATTACKS[ATTACK if pose == "attack" else pose], P)
     return G

@@ -7,6 +7,7 @@ import maniac as MN
 import colossus as CL
 import golem7 as G7
 import frames as F
+import golems_h as GH
 import swarm1 as SW
 from noise import value_noise
 from paths import font, out
@@ -38,7 +39,7 @@ def fonts():
 
 LEADERS = [
     ("Отец колосса", "размер 7 · титан, армия из одного",
-     lambda p: CL.build(p, 1.45), 80,
+     lambda p: GH.colossus_build(p, 2.6), 80,
      [("Сотрясение", "каждые 3 хода: оглушает мелких врагов вокруг"),
       ("Неудержимый", "постоянно: не сдвинуть, не отбросить, не оглушить"),
       ("Ужас", "постоянно: враги до 3 клеток проверяют страх"),
@@ -86,7 +87,7 @@ def overview():
     # true relative scale
     yb = 50 + 2 * QH + 210
     r = 1.15 / 1.8
-    row = [(CL.build("idle", 1.15), "Отец колосса · 7", 70),
+    row = [(GH.colossus_build("idle", 3.5 * r), "Отец колосса · 7", 70),
            (F.build("Страж", "idle", k=2.2 * r), "Страж · 6", 36),
            (F.build("Молот", "idle", k=1.6 * r), "Молот · 5", 24),
            (IV.render_model(IV.inventor("idle"), 1.9 * r * 1.55, w=56, h=60, ox=24, oy=48), "Изобретатель · 3", 10),
@@ -132,8 +133,8 @@ def architect_sheet():
         AR.wall_segment(m, 0.0, -14.0, 14.0, 13.0, t)
         spr = AR.render_model(m, 1.9, w=60, h=40, ox=30, oy=30)
         put(sc, spr, 120 + i * 170, 420, 30)
-    put(sc, AR.render_model(AR.mason("idle"), 1.5), 690, 440, 22)
-    put(sc, AR.render_model(AR.mason("attack"), 1.5), 840, 440, 22)
+    put(sc, GH.build(GH.MASON, "idle", k=1.6), 690, 440, 22)
+    put(sc, GH.build(GH.MASON, "attack", k=1.6), 840, 440, 22)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft, fh, fb, fbs, fr = fonts()
