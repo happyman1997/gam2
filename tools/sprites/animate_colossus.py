@@ -33,6 +33,43 @@ def unit(v):
     return v / np.linalg.norm(v)
 
 
+def forearm(A):
+    """The direction of the near forearm in pose A, worked out as creature_parts does it."""
+    R = GH.rot_z(A["lean"]) @ GH.rot_y(A.get("twist", 0.0))
+    X = GH.place_upper(GH.Parts(), R, A["t"], hip=S["hip"], keys=GH.UPPER)
+    sh = X(S["sh"])
+    el, w = GH.ik(sh, sh + np.asarray(A["hand_n"], float), S["LU"], S["LF"], A["pole_n"])
+    return unit(w - el)
+
+
+def held(ref):
+    """How the mace sits in the hand in pose `ref`: the forearm and the haft."""
+    d = forearm(ref)
+    return d, GH.grip_dir(d, ref["mace_dir"], least=ref.get("grip_least", 72.0))
+
+
+def grip_of(ref):
+    """The hold as (the axis the haft and the forearm turn about, the angle between them)."""
+    d, u = held(ref)
+    return unit(np.cross(d, u)), np.arccos(np.clip(d @ u, -1, 1))
+
+
+def hold(A, n, th):
+    """Pose A with the haft at angle th to the forearm, in the plane square to n: the hand does not roll."""
+    d = forearm(A)
+    p = np.cross(n, d)
+    p = unit(p - d * (d @ p))
+    return dict(A, mace_dir=tuple(np.cos(th) * d + np.sin(th) * p), grip_least=30.0)
+
+
+def slerp(a, b, s):
+    a, b = unit(a), unit(b)
+    w = np.arccos(np.clip(a @ b, -1, 1))
+    if w < 1e-6:
+        return a
+    return unit((np.sin((1 - s) * w) * a + np.sin(s * w) * b) / np.sin(w))
+
+
 def blend(A0, A1, s, way_hand, way_mace):
     """Numbers between two poses: the hand and the mace turn round the shoulder the given ways."""
     L = lambda k: tuple(np.asarray(A0[k], float) + (np.asarray(A1[k], float) - np.asarray(A0[k], float)) * s)
@@ -59,22 +96,26 @@ def blend(A0, A1, s, way_hand, way_mace):
 
 
 def timeline():
-    """(numbers, duration ms, ft or None, gun firing) for every frame."""
+    """(numbers, duration ms, ft or None, gun firing) for every frame. The mace is held the same way all
+    through (thumb up, as at rest): the wrist only bends, evenly, from cocked back to driving the head down."""
+    n_i, th_i = grip_of(IDLE)
+    n_c, th_c = grip_of(HIT)
+    th_w = np.radians(112.0)                                  # cocked: the head well back behind the hand
     f = [(IDLE, 420, None, False)]
     for s in (1 / 3, 2 / 3):                                  # raising the mace and cocking it behind
-        f.append((blend(IDLE, WIND, ease_io(s), +1, +1), 80, None, False))
-    f.append((WIND, 160, None, True))
-    # the blow: the mace overhead, then the arm coming forward with the mace still up, lagging behind the hand
-    for s, mace in ((0.35, (-0.35, 0.93, 0.25)), (0.6, (0.45, 0.85, -0.1))):
-        f.append((dict(blend(WIND, HIT, s, -1, -1), mace_dir=mace, ram_n="front"), 50, None, True))
+        e = ease_io(s)
+        A = blend(IDLE, WIND, e, +1, +1)
+        f.append((hold(A, slerp(n_i, n_c, e), th_i + (th_w - th_i) * e), 80, None, False))
+    f.append((hold(WIND, n_c, th_w), 160, None, True))
+    for s in (0.35, 0.65):                                    # the blow comes down over the top
+        A = dict(blend(WIND, HIT, s, -1, -1), ram_n="front")
+        f.append((hold(A, n_c, th_w + (th_c - th_w) * s), 50, None, True))
     f.append((HIT, 220, 0.0, True))
     f.append((HIT, 140, 1.0, True))
-    # the mace goes up again: the wrist turns it upright first
-    for s, mace in ((0.3, (0.6, 0.55, -0.2)), (0.6, (0.1, 1.0, 0.1)), (0.85, None)):
-        A = blend(HIT, IDLE, ease_io(s), 0, +1)
-        if mace:
-            A = dict(A, mace_dir=mace, grip_least=72.0)
-        f.append((A, 100, None, False))
+    for s in (0.3, 0.6, 0.85):                                # the mace goes up again
+        e = ease_io(s)
+        A = blend(HIT, IDLE, e, 0, +1)
+        f.append((hold(A, slerp(n_c, n_i, e), th_c + (th_i - th_c) * e), 100, None, False))
     return [(dict(A, spin=0.55 * i), dur, ft, fire) for i, (A, dur, ft, fire) in enumerate(f)]   # the barrels turn
 
 

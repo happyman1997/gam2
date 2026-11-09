@@ -938,8 +938,8 @@ def shock_mace(G, side, sh, el, w, s, P, A, S):
     g = G["item_" + side]
     e1 = unit(np.cross(u, arr((0, 0, 1.0)))) if abs(u[2]) < 0.95 else arr((1.0, 0, 0))
     e2 = np.cross(u, e1)
-    g.cyl(hand - u * 4.6, hand + u * 14.0, 0.9, M_DIRON, seg=8)                             # haft
-    g.cyl(hand - u * 5.6, hand - u * 4.2, 1.3, M_IRON, seg=8)                                # pommel
+    g.cyl(hand - u * 2.9, hand + u * 14.0, 0.9, M_DIRON, seg=8)                             # haft
+    g.cyl(hand - u * 3.2, hand - u * 2.5, 1.25, M_IRON, seg=8)                               # pommel just below the fist
     for t in (3.6, 4.6, 5.6, 6.6, 7.6):                                                      # copper coil
         g.cyl(hand + u * t, hand + u * (t + 0.5), 1.3, COPPER, seg=10)
     g.cyl(hand + u * 9.2, hand + u * 11.4, 1.2, M_HOLE, seg=10)                              # insulator
@@ -1059,10 +1059,11 @@ COLOSSUS = dict(
         idle=dict(lean=-0.06, t=(0.0, 0.0, 0.0), ank=((3.6, 3.6, 9.4), (-5.0, 3.6, -9.4)),
                   hand_n=(9.0, -4.0, 9.0), pole_n=(-1.0, -0.1, 0.5), mace_dir=(-0.2, 1.0, 0.3), ram_n="back",
                   hand_f=(10.0, -11.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back"),
-        # an overhead blow coming down a little across the body: the arm straight, the mace in line with it
-        attack=dict(lean=-0.28, twist=-0.09, t=(0.6, -3.25, 0.0), ank=((8.4, 3.6, 10.7), (-5.2, 3.6, -10.4)),
-                    hand_n=(19.6, -8.6, -1.1), pole_n=(-0.86, -0.14, 0.34), mace_dir=(0.3, -0.84, -0.37), grip_least=40.0,
-                    ram_n="back",
+        # an overhead hammer blow coming down a little across the body: the arm swung down, the mace held
+        # thumb-up as at rest, its head driven onto the target
+        attack=dict(lean=-0.2, twist=-0.06, t=(1.0, -2.55, 0.0), ank=((7.9, 3.6, 9.5), (-6.55, 3.6, -10.3)),
+                    hand_n=(10.5, -18.2, 2.5), pole_n=(0.03, -0.24, 0.95), mace_dir=(0.88, -0.16, -0.44), grip_least=48.0,
+                    ram_n="front",
                     hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True),
     ),
 )
