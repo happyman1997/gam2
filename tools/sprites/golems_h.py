@@ -933,7 +933,7 @@ def col_torso(G, P, S):
 
 def shock_mace(G, side, sh, el, w, s, P, A, S):
     """An electric mace: a long haft with a copper coil, a flanged head on an insulated collar, arcs."""
-    u = grip_dir(w - el, arr(A.get("mace_dir", (0.0, 1.0, 0.0))))
+    u = grip_dir(w - el, arr(A.get("mace_dir", (0.0, 1.0, 0.0))), least=A.get("grip_least", 72.0))
     hand, h, u = fist(G, "hand_" + side, w, w - el, u, s, P, th=1.5)
     g = G["item_" + side]
     e1 = unit(np.cross(u, arr((0, 0, 1.0)))) if abs(u[2]) < 0.95 else arr((1.0, 0, 0))
@@ -964,7 +964,7 @@ def shock_mace(G, side, sh, el, w, s, P, A, S):
         q = p + r * 1.3 + u * rnd.uniform(-1.0, 1.0)
         g.cyl(p, q, 0.18, ARC, seg=4)
         g.cyl(q, q + r * 1.0 + e1 * rnd.uniform(-0.8, 0.8), 0.15, ARC, seg=4)
-    return dict(head=c, u=u, tip=c + u * 7.4, hand=hand)
+    return dict(head=c, u=u, tip=c + u * 7.4, hand=hand, d=unit(w - el), el=el)
 
 
 def minigun(G, side, sh, el, w, s, P, A, S):
@@ -1049,8 +1049,10 @@ COLOSSUS = dict(
         idle=dict(lean=-0.06, t=(0.0, 0.0, 0.0), ank=((3.6, 3.6, 9.4), (-5.0, 3.6, -9.4)),
                   hand_n=(9.0, -4.0, 9.0), pole_n=(-1.0, -0.1, 0.5), mace_dir=(-0.2, 1.0, 0.3), ram_n="back",
                   hand_f=(10.0, -11.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back"),
-        attack=dict(lean=-0.2, twist=-0.12, t=(1.4, -1.8, 0.0), ank=((5.5, 3.6, 9.6), (-6.5, 3.6, -9.4)),
-                    hand_n=(15.0, -9.0, -2.0), pole_n=(0.0, -1.0, 0.8), mace_dir=(0.6, -0.8, 0.0), ram_n="front",
+        # an overhead blow coming down a little across the body: the arm straight, the mace in line with it
+        attack=dict(lean=-0.28, twist=-0.09, t=(0.6, -3.25, 0.0), ank=((8.4, 3.6, 10.7), (-5.2, 3.6, -10.4)),
+                    hand_n=(19.6, -8.6, -1.1), pole_n=(-0.86, -0.14, 0.34), mace_dir=(0.3, -0.84, -0.37), grip_least=40.0,
+                    ram_n="back",
                     hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True),
     ),
 )
