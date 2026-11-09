@@ -194,7 +194,7 @@ def broken_pose(S):
              hand_n=(5.0, -S["LU"] - S["LF"] + 1.0, 2.6), pole_n=(-0.6, 0.0, 1.0),
              hand_f=(3.6, -S["LU"] - S["LF"] + 1.4, -2.6), pole_f=(-0.6, 0.0, -1.0),
              ram_n="back", ram_f="back", fx="broken", open=40.0, hook=10.0)
-    for key in ("wrench_dir", "hammer_dir", "trowel_dir", "ladle_dir", "sword_dir"):
+    for key in ("wrench_dir", "hammer_dir", "trowel_dir", "ladle_dir", "sword_dir", "mace_dir"):
         if key in I:
             A[key] = (0.9, -0.15, 0.4)
     if "manip_n" in I:
@@ -842,172 +842,216 @@ MASON = dict(
 )
 
 
-# ---------------------------------------------------------------- Отец колосса: a warlord titan
-DARK_BRONZE = ramp("#0e0c0c", "#1e1a18", "#342c26", "#54463a", "#86705a")
-CLOTH = Mat(ramp("#1a0606", "#3a0c0c", "#621616", "#8c2420", "#b43a2c"))
-GOLD = Mat(ramp("#2a1a06", "#5a3c10", "#8e6420", "#c49038", "#f0c866"))
+# ---------------------------------------------------------------- Отец колосса: a war machine
+GUNMETAL = ramp("#101216", "#20242a", "#363c44", "#545c66", "#808993")
+WARN = Mat(ramp("#1a0404", "#3e0a08", "#6a1410", "#9a2016", "#c83420"))
+OPTIC = Mat(ramp("#5a0a06", "#a01a10", "#e0402a", "#ff8060", "#ffd0c0"), emissive=hexc("#ff3a24"), glow_r=8, glow_k=0.8)
 ENERGY = Mat(ramp("#2a6a8a", "#4aa8d0", "#8ad8f0", "#c8f2ff", "#ffffff"), emissive=hexc("#70e0ff"), glow_r=12, glow_k=0.75)
-COL_CORE = Core(20.0, ((8.0, 11.6), (8.8, 12.8)), (0.6, 32.0, (10.0, 11.0), (14.0, 24.0), 10.0), ring_r=3.0)
+ARC = Mat(ramp("#4aa8d0", "#8ad8f0", "#c8f2ff", "#eafaff", "#ffffff"), emissive=hexc("#90ecff"), glow_r=6, glow_k=0.5)
+COPPER = Mat(ramp("#2a1006", "#5a240e", "#8a4018", "#b8662a", "#e09a50"))
+BRASS = Mat(ramp("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f0d88a"))
+COL_CORE = Core(20.0, ((8.6, 13.0), (9.4, 14.4)), (0.6, 31.6, (10.4, 14.0), (14.6, 30.0), 10.4), ring_r=3.2)
+COL_SH = arr((0.4, 36.0, 17.0))
+
+
+def stripes(m, c, R, w, h, n, d=0.3):
+    """Red-and-black hazard stripes on a plate (in the plate's own axes: x out, y up, z across)."""
+    for i in range(n):
+        z = (i - (n - 1) / 2) * w / n
+        m.box(arr(c) + R @ arr((d, 0, z)), (0.3, h, w / n * 0.5), WARN, R @ rot_x(0.5))
 
 
 def col_torso(G, P, S):
     C = COL_CORE
-    C.build(G, P, grate=False, fins=4, gauge=False)
+    C.build(G, P, grate=True, fins=4, gauge=False)
     ch = G["chest"]
-    # the reactor heart in the chest: a ring of gold, a cage, a blue-white core
-    ry = C.sy + 0.4
-    rx = C.front(ry)
-    ch.cyl((rx - 0.4, ry, 0), (rx + 1.0, ry, 0), 4.2, M_DIRON, seg=16)
-    ch.cyl((rx + 0.7, ry, 0), (rx + 1.2, ry, 0), 4.6, GOLD, seg=16)
-    ch.ell((rx + 1.1, ry, 0), (0.9, 3.3, 3.3), ENERGY)
-    for a in np.linspace(0, np.pi, 4)[:-1]:
-        ch.box((rx + 1.7, ry, 0), (0.4, 7.0, 0.45), M_DIRON, rot_x(a))
-    for y in (C.sy + C.sh_ / 2 - 0.6, C.sy - C.sh_ / 2 + 0.5):                          # gold trim on the breastplate
-        ch.box((C.front(y) + 0.4, y, 0), (0.4, 0.5, (C.stop[1] if y > C.sy else C.sbot[1]) * 0.9), GOLD)
+    top = C.cy + C.h / 2
+    # armoured collar: the head sits low inside it, between the shoulders
+    tbox(ch, (1.6, top + 0.6, 0), (10.0, 16.0), (8.0, 12.0), 2.0, M_DIRON)
+    for s_ in (1, -1):
+        tbox(ch, (1.4, top + 1.6, 6.6 * s_), (7.0, 2.6), (5.0, 2.0), 3.2, P, rot_x(0.35 * s_))
+    for s_ in (1, -1):                                                   # red warning plates on the breast
+        y = C.sy + 2.6
+        stripes(ch, (C.front(y) + 0.1, y, 7.0 * s_), I3, 5.0, 3.4, 4)
+    for s_ in (1, -1):
+        ch.ell((C.front(C.sy - 3.4) + 0.4, C.sy - 3.4, 4.6 * s_), (0.4, 0.5, 0.5), OPTIC)
+    # the back: a generator between two exhaust stacks and a capacitor tower that feeds the mace
     bk = G["back"]
-    # a crimson cape hanging from the shoulders, gold-edged
-    top_y = C.cy + C.h / 2 - 0.4
-    R_c = rot_z(-0.3)
-    cc = arr((-9.0, top_y - 12.6, 0))
-    tbox(bk, cc, (0.9, 34.0), (0.9, 21.0), 26.0, CLOTH, R_c)
-    tbox(bk, cc + R_c @ arr((0, -12.6, 0)), (1.1, 34.6), (1.1, 34.2), 1.0, GOLD, R_c)
-    for z in (-11.0, -5.0, 5.0, 11.0):                                                       # folds
-        bk.box(cc + R_c @ arr((-0.4, -2.0, z)), (0.5, 20.0, 0.6), Mat(ramp("#140404", "#2a0808", "#461010", "#6a1a18", "#8c2420")), R_c)
-    # two short exhaust towers and the machine gun's ammunition box behind the shoulders
-    for z in (4.6, -4.6):
-        b0, b1 = arr((-4.6, top_y, z)), arr((-6.2, top_y + 9.0, z))
-        bk.cyl(b0, b1, 1.5, M_DIRON, seg=10)
-        bk.cyl(b1, b1 + (0, 0.8, 0), 2.0, GOLD, seg=10)
-        for i, d in enumerate(((0.0, 2.6, 0.0), (-1.2, 5.4, 0.6))):
-            bk.ell(b1 + arr(d), (1.7 + i * 0.8, 1.3 + i * 0.6, 1.5 + i * 0.7), M_PUFF)
-    bk.box((-5.0, 27.4, -8.6), (5.0, 5.4, 3.2), M_IRON)                                    # ammunition box
-    bk.box((-5.0, 27.4, -10.3), (5.2, 5.6, 0.3), P)
-    # the head: a great helm on a ringed neck, a T-visor with blue eyes, a gold crown, a high crest, swept horns
+    bc = arr((-8.6, top + 1.0, 0))
+    tbox(bk, bc + (0, -4.0, 0), (7.0, 20.0), (6.4, 18.0), 9.0, M_DIRON)
+    bk.cyl(bc + (0, 2.4, -7.2), bc + (0, 2.4, 3.6), 3.6, P, seg=14)                          # generator drum
+    for z in (-6.0, -3.4, -0.8, 1.8):
+        bk.cyl(bc + (0, 2.4, z), bc + (0, 2.4, z + 0.6), 3.9, M_DIRON, seg=14)
+    stripes(bk, bc + (-3.6, 2.4, -1.8), rot_y(np.pi), 8.0, 2.8, 5)
+    for z, h_ in ((-9.8, 9.0), (-12.6, 7.0)):                                                # exhaust stacks
+        b0 = bc + (-1.0, -2.0, z)
+        b1 = b0 + (-1.4, h_, 0)
+        bk.cyl(b0, b1, 1.4, M_DIRON, seg=10)
+        bk.cyl(b1 - (0, 1.2, 0), b1, 1.8, M_IRON, seg=10)
+        bk.cyl(b1 - (0, 1.0, 0), b1 + (0, 0.1, 0), 1.0, M_HOLE, seg=8)
+        for i, d in enumerate(((-0.4, 2.4, 0.0), (-1.8, 5.2, -0.6))):
+            bk.ell(b1 + arr(d), (1.6 + i * 0.8, 1.3 + i * 0.6, 1.5 + i * 0.7), M_PUFF)
+    t0 = bc + (-1.2, 5.4, -2.4)                                                              # coil mast with a beacon
+    bk.cyl(t0 - (0, 7.0, 0), t0 + (0, 6.0, 0), 1.3, M_DIRON, seg=10)
+    for i in range(4):
+        y = t0[1] + i * 1.5
+        bk.cyl((t0[0], y, t0[2]), (t0[0], y + 0.6, t0[2]), 2.0 - 0.15 * i, COPPER, seg=12)
+    bk.cyl(t0 + (0, 6.0, 0), t0 + (0, 6.6, 0), 1.6, M_DIRON, seg=10)
+    bk.ell(t0 + (0, 7.3, 0), (1.1, 1.1, 1.1), OPTIC)                                          # red beacon
+    for z in (-1.0, 1.0):                                                                    # antenna mast
+        bk.cyl(bc + (-2.6, 5.0, z * 1.6 - 9.0), bc + (-3.8, 14.0, z * 2.0 - 9.0), 0.2, M_STEEL, seg=4)
+    # the head: a low armoured hunter's head, a slit visor with three red eyes, a grilled jaw
     hd = G["head"]
-    tbox(hd, (1.0, top_y + 0.6, 0), (8.0, 9.6), (6.0, 7.0), 2.0, M_DIRON)
-    tbox(hd, (1.2, top_y + 1.7, 0), (6.4, 7.4), (5.6, 6.4), 0.6, GOLD)
-    hd.cyl((1.4, top_y + 1.6, 0), (2.4, top_y + 5.4, 0), 1.9, M_DIRON, seg=8)
-    for i in range(3):
-        hd.cyl((1.6 + 0.3 * i, top_y + 2.6 + i * 0.9, 0), (1.6 + 0.3 * i, top_y + 3.0 + i * 0.9, 0), 2.3, M_STEEL, seg=8)
-    hc = arr((3.2, top_y + 8.6, 0))
-    tbox(hd, hc, (6.6, 6.0), (5.6, 5.0), 6.6, P)
-    tbox(hd, hc + (1.4, -2.2, 0), (3.4, 5.0), (2.8, 4.4), 2.8, M_IRON)
-    hd.box(hc + (3.15, 0.8, 0), (0.5, 0.9, 4.6), M_HOLE)                                    # T-visor
-    hd.box(hc + (3.15, -0.6, 0), (0.5, 2.6, 0.9), M_HOLE)
-    for z in (-1.4, 1.4):
-        hd.box(hc + (3.3, 0.8, z), (0.4, 0.6, 1.2), ENERGY)                                  # eyes
-    hd.box(hc + (2.6, 1.9, 0), (1.8, 0.9, 6.0), GOLD)                                        # brow
-    hd.cyl(hc + (0.0, 3.4, -3.0), hc + (0.0, 3.4, 3.0), 0.8, GOLD, seg=8)                    # crown band
-    for z in (-2.4, -1.2, 0.0, 1.2, 2.4):
-        spike(hd, hc + (0.6, 3.6, z), hc + (1.0, 6.6 - 0.4 * abs(z), z * 1.15), 0.6, GOLD)
-    for i, x in enumerate((-2.4, -0.6, 1.2)):                                                # high crest
-        tbox(hd, hc + (x - 1.0, 5.6 + (1.6 if i == 1 else 0.6), 0), (2.2, 0.9), (0.9, 0.5),
-             3.4 + (3.0 if i == 1 else 1.4), GOLD, rot_z(0.3))
-    for s_ in (1, -1):                                                                       # swept-back horns
-        spike(hd, hc + (0.0, 2.0, 2.8 * s_), hc + (-7.0, 7.0, 6.0 * s_), 1.1, M_IRON)
+    hc = arr((5.6, top + 4.6, 0))
+    hd.cyl(hc - (2.8, 2.6, 0), hc - (1.2, 0.6, 0), 2.2, M_DIRON, seg=8)                     # neck
+    tbox(hd, hc, (6.8, 6.8), (5.4, 5.6), 5.0, P)                                             # skull
+    tbox(hd, hc + (0.8, 3.1, 0), (5.4, 5.6), (3.0, 3.4), 1.4, P)                             # crown plate
+    hd.box(hc + (-0.2, 3.4, 0), (5.6, 0.6, 0.9), WARN)                                      # red stripe over the head
+    tbox(hd, hc + (3.0, -0.2, 0), (1.2, 6.4), (2.2, 6.0), 4.0, M_DIRON, rot_z(-0.25))        # sloped face plate
+    hd.box(hc + (3.9, 0.9, 0), (0.8, 1.3, 5.6), M_HOLE, rot_z(-0.25))                        # visor slit
+    hd.ell(hc + (4.3, 0.9, 0), (0.6, 0.75, 0.95), OPTIC)                                     # three eyes
+    for z in (-1.9, 1.9):
+        hd.ell(hc + (4.25, 0.95, z), (0.5, 0.55, 0.6), OPTIC)
+    tbox(hd, hc + (3.0, -2.9, 0), (2.4, 4.0), (2.8, 5.2), 1.8, M_IRON)                       # jaw
+    for z in (-1.5, -0.5, 0.5, 1.5):
+        hd.box(hc + (4.3, -2.9, z), (0.4, 1.6, 0.35), M_HOLE)                                # grille
+    for s_ in (1, -1):                                                                       # cheek guards
+        tbox(hd, hc + (0.8, -0.6, 3.5 * s_), (5.6, 0.9), (4.4, 0.7), 4.4, M_DIRON, rot_x(-0.12 * s_))
+        hd.box(hc + (-2.8, 1.0, 2.0 * s_), (0.9, 1.8, 0.9), M_STEEL)                         # sensor stubs
+    # massive angular pauldrons with red warning edges
     for s_, key in ((1, "pauldron_n"), (-1, "pauldron_f")):
-        c = S["sh"] * arr((1, 1, s_)) + (0, 2.0, 0)
-        pauldron(G, key, c, s_, P, r=(6.4, 3.8, 5.2), layers=3, spikes=3)
-        G[key].ell(c + (0, 0.2, 5.4 * s_), (2.0, 2.0, 0.6), GOLD)
+        c = COL_SH * arr((1, 1, s_)) + (0, 2.4, 0)
+        pd = G[key]
+        tbox(pd, c + (0, 0.6, 0.0), (10.4, 8.0), (7.4, 5.2), 3.4, P, rot_x(-0.22 * s_))
+        tbox(pd, c + (0, -1.8, 2.4 * s_), (11.0, 3.4), (10.4, 3.8), 3.0, P, rot_x(-0.62 * s_))
+        pd.box(c + (0, 2.35, 0.0), (7.8, 0.3, 5.4), M_DIRON, rot_x(-0.22 * s_))
+        pd.box(c + (0, -2.4, 4.0 * s_), (11.0, 0.9, 0.6), WARN, rot_x(-0.62 * s_))
+        rivets(pd, [c + (x, -0.6, 3.6 * s_) for x in (-3.6, 0.0, 3.6)], r=0.4)
+        for x in (-2.6, 0.8):                                                                 # spikes
+            spike(pd, c + (x, 2.0, 0.6 * s_), c + (x - 1.4, 4.8, 1.4 * s_), 0.8, M_IRON)
 
 
-def energy_broadsword(G, side, sh, el, w, s, P, A, S):
-    """A straight single-edged blade with a glowing edge and fuller, a gold guard, a power cable."""
-    u = grip_dir(w - el, arr(A.get("sword_dir", (0.2, -1.0, 0.0))))
-    hand, h, u = fist(G, "hand_" + side, w, w - el, u, s, P, th=1.4)
+def shock_mace(G, side, sh, el, w, s, P, A, S):
+    """An electric mace: a long haft with a copper coil, a flanged head on an insulated collar, arcs."""
+    u = grip_dir(w - el, arr(A.get("mace_dir", (0.0, 1.0, 0.0))))
+    hand, h, u = fist(G, "hand_" + side, w, w - el, u, s, P, th=1.5)
     g = G["item_" + side]
-    wv = unit(np.cross(u, arr((0, 0, 1.0)))) if abs(u[2]) < 0.95 else arr((1.0, 0, 0))     # the flat faces the viewer
-    n = np.cross(u, wv)
-    R = np.column_stack([wv, u, n])
-    g.cyl(hand - u * 4.0, hand + u * 3.4, 0.75, M_DIRON, seg=8)                              # grip
-    g.ell(hand - u * 4.4, (1.2, 1.2, 1.2), GOLD)                                             # pommel
-    g.box(hand + u * 3.6, (7.0, 1.2, 2.0), GOLD, R)                                          # cross-guard
-    L, Wd = 22.0, 3.6
-    base, tip = hand + u * 4.2, hand + u * (4.2 + L)
-    g.box(lerp(base, tip, 0.5) - wv * 0.1, (Wd, L, 0.8), M_STEEL, R)                         # the blade
-    g.box(lerp(base, tip, 0.45) - wv * 0.5, (0.6, L * 0.8, 0.9), M_DIRON, R)                 # fuller
-    g.box(lerp(base, tip, 0.5) + wv * (Wd / 2 + 0.15), (0.5, L, 0.95), ENERGY, R)           # the energy edge
-    tbox(g, tip + u * 1.4, (Wd, 0.8), (0.4, 0.4), 2.8, M_STEEL, R)                            # the point
-    rnd = np.random.RandomState(31)
-    for i in range(5):                                                                       # crackling along the edge
-        t = rnd.uniform(0.15, 0.95)
-        p = lerp(base, tip, t) + wv * (Wd / 2 + 0.7)
-        g.cyl(p, p + wv * 0.9 + u * rnd.uniform(-1.2, 1.2), 0.18, ENERGY, seg=4)
-    return dict(tip=tip + u * 2.6, u=u, wv=wv, mid=lerp(base, tip, 0.7))
+    e1 = unit(np.cross(u, arr((0, 0, 1.0)))) if abs(u[2]) < 0.95 else arr((1.0, 0, 0))
+    e2 = np.cross(u, e1)
+    g.cyl(hand - u * 4.6, hand + u * 14.0, 0.9, M_DIRON, seg=8)                             # haft
+    g.cyl(hand - u * 5.6, hand - u * 4.2, 1.3, M_IRON, seg=8)                                # pommel
+    for t in (3.6, 4.6, 5.6, 6.6, 7.6):                                                      # copper coil
+        g.cyl(hand + u * t, hand + u * (t + 0.5), 1.3, COPPER, seg=10)
+    g.cyl(hand + u * 9.2, hand + u * 11.4, 1.2, M_HOLE, seg=10)                              # insulator
+    for t in (9.4, 10.4):
+        g.cyl(hand + u * t, hand + u * (t + 0.4), 1.6, M_DIRON, seg=10)
+    c = hand + u * 17.0
+    g.cyl(c - u * 3.8, c + u * 3.4, 2.4, M_IRON, seg=12)                                    # head core
+    g.cyl(c - u * 0.6, c + u * 0.6, 2.8, ENERGY, seg=12)                                    # glowing band
+    g.cyl(c - u * 4.4, c - u * 3.6, 2.9, M_DIRON, seg=12)
+    for i in range(6):                                                                       # flanges
+        a = i * np.pi / 3 + 0.3
+        r = e1 * np.cos(a) + e2 * np.sin(a)
+        Rf = np.column_stack([r, u, np.cross(r, u)])
+        tbox(g, c + r * 3.0, (3.2, 0.8), (1.6, 0.6), 6.8, M_IRON, Rf)
+        g.box(c + r * 4.7, (0.6, 5.0, 0.65), M_STEEL, Rf)                                    # honed edge
+    spike(g, c + u * 3.4, c + u * 7.4, 1.4, M_IRON)                                          # top spike
+    rnd = np.random.RandomState(17)
+    for i in range(6):                                                                       # arcs between the flanges
+        a = rnd.uniform(0, 2 * np.pi)
+        r = e1 * np.cos(a) + e2 * np.sin(a)
+        p = c + r * 4.4 + u * rnd.uniform(-2.4, 2.4)
+        q = p + r * 1.3 + u * rnd.uniform(-1.0, 1.0)
+        g.cyl(p, q, 0.18, ARC, seg=4)
+        g.cyl(q, q + r * 1.0 + e1 * rnd.uniform(-0.8, 0.8), 0.15, ARC, seg=4)
+    return dict(head=c, u=u, tip=c + u * 7.4, hand=hand)
 
 
-def machine_gun(G, side, sh, el, w, s, P, A, S):
-    """A belt-fed machine gun held by its pistol grip: receiver, a ribbed cooling jacket, a flash hider."""
+def minigun(G, side, sh, el, w, s, P, A, S):
+    """A rotary minigun on a pistol grip: six barrels in clamps, a drive motor, a box of belted rounds."""
     d = unit(w - el)
     up = arr((0, 1.0, 0)) - d * d[1]
     up = unit(up) if np.linalg.norm(up) > 1e-6 else arr((1.0, 0, 0))
-    hand, h, u = fist(G, "hand_" + side, w, w - el, up, s, P, th=1.4)
+    hand, h, u = fist(G, "hand_" + side, w, w - el, up, s, P, th=1.5)
     g = G["item_" + side]
-    c = hand + u * 5.4 + d * 2.0
-    R = np.column_stack([d, u, np.cross(d, u)])
-    g.cyl(hand - u * 3.0, c, 1.0, M_IRON, seg=8)                                            # pistol grip
-    g.box(c - d * 1.0, (7.0, 4.0, 3.6), M_DIRON, R)                                          # receiver
-    g.box(c - d * 1.0 + u * 2.2, (6.0, 0.6, 3.0), GOLD, R)
-    g.cyl(c + d * 2.4, c + d * 13.0, 1.6, M_IRON, seg=12)                                    # cooling jacket
-    for t in np.linspace(3.2, 12.0, 7):
-        g.cyl(c + d * t, c + d * (t + 0.35), 1.8, M_DIRON, seg=12)
-    g.cyl(c + d * 13.0, c + d * 16.0, 0.6, M_DIRON, seg=8)                                   # barrel
-    g.cyl(c + d * 15.6, c + d * 16.8, 1.1, M_STEEL, seg=8)                                   # flash hider
-    g.box(c - d * 5.0, (2.4, 3.0, 2.6), M_IRON, R)                                           # back plate and spade grips
-    for e in (unit(np.cross(d, u)), -unit(np.cross(d, u))):
-        g.cyl(c - d * 5.8 + e * 1.0, c - d * 7.4 + e * 1.0, 0.45, M_DIRON, seg=6)
-    belt0 = c - d * 1.0 - u * 2.2
-    mid, belt1 = A["_X"]((1.0, 21.6, -14.6)), A["_X"]((-3.4, 25.6, -10.6))
-    brass = Mat(ramp("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f0d88a"))
-    for i in range(12):                                                                      # the ammunition belt, under the arm
-        t = i / 11
-        p = lerp(belt0, mid, t * 2) if t < 0.5 else lerp(mid, belt1, t * 2 - 1)
-        g.box(p, (0.9, 0.5, 1.2), brass)
-    return dict(muzzle=c + d * 17.0, d=d, up=u)
+    e = unit(np.cross(d, u))
+    R = np.column_stack([d, u, e])
+    c = hand + u * 6.6 + d * 4.4                                                             # axis of the gun above the fist
+    g.cyl(hand - u * 3.2, c - u * 1.6, 1.1, M_IRON, seg=8)                                   # pistol grip
+    g.box(c - d * 0.2, (8.0, 5.2, 5.0), P, R)                                                # receiver
+    g.box(c - d * 0.2 + u * 2.7, (7.0, 0.4, 4.0), WARN, R)
+    g.cyl(c - d * 6.6, c - d * 4.2, 2.4, M_DIRON, seg=12)                                    # drive motor
+    for t in (-6.2, -5.2):
+        g.cyl(c + d * t, c + d * (t + 0.35), 2.7, M_IRON, seg=12)
+    g.cyl(c + d * 3.8, c + d * 5.2, 2.6, M_IRON, seg=12)                                     # front bearing
+    for i in range(6):                                                                       # the barrel cluster
+        a = i * np.pi / 3 + A.get("spin", 0.0)
+        o = (u * np.cos(a) + e * np.sin(a)) * 1.25
+        g.cyl(c + d * 5.0 + o, c + d * 20.0 + o, 0.42, M_STEEL if i % 2 else M_DIRON, seg=6)
+    for t in (11.0, 18.6):                                                                   # clamps
+        g.cyl(c + d * t, c + d * (t + 0.8), 2.0, M_DIRON, seg=12)
+    g.cyl(c + d * 19.4, c + d * 20.2, 0.6, M_HOLE, seg=8)
+    g.cyl(c + u * 3.6 - d * 2.6, c + u * 3.6 + d * 2.0, 0.45, M_IRON, seg=6)                 # carry handle
+    for t in (-2.6, 2.0):
+        g.cyl(c + u * 2.6 + d * t, c + u * 3.6 + d * t, 0.4, M_IRON, seg=6)
+    bx = c + d * 6.6 - u * 5.2                                                               # ammunition box under the barrels
+    g.box(bx, (6.0, 4.6, 3.8), M_IRON, R)
+    g.box(bx + u * 0.4, (6.2, 0.8, 4.0), WARN, R)
+    for i in range(6):                                                                       # the belt up into the receiver
+        p = lerp(bx + u * 2.3 - d * 1.6, c - u * 2.5 + d * 1.8, i / 5)
+        g.box(p + e * 0.0, (0.9, 0.5, 1.4), BRASS, R)
+    return dict(muzzle=c + d * 20.6, d=d, up=u, c=c, e=e)
 
 
 def col_fx(fx, A, info, S, ft):
-    sw = info["n"]
-    tip = sw["tip"]
+    mc = info["n"]
+    head, u = mc["head"], mc["u"]
     near = ft < 0.5
-    g = arr((tip[0], 0.25, tip[2]))
-    if near:                                                   # the blade bites: a burst of energy
-        fx.ell(tip, (2.4, 2.4, 2.4), ENERGY)
+    g = arr((head[0], 0.25, head[2]))
+    if near:                                                   # the mace lands: a burst of lightning
+        fx.ell(head - u * 0.5, (3.0, 3.0, 3.0), ENERGY)
         rnd = np.random.RandomState(41)
-        for i in range(7):
+        for i in range(9):
             a = rnd.uniform(0, 2 * np.pi)
-            p = tip + arr((np.cos(a), rnd.uniform(-0.4, 1.0), np.sin(a))) * rnd.uniform(3.0, 6.0)
-            q = lerp(tip, p, 0.5) + arr((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1)))
-            fx.cyl(tip, q, 0.25, ENERGY, seg=4)
-            fx.cyl(q, p, 0.2, ENERGY, seg=4)
-        fx.ell(g + (0, 0.1, 0), (6.0, 0.2, 5.0), Mat(ramp("#0e1a22", "#18303c", "#245060", "#3a7a8e", "#6ab8c8"), dither=True))
-    sparks(fx, tip, n=6, spread=3.0, ft=ft, seed=5, big=False)
-    puffs(fx, g, n=3, r=2.4, spread=4.0, ft=ft, seed=3)
-    mg = info["f"]                                             # and the machine gun hammers away
-    mz, d, up = mg["muzzle"], mg["d"], mg["up"]
+            p = head + arr((np.cos(a), rnd.uniform(-0.6, 1.0), np.sin(a))) * rnd.uniform(4.0, 8.0)
+            p[1] = max(p[1], 0.3)
+            q = lerp(head, p, 0.5) + arr((rnd.uniform(-1.4, 1.4), rnd.uniform(-1.0, 1.0), rnd.uniform(-1.4, 1.4)))
+            fx.cyl(head, q, 0.26, ARC, seg=4)
+            fx.cyl(q, p, 0.2, ARC, seg=4)
+        fx.ell(g + (0, 0.1, 0), (7.0, 0.2, 6.0), Mat(ramp("#0e1a22", "#18303c", "#245060", "#3a7a8e", "#6ab8c8"), dither=True))
+    sparks(fx, head, n=6, spread=3.4, ft=ft, seed=5, big=False)
+    puffs(fx, g, n=4, r=2.6, spread=4.6, ft=ft, seed=3)
+    mg = info["f"]                                             # and the minigun pours fire
+    mz, d, up, e = mg["muzzle"], mg["d"], mg["up"], mg["e"]
     if near:
-        fx.ell(mz + d * 1.4, (2.2, 1.6, 1.6), emissive("fire", 18, 0.9))
-        for a in (0.0, 1.0, -1.0):
-            fx.cyl(mz + d * 0.4, mz + d * 3.2 + up * a, 1.0, emissive("fire", 0, 0), r1=0.2, seg=6)
-        for i in range(4):
-            p = mz + d * (7.0 + i * 5.0)
-            fx.cyl(p, p + d * 2.6, 0.3, emissive("fire", 3, 0.6), seg=5)
-    puffs(fx, mz + d * 2.0 + up * 1.0, n=2, r=1.6, spread=2.0, ft=ft, seed=9)
+        fx.ell(mz + d * 1.8, (2.8, 2.2, 2.2), emissive("fire", 20, 0.9))
+        for a in range(5):
+            r = up * np.cos(a * 1.26) + e * np.sin(a * 1.26)
+            fx.cyl(mz + d * 0.6, mz + d * 3.2 + r * 2.0, 0.9, emissive("fire", 0, 0), r1=0.15, seg=6)
+        for i in range(6):                                                    # a stream of tracers
+            p = mz + d * (6.0 + i * 4.2) + up * (0.6 if i % 2 else -0.6)
+            fx.cyl(p, p + d * 2.4, 0.32, emissive("fire", 3, 0.6), seg=5)
+    rnd = np.random.RandomState(13)
+    for i in range(5):                                                        # spent cases tumbling out
+        p = mg["c"] + e * (2.6 + i * 0.9) - up * (1.0 + i * 1.6) + d * rnd.uniform(-1.0, 1.0)
+        fx.box(p, (0.8, 0.45, 0.45), BRASS, rot_z(rnd.uniform(0, 3)))
+    puffs(fx, mz + d * 2.6 + up * 1.2, n=3, r=1.8, spread=2.4, ft=ft, seed=9)
 
 
 COLOSSUS = dict(
-    name="Отец колосса", role="лидер-титан · 7", k=3.2, paint=DARK_BRONZE, canvas=(100, 100, 44, 88),
-    hip=20.0, hz=6.6, hipx=(0.4, -0.8), LT=10.0, LS=7.8, LU=10.0, LF=11.0, th_leg=1.35, th_arm=1.45,
-    sh=arr((0.0, 36.0, 13.5)), torso=col_torso, item_n=energy_broadsword, item_f=machine_gun, fx=col_fx,
-    hit=lambda info: info["n"]["tip"] * arr((1, 0, 1)),
-    allow=[("hand_n", "item_n"), ("hand_f", "item_f"), ("back", "item_f"), ("arm_f", "item_f")],
+    name="Отец колосса", role="лидер-титан · 7", k=3.2, paint=GUNMETAL, canvas=(110, 110, 48, 88),
+    hip=20.0, hz=7.4, hipx=(0.4, -0.8), LT=10.0, LS=7.8, LU=10.4, LF=11.0, th_leg=1.4, th_arm=1.55,
+    sh=COL_SH, torso=col_torso, item_n=shock_mace, item_f=minigun, fx=col_fx,
+    hit=lambda info: info["n"]["head"] * arr((1, 0, 1)),
+    allow=[("hand_n", "item_n"), ("hand_f", "item_f")],
+    broken=dict(hand_f=(3.6, -19.4, -4.0)),       # the far arm hangs clear of the pauldron
     poses=dict(
-        idle=dict(lean=0.0, t=(0.0, 0.0, 0.0), ank=((3.6, 3.6, 7.8), (-5.0, 3.6, -7.8)),
-                  hand_n=(12.7, -6.7, -3.5), pole_n=(-0.4, -0.6, 1.0), sword_dir=(0.05, -1.0, 0.0), ram_n="back",
-                  hand_f=(8.7, -11.9, 2.0), pole_f=(-0.8, -0.4, -0.6), ram_f="front"),
-        attack=dict(lean=-0.2, twist=-0.12, t=(1.4, -1.8, 0.0), ank=((5.5, 3.6, 8.0), (-6.5, 3.6, -7.8)),
-                    hand_n=(15.1, -5.7, -3.8), pole_n=(0.0, -1.0, 0.8), sword_dir=(0.8, -0.6, 0.0), ram_n="front",
-                    hand_f=(11.1, -6.5, -0.85), pole_f=(-0.8, -0.4, -0.6), ram_f="back", fx=True),
+        idle=dict(lean=-0.06, t=(0.0, 0.0, 0.0), ank=((3.6, 3.6, 9.4), (-5.0, 3.6, -9.4)),
+                  hand_n=(9.0, -4.0, 9.0), pole_n=(-1.0, -0.1, 0.5), mace_dir=(-0.2, 1.0, 0.3), ram_n="back",
+                  hand_f=(10.0, -11.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back"),
+        attack=dict(lean=-0.2, twist=-0.12, t=(1.4, -1.8, 0.0), ank=((5.5, 3.6, 9.6), (-6.5, 3.6, -9.4)),
+                    hand_n=(15.0, -9.0, -2.0), pole_n=(0.0, -1.0, 0.8), mace_dir=(0.6, -0.8, 0.0), ram_n="front",
+                    hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True),
     ),
 )
 
@@ -1165,7 +1209,7 @@ MANIAC = dict(
 
 ROSTER = [MOLOT, GORN, ORUDIE, MEH, MASON, COLOSSUS, MANIAC]
 for _S in ROSTER:
-    _S["poses"]["broken"] = broken_pose(_S)
+    _S["poses"]["broken"] = dict(broken_pose(_S), **_S.get("broken", {}))
 BY_NAME = {S["name"]: S for S in ROSTER}
 
 
