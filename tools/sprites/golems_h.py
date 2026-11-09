@@ -150,7 +150,7 @@ def creature_parts(S, A, P=None, fx=True):
     for key, hx, ank, s in (("leg_n", S["hipx"][0], A["ank"][0], 1), ("leg_f", S["hipx"][1], A["ank"][1], -1)):
         h = X((hx, S["hip"], S["hz"] * s))
         kn, an = ik(h, arr(ank) + (0, lift, 0), S["LT"], S["LS"], (1.0, 0.25, 0.0))
-        leg(G, key, h, kn, an, s, S["paints"][key] if S.get("paints") else P, th=S["th_leg"])
+        S.get("leg_fn", leg)(G, key, h, kn, an, s, S["paints"][key] if S.get("paints") else P, th=S["th_leg"])
     A = dict(A, _X=X)
     wpn = S["two_hand"](A, X, S) if S.get("two_hand") else None
     for side, s in (("n", 1), ("f", -1)):
@@ -166,7 +166,8 @@ def creature_parts(S, A, P=None, fx=True):
         else:
             el, w = ik(sh, sh + arr(A["hand_" + side]), S["LU"], S["LF"], A["pole_" + side])
         Pa = S["paints"]["arm_" + side] if S.get("paints") else P
-        arm(G, "arm_" + side, sh, el, w, s, Pa, ram_side=A.get("ram_" + side, "back"), th=S["th_arm"], cuff=S.get("cuff", True))
+        armfn = S.get("arm_fn", {}).get(side, arm)                # a creature may draw its own arm (a human sleeve)
+        armfn(G, "arm_" + side, sh, el, w, s, Pa, ram_side=A.get("ram_" + side, "back"), th=S["th_arm"], cuff=S.get("cuff", True))
         if wpn is not None:
             fist(G, "hand_" + side, w, w - el, wpn["a"], s, P, th=S.get("th_fist", 1.0))
             info[side] = dict(w=w, el=el)

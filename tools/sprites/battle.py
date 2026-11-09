@@ -5,7 +5,7 @@ from kit import *
 from r3d import rot_x, rot_z, render
 import golem7 as G
 import frames as F
-import architect as AR
+import leaders_h as LH
 import swarm1 as W
 from golem7 import cfg
 from noise import value_noise
@@ -147,7 +147,7 @@ def build():
             hx, hy = F.to_screen(h, GK[size])
             targets.append([fx + hx, fy + hy, frame == "Орудие"])
     lx, ly = X0 + 2.5 * CW, Y0 + 6.8 * CH
-    lead = AR.render_model(AR.architect("idle"), 1.55)
+    lead = LH.GH.build(LH.ZODCHIY, "idle", 1.05)
     items.append((ly, lambda: (shadow(sc, lx + 2, ly, 34, 7), put(sc, lead, lx, ly))))
 
     # ---------------- swarm: pressed against the golems, the ones being hit stand where the blows land

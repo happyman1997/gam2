@@ -21,6 +21,7 @@ from r3d import render
 from noise import value_noise
 import golems_h as GH
 import humanoid as HM
+import leaders_h as LH
 import animate as AN
 import animate_colossus as AC
 import swarm1 as W
@@ -33,6 +34,7 @@ unit = AC.unit
 
 # ---------------------------------------------------------------- targets, in the battle scale
 TARGETS = {
+    "worker": dict(name="рабочая роя", spr=lambda: W.build((), 0.02, "idle", False, k=1.0, genes=W.genes_for(7)), push=3),
     "soldier": dict(name="солдат роя", spr=lambda: W.build((), 0.02, "idle", True, k=1.0, genes=W.genes_for(7)), push=3),
     "queen": dict(name="матка", spr=lambda: W.queen(0.0, "idle", k=1.0), push=2),
     "guard": dict(name="Страж", spr=lambda: HM.build("idle", 2.2), push=4),
@@ -159,6 +161,8 @@ WIND = dict(
                      hand_f=(5.0, -9.0, -2.0), ram_n="front", spin=0.6),
     maniac_under=dict(MN_I, lean=-0.12, twist=0.15, t=(-0.4, -1.4, 0.0), hand_n=(-4.0, -11.0, 3.5), pole_n=(-0.6, 0.3, 1.0),
                       hand_f=(5.0, -9.0, -2.0), ram_n="back", spin=0.6),
+    # the crane: the jib raised up and back over the mast, the sling of bricks swinging behind it
+    zodchiy=dict(LH.ZODCHIY["poses"]["idle"], lean=0.05, t=(-0.4, -0.3, 0.0), hand_n=(-6.0, 8.0, 0.0), pole_n=(-0.3, 1.0, 0.0)),
 )
 
 
@@ -214,10 +218,19 @@ ATTACKERS = {
                                                 ("high", "colossus", melee(MN, "high", "maniac_under", +1, ("n",)))]),
     "Каменщик": dict(file="mason", S=MS, panels=[("level", "soldier", melee(MS, "level", "mason", -1, ("n",))),
                                                  ("high", "queen", melee(MS, "high", "mason", -1, ("n",)))]),
+    "Изобретатель": dict(file="inventor", S=LH.INVENTOR,
+                         panels=[("low", "worker", gunner(LH.INVENTOR, "low", ("n",))),
+                                 ("level", "soldier", gunner(LH.INVENTOR, "level", ("n",))),
+                                 ("high", "queen", gunner(LH.INVENTOR, "high", ("n",)))]),
+    "Зодчий": dict(file="zodchiy", S=LH.ZODCHIY,
+                   panels=[("low", "soldier", melee(LH.ZODCHIY, "low", "zodchiy", -1, ("n",))),
+                           ("level", "queen", melee(LH.ZODCHIY, "level", "zodchiy", -1, ("n",))),
+                           ("high", "guard", melee(LH.ZODCHIY, "high", "zodchiy", -1, ("n",)))]),
     "Отец колосса": dict(file="colossus", S=GH.COLOSSUS, frame=colossus_frame,
                          panels=[("low", "soldier", colossus_line("low")), ("level", "guard", colossus_line("level"))]),
 }
-SCALE = {"Страж": 2.2, "Мудрец": 1.6, "Горн": 1.6, "Орудие": 1.6, "Маньяк": 1.3, "Каменщик": 0.85, "Отец колосса": 3.5}
+SCALE = {"Страж": 2.2, "Мудрец": 1.6, "Горн": 1.6, "Орудие": 1.6, "Маньяк": 1.3, "Каменщик": 0.85, "Отец колосса": 3.5,
+         "Изобретатель": 0.9, "Зодчий": 1.05}
 
 
 # ---------------------------------------------------------------- the duel scene

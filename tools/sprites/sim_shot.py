@@ -11,9 +11,8 @@ from kit import *
 import golem7 as G
 import frames as F
 import golems_h as GH
-import architect as AR
 import colossus as CL
-import inventor as IV
+import leaders_h as LH
 import maniac as MN
 import swarm1 as W
 from golem7 import cfg
@@ -77,11 +76,11 @@ def unit_sprite(u, pose):
     if name == "Каменщик":
         return GH.build(GH.MASON, pose, k=0.85)
     if name == "Зодчий":
-        return AR.render_model(AR.architect("idle" if pose == "broken" else pose), 1.55)
+        return GH.build(LH.ZODCHIY, pose, 1.05)
     if name == "Отец колосса":
         return GH.colossus_build("idle" if pose == "broken" else pose, 3.5)
     if name == "Изобретатель":
-        return IV.render_model(IV.inventor("idle" if pose == "broken" else pose), 1.9, w=56, h=60, ox=24, oy=48)
+        return GH.build(LH.INVENTOR, pose, 0.9)
     if name == "Маньяк":
         return GH.build(GH.MANIAC, pose, 1.3)
     soldier = name == "Солдат"
