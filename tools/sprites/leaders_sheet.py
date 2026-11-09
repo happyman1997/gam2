@@ -1,7 +1,6 @@
 """Foundry leaders: an overview of all four, plus sheets for the Architect's and the Inventor's armies."""
 from PIL import ImageFont
 from kit import *
-import architect as AR
 import inventor as IV
 import maniac as MN
 import colossus as CL
@@ -119,40 +118,66 @@ def overview():
 
 
 def architect_sheet():
-    WW, HH = 960, 520
+    """The building modules: each frame marching with its module packed on the back, deployed (the golem
+    plants itself and becomes the core of the building), and at work; below, the levels and the mason."""
+    import buildings as BD
+    WW, HH = 960, 1110
     sc = canvas(WW, HH, 31)
-    mods = [("tower", "Бойницы: башня", "каждый ход стреляет во 2–3 ряд"),
-            ("wall", "Щит-стена: стена", "мелкие враги не проходят"),
-            ("gate", "Створки: ворота", "свои проходят, враги нет"),
-            ("pitch", "Смоляной котёл: котёл над топкой", "каждые 3 хода льёт смолу: враги вязнут")]
-    k = 1.5
-    for i, (key, _, _) in enumerate(mods):
-        cx = 60 + i * 230
-        put(sc, AR.render_model(AR.with_module(key, False), k), cx, 200, 26)
-        put(sc, AR.render_model(AR.with_module(key, True, pose="attack" if key == "pitch" else "idle"), k), cx + 110, 200, 30)
-    for i, t in enumerate((1, 2, 3)):
-        m = AR.Model()
-        AR.wall_segment(m, 0.0, -14.0, 14.0, 13.0, t)
-        spr = AR.render_model(m, 1.9, w=60, h=40, ox=30, oy=30)
-        put(sc, spr, 120 + i * 170, 420, 30)
-    put(sc, GH.build(GH.MASON, "idle", k=1.6), 690, 440, 22)
-    put(sc, GH.build(GH.MASON, "attack", k=1.6), 840, 440, 22)
+    K = {"Страж": 2.2, "Орудие": 1.6, "Горн": 1.6, "Мудрец": 1.6, "Механик": 1.15}       # the frames' battle scale
+    f = 1.0
+    mods = [("tower", "башня: каждый ход стреляет во 2–3 ряд", "стреляет", dict()),
+            ("wall", "стена на 3 клетки: мелкие не пройдут", "уровень III", dict(t=3, pose="idle")),
+            ("gate", "ворота: свои проходят, враги нет", "открыты", dict()),
+            ("pitch", "каждые 3 хода льёт кипящую смолу", "льёт смолу", dict()),
+            ("press", "вкапывается: первый враг рядом расплющен", "давит", dict()),
+            ("thunder", "каждые 2 хода бьёт молнией в радиусе 4", "бьёт молнией", dict()),
+            ("boom", "раз в 3 хода переставляет соседнего голема", "переставляет", dict()),
+            ("forge", "раз в 2 хода чинит голема рядом", "чинит", dict())]
+    rows_h, Y0 = (222, 222, 205, 160), 96                     # the Mechanic (size 4) needs less height
+    labels = []
+    for i, (key, desc, act, alt) in enumerate(mods):
+        name, frame, _ = BD.MODULES[key]
+        k = K[frame] * f
+        x0, y0 = (i % 2) * 480, Y0 + sum(rows_h[:i // 2])
+        by = y0 + rows_h[i // 2] - 38
+        sw = 16 * k
+        third = dict(t=alt.get("t", 2), pose=alt.get("pose", "attack"))
+        lows = []
+        for j, (dep, t, pose, cap) in enumerate(((False, 2, "idle", "в походе"), (True, 2, "idle", "развёрнут"),
+                                                 (True, third["t"], third["pose"], act))):
+            cx = x0 + 85 + j * 150
+            spr = BD.build(key, dep, t, pose, k=k)
+            put(sc, spr, cx, by, sw)
+            lows.append(int(np.nonzero(spr.a.any(axis=1))[0].max()) - spr.oy)   # how far it reaches below the ground line
+        for j, cap in enumerate(("в походе", "развёрнут", act)):
+            labels.append((x0 + 85 + j * 150, by + max(9, max(lows) + 4), cap))
+        labels.append((x0, y0, (name, frame, desc)))
+    yb = Y0 + sum(rows_h) + 150                                       # the levels and the mason
+    for j, t in enumerate((1, 2, 3)):
+        put(sc, BD.build("tower", True, t, "idle", k=1.25), 90 + j * 150, yb, 26)
+    put(sc, GH.build(GH.MASON, "idle", k=1.7), 690, yb, 18)
+    put(sc, GH.build(GH.MASON, "attack", k=1.7), 830, yb, 18)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft, fh, fb, fbs, fr = fonts()
     d.text((24, 16), "Зодчий: големы разворачиваются в укрепления", font=ft, fill=INK)
-    d.text((24, 60), "Слева ходовой вид, справа развёрнутый. Развёртывание — способность по условию (например, на 2-м ходу).",
-           font=fr, fill=MUT)
-    for i, (_, name, txt) in enumerate(mods):
-        cx = (60 + i * 230 + 55) * S
-        d.text((cx - d.textlength(name, font=fbs) / 2, 212 * S), name, font=fbs, fill=INK)
-        d.text((cx - d.textlength(txt, font=fr) / 2, 212 * S + 22), txt, font=fr, fill=MUT)
-    d.text((24, 280 * S), "Уровни построек видны на спрайте", font=fh, fill=GOLD)
-    for i, t in enumerate(("I · брёвна и хлам", "II · камень и бронза", "III · железо, шипы, руны")):
-        cx = (120 + i * 170) * S
-        d.text((cx - d.textlength(t, font=fr) / 2, 432 * S), t, font=fr, fill=INK)
-    d.text((620 * S, 280 * S), "Каменщик — призыв Зодчего", font=fh, fill=GOLD)
-    d.text((620 * S, 280 * S + 30), "каждые 2 хода выкладывает отрезок стены", font=fr, fill=MUT)
+    d.text((24, 60), "Строительный модуль едет сложенным за спиной. Развернувшись, голем врастает в постройку и становится её "
+                     "сердцевиной: щит — середина стены, Орудие стоит на своей башне.", font=fr, fill=MUT)
+    d.text((24, 84), "Развёртывание — способность по условию (например, на 2-м ходу). Масштаб фреймов настоящий.", font=fr, fill=MUT)
+    for x, y, cap in labels:
+        if isinstance(cap, tuple):
+            name, frame, desc = cap
+            d.text(((x + 24) * S, (y + 6) * S), name, font=fbs, fill=GOLD)
+            w = d.textlength(name, font=fbs)
+            d.text(((x + 24) * S + w + 10, (y + 6) * S + 1), f"{frame} · {desc}", font=fr, fill=MUT)
+        else:
+            d.text((x * S - d.textlength(cap, font=fr) / 2, y * S), cap, font=fr, fill=INK)
+    d.text((24, (yb - 128) * S), "Уровни построек видны на спрайте", font=fh, fill=GOLD)
+    for j, t in enumerate(("I · брёвна и хлам", "II · камень и бронза", "III · железо, шипы, руны")):
+        cx = (90 + j * 150) * S
+        d.text((cx - d.textlength(t, font=fr) / 2, (yb + 9) * S), t, font=fr, fill=INK)
+    d.text((620 * S, (yb - 128) * S), "Каменщик — призыв Зодчего", font=fh, fill=GOLD)
+    d.text((620 * S, (yb - 128) * S + 30), "каждые 2 хода выкладывает отрезок стены", font=fr, fill=MUT)
     img.save(out("architect.png"))
 
 
