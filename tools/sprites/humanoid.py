@@ -481,7 +481,12 @@ ATTACKS = {
                 ankles=((-2.0, 3.6, HZ + 1.0), (7.5, 3.6, -HZ - 0.6)),
                 hand=(6.4, 0.8, 2.4), hand_pole=(1.4, -7.6, 2.0), haft=None, face=(0.0, 1.0, 0.0), carry=1.0,
                 shield=(10.5, -2.0, 3.0), shield_pole=(0.0, -1.0, -0.5), shield_rot=0.0, fx="ram", ram="back"),
+    # the same overhead blow against taller enemies (see golems_h bands): the maul out in front, its face
+    # coming down into a body about the Guard's own height; held high, driven into the belly of a giant
+    "level": dict(name="удар вровень", lean=-0.361, twist=-0.295, t=(1.182, -2.693, 0.0), ankles=((-4.671, 3.6, 5.176), (2.628, 3.6, -5.632)), hand=(10.443, -12.202, 2.505), hand_pole=(0.199, 0.945, 0.258), haft=(0.763, 0.571, -0.303), face=(0.64, -0.734, 0.229), shield=(-5.0, -12.5, -3.0), shield_pole=(0.3, -1.0, -0.6), shield_rot=-2.6, fx="slam", ram="front", ground=False),
+    "high": dict(name="удар снизу вверх", lean=-0.375, twist=-0.045, t=(0.67, -0.941, 0.0), ankles=((-1.425, 3.6, 5.111), (5.954, 3.6, -5.487)), hand=(11.415, 3.951, 1.379), hand_pole=(0.654, 0.708, 0.268), haft=(0.339, 0.746, 0.573), face=(0.797, 0.096, -0.597), shield=(-5.0, -12.5, -3.0), shield_pole=(0.3, -1.0, -0.6), shield_rot=-2.6, fx="slam", ram="front", ground=False),
 }
+BANDS = dict(low="slam", level="level", high="high")
 SMEAR = Mat(ramp("#2a2e38", "#4a505e", "#6e7686", "#98a0b2", "#c8ced8"), dither=True)
 
 
@@ -551,7 +556,13 @@ def impact(fx, A, ft, info):
                 continue
             fx.ell(face + tf * d[0] * spread + arr((0, d[1], d[2])) * (0.6 if i else 0) * spread, ((0.75 - 0.08 * i) / grow,) * 3,
                    emissive("fire", 16 if i == 0 else 4, 0.85))
-    if A["fx"] == "slam":         # grit and dust where the blow lands
+    if A["fx"] == "slam" and not A.get("ground", True):      # into a body: a flash, armour chips, no dust
+        if near:
+            fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 22, 0.9))
+        for i, d in enumerate(((1.6, 2.0, 1.4), (1.2, -2.2, -1.2), (2.4, 0.6, -2.0))):
+            fx.box(face + tf * d[0] * spread + arr((0, d[1], d[2])) * spread - (0, 1.5 * ft, 0), (0.8, 0.7, 0.8), M_IRON,
+                   rot_z(0.7 + i + 2.0 * ft))
+    elif A["fx"] == "slam":       # grit and dust where the blow lands
         if near:
             fx.ell(face + tf * 0.6, (1.4, 2.2, 2.2), emissive("fire", 22, 0.9))                 # the flash of contact
         g = arr((face[0], 0.3, face[2]))

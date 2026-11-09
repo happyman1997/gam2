@@ -51,6 +51,8 @@ WINDUP = {
 }
 # the plane the hand and haft swing in, and the way round (-1: forward and down / towards the far side)
 SWING = {"slam": ("xy", -1), "sweep": ("xz", -1), "ram": ("xy", 0)}
+for _k in ("level", "high"):                 # the blows by the height of the target start from the same wind-up
+    WINDUP[_k], SWING[_k] = WINDUP["slam"], SWING["slam"]
 
 
 def _plane(v, plane):
@@ -140,6 +142,7 @@ LIFT = {   # on the way back the maul is raised before it goes onto the shoulder
     "sweep": dict(hand=(8.0, -4.0, 1.0), haft=(0.1, 1.0, 0.0), face=(1.0, 0.0, 0.0)),
     "ram": dict(hand=(3.0, -5.0, 3.0), haft=(-0.3, 0.95, 0.0), face=(1.0, 0.3, 0.0)),
 }
+LIFT["level"] = LIFT["high"] = LIFT["slam"]
 
 
 def timeline(kind):
@@ -147,7 +150,7 @@ def timeline(kind):
     I, Wd, X = IDLE, WINDUP[kind], dict(H.ATTACKS[kind], smear=False)
     plane, way = SWING[kind]
     Lf = dict(I, carry=0.0, **LIFT[kind])
-    up = {"slam": 2.0, "sweep": 6.0, "ram": 0.0}[kind]
+    up = {"slam": 2.0, "sweep": 6.0, "ram": 0.0}.get(kind, 2.0)
     f = [(I, 420, None, None, None)]
     for s in (1 / 3, 2 / 3):
         f.append((blend(I, Wd, ease_io(s), "xy", 0, lift=up), 70, None, None, None))

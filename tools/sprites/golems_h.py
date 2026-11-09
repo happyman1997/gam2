@@ -358,12 +358,14 @@ MOLOT = dict(
         attack=dict(lean=-0.38, t=(1.4, -1.6, 0.0), ank=((4.5, 3.6, 6.0), (-5.5, 3.6, -5.8)),
                     hand_n=(12.5, -14.0, -3.0), pole_n=(0.0, 0.6, 1.0), hand_f=(12.5, -14.0, 3.0), pole_f=(0.0, 0.6, -1.0),
                     ram_n="front", ram_f="front", fx=True),
-        # against a much bigger enemy (size +2 and more): both fists driven up into its belly
+        # against an enemy about its own height: both fists straight into its body at waist height
+        attack_level=dict(lean=-0.29, t=(0.83, -1.1, 0.0), ank=((4.08, 3.6, 6.24), (-3.78, 3.6, -5.77)), hand_n=(16.19, -7.5, -4.34), pole_n=(-0.23, -0.7, 0.86), hand_f=(15.35, -8.43, 2.86), pole_f=(-0.74, -0.42, -0.92), ram_n="front", ram_f="front", twist=-0.09, ground=False, fx=True),
+        # against a much bigger enemy: both fists driven up into its belly
         attack_high=dict(lean=-0.02, twist=-0.02, t=(1.68, -0.9, 0.0), ank=((5.0, 3.6, 5.5), (-5.56, 3.6, -6.7)),
                          hand_n=(14.4, 7.25, -1.84), pole_n=(0.05, -0.18, 0.44), hand_f=(13.94, 8.38, 2.76), pole_f=(-0.2, -0.59, -0.85),
                          ram_n="front", ram_f="front", fx=True, ground=False),
     ),
-    bands=dict(low="attack", high="attack_high"),
+    bands=dict(low="attack", level="attack_level", high="attack_high"),
     strike=lambda info: (info["n"]["face"] + info["f"]["face"]) / 2,
 )
 
@@ -519,10 +521,13 @@ GORN = dict(
         idle=dict(lean=0.0, t=(0.0, 0.0, 0.0), ank=((2.6, 3.6, 6.0), (-3.6, 3.6, -6.0)), open=10.0,
                   hand_n=(5.0, -12.5, 3.0), pole_n=(-0.4, -0.2, 1.0), hand_f=(3.0, -13.4, -2.8), pole_f=(-0.3, -0.2, -1.0),
                   ram_n="back", ram_f="front"),
-        attack=dict(lean=-0.06, t=(0.6, -0.8, 0.0), ank=((4.4, 3.6, 6.2), (-5.0, 3.6, -6.0)), open=30.0,
-                    hand_n=(10.0, -7.4, 1.6), pole_n=(-1.0, -0.3, 0.6), hand_f=(-1.0, -11.0, -5.6), pole_f=(-0.5, 0.2, -1.0),
-                    ram_n="back", fx=True),
+        # the jet goes where the enemy is: down into bugs, into a body of its own height, up into a giant
+        attack=dict(lean=-0.1, t=(1.27, -1.05, 0.0), ank=((3.87, 3.6, 6.59), (-4.29, 3.6, -5.74)), open=30.0, hand_n=(8.04, -10.53, 2.6), pole_n=(-0.96, -0.78, 0.81), hand_f=(0.7, -12.45, -7.08), pole_f=(-0.5, 0.2, -1.0), ram_n="back", twist=-0.04, ram_f="back", fx=True),
+        attack_level=dict(lean=-0.04, t=(0.43, -1.31, 0.0), ank=((3.17, 3.6, 5.69), (-4.66, 3.6, -6.03)), open=30.0, hand_n=(14.73, -4.16, 3.13), pole_n=(-0.62, 0.18, 0.44), hand_f=(-1.62, -12.89, -5.37), pole_f=(-0.5, 0.2, -1.0), ram_n="back", twist=-0.07, ram_f="back", fx=True),
+        attack_high=dict(lean=-0.2, t=(1.05, -1.44, 0.0), ank=((3.93, 3.6, 6.34), (-5.22, 3.6, -5.74)), open=30.0, hand_n=(12.72, -2.6, 3.8), pole_n=(-0.1, -0.85, 0.89), hand_f=(-2.43, -10.08, -6.04), pole_f=(-0.5, 0.2, -1.0), ram_n="front", twist=-0.01, ram_f="front", fx=True),
     ),
+    bands=dict(low="attack", level="attack_level", high="attack_high"),
+    strike=lambda info: info["n"]["nozzle"] + info["n"]["a"] * 24.0 + info["n"]["up"] * 1.5,
 )
 
 
@@ -613,10 +618,13 @@ ORUDIE = dict(
     poses=dict(
         idle=dict(lean=0.0, t=(0.0, 0.0, 0.0), ank=((2.8, 3.6, 5.3), (-4.6, 3.6, -5.4)),
                   hand_n=(6.0, -10.5, 1.0), pole_n=(-0.6, -0.2, 0.8), hand_f=(5.5, -10.5, -1.0), pole_f=(-0.6, -0.2, -0.8)),
-        attack=dict(lean=0.08, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)),
-                    hand_n=(10.5, -7.5, 0.6), pole_n=(-1.0, -0.2, 0.6), hand_f=(10.1, -7.5, -0.6), pole_f=(-1.0, -0.2, -0.6),
-                    ram_n="front", ram_f="front", fx=True),
+        # aimed at an enemy two or three rows off (about 100 units): at a bug, at a body of its own height, at a giant
+        attack=dict(lean=0.12, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(12.74, -7.2, -0.14), pole_n=(-1.29, -0.42, 0.88), hand_f=(12.9, -7.41, -0.18), pole_f=(-0.65, -0.42, -0.48), ram_n="front", ram_f="back", fx=True),
+        attack_level=dict(lean=0.09, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(8.46, -8.19, -0.1), pole_n=(-1.26, -0.63, 0.54), hand_f=(9.67, -7.73, -0.8), pole_f=(-0.87, -0.76, -0.59), ram_n="front", ram_f="back", fx=True),
+        attack_high=dict(lean=0.06, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(11.08, -5.19, 1.51), pole_n=(-0.74, -0.42, 0.43), hand_f=(9.22, -5.48, -1.68), pole_f=(-1.11, -0.66, -0.72), ram_n="front", ram_f="front", fx=True),
     ),
+    bands=dict(low="attack", level="attack_level", high="attack_high"),
+    strike=lambda info: info["n"]["muzzle"] + info["n"]["d"] * (100.0 / np.hypot(info["n"]["d"][0], info["n"]["d"][2])),
 )
 
 
@@ -833,6 +841,10 @@ def mason_fx(fx, A, info, S, ft):
     near = ft < 0.5
     face = it["face"]
     sparks(fx, face, n=4, spread=1.8, ft=ft, seed=2, big=near)
+    if not A.get("ground", True):                    # into a body: chips fly off the face, no dust
+        for i, d in enumerate(((1.6, 1.2, 1.0), (-1.0, 1.8, -0.8), (2.0, -0.6, -1.4))):
+            fx.box(face + arr(d) * (1.0 + 1.5 * ft) - (0, 1.5 * ft, 0), (0.7, 0.6, 0.7), M_IRON, rot_z(0.6 + i + 1.6 * ft))
+        return
     g = arr((face[0], 0.3, face[2]))
     puffs(fx, g, n=3, r=1.6, spread=2.6, ft=ft, seed=8)
     for i, d in enumerate(((1.8, 2.0, 1.0), (-1.4, 2.6, -0.8), (2.4, 1.2, -1.6))):
@@ -853,7 +865,12 @@ MASON = dict(
                     hand_n=(9.0, -9.6, -0.8), pole_n=(0.0, 0.3, 1.0), hammer_dir=(0.95, -0.3, 0.0), face=(-0.3, -0.95, 0.0),
                     hand_f=(-4.0, -9.0, -2.6), pole_f=(0.3, -1.0, -0.6), trowel_dir=(-0.3, -0.95, -0.1),
                     ram_n="front", fx=True),
+        # a bug about its own height: the hammer into its body; a much taller enemy: the hammer raised high
+        attack_level=dict(lean=-0.3, t=(0.15, -1.33, 0.0), ank=((2.86, 3.6, 4.23), (-2.54, 3.6, -4.19)), hand_n=(8.87, -10.53, -0.44), pole_n=(-0.44, -0.87, 0.76), hammer_dir=(0.85, 0.5, -0.16), face=(0.06, -1.0, 0.0), hand_f=(2.85, -11.23, -1.28), pole_f=(0.33, 0.13, -0.38), trowel_dir=(-0.3, -0.95, -0.1), ram_n="back", twist=-0.16, ram_f="back", ground=False, fx=True),
+        attack_high=dict(lean=-0.41, t=(1.27, -1.29, 0.0), ank=((2.57, 3.6, 4.17), (-3.39, 3.6, -4.95)), hand_n=(12.3, 5.49, 1.06), pole_n=(0.2, 0.14, 0.96), hammer_dir=(0.71, 0.67, -0.21), face=(0.74, 0.67, 0.0), hand_f=(5.24, -11.36, -0.4), pole_f=(0.26, -0.04, -0.68), trowel_dir=(-0.3, -0.95, -0.1), ram_n="front", twist=-0.18, ram_f="back", ground=False, fx=True),
     ),
+    bands=dict(low="attack", level="attack_level", high="attack_high"),
+    strike=lambda info: info["n"]["face"],
 )
 
 
@@ -1083,11 +1100,12 @@ COLOSSUS = dict(
         attack=dict(lean=-0.2, twist=-0.06, t=(1.0, -2.55, 0.0), ank=((7.9, 3.6, 9.5), (-6.55, 3.6, -10.3)),
                     hand_n=(10.5, -18.2, 2.5), pole_n=(0.03, -0.24, 0.95), mace_dir=(0.88, -0.16, -0.44), grip_least=48.0,
                     ram_n="front",
-                    hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True),
-        # against an enemy of about its own size: the same blow, the head into the chest
+                    hand_f=(9.48, -12.96, -2.09), pole_f=(-1.12, 0.03, -0.35), ram_f="front", spin=0.5, fx=True),
+        # against an enemy about half its height or more: the same blow, the head into the chest; the minigun
+        # (in both bands) fires down into the enemy, not over its head
         attack_level=dict(lean=-0.22, twist=-0.217, t=(1.08, -2.45, 0.0), ank=((6.45, 3.6, 9.5), (-5.92, 3.6, -9.98)),
                           hand_n=(16.05, -13.66, -3.76), pole_n=(0.65, 0.17, 0.74), mace_dir=(0.893, 0.272, -0.358), grip_least=48.0,
-                          ram_n="back", hand_f=(11.0, -8.0, -1.0), pole_f=(-0.8, -0.4, -0.6), ram_f="back", spin=0.5, fx=True,
+                          ram_n="back", hand_f=(13.83, -12.14, -2.24), pole_f=(-0.58, -0.09, -0.68), ram_f="front", spin=0.5, fx=True,
                           ground=False),
     ),
     bands=dict(low="attack", level="attack_level"),
@@ -1190,12 +1208,13 @@ def buzzsaw(G, side, sh, el, w, s, P, A, S):
         a = 2 * np.pi * i / 16 + A.get("spin", 0.0)
         g.box(hub + arr((np.cos(a), np.sin(a), 0)) * 4.9, (0.8, 0.5, 0.4), SAW, rot_z(a + 0.5))
     g.ell(hub + ax * 0.35, (1.0, 1.0, 0.2), M_IRON)
+    bite = hub + d * 4.6 if A.get("bite") == "fwd" else hub + arr((3.6, -3.4, 0.0))     # where the teeth go in
     up = unit(-d + arr((0, 1.0, 0)))
     for i in range(5):                                                                      # a guard over the top
         a = -1.2 + i * 0.55
         dir_ = unit(up * np.cos(a) + unit(np.cross(ax, up)) * np.sin(a))
         g.box(hub + dir_ * 5.3 + ax * 0.9, (1.8, 0.4, 0.4), Mat(PATCH_B), np.column_stack([unit(np.cross(ax, dir_)), dir_, ax]))
-    return dict(hub=hub, edge=hub + unit(arr((1.0, -1.0, 0))) * 4.8)
+    return dict(hub=hub, edge=hub + unit(arr((1.0, -1.0, 0))) * 4.8, d=d, bite=bite)
 
 
 def drill(G, side, sh, el, w, s, P, A, S):
@@ -1213,8 +1232,7 @@ def drill(G, side, sh, el, w, s, P, A, S):
 
 
 def man_fx(fx, A, info, S, ft):
-    hub = info["n"]["hub"]
-    contact = hub + arr((3.6, -3.4, 0.0))
+    contact = info["n"]["bite"]
     near = ft < 0.5
     if near:
         fx.ell(contact, (1.4, 1.4, 1.4), emissive("fire", 18, 0.9))
@@ -1225,7 +1243,8 @@ def man_fx(fx, A, info, S, ft):
         fx.cyl(p, p + dd * 1.6, 0.2, emissive("fire", 0, 0), seg=4)
     mad_specks(fx, contact, n=6, r=3.4 + 2 * ft, seed=4)
     mad_specks(fx, info["X"]((-5.4, 40.0, 2.4)), n=8, r=4.4, seed=6)                       # the coil goes wild
-    puffs(fx, contact + arr((0, 1.5, 0)), n=2, r=1.6, spread=2.0, ft=ft, seed=7)
+    if A.get("ground", True):
+        puffs(fx, contact + arr((0, 1.5, 0)), n=2, r=1.6, spread=2.0, ft=ft, seed=7)
 
 
 MANIAC = dict(
@@ -1242,7 +1261,12 @@ MANIAC = dict(
         attack=dict(lean=-0.3, twist=-0.15, t=(1.0, -1.4, 0.0), ank=((5.0, 3.6, 5.0), (-4.6, 3.6, -4.8)),
                     hand_n=(12.0, -9.0, 0.6), pole_n=(-0.4, -0.8, 1.0), spin=0.2,
                     hand_f=(9.0, -4.0, -2.6), pole_f=(-0.6, -0.6, -1.0), fx=True),
+        # about its own height: the saw bites into the body at chest height; much taller: the saw raised high
+        attack_level=dict(lean=-0.29, twist=-0.23, t=(1.59, -0.9, 0.0), ank=((5.16, 3.6, 5.04), (-4.39, 3.6, -5.1)), hand_n=(13.81, -5.6, 1.13), pole_n=(-0.23, -0.28, 0.37), spin=0.2, hand_f=(14.23, 0.86, -2.5), pole_f=(-0.11, -0.05, -0.57), ram_n="front", ram_f="front", bite="fwd", ground=False, fx=True),
+        attack_high=dict(lean=-0.32, twist=-0.19, t=(0.17, -0.82, 0.0), ank=((3.15, 3.6, 5.43), (-3.74, 3.6, -4.89)), hand_n=(12.92, 7.33, -0.5), pole_n=(-0.5, -0.84, 0.31), spin=0.2, hand_f=(14.05, 2.58, -2.63), pole_f=(0.05, -0.02, -0.97), ram_n="back", ram_f="front", bite="fwd", ground=False, fx=True),
     ),
+    bands=dict(low="attack", level="attack_level", high="attack_high"),
+    strike=lambda info: info["n"]["bite"],
 )
 
 
