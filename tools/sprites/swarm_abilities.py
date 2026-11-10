@@ -175,15 +175,19 @@ def sheet():
     # ---- Пожиратель: growing
     y0 += RH
     by = y0 + RH - 44
-    heads.append((y0, "Пожиратель", "Рост — каждое 2-е убийство", "развитие: стартует крупнее, растёт с каждого убийства или лечится вдвое", 2))
+    heads.append((y0, "Пожиратель", "Рост — каждые 2 съеденных тела, свои тоже", "развитие: стартует крупнее, растёт с каждого тела или лечится вдвое", 2))
     xs = (110, 410, 760)
+    import swarm_effects as E
+    dead = lambda sd: E.lit(W.build((), 0.0, "idle", False, k=k, genes=W.genes_for(sd)), (40, 22, 22), 0.6)
+    put(sc, dead(41), xs[0] + 74, by + 4, 0)                    # its own dead, in its jaws
+    put(sc, dead(42), xs[0] + 96, by - 6, 0)
     for j, (st, p) in enumerate(((0, "attack"), (1, "idle"), (2, "attack"))):
         spr = SL.build("Пожиратель", p, k, stage=st)
         put(sc, spr, xs[j], by, spr.w * 0.38)
-        caps.append((xs[j], by + 10, ("размер 5", "размер 6: здоровье ×1,4, +2 к удару", "размер 7: ещё раз")[j]))
+        caps.append((xs[j], by + 10, ("размер 5: ест погибших своих", "размер 6: здоровье ×1,4, +2 к удару", "размер 7: ещё раз")[j]))
     arrow(sc, 205, 290, by - 40)
     arrow(sc, 525, 610, by - 40)
-    caps.append((248, by - 62, "2 убийства"))
+    caps.append((248, by - 62, "2 тела"))
     caps.append((568, by - 62, "ещё 2"))
 
     # ---- Кукушка: the egg-layer and the changeling
@@ -228,7 +232,7 @@ def sheet():
         d.text((x, (y0 + 4) * S + 4), ab, font=fbs, fill=INK)
         d.text((x + d.textlength(ab, font=fbs) + 14, (y0 + 4) * S + 5), dev, font=fr, fill=MUT)
     for x, y, t in caps:
-        if t not in ("2 убийства", "ещё 2"):            # captions go under the lowest thing standing on that ground
+        if t not in ("2 тела", "ещё 2"):            # captions go under the lowest thing standing on that ground
             y = max([bot for b, bot in LOWS if abs(b - (y - 10)) < 50] + [y - 10]) + 5
         d.text((x * S - d.textlength(t, font=fr) / 2, y * S), t, font=fr, fill=INK)
     img.save(out("swarm_abilities.png"))
