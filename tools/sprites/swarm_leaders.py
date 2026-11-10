@@ -15,6 +15,7 @@ Geometry is in worker units (a worker is about 15 long); the size sets the scale
 
     python3 tools/sprites/swarm_leaders.py          -> out/swarm_leaders.png (the sheet)
     python3 tools/sprites/swarm_leaders.py check    -> out/swarm_leaders_check.png
+    python3 tools/sprites/swarm_leaders.py dev      -> out/swarm_development.png (each leader's developments)
 """
 import numpy as np
 from kit import *
@@ -368,11 +369,115 @@ def trim(spr, pad=2):
     return s
 
 
-def build(name, pose="idle", k=1.0, stage=0, hue=0.0):
-    """k multiplies the in-game scale, as in swarm1.build."""
-    size = SIZE[name] + (stage if name == "Пожиратель" else 0)
+# ---------------------------------------------------------------- development: what each choice adds to the body
+DEV = {
+    "Матка": [("often", "Кладка чаще", "откладывает каждые 2 хода — яйца светятся сквозь брюшко, кладка больше"),
+              ("larva", "+1 личинка", "личинки вылупляются по три и цепляются за неё"),
+              ("size", "+1 к размеру", "размер 7 — предел роя больше; корона выше")],
+    "Разум улья": [("two", "Две метки", "вторая пара перистых усов: метит двоих"),
+                   ("every", "Метка каждый ход", "мозг весь светится узлами"),
+                   ("strike", "+1 к удару", "Единый разум бьёт сильнее: шипы по борозде, жвалы крупнее")],
+    "Пожиратель": [("bigger", "Стартует крупнее", "бой начинает размером 6"),
+                   ("every_kill", "Растёт с каждого убийства", "раздутое брюхо светится ихором"),
+                   ("heal", "Лечится вдвое", "второй желудок-мешок на спине")],
+    "Кукушка": [("three", "Личинок 3", "мешочек с тремя крупными яйцами"),
+                ("venom", "Заражает и яд скорпионов", "ядовитая железа, яйцеклад сочится ядом"),
+                ("two", "Подкидышей двое", "несёт рабочую под брюхом")],
+}
+
+
+def add_dev(m, name, dev, pose, hue=0.0):
+    """The development the leader took, on its body (coordinates as in its builder)."""
+    if not dev:
+        return
+    if name == "Матка":
+        mc = mat(QUEEN, hue)
+        gc, gx, gy, gz = np.array((-14.0, 7.0, 0)), 15.5, 6.6, 6.6
+        if dev == "often":
+            rng = np.random.default_rng(9)
+            for _ in range(16):
+                x = rng.uniform(-27.0, -2.0)
+                t = (x - gc[0]) / gx
+                kk = np.sqrt(max(0.05, 1 - t * t))
+                a = rng.uniform(-0.6, 0.3)
+                m.ell((x, gc[1] + gy * kk * np.sin(a) * 0.9, gz * kk * np.cos(a) * 0.95), (1.1, 0.8, 0.6), M_EGG_IN)
+            for ex, ey, ez in ((-37.0, 1.0, 0.2), (-38.4, 1.0, 2.2), (-36.6, 2.6, 1.2), (-39.0, 1.0, -1.6), (-37.6, 2.6, -0.8),
+                               (-40.4, 1.0, 0.6), (-35.2, 1.0, 3.4)):
+                m.ell((ex, ey, ez), (1.3, 0.95, 0.95), W.M_EGG)
+        elif dev == "larva":
+            for (x, y, z, r) in ((-4.0, 0.0, 10.0, 0.5), (4.0, 0.0, 11.0, -0.2), (15.5, 0.0, 6.0, 0.3),
+                                 (-12.0, gc[1] + gy * 0.92, 1.2, 0.0)):
+                lv = larva("idle").transformed(rot_y(r), (0, 0, 0)).scaled(0.75)
+                m.extend(lv.transformed(I3, (x, y, z)))
+        elif dev == "size":
+            hc = np.array((10.0, 8.0, 0))
+            for a, L in ((-0.6, 5.6), (-0.2, 6.6), (0.2, 6.6), (0.6, 5.6)):
+                base = hc + np.array((-0.6, 2.0, np.sin(a) * 1.4))
+                W.spike(m, base, base + np.array((-L * 0.45, L, np.sin(a) * L * 0.5)), 0.6, M_BONE)
+    elif name == "Разум улья":
+        mc = mat(HIVE, hue)
+        bc, bx, by, bz = np.array((1.4, 11.2, 0)), 7.0, 5.9, 6.3
+        if dev == "two":
+            for z in (1, -1):
+                a0 = bc + np.array((bx * 0.4, by * 0.8, 1.2 * z))
+                mid = a0 + np.array((1.6, 3.6, 1.4 * z))
+                tip = mid + np.array((4.4, 2.6, 2.4 * z))
+                m.limb([a0, mid, tip], 1, mc, band=3 if z > 0 else 1)
+                for f in (0.25, 0.5, 0.75):
+                    p = mid + (tip - mid) * f
+                    m.limb([p, p + np.array((-0.6, 1.2, 0.5 * z))], 1, mc, band=2)
+                m.ell(tip, (0.65, 0.65, 0.65), M_PHERO)
+        elif dev == "every":
+            rng = np.random.default_rng(13)
+            for _ in range(18):
+                th, ph = rng.uniform(0.1, 1.4), rng.uniform(-0.4, 1.9)
+                n = np.array((np.sin(th) * np.cos(ph), np.cos(th), np.sin(th) * np.sin(ph)))
+                m.ell(bc + n * np.array((bx, by, bz)) * 1.0, (0.6, 0.6, 0.6), M_PHERO)
+        elif dev == "strike":
+            for x in np.linspace(-4.5, 5.0, 6):
+                p = bc + np.array((x, by * np.sqrt(max(0.0, 1 - (x / bx) ** 2)) - 0.2, 0))
+                W.spike(m, p, p + np.array((-1.0, 2.6, 0)), 0.55, M_BONE)
+            mandibles(m, M_BONE, np.array((6.6, 6.0, 0)), 1.3, 0.3 if pose == "idle" else 0.85)
+    elif name == "Пожиратель":
+        ac = np.array((-7.6, 5.6, 0))
+        if dev == "every_kill":
+            m.ell(ac + (0.4, -1.2, 0.0), (6.6, 3.4, 5.4), M_BLOODY)
+            for x in (-12.0, -9.0, -6.0, -3.0):
+                m.limb([np.array((x, ac[1] - 3.6, 4.0)), np.array((x + 1.0, ac[1] - 0.4, 5.2))], 1, M_CRACK, band=2)
+            m.ell(ac + (1.0, -2.6, 4.6), (2.2, 1.0, 0.6), M_CRACK)
+        elif dev == "heal":
+            c = np.array((-6.0, 11.2, 0))
+            m.ell(c, (4.4, 3.0, 3.4), M_SAC)
+            for z in (1, -1):
+                m.limb([c + (-3.0, 1.2, 2.6 * z), c + (0.0, 2.6, 3.0 * z), c + (3.0, 1.0, 2.4 * z)], 1, M_VEIN_R, band=2)
+            m.ell(c + (1.4, 1.6, 2.0), (1.0, 0.6, 0.8), M_BLOODY)
+    elif name == "Кукушка":
+        curl = pose == "attack"
+        tip = np.array((-14.4, 5.8, 0)) if not curl else np.array((-4.6, 1.8, 0))
+        bulb = tip + (np.array((-1.4, -0.6, 0)) if not curl else np.array((1.0, -0.4, 0)))
+        if dev == "three":
+            m.ell(bulb, (2.8, 2.3, 2.1), M_MEMBRANE)
+            for d in ((-1.0, 0.3, 1.5), (0.8, -0.1, 1.6), (0.0, 1.0, 1.3)):
+                m.ell(bulb + np.array(d), (1.0, 0.8, 0.7), W.M_EGG)
+        elif dev == "venom":
+            m.ell(bulb + (0.6, 1.2, 0), (1.4, 1.1, 1.1), W.M_ACID)
+            far = np.array((-30.0, 6.8, 0)) if not curl else np.array((11.0, 2.0, 0))
+            for f in (0.3, 0.55, 0.8, 1.0):
+                p = bulb + (far - bulb) * f
+                m.ell(p + (0, -0.6, 0), (0.35, 0.55, 0.35), W.M_ACID)
+        elif dev == "two":
+            ant = W.body(0.12, (), "idle", False, genes=W.genes_for(5))
+            m.extend(ant.transformed(rot_z(0.5), (0.0, 0.0, 0)).scaled(0.85).transformed(I3, (4.6, 2.2, 1.0)))
+
+
+def build(name, pose="idle", k=1.0, stage=0, hue=0.0, dev=None):
+    """k multiplies the in-game scale, as in swarm1.build. dev: the development taken (see DEV)."""
+    if name == "Пожиратель" and dev == "bigger":
+        stage = max(stage, 1)
+    size = SIZE[name] + (stage if name == "Пожиратель" else 0) + (1 if (name == "Матка" and dev == "size") else 0)
     s = SCALE[size] * k
     m = pozhiratel(pose, stage, hue) if name == "Пожиратель" else BUILD[name](pose, hue)
+    add_dev(m, name, dev, pose, hue)
     w, h, ox, oy = int(110 * s), int(70 * s), int(70 * s), int(56 * s)
     spr = W.rim_light(render(m.scaled(s), w, h, ox, oy, **W.STYLE1))
     spr.ox, spr.oy = ox, oy
@@ -466,9 +571,59 @@ def sheet():
     print("swarm_leaders.png", img.size)
 
 
+def dev_sheet():
+    """Each leader as it starts and with each of its three developments."""
+    from PIL import ImageFont
+    from leaders_sheet import canvas, put, fonts, S as SS, GOLD, INK, MUT
+    from paths import out, font
+    K = {"Матка": 0.95, "Разум улья": 1.7, "Пожиратель": 1.1, "Кукушка": 1.55}
+    RH = {"Матка": 150, "Разум улья": 142, "Пожиратель": 132, "Кукушка": 124}
+    WW, Y0, CWD = 960, 60, 240
+    HH = Y0 + sum(RH.values()) + 8
+    sc = canvas(WW, HH, 47)
+    labels, y0 = [], Y0
+    for r, (name, devs) in enumerate(DEV.items()):
+        by = y0 + RH[name] - 52
+        for j, dv in enumerate([None] + [d[0] for d in devs]):
+            cx = 120 + j * CWD
+            spr = build(name, "idle", K[name], dev=dv)
+            put(sc, spr, cx, by, spr.w * 0.34)
+            labels.append(("cap", cx, by + 8, ("как начинает", "") if dv is None else next((n, w) for k, n, w in devs if k == dv)))
+        labels.append(("head", 24, y0 + 2, (name, ACCENT[[l[0] for l in LEADERS].index(name)])))
+        y0 += RH[name]
+    img = sc.image(SS)
+    d = ImageDraw.Draw(img)
+    ft, fh, fb, fbs, fr = fonts()
+    small = ImageFont.truetype(font("PTSerif-Regular.ttf"), 14)
+    d.text((24, 16), "Рой: развитие лидеров", font=ft, fill=INK)
+    d.text((24, 60), "После босса лидер получает развитие — один вариант из предложенных. Каждый виден на спрайте.",
+           font=fr, fill=MUT)
+    for kind, x, y, v in labels:
+        if kind == "head":
+            d.text((x * SS, y * SS), v[0], font=fh, fill=tuple(int(c) for c in hexc(v[1])))
+            continue
+        name, what = v
+        d.text((x * SS - d.textlength(name, font=fbs) / 2, y * SS), name, font=fbs, fill=INK if what else MUT)
+        words, lines, cur = what.split(" "), [], ""
+        for wd in words:
+            if d.textlength(cur + " " + wd, font=small) > (CWD - 16) * SS and cur:
+                lines.append(cur)
+                cur = wd
+            else:
+                cur = (cur + " " + wd).strip()
+        lines.append(cur)
+        for n, ln in enumerate(lines[:2]):
+            d.text((x * SS - d.textlength(ln, font=small) / 2, y * SS + 22 + n * 18), ln, font=small, fill=MUT)
+    img.save(out("swarm_development.png"))
+    print("swarm_development.png", img.size)
+
+
 if __name__ == "__main__":
     import sys
     from paths import out
+    if "dev" in sys.argv[1:]:
+        dev_sheet()
+        raise SystemExit
     if "check" not in sys.argv[1:]:
         sheet()
         raise SystemExit
