@@ -8,13 +8,10 @@ import random
 import sys
 from PIL import ImageFont
 from kit import *
-import golem7 as G
 import frames as F
 import golems_h as GH
-import colossus as CL
 import leaders_h as LH
 import swarm1 as W
-from golem7 import cfg
 from battle import shadow, put, flash, spark, dead_bug
 from noise import value_noise
 from paths import font, out

@@ -1195,7 +1195,8 @@ def colossus_build(pose="idle", k=3.2):
 
 # ---------------------------------------------------------------- Маньяк: a madman in a scrap-built exosuit
 from leaders import human, HAIR, SKIN, LEATHER, CLOTH_RED
-from maniac import MAD, MADG
+MAD = Mat(ramp("#2a0a2a", "#5a1460", "#9a2aa0", "#d860d0", "#ffc0f4"), emissive=hexc("#e060e0"), glow_r=6, glow_k=0.45)
+MADG = Mat(ramp("#0a2a10", "#145a20", "#2aa040", "#70e080", "#d0ffd8"), emissive=hexc("#60f080"), glow_r=6, glow_k=0.45)
 RUST_P = ramp("#1e0c06", "#3e1a0c", "#62301a", "#8a4c2a", "#b47448")
 PATCH_G = ramp("#0e160c", "#1e2e18", "#324a26", "#4e6a38", "#7a9456")
 PATCH_B = ramp("#0e1218", "#1e2630", "#323e4a", "#4e5e6e", "#7a8a9a")

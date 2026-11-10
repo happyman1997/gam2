@@ -1,8 +1,6 @@
 """Foundry leaders: an overview of all four, plus sheets for the Architect's and the Inventor's armies."""
 from PIL import ImageFont
 from kit import *
-import colossus as CL
-import golem7 as G7
 import frames as F
 import golems_h as GH
 import leaders_h as LH

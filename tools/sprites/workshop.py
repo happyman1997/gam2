@@ -103,7 +103,7 @@ def build():
         ring = (e <= 1) & (e > 0.8)
         sc.rgb[e <= 1] *= 0.7
         sc.rgb[ring] = sc.rgb[ring] * 0.4 + (hexc("#e2b968") if hi else hexc("#5a5a6a")) * 0.6
-        spr = F.build(name, "idle", k=F.FRAMES[name][2] * kk)
+        spr = F.build(name, "idle", k=F.FRAMES[name][0] * kk)
         sc.blit(spr, int(x - spr.ox), int(base - spr.oy))
     # reward cards
     frame(sc, 616, 40, 950, 74)

@@ -3,11 +3,9 @@ import random
 from PIL import ImageFont
 from kit import *
 from r3d import rot_x, rot_z, render
-import golem7 as G
 import frames as F
 import leaders_h as LH
 import swarm1 as W
-from golem7 import cfg
 from noise import value_noise
 from paths import font, out
 
