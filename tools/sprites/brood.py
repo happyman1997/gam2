@@ -147,7 +147,120 @@ def overlay(img):
     d.text(((480 + 704) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 506 * S), t, font=f(0, 15), fill=MUTED)
 
 
+# ---------------------------------------------------------------- finds: the brood's other offers
+FINDS = [
+    ("Чистая линия", "выжили двое одной формы", "3 потомка той же формы, без мутаций: порода закрепляется"),
+    ("Кокон", "рабочая убила больше всех", "окукливается и выходит солдатом с теми же чертами"),
+    ("Приблудная стая", "бой со зверями или роем", "3 дикие особи формы, которой у вас нет"),
+    ("Яйцо гиганта", "бой с боссом", "из яйца выйдет гигант формы одного из родителей"),
+    ("Химерная кладка", "рой съел живых врагов", "у одного-двух потомков чужая черта"),
+]
+
+
+def cocoon_model():
+    """A pupa in silk: a spindle wound with threads, the dark head-end of the creature showing."""
+    from r3d import Model, Mat, rot_z
+    import swarm_leaders as SL
+    silk = Mat(ramp("#2a2622", "#5a544a", "#948c7e", "#c8c0b0", "#f0eadc"))
+    m = Model()
+    R = rot_z(0.35)
+    c = np.array((0.0, 5.0, 0.0))
+    m.ell(c, (6.0, 2.8, 2.8), silk, R)
+    for t in np.linspace(-0.75, 0.75, 6):
+        p = c + R @ np.array((t * 6.0, 0, 0))
+        r = 2.85 * np.sqrt(1 - t * t)
+        m.ell(p, (0.35, r, r), SL.M_GRUB_SEG, R)
+    m.ell(c + R @ np.array((5.6, 0, 0)), (1.2, 1.4, 1.4), Mat(W.chitin(0.0)))
+    for a, b in (((-4.0, 3.2, 1.5), (-6.2, 0.0, 2.6)), ((-2.0, 2.6, -1.6), (-3.4, 0.0, -2.8)), ((3.0, 6.2, 0.0), (4.6, 12.0, 0.0))):
+        m.limb([np.array(a), np.array(b)], 1, silk, band=2)
+    return m
+
+
+def giant_egg_model():
+    from r3d import Model, Mat
+    import swarm_leaders as SL
+    m = Model()
+    c = np.array((0.0, 5.6, 0.0))
+    m.ell(c, (4.6, 5.6, 4.6), SL.M_EGG_IN)
+    m.ell(c + (1.4, 2.2, 1.6), (1.0, 1.4, 0.6), SL.M_GRUB)
+    for a in np.linspace(0, 2 * np.pi, 7)[:-1]:
+        p0 = c + np.array((np.cos(a) * 3.6, -3.0, np.sin(a) * 3.6))
+        p1 = c + np.array((np.cos(a + 0.4) * 4.4, 1.6, np.sin(a + 0.4) * 4.4))
+        p2 = c + np.array((np.cos(a + 0.2) * 3.0, 4.6, np.sin(a + 0.2) * 3.0))
+        m.limb([p0, p1, p2], 1, SL.M_VEIN_R, band=2)
+    for x, z in ((-6.0, 2.0), (5.6, 2.6), (-4.6, -2.4)):
+        m.ell((x, 1.15, z), (1.35, 1.15, 1.15), W.M_EGG)
+    m.ell((0, 0.1, 0.4), (8.0, 0.15, 5.0), SL.M_EGG_IN)
+    return m
+
+
+def finds():
+    from swarm_abilities import render_small
+    WW_, HH_ = 960, 272
+    sc = Scene(WW_, HH_)
+    n = value_noise(WW_, HH_, 14, 33) * 0.6 + value_noise(WW_, HH_, 5, 34) * 0.4
+    th = BAYER[sc.yy % 4, sc.xx % 4]
+    lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
+    for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
+        sc.rgb[lv == i] = hexc(c)
+    CW_ = 184
+    xs = [12 + i * (CW_ + 4) for i in range(5)]
+    for i, x0 in enumerate(xs):
+        frame(sc, x0, 44, x0 + CW_, 262, hi=False, col="#9a7ac0")
+        sc.glow(x0 + CW_ / 2, 150, 90, hexc("#7ae040"), 0.10)
+    by = 176
+    # Чистая линия: three scorpions alike
+    x0 = xs[0]
+    for j, dx in enumerate((46, 92, 140)):
+        put(sc, W.build(("stinger",), -0.08 + 0.01 * j, "idle", False, k=1.9, genes=W.genes_for(3)), x0 + dx, by - (16 if j == 1 else 0), 16)
+    # Кокон: a worker, its cocoon, the soldier it becomes
+    x0 = xs[1]
+    put(sc, W.build(("ant", "horn"), 0.05, "idle", False, k=1.8, genes=W.genes_for(8)), x0 + 32, by, 12)
+    put(sc, render_small(cocoon_model().scaled(1.5), 2.2), x0 + 90, by, 20)
+    put(sc, W.build(("ant", "horn"), 0.05, "idle", True, k=1.8, genes=W.genes_for(8)), x0 + 148, by, 18)
+    # Приблудная стая: three wild fireflies
+    x0 = xs[2]
+    for j, (dx, dy) in enumerate(((50, 0), (96, -18), (138, 2))):
+        put(sc, W.build(("firefly",), 0.08 * (j - 1), "idle", False, k=1.9, genes=W.genes_for(40 + j)), x0 + dx, by + dy, 14)
+    # Яйцо гиганта
+    x0 = xs[3]
+    put(sc, render_small(giant_egg_model(), 2.4, size=2), x0 + 92, by, 40)
+    # Химерная кладка
+    x0 = xs[4]
+    put(sc, W.build(("acid",), 0.0, "idle", False, k=1.9, chimera="hand", genes=W.genes_for(50)), x0 + 54, by, 16)
+    put(sc, W.build(("ant",), 0.05, "idle", False, k=1.9, chimera="face", genes=W.genes_for(51)), x0 + 134, by, 14)
+    img = sc.image(S)
+    d = ImageDraw.Draw(img)
+    f = lambda b, s_: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s_)
+    d.text((20, 12), "Выводок: находки вместо одной из кладок", font=f(1, 24), fill=INK)
+    t = "обычно две кладки и одна находка; какая — зависит от прошедшего боя"
+    d.text((WW_ * S - 24 - d.textlength(t, font=f(0, 17)), 18), t, font=f(0, 17), fill=MUTED)
+    icons_ = ["evolve", "larva", "ant", "clutch", "hand"]
+    for i, (x0, (name, when, what)) in enumerate(zip(xs, FINDS)):
+        cx = (x0 + CW_ / 2) * S
+        nw = d.textlength(name, font=f(1, 19))
+        d.text((cx - nw / 2 + 18, 56 * S), name, font=f(1, 19), fill=GOLD)
+        icon(img, icons_[i], cx - nw / 2 - 22, 56 * S - 4, 34)
+        d.text((cx - d.textlength(when, font=f(0, 14)) / 2, 76 * S), when, font=f(0, 14), fill=MUTED)
+        words, lines, cur = what.split(" "), [], ""
+        for wd in words:
+            if d.textlength(cur + " " + wd, font=f(0, 15)) > (CW_ - 16) * S and cur:
+                lines.append(cur)
+                cur = wd
+            else:
+                cur = (cur + " " + wd).strip()
+        lines.append(cur)
+        for k, ln in enumerate(lines):
+            d.text((cx - d.textlength(ln, font=f(0, 15)) / 2, (by + 26) * S + k * 22), ln, font=f(0, 15), fill=INK)
+    img.save(out("brood_finds.png"))
+    print("brood_finds.png", img.size)
+
+
 if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["finds"]:
+        finds()
+        raise SystemExit
     sc = build()
     img = sc.image(S)
     overlay(img)
