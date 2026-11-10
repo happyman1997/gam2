@@ -4,7 +4,7 @@
   exploder  Взрывной муравей   — a bloated yellow abdomen full of glands
   vivi      Живородящая        — a sac of an abdomen with a larva curled inside
   strider   Стрекот            — a ribbed file on the back to stridulate with
-  mimic     Двойник            — chitin grown like the enemy: against the Foundry, riveted plates and a dull «core»
+  bud       Почкование         — a bud on its side: a small second creature with eyes, growing
 and what each does in battle, at battle scale (zoomed).
 
     python3 tools/sprites/swarm_rare.py      -> out/swarm_rare.png
@@ -30,9 +30,9 @@ RARE = [("alarm", "Тревога", "гибель поднимает трево�
         ("exploder", "Взрывной муравей", "раненая лопается липким ядом: соседние враги склеены"),
         ("vivi", "Живородящая", "погибнув, выпускает личинку"),
         ("strider", "Стрекот", "враги проверяют страх, у машин дребезжат детали: −2 к инициативе"),
-        ("mimic", "Двойник", "враги считают своей: проходит за спину, первый удар двойной")]
+        ("bud", "Почкование", "впервые раненая делится надвое, у каждой половина здоровья")]
 SECOND = {"alarm": ("horn",), "spinner": ("stinger",), "exploder": ("wings",), "vivi": ("acid",), "strider": ("jumper",),
-          "mimic": ("scythes",)}
+          "bud": ("scythes",)}
 
 
 def add(m, mc, a, rare, pose):
@@ -75,16 +75,18 @@ def add(m, mc, a, rare, pose):
             m.box(p, (0.32, 0.9, gr * 1.3), M_BONE, rot_z(0.2))
         for z in (1, -1):
             m.ell(w + (0.6, -0.6, 1.8 * z), (0.8, 0.8, 0.3), M_SHEEN)          # the drum-skins (tympana)
-    elif rare == "mimic":
-        R = rot_z(0.2)
-        m.box(gc + (0, gr * 0.15, 0), (gr * 1.8, gr * 1.5, gr * 1.5), STEEL, R)         # a riveted steel shell
-        for dx in (-0.55, 0.0, 0.55):
-            m.box(gc + R @ np.array((dx * gr, gr * 0.15, 0)), (0.35, gr * 1.55, gr * 1.55), STEEL_D, R)
-            for z in (-1, 1):
-                m.ell(gc + R @ np.array((dx * gr + 0.4, gr * 0.9, z * gr * 0.5)), (0.3, 0.3, 0.3), M_SHEEN)
-        m.ell(gc + R @ np.array((gr * 0.3, gr * 0.1, gr * 0.78)), (gr * 0.32, gr * 0.3, 0.3), CORE)     # its «core»
-        m.cyl(gc + R @ np.array((-gr * 0.4, gr * 0.9, 0)), gc + R @ np.array((-gr * 0.6, gr * 2.2, 0)), 0.6, M_DIRON, seg=6)
-        m.box(w + (0, 0.3, 0), (3.2, 1.0, 2.6), STEEL)
+    elif rare == "bud":
+        pale = Mat(W.chitin_shift(mc, 0.0, sat=0.8, light=1.45))
+        c = gc + np.array((gr * 0.05, gr * 0.05, gr * 1.05))           # the bud on the near side of the abdomen
+        m.ell(gc + np.array((gr * 0.05, 0.0, gr * 0.75)), (gr * 0.5, gr * 0.45, gr * 0.3), VIVI)
+        m.ell(c + (0, 0, gr * 0.3), (gr * 0.75, gr * 0.62, gr * 0.6), pale)
+        h = c + (gr * 0.7, gr * 0.2, gr * 0.55)
+        m.ell(h, (gr * 0.4, gr * 0.36, gr * 0.36), pale)
+        for z in (0.16, -0.16):
+            m.ell(h + (gr * 0.28, gr * 0.12, z * gr + gr * 0.2), (0.38, 0.38, 0.38), W.M_EYE)
+        for k in range(3):
+            m.limb([c + (gr * (0.35 - 0.35 * k), -gr * 0.4, gr * 0.7), c + (gr * (0.5 - 0.35 * k), -gr * 0.95, gr * 1.1)], 1, pale,
+                   band=2)
 
 
 def sheet():
@@ -142,11 +144,12 @@ def sheet():
     for dy in (-50, -34, -18):
         for k in range(3):
             E.dot(sc, x + 50 + k * 3, by + dy + (k % 2) * 2, hexc("#e0d8a0"))
-    # mimic: behind the enemy line, the reveal, a blow in the back
+    # bud: wounded, it splits in two
     x = X0 + 5 * CWD
-    put(sc, meh(), x - 22, by, 0)
-    put(sc, E.mirror(W.build(("scythes",), 0.0, "attack", False, k=Z, genes=W.genes_for(8), rare="mimic")), x + 26, by, 8)
-    E.burst(sc, x - 8, by - 34, 9)
+    put(sc, meh("attack"), x + 36, by, 0)
+    for dx, dy, sd in ((-14, -8, 8), (-20, 10, 9)):
+        put(sc, W.build(("scythes",), 0.0, "attack", False, k=Z, genes=W.genes_for(sd)), x + dx, by + dy, 8)
+    E.burst(sc, x - 18, by - 2, 8, hexc("#c8a0e0"))
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft, fh, fb, fbs, fr = fonts()
@@ -169,7 +172,7 @@ def sheet():
             d.text((cx - d.textlength(ln, font=small) / 2, (Y1 + 10) * S + 24 + n * 18), ln, font=small, fill=MUT)
     d.text((24, (Y2 + 30) * S), "В бою", font=fh, fill=GOLD)
     caps = ["свои рвутся к убийце", "враг застрял в паутине", "лопнула: враг склеен", "личинка из тела",
-            "дребезг: −2 к инициативе", "удар в спину"]
+            "дребезг: −2 к инициативе", "ранена — стала двумя"]
     for j, c in enumerate(caps):
         cx = (X0 + j * CWD) * S
         d.text((cx - d.textlength(c, font=small) / 2, (Y3 + 18) * S), c, font=small, fill=INK)

@@ -202,10 +202,13 @@ def sheet():
     for dx in (-30, 30):
         put(sc, flip(SL.build("личинка", "attack", k)) if dx > 0 else SL.build("личинка", "attack", k), 330 + dx, by + 2, 8)
     caps.append((330, by + 10, "погиб — выпускает 2 личинки"))
-    ku2 = SL.build("Кукушка", "attack", k)
-    put(sc, ku2, 470, by, 24)
-    put(sc, flip(F.build("Орудие", "idle", k=1.6 * k)), 556, by, 30)
-    caps.append((512, by + 10, "механизмы не заражаются"))
+    gx = 548                                           # a machine is a nest: eggs ripen in the warmth of its furnace
+    put(sc, flip(F.build("Орудие", "idle", k=1.6 * k)), gx, by, 30)
+    spots(sc, gx - 6, by - 64, [(0, 0), (-8, 6), (6, 10), (-2, 18), (10, -4)])
+    put(sc, flip(SL.build("личинка", "attack", k)), gx - 22, by - 58, 0)
+    put(sc, SL.build("личинка", "attack", k), gx - 64, by + 2, 8)
+    put(sc, flip(SL.build("личинка", "idle", k)), gx + 40, by + 4, 8)
+    caps.append((gx - 20, by + 10, "в машине — гнездо: личинки лезут из решёток"))
     for g, x in (("Страж", 700), ("Мудрец", 770)):
         put(sc, flip(F.build(g, "idle", k=F.FRAMES[g][0] * k * 0.8)), x, by, 30)
     splat(sc, 870, by + 2, 16, col=hexc("#6a5038"), k=0.8)
