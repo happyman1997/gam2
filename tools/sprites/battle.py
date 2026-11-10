@@ -109,11 +109,24 @@ def dead_bug(hue, seed):
     return spr
 
 
-def build():
+LEADERS = {   # the swarm's leader: (name, size, file, evolutions bred by now: form → its evolutions)
+    "Матка": ("матка", 6, "battle.png", {}),
+    "Разум улья": ("Разум улья", 4, "battle_razum.png", {None: ("phalanx",), "wings": ("syringe",), "scythes": ("saws",)}),
+    "Пожиратель": ("Пожиратель", 7, "battle_pozh.png", {None: ("formic",), "horn": ("forked",), "stinger": ("vise",)}),
+    "Кукушка": ("Кукушка", 3, "battle_kuk.png", {"acid": ("scent",), "wings": ("tough",), "firefly": ("hood",)}),
+}
+
+
+def build(leader="Матка"):
+    import swarm_leaders as SL
+    import swarm_abilities as SA
     sc = Scene(WW, HH)
     ground(sc)
     items = []
     rnd = random.Random(8)
+    evo_of = LEADERS[leader][3]
+    placed = []                                     # where the bugs stand (for the Hive Mind's threads)
+    reserve = []                                    # boxes kept clear of bugs (the Devourer at the front)
 
     # ---------------- foundry
     golems = [  # (col, row, size, frame, pose, dx)
@@ -147,6 +160,12 @@ def build():
     lx, ly = X0 + 2.5 * CW, Y0 + 6.8 * CH
     lead = LH.GH.build(LH.ZODCHIY, "idle", 1.05)
     items.append((ly, lambda: (shadow(sc, lx + 2, ly, 34, 7), put(sc, lead, lx, ly))))
+    gx, gy = X0 + 6.5 * CW + 16, Y0 + (6 + 3 * 0.72) * CH            # the Guard
+    if leader == "Пожиратель":                     # grown to size 7, at the front, its jaws in the Guard
+        px, py = gx + 150, gy + 14
+        reserve.append((px - 40, py - 60, px + 120, py + 34))
+        dv = SL.build("Пожиратель", "attack", 1.0, stage=2)
+        items.append((py, lambda: (shadow(sc, px + 30, py, 130, 16), put(sc, dv, px, py, mirror=True))))
 
     # ---------------- swarm: pressed against the golems, the ones being hit stand where the blows land
     count = 0
@@ -157,7 +176,12 @@ def build():
         return max(xs) if xs else None
 
     def bug(traits, pose, soldier, x, y, hit=False):
-        spr = W.build(traits, rnd.uniform(-0.16, 0.16), pose, soldier, k=1.0, genes=W.genes_for(rnd.randrange(10 ** 6)))
+        if any(a <= x <= c and b <= y <= d for a, b, c, d in reserve):
+            return
+        primary = traits[0] if traits and traits[0] != "giant" else None
+        spr = W.build(traits, rnd.uniform(-0.16, 0.16), pose, soldier, k=1.0, genes=W.genes_for(rnd.randrange(10 ** 6)),
+                      evo=evo_of.get(primary, ()))
+        placed.append((x, y))
         if hit:
             spr = flash(spr, 0.75)
         def f(spr=spr, fx=x, fy=y):
@@ -216,14 +240,33 @@ def build():
         spr = dead_bug(rnd.uniform(-0.15, 0.15), i)
         items.append((y - 3, lambda spr=spr, x=x, y=y: put(sc, spr, x, y, mirror=True)))
     qx, qy = X0 + 15.6 * CW, Y0 + 8.4 * CH
-    qs = W.queen(0.0, "attack", k=0.92)
-    items.append((qy, lambda: (shadow(sc, qx + 30, qy, 170, 22), put(sc, qs, qx, qy, mirror=True))))
+    if leader == "Матка":
+        qs = W.queen(0.0, "attack", k=0.92)
+        items.append((qy, lambda: (shadow(sc, qx + 30, qy, 170, 22), put(sc, qs, qx, qy, mirror=True))))
+    elif leader == "Разум улья":
+        qs = SL.build("Разум улья", "idle", 1.0)
+        items.append((qy, lambda: (shadow(sc, qx + 4, qy, 60, 10), put(sc, qs, qx, qy, mirror=True))))
+    elif leader == "Кукушка":
+        qs = SL.build("Кукушка", "idle", 1.0)
+        items.append((qy, lambda: (shadow(sc, qx + 4, qy, 50, 8), put(sc, qs, qx, qy, mirror=True))))
+        cx_, cy_ = lx - 26, ly + 4                  # the changeling: a worker in the Foundry's rear, at the Architect's back
+        ch = W.build((), 0.02, "attack", False, k=1.0, genes=W.genes_for(77))
+        items.append((cy_, lambda: (shadow(sc, cx_, cy_ + 2, 22, 5), put(sc, ch, cx_, cy_))))
     count += 1
 
     for _, f in sorted(items, key=lambda t: t[0]):
         f()
     for (tx, ty) in targets:
         spark(sc, int(tx), int(ty) - 6, True)
+    if leader == "Разум улья":                    # one mind: threads from the brain across the swarm; the mark on the Guard
+        prnd = random.Random(5)
+        for (x, y) in prnd.sample(placed, 12):
+            SA.thread(sc, (qx - 6, qy - 34), (x, y - 8), sag=-14, k=0.55)
+        SA.ring(sc, gx, gy + 2, 52, 11)
+        SA.sigil(sc, gx - 4, gy - 112, 9)
+    if leader == "Кукушка":                       # the Architect bitten from behind: infected
+        SA.spots(sc, int(lx) + 2, int(ly) - 30, [(0, 0), (-3, 7), (2, 13)])
+        SA.splat(sc, lx - 26, ly + 6, 14, col=hexc("#5a4030"), k=0.7)
     for (a, b) in shots:                    # tracers along the shells' path
         for f in (0.35, 0.7):
             x = a[0] + (b[0] - a[0]) * f
@@ -232,7 +275,7 @@ def build():
     return sc, count, len(golems)
 
 
-def overlay(img, count, ng):
+def overlay(img, count, ng, leader="Матка"):
     d = ImageDraw.Draw(img)
     ft = ImageFont.truetype(font("PTSerif-Bold.ttf"), 22)
     fs = ImageFont.truetype(font("PTSerif-Regular.ttf"), 17)
@@ -242,13 +285,33 @@ def overlay(img, count, ng):
     d.text((WW - w / 2, 15), t, font=ft, fill=(230, 222, 206))
     d.text((24, HH * S - 34), f"Литейщик · лидер и {ng} големов · размеры 4–6 (1, 2×2, 3×3 клетки) · один сломан",
            font=fs, fill=(214, 196, 150))
-    t2 = f"Рой · {count - 1} особей размера 1–2 и матка (6)"
+    name, size = LEADERS[leader][0], LEADERS[leader][1]
+    t2 = f"Рой · {count - 1} особей размера 1–2 и {name} ({size})"
     d.text((WW * S - 24 - d.textlength(t2, font=fs), HH * S - 34), t2, font=fs, fill=(196, 186, 214))
 
 
+def overview(names=("Разум улья", "Пожиратель", "Кукушка")):
+    """The other swarm leaders' battles side by side, half size."""
+    from PIL import Image
+    ims = [Image.open(out(LEADERS[n][2])).convert("RGB").resize((WW, HH), Image.LANCZOS) for n in names]
+    grid = Image.new("RGB", (WW * 2 + 12, HH * 2 + 12), (24, 18, 30))
+    grid.paste(Image.open(out("battle.png")).convert("RGB").resize((WW, HH), Image.LANCZOS), (0, 0))
+    for i, im in enumerate(ims, 1):
+        grid.paste(im, ((i % 2) * (WW + 12), (i // 2) * (HH + 12)))
+    grid.save(out("swarm_battles.png"))
+    print("swarm_battles.png", grid.size)
+
+
 if __name__ == "__main__":
-    sc, count, ng = build()
-    img = sc.image(S)
-    overlay(img, count, ng)
-    img.save(out("battle.png"))
-    print(img.size, count)
+    import sys
+    names = sys.argv[1:] or ["Матка"]
+    if names == ["all"]:
+        names = list(LEADERS)
+    for leader in names:
+        sc, count, ng = build(leader)
+        img = sc.image(S)
+        overlay(img, count, ng, leader)
+        img.save(out(LEADERS[leader][2]))
+        print(LEADERS[leader][2], img.size, count)
+    if len(names) == len(LEADERS):
+        overview()
