@@ -59,6 +59,9 @@ R = {   # target ramps, dark → light
     "bone": ramp("#120c0a", "#2e241c", "#6a5a46", "#b4a688", "#ece2c8"),
     "slime": ramp("#06201c", "#0e4a3e", "#1a8270", "#4ac0a8", "#b0f4e4"),
     "worm": ramp("#200810", "#4a1424", "#80283c", "#c05062", "#f0a0a8"),
+    "locust": ramp("#0a0802", "#262006", "#56460e", "#9a821e", "#e2ca50"),
+    "petal": ramp("#2a1420", "#6a3450", "#b06a8a", "#e0a8c0", "#fbe4ee"),
+    "lure": ramp("#401006", "#8a2a0a", "#d0601a", "#f4a040", "#ffe0a0"),
 }
 
 
@@ -186,6 +189,41 @@ SWARM_ICONS = {
     "larva": (617184, "Личинка", "выводок", dict(brown="grub", warm="grub", red="grub", grey="grub")),
     "selection": (1364435, "Естественный отбор", "выводок", dict(grey="bone", brown="chitin", warm="bone")),
     "fear": (929257, "Страх", "бой", dict(warm="bone", blue="phero", red="crimson", grey="chitin")),
+    # evolutions of the forms
+    "evo_formic": (1399573, "Муравьиная кислота", "эволюция", dict(blue="acid", grey="chitin", warm="acid")),
+    "evo_phalanx": (1146545, "Сомкнутый строй", "эволюция", dict(grey="slate", warm="bone", red="crimson")),
+    "evo_bridge": (931195, "Живой мост", "эволюция", dict(grey="bone", brown="chitin", warm="bone")),
+    "evo_syringe": (719074, "Жало-шприц", "эволюция", dict(red="crimson", grey="bone", blue="bone", warm="amber")),
+    "evo_tough": (1235642, "Жёсткие крылья", "эволюция", dict(grey="amber", warm="amber", brown="chitin")),
+    "evo_dive": (1034603, "Пикирование", "эволюция", dict(brown="chitin", grey="bone", warm="amber")),
+    "evo_vise": (797141, "Клешни-тиски", "эволюция", dict(red="bone", warm="bone", brown="rust", grey="rust")),
+    "evo_neuro": (867496, "Нейротоксин", "эволюция", dict(red="phero", purple="phero", grey="steel", blue="phero", brown="chitin")),
+    "evo_longlegs": (1155620, "Длинные лапы", "эволюция", dict(red="rust", warm="rust", brown="rust", grey="bone")),
+    "evo_farspit": (785063, "Дальний плевок", "эволюция", dict(grey="chitin", blue="acid", warm="acid", red="acid")),
+    "evo_scent": (426832, "Свой запах", "эволюция", dict(warm="amber", grey="chitin", red="crimson")),
+    "evo_pool": (737509, "Едкая лужа", "эволюция", dict(green="acid", grey="acid", blue="acid")),
+    "evo_forked": (1251315, "Двойной рог", "эволюция", dict(brown="bone", grey="bone", warm="bone")),
+    "evo_bosses": (1082063, "Бугристые надкрылья", "эволюция", dict(grey="elytra", brown="elytra", warm="bone", red="elytra")),
+    "evo_flyer": (634178, "Летучий жук", "эволюция", dict(blue="amber", grey="elytra", green="amber", purple="elytra")),
+    "evo_longspines": (1004377, "Длинные шипы", "эволюция", dict(grey="bone", blue="bone", warm="bone")),
+    "evo_lime": (533399, "Известковый панцирь", "эволюция", dict(grey="stone", brown="stone", purple="stone")),
+    "evo_flanges": (127633, "Щитовые края", "эволюция", dict(grey="slate", warm="bone", red="slate", blue="slate")),
+    "evo_locust": (631602, "Стадная фаза", "эволюция", dict(green="locust", grey="locust", brown="locust", warm="locust")),
+    "evo_shins": (1067322, "Шипастые голени", "эволюция", dict(grey="olive", brown="olive", warm="bone")),
+    "evo_farjump": (893935, "Дальний прыжок", "эволюция", dict(grey="bone", warm="bone", brown="olive", red="olive")),
+    "evo_saws": (1275309, "Серпы-пилы", "эволюция", dict(grey="bone", brown="mantis", warm="bone")),
+    "evo_orchid": (248731, "Цветочная мимикрия", "эволюция", dict(red="petal", warm="petal", purple="petal", green="mantis", brown="mantis")),
+    "evo_eyespots": (816490, "Глазчатые крылья", "эволюция", dict(green="mantis", blue="phero", warm="amber", brown="chitin", grey="chitin")),
+    "evo_bright": (392718, "Яркий фонарь", "эволюция", dict(warm="lantern", red="lantern", grey="chitin", brown="amber")),
+    "evo_hood": (1076579, "Капюшон", "эволюция", dict(brown="chitin", warm="lantern", grey="chitin", red="chitin")),
+    "evo_lure": (434562, "Ложный сигнал", "эволюция", dict(warm="lure", red="lure", grey="chitin", blue="lantern")),
+    # rare traits
+    "rare_alarm": (198672, "Тревога", "редкая черта", dict(red="crimson", warm="amber", grey="chitin")),
+    "rare_spinner": (420375, "Прядильные железы", "редкая черта", dict(grey="bone", blue="bone", purple="bone")),
+    "rare_exploder": (1320474, "Взрывной муравей", "редкая черта", dict(red="amber", warm="lantern", grey="chitin", brown="chitin")),
+    "rare_vivi": (569154, "Живородящая", "редкая черта", dict(grey="grub", warm="grub", red="crimson", brown="grub")),
+    "rare_strider": (658377, "Стрекот", "редкая черта", dict(warm="amber", brown="chitin", red="amber", grey="bone")),
+    "rare_bud": (59838, "Почкование", "редкая черта", dict(green="egg", grey="bone", brown="chitin", warm="bone", blue="egg")),
 }
 SETS = {"module": (ICONS, ASSET, INDEX), "swarm": (SWARM_ICONS, SW_ASSET, SW_INDEX)}
 

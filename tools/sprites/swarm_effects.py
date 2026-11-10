@@ -271,13 +271,21 @@ def scorpion_sting(giant=False):
     a, b = human("Изобретатель"), human("Зодчий")
     if not giant:
         s = lambda p: bug(("stinger",), p, soldier=True, seed=4)
-        base = [(a, X(2.4), GY)]
+        t = golem("Орудие")
+        tx = X(2.5)
+        base = [(t, tx, GY)]
+
+        def pits(sc, n):                                   # the venom eats the cast metal: pitted, greenish blots
+            for k, (dx, dy) in enumerate(((-8, -34), (6, -52), (-2, -70), (10, -30), (-12, -58), (2, -44))[:n]):
+                blob(sc, tx + dx, GY + dy, 2.2, hexc("#3a5a1a"), 0.9, glow=0.15)
+                dot(sc, tx + dx - 1, GY + dy - 1, hexc("#9ae030"))
         return [frame(base + [(s("idle"), X(1.0), GY)]),
-                frame(base + [(s("attack"), X(1.3), GY)], fx=[lambda sc: burst(sc, X(2.4) - 4, GY - 26, 8)], key=True,
-                      text=[(X(2.0), 30, "пробил — яд 1–6")]),
-                frame(base + [(s("idle"), X(1.0), GY)], fx=[lambda sc: bubbles(sc, X(2.4), GY - 20, seed=1)],
-                      text=[(X(2.0), 30, "яд копится")]),
-                frame(base + [(s("attack"), X(1.3), GY)], fx=[lambda sc: bubbles(sc, X(2.4), GY - 20, n=10, seed=2)])]
+                frame(base + [(s("attack"), X(1.3), GY)], fx=[lambda sc: burst(sc, tx - 22, GY - 40, 8)], key=True,
+                      text=[(X(1.9), 30, "пробил: броня −1")]),
+                frame(base + [(s("idle"), X(1.0), GY)], fx=[lambda sc: pits(sc, 3)],
+                      text=[(X(1.9), 30, "яд машине не страшен, но броню разъедает")]),
+                frame(base + [(s("attack"), X(1.3), GY)], fx=[lambda sc: pits(sc, 6), lambda sc: burst(sc, tx - 22, GY - 40, 8)],
+                      text=[(X(1.9), 30, "−2: больше с одной цели нельзя")])]
     s = lambda p: bug(("stinger",), p, soldier=True, giant=True, seed=4)
     base = [(a, X(2.5), GY - 10), (b, X(2.9), GY + 14)]
     return [frame(base + [(s("idle"), X(0.8), GY)]),
