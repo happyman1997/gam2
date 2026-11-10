@@ -621,46 +621,9 @@ def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chi
 
 
 def queen(hue=0.0, pose="idle", k=1.0):
-    c = chitin(hue)
-    mc = Mat(c)
-    m = Model()
-    for (cx, r) in ((-6, 7.5), (-13, 10), (-21, 10.5), (-29, 9), (-35.5, 6)):
-        m.ell((cx, 11, 0), (4.2, r, r * 0.95), M_MEMBRANE)
-        m.ell((cx + 0.6, 11 + r * 0.32, 0), (3.2, r * 0.72, r * 0.82), mc)
-    m.ell((-39, 9, 0), (2.4, 3.2, 3.2), mc)
-    for ex, ey, ez in ((-42, 4, 1.5), (-43.5, 6, -1), (-41.5, 2.5, -2.5), (-44, 3, 2)):
-        m.ell((ex, ey, ez), (1.5, 1.1, 1.1), M_EGG)
-    m.ell((-1.5, 9, 0), (1.3, 1.8, 1.3), mc)
-    m.ell((2.5, 10, 0), (4, 2.8, 2.6), mc, rot_z(0.2))
-    up = 0 if pose == "idle" else 2.5
-    hc = np.array((7.6, 11.8 + up, 0))
-    m.ell(hc, (2.6, 2.3, 2.3), mc)
-    jaw = 0.25 if pose == "idle" else 0.8
-    for z in (1.4, -1.4):
-        m.ell(hc + (1.2, 0.7, z), (0.7, 0.7, 0.7), M_EYE)
-        m.ell(hc + (0.6, 1.5, z * 0.8), (0.45, 0.45, 0.45), M_EYE)
-        m.ell(hc + (1.6, 0.0, z * 1.1), (0.4, 0.4, 0.4), M_EYE)
-        base = hc + (2.1, -1.0, z * 0.5)
-        mid = base + np.array((np.cos(jaw) * 2.6, -0.8, np.sign(z) * np.sin(jaw) * 2.2))
-        tip = mid + np.array((1.6, -0.3, -np.sign(z) * 1.2))
-        m.cyl(base, mid, 0.85, M_FANG, r1=0.55, seg=5)
-        m.cyl(mid, tip, 0.55, M_FANG, r1=0.08, seg=4)
-        a0 = hc + (1.0, 1.6, z * 0.4)
-        m.limb([a0, a0 + (0.2, 3.6, z * 0.5), a0 + (3.8, 4.4, z * 1.4)], 1, mc, band=3 if z > 0 else 1)
-    if pose == "attack":
-        m.ell(hc + (6.5, -1.5, 0), (1.8, 1.5, 1.5), M_ACID_SPIT)
-        m.ell(hc + (9.5, -2.5, 0), (0.9, 0.9, 0.9), M_ACID_SPIT)
-    for side in (1, -1):
-        for x, dx in ((0.5, -3), (2.5, 0.5), (4.5, 3.5)):
-            hip = np.array((x, 8.4, 1.8 * side))
-            knee = np.array((x + dx, 11.5, 6 * side))
-            foot = np.array((x + dx * 1.6, 0, 8.5 * side))
-            m.limb([hip, knee, foot], 1, mc, band=3 if side > 0 else 1)
-    s = 2.6 * k
-    w, h, ox, oy = int(88 * s), int(56 * s), int(48 * s), int(50 * s)
-    spr = rim_light(render(m.scaled(s), w, h, ox, oy, **STYLE1))
-    spr.ox, spr.oy = ox, oy
-    return spr
+    """The Matka, the swarm's queen (size 6) — drawn with the other leaders in swarm_leaders."""
+    import swarm_leaders as SL
+    return SL.build("Матка", pose, k, hue=hue)
 
 
 if __name__ == "__main__":

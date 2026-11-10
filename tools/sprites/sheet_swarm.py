@@ -89,8 +89,8 @@ put(W.build((), 0.0, "idle", False, k=1.5), 120, by, 14)
 labels.append((120, by + 6, "Рабочая", "размер 1"))
 put(W.build((), 0.0, "idle", True, k=1.5), 270, by, 20)
 labels.append((270, by + 6, "Солдат", "размер 2"))
-put(W.queen(0.0, "idle", k=0.6), 600, by, 90)
-labels.append((560, by + 6, "Матка", "размер 6"))
+put(W.queen(0.0, "idle", k=1.5), 720, by, 120)
+labels.append((640, by + 6, "Матка", "размер 6"))
 y += HEAD + rows_h[3]
 
 # 5. bred lines
