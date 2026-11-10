@@ -1109,9 +1109,9 @@ def parts(frame, key, t=1):
 
 
 
-def parts_multi(frame, levels):
-    """A frame wearing several of its modules at once: {key: level}."""
-    so, A = {}, None
+def parts_multi(frame, levels, A=None):
+    """A frame wearing several of its modules at once: {key: level}; A — a pose (idle by default)."""
+    so = {}
     if "spider" in levels:
         so["leg_fn"] = spider_leg_fn(2 if levels["spider"] < 3 else 3, armour=levels["spider"] >= 2)
         Sx = GH.BY_NAME[frame]
