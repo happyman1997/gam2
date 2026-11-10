@@ -6,8 +6,10 @@ recoloured into the Foundry's palettes (iron, brass, copper, fire, the arc's blu
 Maniac's purple for his modules), turned to face right like our creatures, given our outline and a rim light along
 the top edge. Only the reworked icons are kept in the repository (assets/module_icons.png); the dataset is not.
 
-    python3 tools/sprites/icons.py <dir with the dataset's tokens.npy, palette.npy>   -> assets/module_icons.png, .json
+    python3 tools/sprites/icons.py <dir with the dataset's tokens.npy, palette.npy>
+        -> assets/module_icons.png, .json and assets/swarm_icons.png, .json (the swarm's traits, chimeras, leaders, brood)
     icons.icon("long", 5)  -> a Sprite of the «Длинный ствол» icon, 5× (nearest), centred on (ox, oy)
+    icons.icon("acid", 5, "swarm")  -> the swarm's «Кислотная железа»
 """
 import json
 import os
@@ -18,6 +20,8 @@ from kit import *
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSET = os.path.join(HERE, "assets", "module_icons.png")
 INDEX = os.path.join(HERE, "assets", "module_icons.json")
+SW_ASSET = os.path.join(HERE, "assets", "swarm_icons.png")
+SW_INDEX = os.path.join(HERE, "assets", "swarm_icons.json")
 
 R = {   # target ramps, dark → light
     "iron": ramp("#141519", "#262930", "#3c414c", "#5c6372", "#8d95a6"),
@@ -34,6 +38,27 @@ R = {   # target ramps, dark → light
     "mad": ramp("#2a0a2a", "#5a1460", "#9a2aa0", "#d860d0", "#ffc0f4"),
     "madg": ramp("#0a2a10", "#145a20", "#2aa040", "#70e080", "#d0ffd8"),
     "ochre": ramp("#1e1404", "#46300a", "#76561a", "#a8822a", "#d6b048"),
+    # the swarm
+    "chitin": ramp("#07050a", "#180e1c", "#30182c", "#523048", "#9a84a2"),
+    "rust": ramp("#080404", "#1e0a08", "#3a1410", "#5e2618", "#a8603e"),
+    "olive": ramp("#060804", "#151b0c", "#283216", "#424e22", "#808e4a"),
+    "mantis": ramp("#0a0c08", "#20281c", "#3a4630", "#5e6c52", "#a4b294"),
+    "amber": ramp("#140a04", "#3a2008", "#74420c", "#b4741a", "#e2b048"),
+    "elytra": ramp("#0a0408", "#24080e", "#4a1016", "#7e2220", "#c0603a"),
+    "slate": ramp("#14141c", "#2a2a36", "#4a4a5a", "#74748a", "#a8a8bc"),
+    "acid": ramp("#0a1a04", "#1e3c0a", "#3e7a16", "#7ac83a", "#c8ff8a"),
+    "lantern": ramp("#4a4410", "#8a7a18", "#d0b830", "#f4e870", "#fffcd0"),
+    "crimson": ramp("#14040a", "#3a0a14", "#6a1420", "#a02a2e", "#d65a4a"),
+    "membrane": ramp("#12060e", "#2a0e1c", "#461828", "#6a2838", "#9a4a56"),
+    "brain": ramp("#1c0c16", "#3c1a2c", "#66304a", "#98566e", "#cc8c98"),
+    "phero": ramp("#1e0e36", "#462078", "#7640c0", "#ac80ec", "#e6d2ff"),
+    "egg": ramp("#2a3a20", "#4a6a2e", "#76a040", "#a8d060", "#e0f6a0"),
+    "grub": ramp("#241a12", "#54442e", "#8a7656", "#bea98a", "#ece0c4"),
+    "skin": ramp("#2a140c", "#5a3020", "#9a5a3c", "#d09070", "#f2c8a8"),
+    "fur": ramp("#141010", "#2e2620", "#4e4236", "#766652", "#a8987e"),
+    "bone": ramp("#120c0a", "#2e241c", "#6a5a46", "#b4a688", "#ece2c8"),
+    "slime": ramp("#06201c", "#0e4a3e", "#1a8270", "#4ac0a8", "#b0f4e4"),
+    "worm": ramp("#200810", "#4a1424", "#80283c", "#c05062", "#f0a0a8"),
 }
 
 
@@ -127,6 +152,42 @@ ICONS = {
 }
 
 
+# the swarm's icons: its traits (the form each gives as the first trait), the chimeras' foreign traits, its leaders and
+# the brood screen's actions; recoloured into the swarm's oily chitin, acid, ichor and pheromone colours
+CH = dict(grey="chitin", brown="chitin", red="chitin", warm="amber", green="chitin", blue="chitin", purple="chitin")
+SWARM_ICONS = {
+    "ant": (834220, "Муравей · без черт", "черта", dict(CH)),
+    "wings": (1211376, "Крылья · оса", "черта", dict(CH, warm="amber", grey="slate", blue="slate")),
+    "stinger": (685804, "Жало · скорпион", "черта", dict(grey="rust", brown="rust", red="crimson", warm="bone")),
+    "acid": (1289263, "Кислотная железа · бочонок", "черта", dict(green="acid", grey="chitin", blue="acid")),
+    "horn": (1059264, "Рог · жук", "черта", dict(grey="elytra", brown="elytra", red="elytra", warm="bone", blue="elytra")),
+    "carapace": (1367859, "Панцирь · мокрица", "черта", dict(grey="slate", brown="slate", warm="slate", red="slate")),
+    "jumper": (841013, "Прыгучие ноги · кузнечик", "черта", dict(green="olive", grey="olive", brown="olive", warm="olive")),
+    "scythes": (845234, "Серпы · богомол", "черта", dict(green="mantis", grey="bone", brown="mantis", warm="bone")),
+    "firefly": (1140464, "Светлячок · светляк", "черта", dict(green="lantern", grey="chitin", warm="lantern", brown="amber")),
+    "iron": (644922, "Железный панцирь", "химера", dict(warm="iron", brown="iron", red="iron", grey="grub", green="grub")),
+    "boil": (731424, "Кипящая кровь", "химера", dict(red="fire", warm="fire", grey="steel", brown="ember")),
+    "hand": (622418, "Человеческая рука", "химера", dict(warm="skin", brown="skin", red="skin", grey="skin")),
+    "face": (816676, "Человеческое лицо", "химера", dict(warm="skin", brown="skin", red="crimson", grey="chitin", green="skin")),
+    "bones": (1282939, "Чужие кости", "химера", dict(grey="bone", warm="bone", brown="bone")),
+    "quills": (1351734, "Иглы", "химера", dict(brown="bone", grey="bone", warm="bone", red="chitin")),
+    "snout": (724249, "Волчий нюх", "химера", dict(grey="fur", brown="fur", warm="fur", red="crimson")),
+    "slime": (1218735, "Слизистая кожа", "химера", dict(green="slime", grey="slime", blue="slime", warm="slime")),
+    "worm": (1396528, "Червь внутри", "химера", dict(red="worm", warm="worm", brown="worm", grey="worm", purple="worm")),
+    "matka": (708853, "Матка", "лидер", dict(warm="amber", brown="amber", red="crimson", blue="egg", grey="bone")),
+    "razum": (597655, "Разум улья", "лидер", dict(red="brain", warm="phero", grey="brain", purple="phero", blue="phero")),
+    "pozh": (1366933, "Пожиратель", "лидер", dict(red="crimson", grey="bone", warm="bone", brown="crimson")),
+    "kuk": (357997, "Кукушка", "лидер", dict(green="amber", blue="amber", grey="chitin", purple="chitin", warm="amber")),
+    "feed": (936138, "Кормление лидера", "выводок", dict(red="crimson", brown="crimson", warm="bone", grey="bone")),
+    "evolve": (189565, "Эволюция формы", "выводок", dict(green="acid", brown="chitin", warm="amber", grey="chitin")),
+    "clutch": (1268191, "Вторая кладка", "выводок", dict(brown="chitin", warm="amber", grey="egg", green="egg")),
+    "reroll": (1576, "Переброс кладок", "выводок", dict(grey="bone", red="crimson", warm="amber")),
+    "biomass": (1310924, "Биомасса", "выводок", dict(red="crimson", brown="crimson", warm="membrane", grey="bone")),
+    "larva": (617184, "Личинка", "выводок", dict(brown="grub", warm="grub", red="grub", grey="grub")),
+    "selection": (1364435, "Естественный отбор", "выводок", dict(grey="bone", brown="chitin", warm="bone")),
+}
+SETS = {"module": (ICONS, ASSET, INDEX), "swarm": (SWARM_ICONS, SW_ASSET, SW_INDEX)}
+
 def group(r, g, b):
     h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
     h *= 360
@@ -183,25 +244,26 @@ def rework(rgba, spec, owner):
     return res
 
 
-def build_atlas(src):
+def build_atlas(src, which="module"):
     from PIL import Image
+    table, asset, index_path = SETS[which]
     tokens = np.load(os.path.join(src, "tokens.npy"), mmap_mode="r", allow_pickle=False)
     palette = np.load(os.path.join(src, "palette.npy"), allow_pickle=False)
-    keys = list(ICONS)
+    keys = list(table)
     cols = 10
     rows = (len(keys) + cols - 1) // cols
     atlas = np.zeros((rows * 16, cols * 16, 4), np.uint8)
     index = {}
     for n, key in enumerate(keys):
-        row, name, owner, spec = ICONS[key]
+        row, name, owner, spec = table[key]
         p = np.asarray(tokens[row]).reshape(16, 16)
         rgba = np.dstack((palette[p], (p != 0).astype("uint8") * 255)).astype(np.uint8)
         y, x = (n // cols) * 16, (n % cols) * 16
         atlas[y:y + 16, x:x + 16] = rework(rgba, spec, owner)
         index[key] = dict(cell=[n % cols, n // cols], name=name, owner=owner, source_row=row)
-    os.makedirs(os.path.dirname(ASSET), exist_ok=True)
-    Image.fromarray(atlas, "RGBA").save(ASSET)
-    json.dump(dict(source="Angais/pixel-art-atlas-1.4m (CC0 1.0), reworked", icons=index), open(INDEX, "w"),
+    os.makedirs(os.path.dirname(asset), exist_ok=True)
+    Image.fromarray(atlas, "RGBA").save(asset)
+    json.dump(dict(source="Angais/pixel-art-atlas-1.4m (CC0 1.0), reworked", icons=index), open(index_path, "w"),
               ensure_ascii=False, indent=1)
     return atlas
 
@@ -209,18 +271,19 @@ def build_atlas(src):
 _cache = {}
 
 
-def icon_rgba(key):
+def icon_rgba(key, which="module"):
     from PIL import Image
-    if "atlas" not in _cache:
-        _cache["atlas"] = np.array(Image.open(ASSET).convert("RGBA"))
-        _cache["index"] = json.load(open(INDEX))["icons"]
-    cx, cy = _cache["index"][key]["cell"]
-    return _cache["atlas"][cy * 16:(cy + 1) * 16, cx * 16:(cx + 1) * 16]
+    if which not in _cache:
+        _, asset, index_path = SETS[which]
+        _cache[which] = (np.array(Image.open(asset).convert("RGBA")), json.load(open(index_path))["icons"])
+    atlas, index = _cache[which]
+    cx, cy = index[key]["cell"]
+    return atlas[cy * 16:(cy + 1) * 16, cx * 16:(cx + 1) * 16]
 
 
-def icon(key, z=5):
+def icon(key, z=5, which="module"):
     """The icon as a Sprite, z× nearest, its centre at (ox, oy)."""
-    rgba = np.repeat(np.repeat(icon_rgba(key), z, 0), z, 1)
+    rgba = np.repeat(np.repeat(icon_rgba(key, which), z, 0), z, 1)
     s = Sprite(16 * z, 16 * z)
     s.rgb = rgba[..., :3].astype(np.float32)
     s.a = rgba[..., 3] > 0
@@ -228,11 +291,12 @@ def icon(key, z=5):
     return s
 
 
-def sheet(path, z=4):
+def sheet(path, z=4, which="module"):
     """All the icons with their names, for a look."""
     from PIL import Image, ImageDraw, ImageFont
     from paths import font
-    keys = list(ICONS)
+    table = SETS[which][0]
+    keys = list(table)
     cols = 8
     cw, ch = 16 * z + 150, 16 * z + 16
     rows = (len(keys) + cols - 1) // cols
@@ -241,9 +305,9 @@ def sheet(path, z=4):
     f = ImageFont.truetype(font("PTSerif-Regular.ttf"), 14)
     for n, key in enumerate(keys):
         x, y = 10 + (n % cols) * cw, 10 + (n // cols) * ch
-        im = Image.fromarray(np.repeat(np.repeat(icon_rgba(key), z, 0), z, 1), "RGBA")
+        im = Image.fromarray(np.repeat(np.repeat(icon_rgba(key, which), z, 0), z, 1), "RGBA")
         img.paste(im, (x, y), im)
-        d.text((x + 16 * z + 6, y + 16 * z / 2 - 8), ICONS[key][1], font=f, fill=(230, 220, 196))
+        d.text((x + 16 * z + 6, y + 16 * z / 2 - 8), table[key][1], font=f, fill=(230, 220, 196))
     img.save(path)
 
 
@@ -251,6 +315,8 @@ if __name__ == "__main__":
     import sys
     from paths import out
     if len(sys.argv) > 1:
-        build_atlas(sys.argv[1])
+        build_atlas(sys.argv[1], "module")
+        build_atlas(sys.argv[1], "swarm")
     sheet(out("module_icons_sheet.png"))
-    print(ASSET, out("module_icons_sheet.png"))
+    sheet(out("swarm_icons_sheet.png"), which="swarm")
+    print(ASSET, SW_ASSET)

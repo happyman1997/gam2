@@ -1,9 +1,10 @@
 """Mock-up of the swarm's between-battles screen: three clutches, one is chosen; biomass spending."""
-from PIL import ImageFont
+from PIL import Image, ImageFont
 from kit import *
 import swarm1 as W
 from noise import value_noise
 from paths import font, out
+import icons as IC
 
 S = 2
 WW, HH = 960, 540
@@ -47,7 +48,15 @@ CLUTCHES = [
          kids=[(("acid",), False, None, 0.03, "бочонок", None), (("acid",), False, "hand", 0.0, "бочонок с рукой", "химера"),
                (("ant",), True, "hand", -0.03, "муравей с рукой", "химера"), (("scythes",), False, None, 0.06, "богомол", "новая форма")]),
 ]
-SELECTION = (("жало", 23), ("рог", 11), ("кислота", 7), ("серпы", 4))
+SELECTION = (("жало", 23, "stinger"), ("рог", 11, "horn"), ("кислота", 7, "acid"), ("серпы", 4, "scythes"))
+HINT_ICON = ["stinger", "horn", "hand"]
+KID_ICON = {"химера": "hand", "новая форма": "scythes"}
+
+
+def icon(img, key, x, y, px):
+    """Paste a swarm icon (16×16, nearest) of px pixels with its top-left at (x, y)."""
+    im = Image.fromarray(IC.icon_rgba(key, "swarm"), "RGBA").resize((px, px), Image.NEAREST)
+    img.paste(im, (int(x), int(y)), im)
 
 
 def points(kid):
@@ -75,7 +84,7 @@ def build():
             sw = 16 if not soldier and "giant" not in traits else 22
             put(sc, W.build(traits, hue, "idle", soldier, k=1.5, chimera=chim, genes=W.genes_for(i * 10 + j)), cx, by, sw)
     frame(sc, 12, 394, 948, 432)
-    for i, (_, kills) in enumerate(SELECTION):
+    for i, (_, kills, _) in enumerate(SELECTION):
         x = 250 + i * 176
         sc.rgb[410:418, x + 70:x + 160] = hexc("#2a2232")
         sc.rgb[410:418, x + 70:x + 70 + int(90 * kills / 23)] = hexc("#b04a3a") if i == 0 else hexc("#7a5a8a")
@@ -92,7 +101,9 @@ def overlay(img):
     f = lambda b, s: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s)
     d.text((20, 12), "Выводок · после боя 5 из 14 · выбери одну кладку", font=f(1, 24), fill=INK)
     t = "Биомасса 34   ·   Предел роя 41 / 45 очков"
-    d.text((WW * S - 24 - d.textlength(t, font=f(1, 21)), 15), t, font=f(1, 21), fill=BIO)
+    tx = WW * S - 24 - d.textlength(t, font=f(1, 21))
+    d.text((tx, 15), t, font=f(1, 21), fill=BIO)
+    icon(img, "biomass", tx - 40, 10, 34)
     for i, cl in enumerate(CLUTCHES):
         x0 = 12 + i * 314
         cx = (x0 + 151) * S
@@ -108,17 +119,27 @@ def overlay(img):
             ky = (242 if j < 2 else 336) * S
             d.text((kx - d.textlength(label, font=f(0, 14)) / 2, ky), label, font=f(0, 14), fill=INK)
             if badge:
-                d.text((kx - d.textlength(badge, font=f(1, 14)) / 2, ky + 22), badge, font=f(1, 14), fill=BADGE[badge])
-        d.text((cx - d.textlength(cl["hint"], font=f(1, 15)) / 2, 160 * S), cl["hint"], font=f(1, 15), fill=(150, 220, 120))
-    d.text((24, 404 * S), "Естественный отбор — убийства по чертам:", font=f(1, 16), fill=INK)
-    for i, (name, kills) in enumerate(SELECTION):
+                bw = d.textlength(badge, font=f(1, 14))
+                dx = 14 if badge in KID_ICON else 0
+                d.text((kx - bw / 2 + dx, ky + 22), badge, font=f(1, 14), fill=BADGE[badge])
+                if dx:
+                    icon(img, KID_ICON[badge], kx - bw / 2 - 16, ky + 19, 26)
+        hw = d.textlength(cl["hint"], font=f(1, 15))
+        d.text((cx - hw / 2 + 16, 160 * S), cl["hint"], font=f(1, 15), fill=(150, 220, 120))
+        icon(img, HINT_ICON[i], cx - hw / 2 - 18, 160 * S - 6, 30)
+    icon(img, "selection", 34, 397 * S, 34)
+    d.text((74, 404 * S), "Естественный отбор — убийства по чертам:", font=f(1, 16), fill=INK)
+    for i, (name, kills, key) in enumerate(SELECTION):
         x = (250 + i * 176) * S
-        d.text((x + 12, 403 * S), name, font=f(0, 16), fill=INK)
+        icon(img, key, x + 18, 397 * S, 34)
+        d.text((x + 58, 403 * S), name, font=f(0, 16), fill=INK)
         d.text((x + 330, 403 * S), str(kills), font=f(1, 14), fill=MUTED)
-    spend = [(12, 236, "Кормление · 10: кладка +1"), (246, 470, "Эволюция формы · 15"),
-             (480, 704, "Вторая кладка · 10"), (714, 948, "Перебросить · 5")]
-    for x0, x1, t in spend:
-        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 17)) / 2, 461 * S), t, font=f(1, 17), fill=BIO)
+    spend = [(12, 236, "Кормление · 10: кладка +1", "feed"), (246, 470, "Эволюция формы · 15", "evolve"),
+             (480, 704, "Вторая кладка · 10", "clutch"), (714, 948, "Перебросить · 5", "reroll")]
+    for x0, x1, t, key in spend:
+        tw = d.textlength(t, font=f(1, 17))
+        d.text(((x0 + x1) * S / 2 - tw / 2 + 20, 461 * S), t, font=f(1, 17), fill=BIO)
+        icon(img, key, (x0 + x1) * S / 2 - tw / 2 - 26, 455 * S, 40)
     for x0, x1, t in ((12, 236, "Автовыбор"), (246, 470, "Пропустить · +10 биомассы"), (714, 948, "В бой")):
         d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 505 * S), t, font=f(1, 19),
                fill=(250, 226, 160) if t == "В бой" else INK)

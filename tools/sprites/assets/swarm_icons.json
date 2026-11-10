@@ -1,0 +1,266 @@
+{
+ "source": "Angais/pixel-art-atlas-1.4m (CC0 1.0), reworked",
+ "icons": {
+  "ant": {
+   "cell": [
+    0,
+    0
+   ],
+   "name": "Муравей · без черт",
+   "owner": "черта",
+   "source_row": 834220
+  },
+  "wings": {
+   "cell": [
+    1,
+    0
+   ],
+   "name": "Крылья · оса",
+   "owner": "черта",
+   "source_row": 1211376
+  },
+  "stinger": {
+   "cell": [
+    2,
+    0
+   ],
+   "name": "Жало · скорпион",
+   "owner": "черта",
+   "source_row": 685804
+  },
+  "acid": {
+   "cell": [
+    3,
+    0
+   ],
+   "name": "Кислотная железа · бочонок",
+   "owner": "черта",
+   "source_row": 1289263
+  },
+  "horn": {
+   "cell": [
+    4,
+    0
+   ],
+   "name": "Рог · жук",
+   "owner": "черта",
+   "source_row": 1059264
+  },
+  "carapace": {
+   "cell": [
+    5,
+    0
+   ],
+   "name": "Панцирь · мокрица",
+   "owner": "черта",
+   "source_row": 1367859
+  },
+  "jumper": {
+   "cell": [
+    6,
+    0
+   ],
+   "name": "Прыгучие ноги · кузнечик",
+   "owner": "черта",
+   "source_row": 841013
+  },
+  "scythes": {
+   "cell": [
+    7,
+    0
+   ],
+   "name": "Серпы · богомол",
+   "owner": "черта",
+   "source_row": 845234
+  },
+  "firefly": {
+   "cell": [
+    8,
+    0
+   ],
+   "name": "Светлячок · светляк",
+   "owner": "черта",
+   "source_row": 1140464
+  },
+  "iron": {
+   "cell": [
+    9,
+    0
+   ],
+   "name": "Железный панцирь",
+   "owner": "химера",
+   "source_row": 644922
+  },
+  "boil": {
+   "cell": [
+    0,
+    1
+   ],
+   "name": "Кипящая кровь",
+   "owner": "химера",
+   "source_row": 731424
+  },
+  "hand": {
+   "cell": [
+    1,
+    1
+   ],
+   "name": "Человеческая рука",
+   "owner": "химера",
+   "source_row": 622418
+  },
+  "face": {
+   "cell": [
+    2,
+    1
+   ],
+   "name": "Человеческое лицо",
+   "owner": "химера",
+   "source_row": 816676
+  },
+  "bones": {
+   "cell": [
+    3,
+    1
+   ],
+   "name": "Чужие кости",
+   "owner": "химера",
+   "source_row": 1282939
+  },
+  "quills": {
+   "cell": [
+    4,
+    1
+   ],
+   "name": "Иглы",
+   "owner": "химера",
+   "source_row": 1351734
+  },
+  "snout": {
+   "cell": [
+    5,
+    1
+   ],
+   "name": "Волчий нюх",
+   "owner": "химера",
+   "source_row": 724249
+  },
+  "slime": {
+   "cell": [
+    6,
+    1
+   ],
+   "name": "Слизистая кожа",
+   "owner": "химера",
+   "source_row": 1218735
+  },
+  "worm": {
+   "cell": [
+    7,
+    1
+   ],
+   "name": "Червь внутри",
+   "owner": "химера",
+   "source_row": 1396528
+  },
+  "matka": {
+   "cell": [
+    8,
+    1
+   ],
+   "name": "Матка",
+   "owner": "лидер",
+   "source_row": 708853
+  },
+  "razum": {
+   "cell": [
+    9,
+    1
+   ],
+   "name": "Разум улья",
+   "owner": "лидер",
+   "source_row": 597655
+  },
+  "pozh": {
+   "cell": [
+    0,
+    2
+   ],
+   "name": "Пожиратель",
+   "owner": "лидер",
+   "source_row": 1366933
+  },
+  "kuk": {
+   "cell": [
+    1,
+    2
+   ],
+   "name": "Кукушка",
+   "owner": "лидер",
+   "source_row": 357997
+  },
+  "feed": {
+   "cell": [
+    2,
+    2
+   ],
+   "name": "Кормление лидера",
+   "owner": "выводок",
+   "source_row": 936138
+  },
+  "evolve": {
+   "cell": [
+    3,
+    2
+   ],
+   "name": "Эволюция формы",
+   "owner": "выводок",
+   "source_row": 189565
+  },
+  "clutch": {
+   "cell": [
+    4,
+    2
+   ],
+   "name": "Вторая кладка",
+   "owner": "выводок",
+   "source_row": 1268191
+  },
+  "reroll": {
+   "cell": [
+    5,
+    2
+   ],
+   "name": "Переброс кладок",
+   "owner": "выводок",
+   "source_row": 1576
+  },
+  "biomass": {
+   "cell": [
+    6,
+    2
+   ],
+   "name": "Биомасса",
+   "owner": "выводок",
+   "source_row": 1310924
+  },
+  "larva": {
+   "cell": [
+    7,
+    2
+   ],
+   "name": "Личинка",
+   "owner": "выводок",
+   "source_row": 617184
+  },
+  "selection": {
+   "cell": [
+    8,
+    2
+   ],
+   "name": "Естественный отбор",
+   "owner": "выводок",
+   "source_row": 1364435
+  }
+ }
+}
