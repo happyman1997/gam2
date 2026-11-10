@@ -39,7 +39,33 @@ TARGETS = {
     "queen": dict(name="матка", spr=lambda: W.queen(0.0, "idle", k=1.0), push=2),
     "guard": dict(name="Страж", spr=lambda: HM.build("idle", 2.2), push=4),
     "colossus": dict(name="титан", spr=lambda: GH.colossus_build("idle", 3.5), push=0, body=lambda: body_only(GH.COLOSSUS, 3.5)),
+    # an ally for the Mechanic to mend: the Guard, smoking from a dented shield, then whole again
+    "patient": dict(name="Страж с пробитым щитом", spr=lambda: damaged_guard(2.2), after=lambda: HM.build("idle", 2.2),
+                    push=0, repair=True),
 }
+
+
+def damaged_guard(k):
+    """The Guard at rest with smoke and sparks coming from a hole in its shield."""
+    G = HM.guard_parts("idle")
+    for i, d in enumerate(((13.0, 24.0, -6.0), (12.0, 29.0, -5.0), (10.5, 34.5, -5.6), (9.0, 40.0, -6.2))):
+        G["fx"].ell(np.array(d), (2.0 + i * 1.0, 1.6 + i * 0.8, 1.9 + i * 0.9), GH.M_PUFF)
+    GH.sparks(G["fx"], np.array((14.0, 22.0, -6.0)), n=6, spread=2.2, seed=3, big=True)
+    w, h = int(82 * k), int(80 * k)
+    ox, oy = int(36 * k), int(72 * k)
+    spr = rim_light(render(G.model().scaled(k), w, h, ox, oy, **GH.STYLE1), col="#b8bcc6", k=0.55)
+    spr.ox, spr.oy = ox, oy
+    return spr
+
+
+def damaged(S, k):
+    """A golem in its idle pose with smoke and sparks coming out of a broken plate."""
+    G, info = GH.creature_parts(S, dict(S["poses"]["idle"], fx=None), fx=False)
+    X = info["X"]
+    for i, d in enumerate(((3.0, 31.0, 5.0), (2.0, 36.0, 6.0), (0.5, 41.5, 5.4), (-1.0, 47.0, 4.6))):
+        G["fx"].ell(X(d), (2.0 + i * 1.0, 1.6 + i * 0.8, 1.9 + i * 0.9), GH.M_PUFF)
+    GH.sparks(G["fx"], X((4.6, 29.0, 5.0)), n=6, spread=2.2, seed=3, big=True)
+    return golem_sprite(S)(G, k)
 
 
 def body_only(S, k):
@@ -52,7 +78,7 @@ def body_only(S, k):
     spr = render(G.model().scaled(k), int(cw * k), int(ch * k), int(cx * k), int(cy * k), **GH.STYLE1)
     spr.ox, spr.oy = int(cx * k), int(cy * k)
     return spr
-BAND_NAME = dict(low="сверху вниз", level="вровень", high="снизу вверх")
+BAND_NAME = dict(low="сверху вниз", level="вровень", high="снизу вверх", repair="ремонт")
 
 
 # ---------------------------------------------------------------- golems_h creatures: numbers between poses
@@ -199,6 +225,30 @@ def colossus_frame(A, ft, i):
     return AC.frame_parts(A, ft, 3 <= i <= 7, i)
 
 
+def meh_blend(A0, A1, s):
+    """Numbers between two of the Mechanic's poses, its two manipulators moving joint by joint."""
+    A = gblend(A0, A1, s, 0, ("n",))
+    for k in ("manip_n", "manip_f"):
+        A[k] = tuple(tuple(np.asarray(a, float) + (np.asarray(b, float) - np.asarray(a, float)) * s) for a, b in zip(A0[k], A1[k]))
+    A["gear_in_claw"] = A1.get("gear_in_claw") if s >= 0.5 else A0.get("gear_in_claw")
+    A["work"] = A1.get("work", A0.get("work"))
+    return A
+
+
+def meh_line():
+    """Idle, reaching in, the weld flickering on and off, the work done (the ally whole again), back."""
+    S = GH.MEH
+    I, X = dict(S["poses"]["idle"], fx=None), dict(S["poses"]["attack"], fx=True)
+    f = [(I, 420, None)]
+    for s in (1 / 3, 2 / 3):
+        f.append((meh_blend(I, X, ease_io(s)), 90, None))
+    for ft, dur in ((0.0, 160), (0.6, 110), (0.0, 120), (0.6, 110), (1.0, 300)):
+        f.append((X, dur, ft))
+    for s in (0.3, 0.6, 0.85):
+        f.append((meh_blend(X, I, ease_io(s)), 100, None))
+    return [(clean(S, A, ft), dur, ft) for A, dur, ft in f]
+
+
 ATTACKERS = {
     "Страж": dict(file="guard", frame=guard_frame, sprite=AN.sprite_of, strike=lambda info: info["face"],
                   check=lambda G: report(G, HM.ALLOWED, skip=("sparks", "fx")),
@@ -226,20 +276,22 @@ ATTACKERS = {
                    panels=[("low", "soldier", melee(LH.ZODCHIY, "low", "zodchiy", -1, ("n",))),
                            ("level", "queen", melee(LH.ZODCHIY, "level", "zodchiy", -1, ("n",))),
                            ("high", "guard", melee(LH.ZODCHIY, "high", "zodchiy", -1, ("n",)))]),
+    "Механик": dict(file="meh", S=GH.MEH, title="ремонт", sheet=False, strike=lambda info: GH.MEH["poses"]["attack"]["work"],
+                    panels=[("repair", "patient", meh_line)]),
     "Отец колосса": dict(file="colossus", S=GH.COLOSSUS, frame=colossus_frame,
                          panels=[("low", "soldier", colossus_line("low")), ("level", "guard", colossus_line("level"))]),
 }
 SCALE = {"Страж": 2.2, "Мудрец": 1.6, "Горн": 1.6, "Орудие": 1.6, "Маньяк": 1.3, "Каменщик": 0.85, "Отец колосса": 3.5,
-         "Изобретатель": 0.9, "Зодчий": 1.05}
+         "Изобретатель": 0.9, "Зодчий": 1.05, "Механик": 1.15}
 
 
 # ---------------------------------------------------------------- the duel scene
-def struck(spr, x, y, r, k=0.7):
-    """The target lit up where the blow lands (x, y: pixels in the sprite)."""
+def struck(spr, x, y, r, k=0.7, col=(245, 245, 245)):
+    """The target lit up where the blow lands (x, y: pixels in the sprite); a mended ally lights up green."""
     f = Sprite(spr.w, spr.h)
     yy, xx = np.mgrid[0:spr.h, 0:spr.w]
     w = np.clip(1.0 - np.hypot(xx - x, yy - y) / r, 0, 1)[..., None] * k
-    f.rgb, f.a = spr.rgb * (1 - w) + 245 * w, spr.a.copy()
+    f.rgb, f.a = spr.rgb * (1 - w) + np.array(col, float) * w, spr.a.copy()
     f.ox, f.oy = spr.ox, spr.oy
     return f
 
@@ -311,6 +363,8 @@ def panel(who, band, tname, line, BW=1000, BH=560):
     tx, ty = fx_ - bite - tgt.ox + cf, gy
     lx, ly = tgt.ox - (fx_ - tx), fy_ - ty + tgt.oy             # the struck spot in the target's own pixels
     bg = background(BW, BH)
+    done = next((i for i, (A, dur, ft) in enumerate(seq) if ft == 1.0), None)
+    whole = T["after"]() if T.get("after") else tgt
     scenes, durs = [], []
     for i, (A, dur, ft) in enumerate(seq):
         G, info = frame(A, ft, i)
@@ -321,7 +375,12 @@ def panel(who, band, tname, line, BW=1000, BH=560):
         sc = Scene(BW, BH)
         sc.rgb[:] = bg.rgb
         t, push = tgt, 0
-        if ft is not None:
+        if T.get("repair"):
+            if done is not None and i >= done:
+                t = whole
+                if i == done:
+                    t = struck(whole, lx, ly, 10 + 2.2 * np.sqrt(tgt.w), 0.55, col=(120, 255, 150))
+        elif ft is not None:
             t = struck(tgt, lx, ly, 6 + 2.2 * np.sqrt(tgt.w), 0.75 if ft == 0.0 else 0.3)
             push = T["push"] if ft == 1.0 else 0
         shadow(sc, tx + push - 0.1 * tgt.w, ty, 0.36 * tgt.w, 0.06 * tgt.w + 3)
@@ -356,7 +415,7 @@ def attacker_gif(who, SC=2):
     for i in range(n):
         img = Image.new("RGB", (Wd, Hh), (24, 18, 30))
         d = ImageDraw.Draw(img)
-        d.text((gap, 8), f"{who}: атака по росту цели", font=ft_, fill=(236, 214, 160))
+        d.text((gap, 8), f"{who}: {A_.get('title', 'атака по росту цели')}", font=ft_, fill=(236, 214, 160))
         x = gap
         for (frames, durs, label, i_hit), sw in zip(panels, slot):
             im = frames[i].resize((frames[i].width * SC, frames[i].height * SC), Image.NEAREST)
@@ -385,6 +444,8 @@ def sheet():
     cols = ("low", "level", "high")
     rows = []
     for who, A_ in ATTACKERS.items():
+        if not A_.get("sheet", True):
+            continue
         bands = [b for b, _, _ in A_["panels"]]
         rows.append((who, {b: (Image.open(out(f"bands/{A_['file']}_{b}.png")).convert("RGB"),
                                json.load(open(out(f"bands/{A_['file']}_{b}.json")))) for b in bands}))
