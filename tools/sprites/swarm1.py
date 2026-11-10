@@ -90,6 +90,9 @@ def genes_for(seed):
     return dict(gs=rng.uniform(0.85, 1.2), hsz=rng.uniform(0.88, 1.18), leg=rng.uniform(0.85, 1.2))
 
 
+_FEET = []                                  # feet of the body being built (evolutions hook onto them)
+
+
 def leg_pairs(m, mc, y0, xs, spread, length, lift, pose, skip=(), fore_lift=False):
     for side in (1, -1):
         band = 3 if side > 0 else 1
@@ -107,6 +110,7 @@ def leg_pairs(m, mc, y0, xs, spread, length, lift, pose, skip=(), fore_lift=Fals
             # a spine at the knee and a hooked claw at the foot
             m.limb([knee, knee + np.array((-0.9, 1.6, 0.5 * side))], 1, M_FANG, band=2)
             m.limb([foot, foot + np.array((0.9, -0.2, 0.3 * side))], 1, M_FANG, band=2)
+            _FEET.append(foot)
 
 
 def antennae(m, mc, a0, back=False, long=1.0):
@@ -205,10 +209,11 @@ def plan_scorpion(m, mc, g, pose, soldier):
     m.ell(hc, (2.2 * hs, 1.6 * hs, 2.4 * hs), mc)
     for z in (0.8, -0.8):
         m.ell(hc + (1.4, 0.8, z), (0.45, 0.45, 0.45), M_EYE)
-    # pincers
-    for z in (2.0, -2.0):
+    claws = []
+    for z in (2.0, -2.0):    # pincers
         a = hc + (0.5, -0.2, z)
         b = a + (4.0, 1.0, np.sign(z) * 1.8)
+        claws.append(b + (1.6, 0.3, 0))
         m.cyl(a, b, 0.8, mc, seg=5)
         m.ell(b + (1.6, 0.3, 0), (2.4, 1.4, 1.3), M_BONE)
         spike(m, b + (3.0, 0.9, 0), b + (5.6, 1.0, -np.sign(z) * 0.6), 0.6, M_FANG)
@@ -225,11 +230,14 @@ def plan_scorpion(m, mc, g, pose, soldier):
     tm.cyl(hook, hook + np.array((0.8, -2.6, 0)), 0.5, M_FANG, r1=0.06, seg=4)
     if pose == "attack":
         tm = pivot(tm, rot_z(-0.75), (-5.0, y0 + 1.4, 0))
+        p = np.array((-5.0, y0 + 1.4, 0))
+        bulb = rot_z(-0.75) @ (bulb - p) + p
     m.extend(tm)
     leg_pairs(m, mc, y0, ((-3.2, -3.0), (-1.4, -0.8), (0.4, 1.0), (1.8, 2.6)), 1.15, g["leg"] * 0.8, 0, pose)
     return dict(y0=y0, hc=hc, hs=hs, tip=np.array((-6, y0, 0)), gc=np.array((-2, y0, 0)), gr=2.2,
                 back=[(-3.5, y0 + 2.6), (-1.5, y0 + 2.8), (0.5, y0 + 2.6)], wing=np.array((-0.5, y0 + 2.6, 0)),
-                hind=np.array((-3.2, y0 - 0.6, 0)), fore=np.array((1.8, y0 + 0.2, 0)), length=14, has_stinger=True)
+                hind=np.array((-3.2, y0 - 0.6, 0)), fore=np.array((1.8, y0 + 0.2, 0)), length=14, has_stinger=True,
+                claws=claws, bulb=bulb)
 
 
 def plan_honeypot(m, mc, g, pose, soldier):
@@ -327,12 +335,19 @@ def plan_grasshopper(m, mc, g, pose, soldier):
     mandibles(m, mc, hc + (0, -1.2, 0), hs * 0.7, 0.3)
     antennae(m, mc, hc + (0.6, 2.4 * hs, 0), back=True, long=1.8)
     leg_pairs(m, mc, y0, ((0.4, 0.8), (2.2, 2.4)), 1.0, 0.85, 0, pose)
+    hind_legs = []
+    L = g.get("hind", 1.0)
     for side in (1, -1):    # the huge hind legs are the body plan here
         hip = np.array((-1.6, y0 - 0.4, 1.6 * side))
         if pose == "idle":
             knee, foot = np.array((-7.6, y0 + 11.0, 3.0 * side)), np.array((-11.6, 0.2, 3.8 * side))
         else:
             knee, foot = np.array((-7.5, y0 - 1.0, 2.8 * side)), np.array((-12.5, y0 - 5.5, 3.4 * side))
+        if L != 1.0:
+            knee = hip + (knee - hip) * L
+            foot = np.array((hip[0] + (foot[0] - hip[0]) * L, foot[1] if pose == "idle" else hip[1] + (foot[1] - hip[1]) * L,
+                             foot[2]))
+        hind_legs.append((knee, foot, side))
         m.cyl(hip, knee, 2.3, mc, r1=1.1, seg=6)
         m.ell(knee, (1.1, 1.1, 1.1), M_BONE)
         spike(m, knee, knee + np.array((-1.0, 2.4, 0)), 0.6, M_FANG)
@@ -342,7 +357,7 @@ def plan_grasshopper(m, mc, g, pose, soldier):
             spike(m, p, p + np.array((-1.0, 0.5, 0.3 * side)), 0.22, M_FANG)
     return dict(y0=y0, hc=hc, hs=hs, tip=gc + (-6.4 * gs, 0, 0), gc=gc, gr=2.2 * gs,
                 back=[(-8, y0 + 3.4), (-4, y0 + 3.6), (0, y0 + 4.2)], wing=np.array((0.8, y0 + 3.8, 0)),
-                hind=None, fore=np.array((2.2, y0 + 0.4, 0)), length=17, has_jumper=True)
+                hind=None, fore=np.array((2.2, y0 + 0.4, 0)), length=17, has_jumper=True, hind_legs=hind_legs)
 
 
 def plan_mantis(m, mc, g, pose, soldier):
@@ -361,12 +376,14 @@ def plan_mantis(m, mc, g, pose, soldier):
     for z in (2.2, -2.2):
         m.ell(hc + (-0.4, 0.9 * hs, z * hs), (0.7, 0.7, 0.7), M_EYE)
     antennae(m, mc, hc + (0.2, 1.0, 0), long=1.1)
+    scythes = []
     for side in (1, -1):    # raptorial forelegs
         base = neck_top + (-1.0, -2.6, 1.0 * side)
         if pose == "idle":
             elbow, tip = base + (3.2, 2.6, 0.6 * side), base + (4.4, -5.6, 0.8 * side)
         else:
             elbow, tip = base + (4.2, 3.6, 0.6 * side), base + (11.0, 0.8, 0.8 * side)
+        scythes.append((elbow, tip, side))
         m.cyl(base, elbow, 1.0, jade, seg=5)
         m.cyl(elbow, tip, 1.3, M_BONE, r1=0.12, seg=4)
         for f in (0.25, 0.45, 0.65, 0.82):
@@ -375,7 +392,7 @@ def plan_mantis(m, mc, g, pose, soldier):
     leg_pairs(m, mc, y0, ((-2.6, -3.6), (-0.6, 1.8)), 1.2, 1.25, 0, pose)
     return dict(y0=y0, hc=hc, hs=hs, tip=gc + (-5.8 * gs, -0.4, 0), gc=gc, gr=2.3 * gs,
                 back=[(-9, y0 + 3.0), (-6, y0 + 3.2), (-3, y0 + 3.0)], wing=np.array((-0.4, y0 + 2.4, 0)),
-                hind=np.array((-2.6, y0 - 0.6, 0)), fore=None, length=16, has_scythes=True)
+                hind=np.array((-2.6, y0 - 0.6, 0)), fore=None, length=16, has_scythes=True, scythes=scythes)
 
 
 def plan_firefly(m, mc, g, pose, soldier):
@@ -428,7 +445,7 @@ def add_parts(m, mc, a, traits, pose):
         r0 = a["wing"]
         for z in (-0.9, 0.9):
             s = np.sign(z)
-            mat = M_WING if z < 0 else M_WING_NEAR
+            mat = a.get("wing_far", M_WING) if z < 0 else a.get("wing_near", M_WING_NEAR)
             m.poly([r0 + (0.6, 0.2, z), r0 + (-15.5 * L, 2.9 + up, z + 7.5 * s), r0 + (-14.0 * L, 6.4 + up, z + 8.0 * s),
                     r0 + (-6.5 * L, 5.4 + up, z + 4.5 * s), r0 + (-0.6, 1.0, z + 0.4 * s)], mat)
             m.limb([r0 + (0.2, 0.4, z), r0 + (-14.6 * L, 4.4 + up, z + 7.6 * s)], 1, M_VEIN, band=2)
@@ -552,19 +569,29 @@ def menace(m, mc, a, pose):
         m.ell(mouth + (0.2, -1.6, 0), (0.3, 0.45, 0.3), M_ICHOR)
 
 
-def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=None):
-    """traits[0] decides the body plan; "ant" as the first trait keeps the ant body for detail traits."""
+def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=None, evo=()):
+    """traits[0] decides the body plan; "ant" as the first trait keeps the ant body for detail traits.
+    evo: the evolutions bought for this form (see swarm_evo), shown on every creature of the form."""
     traits = tuple(t for t in traits if t != "giant")
     g = genes or genes_for(int(abs(hue) * 1000) + 7 * len(traits))
     m = Model()
     primary = traits[0] if traits and traits[0] != "ant" else None
     mc = Mat(chitin(hue, primary))
     traits = tuple(t for t in traits if t != "ant")
+    if evo:
+        import swarm_evo
+        g, mc = swarm_evo.before(g, mc, primary, evo, hue)
+    _FEET.clear()
     a = PLAN_FN[primary](m, mc, g, pose, soldier)
+    a["feet"] = list(_FEET)
+    if evo:
+        swarm_evo.wings(a, evo)
     menace(m, mc, a, pose)
     add_parts(m, mc, a, traits, pose)
     if chimera:
         add_chimera(m, mc, a, chimera, pose)
+    if evo:
+        swarm_evo.add(m, mc, a, primary, evo, pose, g)
     hover = 6.0 if ("wings" in traits) else 0.0
     if primary == "wings":
         hover = 5.0
@@ -611,11 +638,11 @@ def rim_light(spr, col="#c0b0d0", k=0.65):
     return spr
 
 
-def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None):
+def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None, evo=()):
     """k multiplies the in-game scale (use >1 for close-up sheets)."""
     s = scale_for(size_of(traits, soldier)) * k
     w, h, ox, oy = int(64 * s), int(60 * s), int(30 * s), int(52 * s)
-    spr = rim_light(render(body(hue, traits, pose, soldier, genes, chimera).scaled(s), w, h, ox, oy, **STYLE1))
+    spr = rim_light(render(body(hue, traits, pose, soldier, genes, chimera, evo).scaled(s), w, h, ox, oy, **STYLE1))
     spr.ox, spr.oy = ox, oy
     return spr
 
