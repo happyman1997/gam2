@@ -1,0 +1,590 @@
+{
+ "source": "Angais/pixel-art-atlas-1.4m (CC0 1.0), reworked",
+ "icons": {
+  "tower": {
+   "cell": [
+    0,
+    0
+   ],
+   "name": "Ростовой щит",
+   "owner": "Страж",
+   "source_row": 1336617
+  },
+  "intercept": {
+   "cell": [
+    1,
+    0
+   ],
+   "name": "Перехват",
+   "owner": "Страж",
+   "source_row": 1280921
+  },
+  "anchor": {
+   "cell": [
+    2,
+    0
+   ],
+   "name": "Якорь",
+   "owner": "Страж",
+   "source_row": 840513
+  },
+  "plates": {
+   "cell": [
+    3,
+    0
+   ],
+   "name": "Броневые листы",
+   "owner": "Страж",
+   "source_row": 373358
+  },
+  "counter": {
+   "cell": [
+    4,
+    0
+   ],
+   "name": "Контрудар",
+   "owner": "Страж",
+   "source_row": 1069589
+  },
+  "hot": {
+   "cell": [
+    5,
+    0
+   ],
+   "name": "Раскалённая броня",
+   "owner": "Страж",
+   "source_row": 180692
+  },
+  "chain": {
+   "cell": [
+    6,
+    0
+   ],
+   "name": "Цепная молния",
+   "owner": "Мудрец",
+   "source_row": 1280220
+  },
+  "ground": {
+   "cell": [
+    7,
+    0
+   ],
+   "name": "Разряд в землю",
+   "owner": "Мудрец",
+   "source_row": 560255
+  },
+  "overload": {
+   "cell": [
+    8,
+    0
+   ],
+   "name": "Перегрузка",
+   "owner": "Мудрец",
+   "source_row": 1324122
+  },
+  "fireball": {
+   "cell": [
+    9,
+    0
+   ],
+   "name": "Огненный шар",
+   "owner": "Мудрец",
+   "source_row": 1408611
+  },
+  "firewall": {
+   "cell": [
+    0,
+    1
+   ],
+   "name": "Огненная стена",
+   "owner": "Мудрец",
+   "source_row": 768204
+  },
+  "blades": {
+   "cell": [
+    1,
+    1
+   ],
+   "name": "Раскалённые клинки",
+   "owner": "Мудрец",
+   "source_row": 311098
+  },
+  "magnet": {
+   "cell": [
+    2,
+    1
+   ],
+   "name": "Магнит",
+   "owner": "Горн",
+   "source_row": 1369490
+  },
+  "rod": {
+   "cell": [
+    3,
+    1
+   ],
+   "name": "Громоотвод",
+   "owner": "Горн",
+   "source_row": 430869
+  },
+  "smoke": {
+   "cell": [
+    4,
+    1
+   ],
+   "name": "Дымовая труба",
+   "owner": "Горн",
+   "source_row": 98669
+  },
+  "whistle": {
+   "cell": [
+    5,
+    1
+   ],
+   "name": "Паровой свисток",
+   "owner": "Горн",
+   "source_row": 163425
+  },
+  "maw": {
+   "cell": [
+    6,
+    1
+   ],
+   "name": "Пасть топки",
+   "owner": "Горн",
+   "source_row": 675320
+  },
+  "greedy": {
+   "cell": [
+    7,
+    1
+   ],
+   "name": "Жадная топка",
+   "owner": "Горн",
+   "source_row": 1317737
+  },
+  "mortar": {
+   "cell": [
+    8,
+    1
+   ],
+   "name": "Мортира",
+   "owner": "Орудие",
+   "source_row": 203268
+  },
+  "long": {
+   "cell": [
+    9,
+    1
+   ],
+   "name": "Длинный ствол",
+   "owner": "Орудие",
+   "source_row": 290083
+  },
+  "spider": {
+   "cell": [
+    0,
+    2
+   ],
+   "name": "Паучьи лапы",
+   "owner": "Орудие",
+   "source_row": 1313313
+  },
+  "canister": {
+   "cell": [
+    1,
+    2
+   ],
+   "name": "Картечь",
+   "owner": "Орудие",
+   "source_row": 1052381
+  },
+  "hotshot": {
+   "cell": [
+    2,
+    2
+   ],
+   "name": "Калёное ядро",
+   "owner": "Орудие",
+   "source_row": 968115
+  },
+  "bomb": {
+   "cell": [
+    3,
+    2
+   ],
+   "name": "Бомба с фитилём",
+   "owner": "Орудие",
+   "source_row": 379903
+  },
+  "repair": {
+   "cell": [
+    4,
+    2
+   ],
+   "name": "Ремонт",
+   "owner": "Механик",
+   "source_row": 1384031
+  },
+  "crane": {
+   "cell": [
+    5,
+    2
+   ],
+   "name": "Кран",
+   "owner": "Механик",
+   "source_row": 1189998
+  },
+  "spares": {
+   "cell": [
+    6,
+    2
+   ],
+   "name": "Запасные части",
+   "owner": "Механик",
+   "source_row": 1007341
+  },
+  "oiler": {
+   "cell": [
+    7,
+    2
+   ],
+   "name": "Маслёнка",
+   "owner": "Механик",
+   "source_row": 388968
+  },
+  "welding": {
+   "cell": [
+    8,
+    2
+   ],
+   "name": "Сварка",
+   "owner": "Механик",
+   "source_row": 222617
+  },
+  "oiltank": {
+   "cell": [
+    9,
+    2
+   ],
+   "name": "Масляный бак",
+   "owner": "Механик",
+   "source_row": 432090
+  },
+  "torch": {
+   "cell": [
+    0,
+    3
+   ],
+   "name": "Живой факел",
+   "owner": "любой",
+   "source_row": 1269828
+  },
+  "nozzles": {
+   "cell": [
+    1,
+    3
+   ],
+   "name": "Сопла",
+   "owner": "любой",
+   "source_row": 544628
+  },
+  "bounce": {
+   "cell": [
+    2,
+    3
+   ],
+   "name": "Скачущее ядро",
+   "owner": "любой",
+   "source_row": 34696
+  },
+  "whirl": {
+   "cell": [
+    3,
+    3
+   ],
+   "name": "Огненный смерч",
+   "owner": "любой",
+   "source_row": 1366504
+  },
+  "grapple": {
+   "cell": [
+    4,
+    3
+   ],
+   "name": "Крюк-кошка",
+   "owner": "любой",
+   "source_row": 1281104
+  },
+  "mill": {
+   "cell": [
+    5,
+    3
+   ],
+   "name": "Колёса-жернова",
+   "owner": "любой",
+   "source_row": 1060144
+  },
+  "dome": {
+   "cell": [
+    6,
+    3
+   ],
+   "name": "Щит-купол",
+   "owner": "любой",
+   "source_row": 695849
+  },
+  "bombcore": {
+   "cell": [
+    7,
+    3
+   ],
+   "name": "Котёл-бомба",
+   "owner": "любой",
+   "source_row": 954892
+  },
+  "ram": {
+   "cell": [
+    8,
+    3
+   ],
+   "name": "Таранный нос",
+   "owner": "любой",
+   "source_row": 889163
+  },
+  "buffer": {
+   "cell": [
+    9,
+    3
+   ],
+   "name": "Отбойник",
+   "owner": "любой",
+   "source_row": 377417
+  },
+  "spark": {
+   "cell": [
+    0,
+    4
+   ],
+   "name": "Искрящий молот",
+   "owner": "любой",
+   "source_row": 760966
+  },
+  "poker": {
+   "cell": [
+    1,
+    4
+   ],
+   "name": "Кочерга",
+   "owner": "любой",
+   "source_row": 890934
+  },
+  "tracks": {
+   "cell": [
+    2,
+    4
+   ],
+   "name": "Гусеницы",
+   "owner": "любой",
+   "source_row": 847591
+  },
+  "flail": {
+   "cell": [
+    3,
+    4
+   ],
+   "name": "Кистень",
+   "owner": "любой",
+   "source_row": 1210211
+  },
+  "cast": {
+   "cell": [
+    4,
+    4
+   ],
+   "name": "Литое ядро",
+   "owner": "ядро",
+   "source_row": 1279983
+  },
+  "fire": {
+   "cell": [
+    5,
+    4
+   ],
+   "name": "Огненное ядро",
+   "owner": "ядро",
+   "source_row": 434937
+  },
+  "volt": {
+   "cell": [
+    6,
+    4
+   ],
+   "name": "Грозовое ядро",
+   "owner": "ядро",
+   "source_row": 320464
+  },
+  "w_tower": {
+   "cell": [
+    7,
+    4
+   ],
+   "name": "Бойницы",
+   "owner": "Зодчий",
+   "source_row": 317666
+  },
+  "w_wall": {
+   "cell": [
+    8,
+    4
+   ],
+   "name": "Щит-стена",
+   "owner": "Зодчий",
+   "source_row": 1400503
+  },
+  "w_gate": {
+   "cell": [
+    9,
+    4
+   ],
+   "name": "Створки",
+   "owner": "Зодчий",
+   "source_row": 544292
+  },
+  "w_pitch": {
+   "cell": [
+    0,
+    5
+   ],
+   "name": "Смоляной котёл",
+   "owner": "Зодчий",
+   "source_row": 1295401
+  },
+  "w_press": {
+   "cell": [
+    1,
+    5
+   ],
+   "name": "Пресс",
+   "owner": "Зодчий",
+   "source_row": 717768
+  },
+  "w_thunder": {
+   "cell": [
+    2,
+    5
+   ],
+   "name": "Громовая вышка",
+   "owner": "Зодчий",
+   "source_row": 1178205
+  },
+  "w_boom": {
+   "cell": [
+    3,
+    5
+   ],
+   "name": "Подъёмная стрела",
+   "owner": "Зодчий",
+   "source_row": 836849
+  },
+  "w_forge": {
+   "cell": [
+    4,
+    5
+   ],
+   "name": "Полевая кузня",
+   "owner": "Зодчий",
+   "source_row": 990016
+  },
+  "c_saw": {
+   "cell": [
+    5,
+    5
+   ],
+   "name": "Ноги-пилы",
+   "owner": "Маньяк",
+   "source_row": 1383557
+  },
+  "c_catapult": {
+   "cell": [
+    6,
+    5
+   ],
+   "name": "Голова-катапульта",
+   "owner": "Маньяк",
+   "source_row": 1323877
+  },
+  "c_fist": {
+   "cell": [
+    7,
+    5
+   ],
+   "name": "Кулак на пружине",
+   "owner": "Маньяк",
+   "source_row": 1375967
+  },
+  "c_triple": {
+   "cell": [
+    8,
+    5
+   ],
+   "name": "Рука-рука-рука",
+   "owner": "Маньяк",
+   "source_row": 505863
+  },
+  "c_upside": {
+   "cell": [
+    9,
+    5
+   ],
+   "name": "Вверх ногами",
+   "owner": "Маньяк",
+   "source_row": 967709
+  },
+  "c_burning": {
+   "cell": [
+    0,
+    6
+   ],
+   "name": "Пылающая катапульта",
+   "owner": "Маньяк",
+   "source_row": 1193578
+  },
+  "c_salute": {
+   "cell": [
+    1,
+    6
+   ],
+   "name": "Салют",
+   "owner": "Маньяк",
+   "source_row": 503143
+  },
+  "a_coil": {
+   "cell": [
+    2,
+    6
+   ],
+   "name": "Грозовая катушка",
+   "owner": "Изобретатель",
+   "source_row": 482268
+  },
+  "a_mirror": {
+   "cell": [
+    3,
+    6
+   ],
+   "name": "Отражатель",
+   "owner": "Изобретатель",
+   "source_row": 1273695
+  },
+  "a_spring": {
+   "cell": [
+    4,
+    6
+   ],
+   "name": "Пружинный рывок",
+   "owner": "Изобретатель",
+   "source_row": 1099958
+  }
+ }
+}

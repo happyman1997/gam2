@@ -1,10 +1,11 @@
-"""Mock-up of the between-battles workshop: pick 1 of 3 modules, drop it on a golem, done."""
+"""Mock-up of the between-battles workshop: pick 1 of 3 modules, drop it on a golem, done. The golems wear the
+modules listed under them; the cards show the module icons (icons.py)."""
 from PIL import ImageFont
 from kit import *
-from r3d import Model, Mat, render
-import golem7 as G
 import frames as F
-from golem6 import STYLE1, M_BRONZE, M_STEEL, emissive
+import icons as IC
+import guard_modules as GM
+import frame_modules as FM
 from noise import value_noise
 from paths import font, out
 
@@ -13,48 +14,6 @@ WW, HH = 960, 540
 INK = (236, 226, 204)
 MUTED = (176, 166, 150)
 GOLD = (226, 186, 106)
-
-
-def crop(spr):
-    ys, xs = np.nonzero(spr.a)
-    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    c = Sprite(x1 - x0, y1 - y0)
-    c.rgb, c.a = spr.rgb[y0:y1, x0:x1].copy(), spr.a[y0:y1, x0:x1].copy()
-    c.emit = [(x - x0, y - y0, r, col, k) for (x, y, r, col, k) in spr.emit]
-    return c
-
-
-def icon(m, k):
-    return crop(render(m.scaled(k), 200, 200, 100, 150, **STYLE1))
-
-
-def painted(m, frame):
-    return F.repaint(m, M_BRONZE, Mat(F.PAINT[frame])) if frame else m
-
-
-def icon_barrel():          # Длинный ствол, a module of the Gun frame
-    m = Model()
-    G.tool_cannon(m, np.array((0, 0, 0.0)), None, "idle", "fire", 2)
-    return icon(painted(m, "Орудие"), 2.2)
-
-
-def icon_repair():          # Ремонт: a manipulator with a welding spark
-    m = Model()
-    Sp = np.array((0, 14, 0.0))
-    Hn = G.hand_target("claw", Sp, 1, "idle")
-    Hn, fd = G.draw_arm(m, Sp, Hn, "piston", 2, 1, "claw")
-    G.tool_claw(m, Hn, fd, "idle", "fire", 2)
-    m.ell(Hn + np.array((5.0, -2.5, 0)), (1.6, 1.6, 1.6), emissive("volt", 12, 0.9))
-    return icon(painted(m, "Механик"), 2.4)
-
-
-def icon_hook():            # Крюк-кошка: a rare module, fits any frame
-    m = Model()
-    Sp = np.array((0, 14, 0.0))
-    Hn = G.hand_target("claw", Sp, 1, "idle")
-    Hn, fd = G.draw_arm(m, Sp, Hn, "long", 2, 1, "claw")
-    G.tool_claw(m, Hn, fd, "idle", "fire", 3)
-    return icon(m, 2.4)
 
 
 def frame(sc, x0, y0, x1, y1, hi=False):
@@ -88,31 +47,39 @@ def build():
 
     frame(sc, 0, 0, WW, 30)
     # golems on pedestals
-    golems = [   # (frame, display scale, module chips)
-        ("Страж", 1.0, ["Ростовой щит II · Перехват I", "Броневые листы I", "литое ядро"]),
-        ("Мудрец", 1.15, ["Цепная молния I · Огненный шар I", "Перегрузка II", "грозовое ядро"]),
-        ("Орудие", 1.15, ["Мортира I · Картечь I", "свободная ячейка", "литое ядро"]),
-        ("Механик", 1.3, ["Ремонт I · Маслёнка I", "свободная ячейка", "литое ядро"]),
+    golems = [   # (frame, display scale, module chips, the modules it wears)
+        ("Страж", 1.0, ["Ростовой щит II · Перехват I", "Броневые листы I", "литое ядро"],
+         {"tower": 2, "intercept": 1, "plates": 1}),
+        ("Мудрец", 1.15, ["Цепная молния I · Огненный шар I", "Перегрузка II", "грозовое ядро"],
+         {"chain": 1, "fireball": 1, "overload": 2}),
+        ("Орудие", 1.15, ["Мортира I · Картечь I", "свободная ячейка", "литое ядро"],
+         {"mortar": 1, "canister": 1, "long": 1}),            # the preview: Длинный ствол already in place
+        ("Механик", 1.3, ["Ремонт I · Маслёнка I", "свободная ячейка", "литое ядро"],
+         {"repair": 1, "oiler": 1}),
     ]
     xs = [86, 228, 370, 514]
     base = 318
-    for i, (name, kk, _) in enumerate(golems):
+    for i, (name, kk, _, mods) in enumerate(golems):
         x = xs[i]
         hi = i == 2
         e = ((sc.xx - x) / 62) ** 2 + ((sc.yy - base) / 15) ** 2
         ring = (e <= 1) & (e > 0.8)
         sc.rgb[e <= 1] *= 0.7
         sc.rgb[ring] = sc.rgb[ring] * 0.4 + (hexc("#e2b968") if hi else hexc("#5a5a6a")) * 0.6
-        spr = F.build(name, "idle", k=F.FRAMES[name][0] * kk)
+        k = F.FRAMES[name][0] * kk
+        if name == "Страж":
+            spr = GM.build(list(mods), mods, k=k)
+        else:
+            spr = FM.build_multi(name, mods, k=k)
         sc.blit(spr, int(x - spr.ox), int(base - spr.oy))
     # reward cards
     frame(sc, 616, 40, 950, 74)
-    cards = [(icon_barrel(), True), (icon_repair(), False), (icon_hook(), False)]
+    cards = [(IC.icon("long", 5), True), (IC.icon("repair", 5), False), (IC.icon("grapple", 5), False)]
     ys = [84, 196, 308]
     for (ic, hi), y in zip(cards, ys):
         frame(sc, 616, y, 950, y + 102, hi)
         sc.rgb[y + 8:y + 94, 626:712] = hexc("#1e1828")
-        sc.blit(ic, 669 - ic.w // 2, y + 51 - ic.h // 2)
+        sc.blit(ic, 669 - ic.ox, y + 51 - ic.oy)
     # bottom bar
     frame(sc, 0, 440, WW, HH)
     for (x0, x1, hi) in ((16, 196, False), (210, 450, False), (464, 704, False), (784, 944, True)):
@@ -126,7 +93,7 @@ def overlay(img, golems, xs, base, ys):
     d.text((20, 12), "Мастерская · после боя 4 из 12", font=f(1, 24), fill=INK)
     t = "Металл: 14"
     d.text((WW * S - 24 - d.textlength(t, font=f(1, 22)), 14), t, font=f(1, 22), fill=GOLD)
-    for i, (name, _, chips) in enumerate(golems):
+    for i, (name, _, chips, _m) in enumerate(golems):
         cx = xs[i] * S
         d.text((cx - d.textlength(name, font=f(1, 20)) / 2, (base + 22) * S), name, font=f(1, 20), fill=INK)
         for j, line in enumerate(chips):

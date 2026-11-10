@@ -1108,6 +1108,26 @@ def parts(frame, key, t=1):
     return G, allow
 
 
+
+def parts_multi(frame, levels):
+    """A frame wearing several of its modules at once: {key: level}."""
+    so, A = {}, None
+    if "spider" in levels:
+        so["leg_fn"] = spider_leg_fn(2 if levels["spider"] < 3 else 3, armour=levels["spider"] >= 2)
+        Sx = GH.BY_NAME[frame]
+        L = Sx["poses"]["attack_level"]
+        A = dict(Sx["poses"]["idle"], fx=None, **{k: L[k] for k in ("hand_n", "hand_f", "pole_n", "pole_f", "ram_n", "ram_f")})
+    G, info, allow = golem(frame, A=A, **so)
+    for key, t in levels.items():
+        allow = allow + module(frame, key)[3](G, info, t)
+    return G, allow
+
+
+def build_multi(frame, levels, k=1.6):
+    G, _ = parts_multi(frame, levels)
+    return render_parts(G, frame, k)
+
+
 def check(frame, key, t=1):
     G, allow = parts(frame, key, t)
     return report(G, allow, skip=("fx",))
