@@ -1,4 +1,5 @@
-"""Mock-up of the swarm's between-battles screen: three clutches, one is chosen; biomass spending."""
+"""Mock-up of the swarm's between-battles screen: everything hatches, the swarm overflows its limit and the player
+eats the extra (new or old, one by one or a whole group) for biomass; biomass spending. Also the brood's finds."""
 from PIL import Image, ImageFont
 from kit import *
 import swarm1 as W
@@ -33,35 +34,41 @@ def put(sc, spr, cx, by, sw=0):
     sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
 
 
-# one offspring: (traits, soldier, chimera, hue, label, badge)
-CLUTCHES = [
-    dict(name="Линия жала", parents=((("stinger",), True, None, -0.1), (("ant",), False, None, 0.05)),
-         parents_txt="скорпион-солдат × муравей", hint="отбор: жало +",
-         kids=[(("stinger",), False, None, -0.08, "скорпион", None), (("stinger",), False, None, -0.03, "скорпион", None),
-               (("stinger",), True, None, -0.1, "скорпион-солдат", None), (("ant", "stinger"), False, None, 0.04, "муравей с жалом", None)]),
-    dict(name="Линия рога", parents=((("horn",), False, None, 0.12), (("wings",), False, None, -0.05)),
-         parents_txt="жук × оса", hint="отбор: рог +",
-         kids=[(("horn", "wings"), False, None, 0.1, "жук с крыльями", None), (("horn",), True, None, 0.12, "жук-солдат", None),
-               (("wings", "horn"), False, None, -0.04, "оса с рогом", None), (("horn", "giant"), False, None, 0.14, "жук", "гигант")]),
-    dict(name="Линия химер", parents=((("acid",), False, None, 0.02), (("ant",), True, "hand", -0.02)),
-         parents_txt="бочонок × муравей с рукой", hint="съели людей: чужие черты",
-         kids=[(("acid",), False, None, 0.03, "бочонок", None), (("acid",), False, "hand", 0.0, "бочонок с рукой", "химера"),
-               (("ant",), True, "hand", -0.03, "муравей с рукой", "химера"), (("scythes",), False, None, 0.06, "богомол", "новая форма")]),
+LIMIT = 45                       # the swarm's limit in points
+# the swarm after hatching, in groups: (traits, soldier, chimera, hue, name, count, new, badge, eat)
+GROUPS = [
+    ((), False, None, 0.05, "муравей", 19, 0, None, 4),
+    ((), True, None, 0.03, "муравей-солдат", 2, 0, None, 0),
+    (("wings",), False, None, -0.05, "оса", 3, 0, None, 0),
+    (("stinger",), False, None, -0.08, "скорпион", 5, 2, None, 0),
+    (("stinger",), True, None, -0.1, "скорпион-солдат", 2, 1, None, 0),
+    (("ant", "stinger"), False, None, 0.04, "муравей с жалом", 1, 1, None, 0),
+    (("horn",), True, None, 0.12, "жук-солдат", 2, 1, None, 0),
+    (("horn", "wings"), False, None, 0.1, "жук с крыльями", 1, 1, None, 0),
+    (("wings", "horn"), False, None, -0.04, "оса с рогом", 1, 1, None, 1),
+    (("carapace",), True, None, 0.0, "мокрица-солдат", 1, 0, None, 0),
+    (("acid",), False, "hand", 0.0, "бочонок с рукой", 1, 1, "химера", 0),
+    (("scythes",), False, None, 0.06, "богомол", 1, 1, "новая форма", 0),
 ]
 SELECTION = (("жало", 23, "stinger"), ("рог", 11, "horn"), ("кислота", 7, "acid"), ("серпы", 4, "scythes"))
-HINT_ICON = ["stinger", "horn", "hand"]
 KID_ICON = {"химера": "hand", "новая форма": "scythes"}
+GX0, GY0, GCW, GCH, GCOLS = 12, 92, 232, 100, 4
+
+
+def pts(g):
+    return 3 if g[1] else 1
+
+
+def totals():
+    total = sum(pts(g) * g[5] for g in GROUPS)
+    eaten = sum(pts(g) * g[8] for g in GROUPS)
+    return total, eaten
 
 
 def icon(img, key, x, y, px):
     """Paste a swarm icon (16×16, nearest) of px pixels with its top-left at (x, y)."""
     im = Image.fromarray(IC.icon_rgba(key, "swarm"), "RGBA").resize((px, px), Image.NEAREST)
     img.paste(im, (int(x), int(y)), im)
-
-
-def points(kid):
-    traits, soldier = kid[0], kid[1]
-    return (3 if soldier else 1) * (2 if "giant" in traits else 1)
 
 
 def build():
@@ -72,79 +79,100 @@ def build():
     for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
         sc.rgb[lv == i] = hexc(c)
     frame(sc, 0, 0, WW, 30)
-    for i, cl in enumerate(CLUTCHES):
-        x0 = 12 + i * 314
-        frame(sc, x0, 40, x0 + 302, 384, hi=(i == 0))
-        sc.glow(x0 + 151, 260, 120, hexc("#7ae040"), 0.10)
-        for (traits, soldier, chim, hue), px in zip(cl["parents"], (x0 + 92, x0 + 210)):
-            put(sc, W.build(traits, hue, "idle", soldier, k=1.15, chimera=chim), px, 128, 14)
-        for j, (traits, soldier, chim, hue, _, _) in enumerate(cl["kids"]):
-            cx = x0 + (82 if j % 2 == 0 else 222)
-            by = 236 if j < 2 else 330
-            sw = 16 if not soldier and "giant" not in traits else 22
-            put(sc, W.build(traits, hue, "idle", soldier, k=1.5, chimera=chim, genes=W.genes_for(i * 10 + j)), cx, by, sw)
-    frame(sc, 12, 394, 948, 432)
+    # the limit bar: the swarm in points, the limit, what is marked to be eaten
+    frame(sc, 12, 38, 948, 82)
+    total, eaten = totals()
+    bx0, bx1 = 300, 930
+    scale = (bx1 - bx0) / (total + 4)
+    y0, y1 = 64, 74
+    sc.rgb[y0:y1, bx0:bx1] = hexc("#2a2232")
+    sc.rgb[y0:y1, bx0:bx0 + int(LIMIT * scale)] = hexc("#4a8a36")
+    sc.rgb[y0:y1, bx0 + int(LIMIT * scale):bx0 + int(total * scale)] = hexc("#a83a2e")
+    hatch = ((sc.xx + sc.yy) % 4 < 2)[y0:y1, bx0 + int((total - eaten) * scale):bx0 + int(total * scale)]
+    seg = sc.rgb[y0:y1, bx0 + int((total - eaten) * scale):bx0 + int(total * scale)]
+    seg[hatch] = hexc("#e2b968") * 0.8                                    # marked to be eaten: hatched
+    sc.rgb[y0 - 4:y1 + 4, bx0 + int(LIMIT * scale)] = hexc("#f0e6c8")
+    # the groups
+    for k, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(GROUPS):
+        x0 = GX0 + (k % GCOLS) * (GCW + 2)
+        y0 = GY0 + (k // GCOLS) * (GCH + 4)
+        frame(sc, x0, y0, x0 + GCW, y0 + GCH, col="#c0503a" if eat else ("#6ac040" if new else None))
+        if eat:
+            sc.rgb[y0 + 1:y0 + GCH - 1, x0 + 1:x0 + GCW - 1] = hexc("#2a1218")
+        spr = W.build(traits, hue, "idle", soldier, k=1.3 if soldier else 1.7, chimera=chim, genes=W.genes_for(k * 7 + 3))
+        put(sc, spr, x0 + 52, y0 + GCH - 22, 14 if not soldier else 18)
+        if count > 1:                                  # a second one behind: it is a group
+            spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=1.05 if soldier else 1.35, chimera=chim, genes=W.genes_for(k * 7 + 4))
+            put(sc, spr2, x0 + 30, y0 + GCH - 40, 0)
+            sc.blit(spr, int(x0 + 52 - spr.ox), int(y0 + GCH - 22 - spr.oy))
+        for bx, col in ((x0 + GCW - 52, "#c0503a"), (x0 + GCW - 26, "#6c7083")):    # − and + buttons
+            frame(sc, bx, y0 + GCH - 28, bx + 20, y0 + GCH - 8, col=col)
+    frame(sc, 12, 404, 948, 440)
     for i, (_, kills, _) in enumerate(SELECTION):
         x = 250 + i * 176
-        sc.rgb[410:418, x + 70:x + 160] = hexc("#2a2232")
-        sc.rgb[410:418, x + 70:x + 70 + int(90 * kills / 23)] = hexc("#b04a3a") if i == 0 else hexc("#7a5a8a")
-    frame(sc, 0, 442, WW, HH)
+        sc.rgb[418:426, x + 70:x + 160] = hexc("#2a2232")
+        sc.rgb[418:426, x + 70:x + 70 + int(90 * kills / 23)] = hexc("#b04a3a") if i == 0 else hexc("#7a5a8a")
+    frame(sc, 0, 446, WW, HH)
     for (x0, x1) in ((12, 236), (246, 470), (480, 704), (714, 948)):
-        frame(sc, x0, 452, x1, 488, col="#6ac040")
-    for (x0, x1, hi) in ((12, 236, False), (246, 470, False), (714, 948, True)):
-        frame(sc, x0, 496, x1, 532, hi)
+        frame(sc, x0, 454, x1, 490, col="#6ac040")
+    for (x0, x1, hi) in ((12, 236, False), (246, 470, False), (714, 948, False)):
+        frame(sc, x0, 498, x1, 534, hi, col="#6c7083" if x0 == 714 else None)
     return sc
 
 
 def overlay(img):
     d = ImageDraw.Draw(img)
     f = lambda b, s: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s)
-    d.text((20, 12), "Выводок · после боя 5 из 14 · выбери одну кладку", font=f(1, 24), fill=INK)
-    t = "Биомасса 34   ·   Предел роя 41 / 45 очков"
+    total, eaten = totals()
+    over = total - LIMIT
+    d.text((20, 12), "Выводок · после боя 5 из 14 · вылупились все — съешь лишних", font=f(1, 24), fill=INK)
+    t = f"Биомасса 34  +{eaten} за съеденных"
     tx = WW * S - 24 - d.textlength(t, font=f(1, 21))
     d.text((tx, 15), t, font=f(1, 21), fill=BIO)
     icon(img, "biomass", tx - 40, 10, 34)
-    for i, cl in enumerate(CLUTCHES):
-        x0 = 12 + i * 314
-        cx = (x0 + 151) * S
-        d.text(((x0 + 12) * S, 48 * S), cl["name"], font=f(1, 22), fill=GOLD if i == 0 else INK)
-        pts = sum(points(k) for k in cl["kids"])
-        t = f"{len(cl['kids'])} особи · +{pts} очков"
-        d.text(((x0 + 290) * S - d.textlength(t, font=f(0, 16)), 52 * S), t, font=f(0, 16), fill=MUTED)
-        d.text((cx - d.textlength("×", font=f(1, 26)) / 2, 100 * S), "×", font=f(1, 26), fill=MUTED)
-        t = "родители: " + cl["parents_txt"]
-        d.text((cx - d.textlength(t, font=f(0, 15)) / 2, 138 * S), t, font=f(0, 15), fill=MUTED)
-        for j, (_, _, _, _, label, badge) in enumerate(cl["kids"]):
-            kx = (x0 + (82 if j % 2 == 0 else 222)) * S
-            ky = (242 if j < 2 else 336) * S
-            d.text((kx - d.textlength(label, font=f(0, 14)) / 2, ky), label, font=f(0, 14), fill=INK)
-            if badge:
-                bw = d.textlength(badge, font=f(1, 14))
-                dx = 14 if badge in KID_ICON else 0
-                d.text((kx - bw / 2 + dx, ky + 22), badge, font=f(1, 14), fill=BADGE[badge])
-                if dx:
-                    icon(img, KID_ICON[badge], kx - bw / 2 - 16, ky + 19, 26)
-        hw = d.textlength(cl["hint"], font=f(1, 15))
-        d.text((cx - hw / 2 + 16, 160 * S), cl["hint"], font=f(1, 15), fill=(150, 220, 120))
-        icon(img, HINT_ICON[i], cx - hw / 2 - 18, 160 * S - 6, 30)
-    icon(img, "selection", 34, 397 * S, 34)
-    d.text((74, 404 * S), "Естественный отбор — убийства по чертам:", font=f(1, 16), fill=INK)
+    d.text((28, 44 * S), f"Предел роя: {total} / {LIMIT} очков", font=f(1, 20), fill=(240, 140, 110))
+    d.text((28, 60 * S + 4), f"лишних {over} · отмечено к съедению {eaten} · осталось {over - eaten}", font=f(0, 16), fill=MUTED)
+    bx0, bx1 = 300, 930
+    scale = (bx1 - bx0) / (total + 4)
+    d.text(((bx0 + LIMIT * scale) * S - 20, 44 * S), "предел", font=f(0, 15), fill=INK)
+    for k, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(GROUPS):
+        x0 = (GX0 + (k % GCOLS) * (GCW + 2)) * S
+        y0 = (GY0 + (k // GCOLS) * (GCH + 4)) * S
+        d.text((x0 + 200, y0 + 14), name, font=f(1, 17), fill=INK)
+        d.text((x0 + 200, y0 + 42), f"×{count}", font=f(1, 26), fill=INK)
+        d.text((x0 + 262, y0 + 52), f"{pts(GROUPS[k]) * count} оч.", font=f(0, 15), fill=MUTED)
+        y = y0 + 88
+        if new:
+            d.text((x0 + 200, y), f"новых {new}", font=f(1, 15), fill=(150, 220, 120))
+            y += 22
+        if badge:
+            icon(img, KID_ICON[badge], x0 + 198, y - 4, 26)
+            d.text((x0 + 228, y), badge, font=f(1, 15), fill=BADGE[badge])
+            y += 22
+        if eat:
+            d.text((x0 + 200, y), f"съесть {eat}: +{eat * pts(GROUPS[k])} биомассы", font=f(1, 15), fill=(240, 120, 96))
+        bx = x0 + (GCW - 52) * S
+        by = y0 + (GCH - 28) * S
+        d.text((bx + 13, by - 2), "−", font=f(1, 26), fill=(240, 140, 110))
+        d.text((bx + 26 * S + 11, by - 2), "+", font=f(1, 26), fill=INK)
+    icon(img, "selection", 34, 405 * S, 34)
+    d.text((74, 412 * S), "Естественный отбор — убийства по чертам:", font=f(1, 16), fill=INK)
     for i, (name, kills, key) in enumerate(SELECTION):
         x = (250 + i * 176) * S
-        icon(img, key, x + 18, 397 * S, 34)
-        d.text((x + 58, 403 * S), name, font=f(0, 16), fill=INK)
-        d.text((x + 330, 403 * S), str(kills), font=f(1, 14), fill=MUTED)
+        icon(img, key, x + 18, 405 * S, 34)
+        d.text((x + 58, 411 * S), name, font=f(0, 16), fill=INK)
+        d.text((x + 330, 411 * S), str(kills), font=f(1, 14), fill=MUTED)
     spend = [(12, 236, "Кормление · 10: кладка +1", "feed"), (246, 470, "Эволюция формы · 15", "evolve"),
-             (480, 704, "Вторая кладка · 10", "clutch"), (714, 948, "Перебросить · 5", "reroll")]
+             (480, 704, "Ещё кладка · 10", "clutch"), (714, 948, "Перебросить · 5", "reroll")]
     for x0, x1, t, key in spend:
         tw = d.textlength(t, font=f(1, 17))
-        d.text(((x0 + x1) * S / 2 - tw / 2 + 20, 461 * S), t, font=f(1, 17), fill=BIO)
-        icon(img, key, (x0 + x1) * S / 2 - tw / 2 - 26, 455 * S, 40)
-    for x0, x1, t in ((12, 236, "Автовыбор"), (246, 470, "Пропустить · +10 биомассы"), (714, 948, "В бой")):
-        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 505 * S), t, font=f(1, 19),
-               fill=(250, 226, 160) if t == "В бой" else INK)
-    t = "Потомки сверх предела съедаются и дают биомассу."
-    d.text(((480 + 704) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 506 * S), t, font=f(0, 15), fill=MUTED)
+        d.text(((x0 + x1) * S / 2 - tw / 2 + 20, 463 * S), t, font=f(1, 17), fill=BIO)
+        icon(img, key, (x0 + x1) * S / 2 - tw / 2 - 26, 457 * S, 40)
+    for x0, x1, t, col in ((12, 236, "Автоотбор", INK), (246, 470, "Съесть всех новых", INK),
+                           (714, 948, f"В бой — съешь ещё {over - eaten}", MUTED)):
+        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 507 * S), t, font=f(1, 19), fill=col)
+    t = "Съеденное очко предела — биомасса."
+    d.text(((480 + 704) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 508 * S), t, font=f(0, 15), fill=MUTED)
 
 
 # ---------------------------------------------------------------- finds: the brood's other offers
