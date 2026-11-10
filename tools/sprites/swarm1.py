@@ -569,7 +569,7 @@ def menace(m, mc, a, pose):
         m.ell(mouth + (0.2, -1.6, 0), (0.3, 0.45, 0.3), M_ICHOR)
 
 
-def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=None, evo=()):
+def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=None, evo=(), rare=None):
     """traits[0] decides the body plan; "ant" as the first trait keeps the ant body for detail traits.
     evo: the evolutions bought for this form (see swarm_evo), shown on every creature of the form."""
     traits = tuple(t for t in traits if t != "giant")
@@ -592,6 +592,9 @@ def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=Non
         add_chimera(m, mc, a, chimera, pose)
     if evo:
         swarm_evo.add(m, mc, a, primary, evo, pose, g)
+    if rare:
+        import swarm_rare
+        swarm_rare.add(m, mc, a, rare, pose)
     hover = 6.0 if ("wings" in traits) else 0.0
     if primary == "wings":
         hover = 5.0
@@ -638,11 +641,11 @@ def rim_light(spr, col="#c0b0d0", k=0.65):
     return spr
 
 
-def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None, evo=()):
+def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None, evo=(), rare=None):
     """k multiplies the in-game scale (use >1 for close-up sheets)."""
     s = scale_for(size_of(traits, soldier)) * k
     w, h, ox, oy = int(64 * s), int(60 * s), int(30 * s), int(52 * s)
-    spr = rim_light(render(body(hue, traits, pose, soldier, genes, chimera, evo).scaled(s), w, h, ox, oy, **STYLE1))
+    spr = rim_light(render(body(hue, traits, pose, soldier, genes, chimera, evo, rare).scaled(s), w, h, ox, oy, **STYLE1))
     spr.ox, spr.oy = ox, oy
     return spr
 

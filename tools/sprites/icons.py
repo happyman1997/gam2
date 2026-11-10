@@ -185,6 +185,7 @@ SWARM_ICONS = {
     "biomass": (1310924, "Биомасса", "выводок", dict(red="crimson", brown="crimson", warm="membrane", grey="bone")),
     "larva": (617184, "Личинка", "выводок", dict(brown="grub", warm="grub", red="grub", grey="grub")),
     "selection": (1364435, "Естественный отбор", "выводок", dict(grey="bone", brown="chitin", warm="bone")),
+    "fear": (929257, "Страх", "бой", dict(warm="bone", blue="phero", red="crimson", grey="chitin")),
 }
 SETS = {"module": (ICONS, ASSET, INDEX), "swarm": (SWARM_ICONS, SW_ASSET, SW_INDEX)}
 
