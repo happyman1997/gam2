@@ -59,6 +59,20 @@ def clutch(stage=0):
     return m
 
 
+def egg_hatching():
+    """One egg, cracked, a larva's head out."""
+    m = Model()
+    c = np.array((0.0, 1.9, 0.0))
+    m.ell(c - (0, 0.8, 0), (2.3, 1.0, 1.9), W.M_EGG)
+    for a in np.linspace(0, 2 * np.pi, 8)[:-1]:
+        p = c + np.array((np.cos(a) * 2.0, 0.1, np.sin(a) * 1.6))
+        W.spike(m, p, p + np.array((np.cos(a) * 0.5, 1.2, np.sin(a) * 0.3)), 0.45, W.M_EGG)
+    lv = SL.larva("attack").transformed(rot_z(1.1), (0, 0, 0)).scaled(0.8).transformed(I3, c + (0.6, -0.4, 0))
+    m.extend(lv)
+    m.ell((0.4, 0.1, 0.4), (3.6, 0.15, 2.6), SL.M_EGG_IN)
+    return m
+
+
 def thread(sc, a, b, col=PHERO, sag=10.0, k=0.9):
     """A pheromone thread: a sagging dotted line with a faint glow along it."""
     a, b = np.array(a, float), np.array(b, float)
@@ -133,7 +147,7 @@ def sheet():
     # ---- Матка: laying
     y0 = Y0
     by = y0 + RH - 44
-    heads.append((y0, "Матка", "Кладка — каждые 3 хода", "развитие: кладка чаще, +1 личинка или +1 к размеру", 0))
+    heads.append((y0, "Матка", "Кладка и Сердце роя", "развитие: кладка чаще, +1 личинка или +1 к размеру (гнездо на 3 клетки)", 0))
     put(sc, SL.build("Матка", "idle", k), 190, by, 95)
     eg = render_small(clutch(0), k * 1.9)
     sc.blit(eg, 300 - eg.ox, by - eg.oy)
@@ -146,12 +160,16 @@ def sheet():
         put(sc, SL.build("личинка", "attack", k), 600 + dx, by, 10)
     gol = flip(F.build("Орудие", "idle", k=1.6 * k))
     put(sc, gol, 700, by, 34)
-    caps.append((620, by + 10, "две личинки со следующего раунда бьются"))
+    caps.append((610, by + 10, "бьются; дожившие уйдут в выводок"))
+    import swarm_effects as E                          # the heart of the swarm: one of hers falls near her, an egg
+    put(sc, E.lit(W.build((), 0.0, "idle", False, k=k, genes=W.genes_for(44)), (30, 20, 20), 0.65), 836, by + 2, 0)
+    put(sc, render_small(egg_hatching(), k * 1.9), 880, by + 2, 10)
+    caps.append((866, by + 10, "Сердце роя: погибшая у Матки — яйцо"))
 
     # ---- Разум улья: one mind and the mark
     y0 += RH
     by = y0 + RH - 44
-    heads.append((y0, "Разум улья", "Единый разум и Метка", "развитие: две метки, метка каждый ход или +1 к удару", 1))
+    heads.append((y0, "Разум улья", "Пси: Единый разум, Метка, Захват разума", "развитие: две метки, пси-удар на 4 клетки или +1 пси от Метки", 1))
     rz = SL.build("Разум улья", "idle", k)
     put(sc, rz, 120, by, 36)
     bugs = [((), False, 230, by - 40), (("wings",), False, 260, by - 4), (("stinger",), True, 205, by + 2),
@@ -170,7 +188,17 @@ def sheet():
         put(sc, W.build(traits, -0.05, "attack", soldier=sold, k=k), x, by + (0 if sold else -2), 10)
     for x in (600, 640, 572):
         thread(sc, (x + 6, by - 24), (700, by - 70), sag=10, k=0.6)
-    caps.append((660, by + 10, "Метка: рой бьёт её первым и на 1 сильнее"))
+    for t in np.linspace(0, 1, 120):                    # the psionic blow: a wave from the brain to the mark, through armour
+        x = 140 + (700 - 140) * t
+        y = by - 44 + (by - 70 - (by - 44)) * t + np.sin(t * 40) * 4
+        if int(t * 120) % 3:
+            sc.rgb[int(y), int(x)] = sc.rgb[int(y), int(x)] * 0.2 + hexc("#c8a0ff") * 0.8
+    sc.glow(700, by - 70, 24, hexc("#b070ff"), 0.6)
+    caps.append((640, by + 10, "Метка и пси-удар: мимо брони"))
+    cap_ = flip(E.lit(GH.build(LH.INVENTOR, "attack", 0.9 * k), (176, 112, 255), 0.35))   # a captured mind turns on its own
+    put(sc, cap_, 812, by, 14)
+    sigil(sc, 806, by - 64, 6)
+    caps.append((830, by + 10, "Захват разума: бьёт своих"))
 
     # ---- Пожиратель: growing
     y0 += RH
@@ -193,26 +221,28 @@ def sheet():
     # ---- Кукушка: the egg-layer and the changeling
     y0 += RH
     by = y0 + RH - 44
-    heads.append((y0, "Кукушка", "Яйцеклад и Подкидыш", "развитие: личинок 3, заражает и яд скорпионов, или подкидышей двое", 3))
+    heads.append((y0, "Кукушка", "Длинный яйцеклад, дети хозяина, Подкидыш", "развитие: личинок 3, заражает и яд скорпионов, или подкидышей двое", 3))
     ku = SL.build("Кукушка", "attack", k)
-    put(sc, ku, 95, by, 24)
+    put(sc, ku, 70, by, 24)
+    put(sc, W.build((), 0.02, "attack", False, k=k, genes=W.genes_for(12)), 118, by + 2, 8)      # its own, in front of it
     inv = flip(GH.build(LH.INVENTOR, "idle", 0.9 * k))
-    put(sc, inv, 142, by, 14)
-    spots(sc, 140, by - 30, [(0, 0), (-3, 6), (2, 12), (-1, -8)])
-    caps.append((130, by + 10, "пробивший удар заражает"))
+    put(sc, inv, 150, by, 14)
+    spots(sc, 148, by - 30, [(0, 0), (-3, 6), (2, 12), (-1, -8)])
+    caps.append((112, by + 10, "бьёт через клетку и заражает"))
     dead = flip(GH.build(LH.INVENTOR, "broken", 0.9 * k))
     put(sc, dead, 330, by, 16)
     splat(sc, 330, by + 2, 26)
     for dx in (-30, 30):
-        put(sc, flip(SL.build("личинка", "attack", k)) if dx > 0 else SL.build("личинка", "attack", k), 330 + dx, by + 2, 8)
-    caps.append((330, by + 10, "погиб — выпускает 2 личинки"))
+        put(sc, flip(SL.build("личинка", "attack", k, host="hand")) if dx > 0 else SL.build("личинка", "attack", k, host="hand"),
+            330 + dx, by + 2, 8)
+    caps.append((330, by + 10, "погиб — 2 личинки с его рукой"))
     gx = 548                                           # a machine is a nest: eggs ripen in the warmth of its furnace
     put(sc, flip(F.build("Орудие", "idle", k=1.6 * k)), gx, by, 30)
     spots(sc, gx - 6, by - 64, [(0, 0), (-8, 6), (6, 10), (-2, 18), (10, -4)])
-    put(sc, flip(SL.build("личинка", "attack", k)), gx - 22, by - 58, 0)
-    put(sc, SL.build("личинка", "attack", k), gx - 64, by + 2, 8)
-    put(sc, flip(SL.build("личинка", "idle", k)), gx + 40, by + 4, 8)
-    caps.append((gx - 20, by + 10, "в машине — гнездо: личинки лезут из решёток"))
+    put(sc, flip(SL.build("личинка", "attack", k, host="iron")), gx - 22, by - 58, 0)
+    put(sc, SL.build("личинка", "attack", k, host="iron"), gx - 64, by + 2, 8)
+    put(sc, flip(SL.build("личинка", "idle", k, host="iron")), gx + 40, by + 4, 8)
+    caps.append((gx - 20, by + 10, "машина — гнездо: личинки в железе"))
     for g, x in (("Страж", 700), ("Мудрец", 770)):
         put(sc, flip(F.build(g, "idle", k=F.FRAMES[g][0] * k * 0.8)), x, by, 30)
     splat(sc, 870, by + 2, 16, col=hexc("#6a5038"), k=0.8)
