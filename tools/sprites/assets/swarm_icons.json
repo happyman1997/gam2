@@ -514,59 +514,410 @@
    "owner": "эволюция",
    "source_row": 434562
   },
-  "rare_alarm": {
+  "m_spinner": {
    "cell": [
     7,
     5
    ],
-   "name": "Тревога",
-   "owner": "редкая черта",
-   "source_row": 198672
+   "name": "Прядильные железы",
+   "owner": "общий пул",
+   "source_row": 420375
   },
-  "rare_spinner": {
+  "m_exploder": {
    "cell": [
     8,
     5
    ],
-   "name": "Прядильные железы",
-   "owner": "редкая черта",
-   "source_row": 420375
+   "name": "Взрывной муравей",
+   "owner": "общий пул",
+   "source_row": 1320474
   },
-  "rare_exploder": {
+  "m_bolas": {
    "cell": [
     9,
     5
    ],
-   "name": "Взрывной муравей",
-   "owner": "редкая черта",
-   "source_row": 1320474
+   "name": "Болас",
+   "owner": "общий пул",
+   "source_row": 1089911
   },
-  "rare_vivi": {
+  "m_beeball": {
    "cell": [
     0,
     6
    ],
-   "name": "Живородящая",
-   "owner": "редкая черта",
-   "source_row": 569154
+   "name": "Пчелиный шар",
+   "owner": "общий пул",
+   "source_row": 687208
   },
-  "rare_strider": {
+  "m_pupa": {
    "cell": [
     1,
     6
    ],
-   "name": "Стрекот",
-   "owner": "редкая черта",
-   "source_row": 658377
+   "name": "Куколка",
+   "owner": "общий пул",
+   "source_row": 581358
   },
-  "rare_bud": {
+  "m_midge": {
    "cell": [
     2,
     6
    ],
+   "name": "Мошкара",
+   "owner": "общий пул",
+   "source_row": 1063365
+  },
+  "m_honey": {
+   "cell": [
+    3,
+    6
+   ],
+   "name": "Медовая бочка",
+   "owner": "общий пул",
+   "source_row": 1027171
+  },
+  "m_blister": {
+   "cell": [
+    4,
+    6
+   ],
+   "name": "Нарывник",
+   "owner": "общий пул",
+   "source_row": 731424
+  },
+  "m_cutters": {
+   "cell": [
+    5,
+    6
+   ],
+   "name": "Кусачки",
+   "owner": "общий пул",
+   "source_row": 742632
+  },
+  "m_guard": {
+   "cell": [
+    6,
+    6
+   ],
+   "name": "Стража лидера",
+   "owner": "общий пул",
+   "source_row": 1336617
+  },
+  "m_regen": {
+   "cell": [
+    7,
+    6
+   ],
+   "name": "Живучая",
+   "owner": "общий пул",
+   "source_row": 608641
+  },
+  "m_nest": {
+   "cell": [
+    8,
+    6
+   ],
+   "name": "Малое гнездо",
+   "owner": "Матка",
+   "source_row": 426120
+  },
+  "m_nurse": {
+   "cell": [
+    9,
+    6
+   ],
+   "name": "Кормилица",
+   "owner": "Матка",
+   "source_row": 1114675
+  },
+  "m_vivi": {
+   "cell": [
+    0,
+    7
+   ],
+   "name": "Живородящая",
+   "owner": "Матка",
+   "source_row": 569154
+  },
+  "m_bud": {
+   "cell": [
+    1,
+    7
+   ],
    "name": "Почкование",
-   "owner": "редкая черта",
+   "owner": "Матка",
    "source_row": 59838
+  },
+  "m_dominant": {
+   "cell": [
+    2,
+    7
+   ],
+   "name": "Доминантная линия",
+   "owner": "Матка",
+   "source_row": 1321919
+  },
+  "m_flight": {
+   "cell": [
+    3,
+    7
+   ],
+   "name": "Брачный полёт",
+   "owner": "Матка",
+   "source_row": 823556
+  },
+  "m_hybrid": {
+   "cell": [
+    4,
+    7
+   ],
+   "name": "Гибрид",
+   "owner": "Матка",
+   "source_row": 697886
+  },
+  "m_heir": {
+   "cell": [
+    5,
+    7
+   ],
+   "name": "Наследница",
+   "owner": "Матка",
+   "source_row": 934737
+  },
+  "m_psi_gland": {
+   "cell": [
+    6,
+    7
+   ],
+   "name": "Пси-железа",
+   "owner": "Разум улья",
+   "source_row": 1386217
+  },
+  "m_psi_reson": {
+   "cell": [
+    7,
+    7
+   ],
+   "name": "Резонатор",
+   "owner": "Разум улья",
+   "source_row": 577641
+  },
+  "m_psi_dread": {
+   "cell": [
+    8,
+    7
+   ],
+   "name": "Чутьё на страх",
+   "owner": "Разум улья",
+   "source_row": 731518
+  },
+  "m_psi_whisper": {
+   "cell": [
+    9,
+    7
+   ],
+   "name": "Жуткий шёпот",
+   "owner": "Разум улья",
+   "source_row": 90008
+  },
+  "m_strider": {
+   "cell": [
+    0,
+    8
+   ],
+   "name": "Стрекот",
+   "owner": "Разум улья",
+   "source_row": 658377
+  },
+  "m_psi_echo": {
+   "cell": [
+    1,
+    8
+   ],
+   "name": "Эхо крика",
+   "owner": "Разум улья",
+   "source_row": 938397
+  },
+  "m_psi_last": {
+   "cell": [
+    2,
+    8
+   ],
+   "name": "Последняя воля",
+   "owner": "Разум улья",
+   "source_row": 1389787
+  },
+  "m_psi_leash": {
+   "cell": [
+    3,
+    8
+   ],
+   "name": "Пси-поводок",
+   "owner": "Разум улья",
+   "source_row": 804313
+  },
+  "m_psi_relay": {
+   "cell": [
+    4,
+    8
+   ],
+   "name": "Ретранслятор",
+   "owner": "Разум улья",
+   "source_row": 824543
+  },
+  "m_sated": {
+   "cell": [
+    5,
+    8
+   ],
+   "name": "Сытная",
+   "owner": "Пожиратель",
+   "source_row": 109728
+  },
+  "m_bait": {
+   "cell": [
+    6,
+    8
+   ],
+   "name": "Приманка",
+   "owner": "Пожиратель",
+   "source_row": 869845
+  },
+  "m_fattened": {
+   "cell": [
+    7,
+    8
+   ],
+   "name": "Откормленная",
+   "owner": "Пожиратель",
+   "source_row": 380143
+  },
+  "m_frenzy": {
+   "cell": [
+    8,
+    8
+   ],
+   "name": "Кормовое безумие",
+   "owner": "Пожиратель",
+   "source_row": 896038
+  },
+  "m_table": {
+   "cell": [
+    9,
+    8
+   ],
+   "name": "За столом",
+   "owner": "Пожиратель",
+   "source_row": 1274202
+  },
+  "m_hungry": {
+   "cell": [
+    0,
+    9
+   ],
+   "name": "Голодная",
+   "owner": "Пожиратель",
+   "source_row": 1238985
+  },
+  "m_devblood": {
+   "cell": [
+    1,
+    9
+   ],
+   "name": "Кровь Пожирателя",
+   "owner": "Пожиратель",
+   "source_row": 890211
+  },
+  "m_essence": {
+   "cell": [
+    2,
+    9
+   ],
+   "name": "Питательная суть",
+   "owner": "Пожиратель",
+   "source_row": 717747
+  },
+  "m_parasitoid": {
+   "cell": [
+    3,
+    9
+   ],
+   "name": "Паразитоид",
+   "owner": "Кукушка",
+   "source_row": 862234
+  },
+  "m_bloodeggs": {
+   "cell": [
+    4,
+    9
+   ],
+   "name": "Яйца в крови",
+   "owner": "Кукушка",
+   "source_row": 763338
+  },
+  "m_spores": {
+   "cell": [
+    5,
+    9
+   ],
+   "name": "Споры",
+   "owner": "Кукушка",
+   "source_row": 1036721
+  },
+  "m_call": {
+   "cell": [
+    6,
+    9
+   ],
+   "name": "Зов кладки",
+   "owner": "Кукушка",
+   "source_row": 1200904
+  },
+  "m_bodyguard": {
+   "cell": [
+    7,
+    9
+   ],
+   "name": "Телохранитель",
+   "owner": "Кукушка",
+   "source_row": 874853
+  },
+  "m_gnaw": {
+   "cell": [
+    8,
+    9
+   ],
+   "name": "Прожорливая кладка",
+   "owner": "Кукушка",
+   "source_row": 1348304
+  },
+  "m_mutagen": {
+   "cell": [
+    9,
+    9
+   ],
+   "name": "Мутагенная кладка",
+   "owner": "Кукушка",
+   "source_row": 1336294
+  },
+  "m_unstable": {
+   "cell": [
+    0,
+    10
+   ],
+   "name": "Нестабильная",
+   "owner": "Кукушка",
+   "source_row": 467654
+  },
+  "m_royal": {
+   "cell": [
+    1,
+    10
+   ],
+   "name": "Королевская кладка",
+   "owner": "Кукушка",
+   "source_row": 160836
   }
  }
 }

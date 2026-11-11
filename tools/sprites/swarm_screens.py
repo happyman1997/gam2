@@ -111,7 +111,7 @@ DETAILS = [("wings", "Крылья", "Перепархивает: проходи
            ("acid", "Кислотная железа", "раз за бой плевок, −1 брони"), ("horn", "Рог", "первый удар +2, дробящий"),
            ("carapace", "Панцирь", "шипы на спине: 1 колющего в ответ"), ("jumper", "Прыгучие ноги", "+2 к скорости в первом раунде"),
            ("scythes", "Серпы", "инициатива +2"), ("firefly", "Светлячок", "раз за бой вспышка")]
-RARES_MET = [("alarm", "Тревога"), ("vivi", "Живородящая")]
+MUTS_MET = [("spinner", "Прядильные железы"), ("nest", "Малое гнездо")]
 PICK = 3                                     # «Рог»
 
 
@@ -124,11 +124,11 @@ def camp_screen():
         frame(sc, 20, y0, 278, y0 + 54, hi=(i == 0))
         put(sc, W.build(traits, 0.03, "idle", soldier, k=1.15 if soldier else 1.4, genes=W.genes_for(70 + i)), 58, y0 + 46, 12)
     frame(sc, 296, 40, 652, 446)
-    keys = [d[0] for d in DETAILS] + ["rare_" + r[0] for r in RARES_MET] + ["giant", "chimera"]
+    keys = [d[0] for d in DETAILS] + ["m_" + r[0] for r in MUTS_MET] + ["giant", "chimera"]
     for k, key in enumerate(keys):
         x0, y0 = 306 + (k % 4) * 86, 92 + (k // 4) * 100
         locked = key in ("giant", "chimera")
-        frame(sc, x0, y0, x0 + 80, y0 + 92, hi=(k == PICK), col="#3a3446" if locked else ("#c08a3a" if key.startswith("rare_") else None))
+        frame(sc, x0, y0, x0 + 80, y0 + 92, hi=(k == PICK), col="#3a3446" if locked else ("#c08a3a" if key.startswith("m_") else None))
         if locked:
             sc.rgb[y0 + 1:y0 + 91, x0 + 1:x0 + 79] = hexc("#120e16")
     frame(sc, 662, 40, 948, 446)
@@ -148,20 +148,20 @@ def camp_screen():
         d.text((104 * S, y0 + 12), name, font=f(1, 17), fill=INK)
         d.text((104 * S, y0 + 40), f"×{n}", font=f(0, 15), fill=MUTED)
     d.text((310 * S, 50 * S), "Какая черта", font=f(1, 19), fill=GOLD)
-    d.text((310 * S, 50 * S + 32), "деталь любой черты или редкая, уже встреченная в походе", font=f(0, 14), fill=MUTED)
+    d.text((310 * S, 50 * S + 32), "деталь любой черты или мутация — общая или Матки, — уже встреченная", font=f(0, 14), fill=MUTED)
     names = {d_[0]: d_[1] for d_ in DETAILS}
-    names.update({"rare_" + r[0]: r[1] for r in RARES_MET})
+    names.update({"m_" + r[0]: r[1] for r in MUTS_MET})
     names.update(giant="гигантизм", chimera="чужая черта")
     for k, key in enumerate(keys):
         x0, y0 = (306 + (k % 4) * 86) * S, (92 + (k // 4) * 100) * S
         locked = key in ("giant", "chimera")
         if not locked:
-            icon(img, key if not key.startswith("rare_") else key, x0 + 48, y0 + 16, 64)
+            icon(img, key if not key.startswith("m_") else key, x0 + 48, y0 + 16, 64)
         nm = names[key]
         lines = wrap(d, nm, f(1, 14), 76 * S)
         for n_, ln in enumerate(lines):
             d.text((x0 + 80 * S / 2 - d.textlength(ln, font=f(1, 14)) / 2, y0 + 112 + n_ * 18), ln, font=f(1, 14),
-                   fill=(110, 100, 120) if locked else (INK if not key.startswith("rare_") else GOLD))
+                   fill=(110, 100, 120) if locked else (INK if not key.startswith("m_") else GOLD))
         if locked:
             d.text((x0 + 80 * S / 2 - d.textlength("только", font=f(0, 13)) / 2, y0 + 40), "только", font=f(0, 13), fill=(110, 100, 120))
             d.text((x0 + 80 * S / 2 - d.textlength("в выводке", font=f(0, 13)) / 2, y0 + 60), "в выводке", font=f(0, 13), fill=(110, 100, 120))

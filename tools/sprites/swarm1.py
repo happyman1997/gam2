@@ -593,8 +593,8 @@ def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=Non
     if evo:
         swarm_evo.add(m, mc, a, primary, evo, pose, g)
     if rare:
-        import swarm_rare
-        swarm_rare.add(m, mc, a, rare, pose)
+        import swarm_mut
+        swarm_mut.add(m, mc, a, rare, pose)
     hover = 6.0 if ("wings" in traits) else 0.0
     if primary == "wings":
         hover = 5.0
