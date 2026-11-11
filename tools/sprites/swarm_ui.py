@@ -246,36 +246,91 @@ def cell(sc, x0, y0, x1, y1, state="normal", col=None):
         sc.rgb[halo & (th < 0.6)] = sc.rgb[halo & (th < 0.6)] * 0.4 + hexc(hi) * 0.6
 
 
-def button(sc, x0, y0, x1, y1, kind="amber"):
-    """A resin drop pressed into a long hexagon: pointed ends, lit from the top, bubbles caught inside, a shine streak."""
-    ramp_, shine, _ = BUTTON[kind]
-    h = y1 - y0
-    cy = (y0 + y1) / 2
-    X, Y = sc.xx, sc.yy
-    pt = h * 0.5
-    m = (Y >= y0) & (Y < y1) & (X >= x0) & (X < x1)
-    m &= (X - x0) >= np.abs(Y - cy + 0.5) * (pt / (h / 2)) * 0.9
-    m &= (x1 - 1 - X) >= np.abs(Y - cy + 0.5) * (pt / (h / 2)) * 0.9
+def _ramp_fill(sc, m, x0, y0, h, ramp_, X, Y):
     t = np.clip((Y - y0) / max(1, h), 0, 1)
     pal = np.array([hexc(c) for c in ramp_])
     idx = np.clip(np.floor(t * 3.6 + BAYER[Y % 4, X % 4] * 0.6), 0, 3).astype(int)
     sc.rgb[m] = pal[idx][m]
-    o, top, left = edges(m)
+
+
+def button(sc, x0, y0, x1, y1, kind="amber"):
+    """A gem set in chitin: a long hexagon of resin (or shell) in a dark inlay rim, a keel of light along it,
+    spiracle studs at the ends, mandible hooks curling off both tips. Amber holds a gnat caught in it; chitin
+    shimmers like a beetle's back."""
+    ramp_, shine, _ = BUTTON[kind]
+    X, Y = sc.xx, sc.yy
+    h = y1 - y0
+    cy = (y0 + y1 - 1) / 2
+    small = h < 28
+
+    def hexm(a, b, c, d, k=0.9):
+        mm = (Y >= b) & (Y < d) & (X >= a) & (X < c)
+        half = max(1, (d - b) / 2)
+        mm &= (X - a) >= np.abs(Y - (b + d - 1) / 2) * k
+        mm &= (c - 1 - X) >= np.abs(Y - (b + d - 1) / 2) * k
+        return mm
+    outer = hexm(x0, y0, x1, y1)
+    rim = outer & ~hexm(x0 + 2, y0 + 2, x1 - 2, y1 - 2)
+    body = hexm(x0 + 2, y0 + 2, x1 - 2, y1 - 2)
+    # the inlay rim: dark chitin with a light top edge
+    sc.rgb[rim] = hexc("#1a1222")
+    o, top, left = edges(outer)
     sc.rgb[o] = OUTL
-    inner = shrink(m)
-    o1, top1, _ = edges(inner)
-    sc.rgb[top1] = sc.rgb[top1] * 0.4 + hexc(shine) * 0.6
-    streak = m & (Y >= y0 + 3) & (Y < y0 + 5) & (X > x0 + pt + 4) & (X < x0 + pt + (x1 - x0) * 0.35)
-    sc.rgb[streak] = sc.rgb[streak] * 0.3 + hexc(shine) * 0.7
-    if kind == "amber":
+    rt = rim & ~o & (Y < cy)
+    sc.rgb[rt] = sc.rgb[rt] * 0.5 + hexc("#6a5e7e") * 0.5
+    # the gem
+    _ramp_fill(sc, body, x0, y0 + 2, h - 4, ramp_, X, Y)
+    if kind == "chitin":                                     # a beetle's iridescence drifting along it
+        hue = (X - x0) / max(1, x1 - x0)
+        iri = np.stack([90 + 60 * np.sin(hue * 6.0), 70 + 70 * np.sin(hue * 6.0 + 2.1), 120 + 60 * np.sin(hue * 6.0 + 4.2)], -1)
+        band = body & (Y < cy)
+        sc.rgb[band] = sc.rgb[band] * 0.7 + iri[band] * 0.3
+    bo, btop, bleft = edges(body)
+    sc.rgb[btop] = sc.rgb[btop] * 0.35 + hexc(shine) * 0.65
+    bb = bo & ~btop & (Y > cy)
+    sc.rgb[bb] = sc.rgb[bb] * 0.55
+    keel = body & (Y == int(y0 + 2 + (h - 4) * 0.32)) & (X > x0 + h * 0.6) & (X < x1 - h * 0.6) & ((X // 3) % 2 == 0)
+    sc.rgb[keel] = sc.rgb[keel] * 0.45 + hexc(shine) * 0.55
+    if kind == "amber" and not small:                         # bubbles, and a gnat caught in the resin
         rnd = np.random.RandomState(int(x0 + y0))
-        for _ in range(int((x1 - x0) / 14)):
-            bx, by = rnd.uniform(x0 + pt + 4, x1 - pt - 4), rnd.uniform(y0 + h * 0.45, y1 - 4)
+        for _ in range(int((x1 - x0) / 12)):
+            bx, by = rnd.uniform(x0 + h * 0.7, x1 - h * 0.7), rnd.uniform(y0 + h * 0.45, y1 - 4)
             r_ = rnd.choice((1, 1, 2))
-            bub = ((X - bx) ** 2 + (Y - by) ** 2 <= r_ * r_) & m
-            sc.rgb[bub] = sc.rgb[bub] * 0.5 + hexc(shine) * 0.5
-    sc.occ[m] = True
-    sc.light[m] = 0
+            bub = ((X - bx) ** 2 + (Y - by) ** 2 <= r_ * r_) & body
+            sc.rgb[bub] = sc.rgb[bub] * 0.45 + hexc(shine) * 0.55
+        gx, gy = int(x1 - h * 1.15), int(cy + 1)
+        gnat = [(0, 0), (1, 0), (2, 0), (-1, 0), (1, -1), (3, -1), (-1, 1), (1, 1), (3, 1), (-2, -1), (-3, -2), (-2, 1), (0, -2), (2, -2)]
+        for dx, dy in gnat:
+            sc.rgb[gy + dy, gx + dx] = sc.rgb[gy + dy, gx + dx] * 0.25 + hexc("#3a1a04") * 0.75
+        sc.rgb[gy - 3, gx - 1:gx + 2] = sc.rgb[gy - 3, gx - 1:gx + 2] * 0.6 + hexc("#fff0c0") * 0.4    # its wings catch the light
+    if not small:
+        for x_, sd in ((x0 + h * 0.62, 1), (x1 - 1 - h * 0.62, -1)):     # spiracle studs at the ends
+            xi, yi = int(x_), int(cy)
+            sc.rgb[yi - 2:yi + 3, xi - 1:xi + 2] = OUTL
+            sc.rgb[yi - 1:yi + 2, xi - 2:xi + 3] = OUTL
+            sc.rgb[yi - 1:yi + 2, xi - 1:xi + 2] = hexc("#5a4e6a")
+            sc.rgb[yi, xi] = hexc(shine)
+        gk = {"amber": "eat", "chitin": "violet", "blood": "over", "acid": "ok", "dim": "dim"}[kind]
+        for (tx, sd) in ((x0, -1), (x1 - 1, 1)):                          # a gem at each tip, bone mandibles around it
+            gx_ = tx + sd * 5
+            for up in (-1, 1):
+                pts = []
+                for k in range(13):                              # a pincer closing round the gem
+                    t = k / 12
+                    pts.append((tx + sd * (1 + 10 * t), cy + up * (h * 0.3 * (1 - t * t) + 1.2 + h * 0.1 * np.sin(np.pi * t))))
+                for n_, (px, py) in enumerate(pts):
+                    px, py = int(round(px)), int(round(py))
+                    if 0 <= px < sc.w and 0 <= py < sc.h:
+                        sc.rgb[py, px] = hexc("#d8c8a8") if n_ < 10 else hexc("#f4ecd8")
+                        if 0 <= py + up < sc.h:
+                            sc.rgb[py + up, px] = OUTL
+                        if 0 <= py - up < sc.h and n_ < 7:
+                            sc.rgb[py - up, px] = hexc("#8a7a66")
+            gem(sc, tx + sd * 6, cy, 3.4, h * 0.16 + 1, gk)
+    sc.occ[outer] = True
+    sc.light[outer] = 0
+    if kind == "amber":
+        sc.glow((x0 + x1) / 2, cy, (x1 - x0) * 0.42, hexc("#ffa030"), 0.18)
 
 
 def wing(sc, x0, y0, x1, y1):
@@ -308,40 +363,110 @@ def wing(sc, x0, y0, x1, y1):
     sc.light[m] = 0
 
 
-def segbar(sc, x0, y0, x1, h, total, limit, marked):
-    """The limit as an abdomen: one segment per point; within the limit acid-green, over it blood-red,
-    the ones marked to be eaten hatched amber; a bone tick at the limit."""
+GEM = {   # facets: top-left (lit), top-right, bottom-left, bottom-right (shade), the glint
+    "ok": ("#b8f070", "#7ac040", "#4e8a24", "#2a5212", "#f0ffd0"),
+    "over": ("#ff9a7a", "#d84a30", "#9a2418", "#4a0a06", "#ffe0d0"),
+    "eat": ("#ffe08a", "#e8a838", "#b06a14", "#5a3006", "#fff8d8"),
+    "dim": ("#5a4e6a", "#463a58", "#2e2638", "#1a1422", "#8a7ca0"),
+    "violet": ("#d8b0ff", "#a070e0", "#6a40a8", "#3a2060", "#f4e8ff"),
+}
+
+
+def gem(sc, cx, cy, a, b, kind="ok", bite=False, crack=False):
+    """One rhombus scale cut like a gem: four facets, a glint, a dark outline; bitten or cracked if asked."""
+    X, Y = sc.xx, sc.yy
+    m = (np.abs(X - cx) / a + np.abs(Y - cy) / b) <= 1.0
+    if bite:                                               # a bite taken out of the top right
+        m &= ((X - (cx + a * 0.55)) ** 2 + (Y - (cy - b * 0.55)) ** 2) > (a * 0.55) ** 2
+    tl, tr, bl, br, gl = (hexc(c) for c in GEM[kind])
+    sc.rgb[m & (X < cx) & (Y < cy)] = tl
+    sc.rgb[m & (X >= cx) & (Y < cy)] = tr
+    sc.rgb[m & (X < cx) & (Y >= cy)] = bl
+    sc.rgb[m & (X >= cx) & (Y >= cy)] = br
+    inner = (np.abs(X - cx) / (a * 0.45) + np.abs(Y - cy) / (b * 0.45)) <= 1.0
+    sc.rgb[m & inner] = sc.rgb[m & inner] * 0.6 + tl * 0.4
+    o, top, left = edges(m)
+    sc.rgb[o] = OUTL
+    gx, gy = int(cx - a * 0.35), int(cy - b * 0.35)
+    if m[gy, gx]:
+        sc.rgb[gy, gx] = gl
+    if bite:
+        bo = o & (((X - (cx + a * 0.55)) ** 2 + (Y - (cy - b * 0.55)) ** 2) <= (a * 0.55 + 1.2) ** 2)
+        sc.rgb[bo & ((X + Y) % 2 == 0)] = hexc("#fff0c0")          # tooth marks along the bite
+    if crack:
+        for k in range(int(b * 1.4)):
+            yy = int(cy - b * 0.7 + k)
+            xx = int(cx + (1 if (k // 2) % 2 else -1) * 0.8)
+            if m[yy, xx]:
+                sc.rgb[yy, xx] = OUTL
+    sc.occ[m] = True
+    sc.light[m] = 0
+    return m
+
+
+def segbar(sc, x0, y0, x1, h, total, limit, marked, creature=True):
+    """The limit as a centipede: one gem-cut scale per point, legs under them, a head with mandibles and antennae
+    on the left, the tail's cerci on the right. Within the limit the scales glow acid-green, over it they are
+    cracked and red, the ones marked to be eaten amber with a bite out of them; a bone pin stands at the limit."""
+    hd, tl = (16, 10) if creature else (0, 0)
+    bx0, bx1 = x0 + hd, x1 - tl
     n = total
-    w = (x1 - x0) / n
+    w = (bx1 - bx0) / n
+    cy = y0 + h / 2
+    a, b = max(3.0, w * 0.62), h / 2 + 2
+    # the spine under the scales
+    sc.rgb[int(cy):int(cy) + 2, int(bx0):int(bx1)] = hexc("#1a1222")
+    for i in range(n):                                     # legs
+        lx = int(bx0 + (i + 0.5) * w)
+        sd = -1 if i % 2 else 1
+        for k in range(4):
+            yy, xx = int(cy + b - 1 + k), lx + sd * (k // 2)
+            if 0 <= yy < sc.h:
+                sc.rgb[yy, xx] = hexc("#4a3e5c") if k < 3 else hexc("#7a6c90")
     for i in range(n):
-        a, b = x0 + i * w + 1, x0 + (i + 1) * w - 1
-        col = hexc("#6ab030") if i < limit else hexc("#b0382a")
-        hl = hexc("#b0f070") if i < limit else hexc("#ff7a5a")
-        mm = (sc.xx >= a) & (sc.xx < b) & (sc.yy >= y0) & (sc.yy < y0 + h)
-        mm &= ((sc.xx - (a + b) / 2) / ((b - a) / 2 + 0.5)) ** 2 + ((sc.yy - y0 - h / 2) / (h / 2 + 0.6)) ** 2 <= 1.15
-        sc.rgb[mm] = col
-        sc.rgb[mm & (sc.yy < y0 + 3)] = hl
+        cx = bx0 + (i + 0.5) * w
         if i >= n - marked:
-            hat = mm & ((sc.xx + sc.yy) % 4 < 2)
-            sc.rgb[hat] = hexc("#e8b84a")
-        o, _, _ = edges(mm)
+            gem(sc, cx, cy, a, b, "eat", bite=True)
+        elif i >= limit:
+            gem(sc, cx, cy, a, b, "over", crack=True)
+        else:
+            gem(sc, cx, cy, a, b, "ok")
+    if creature:                                           # the head: a dark helmet, a red eye, mandibles, antennae
+        hx, hy = x0 + 9, cy
+        X, Y = sc.xx, sc.yy
+        head = ((X - hx) / 8.0) ** 2 + ((Y - hy) / (b + 1)) ** 2 <= 1
+        sc.rgb[head] = hexc("#2e2438")
+        sc.rgb[head & (Y < hy - 1)] = hexc("#4a3e5c")
+        o, _, _ = edges(head)
         sc.rgb[o] = OUTL
-    lx = int(x0 + limit * w)
-    sc.rgb[y0 - 5:y0 + h + 5, lx - 1:lx + 1] = hexc("#f0e6c8")
-    sc.rgb[y0 - 7:y0 - 5, lx - 3:lx + 3] = hexc("#f0e6c8")
+        sc.rgb[int(hy) - 2:int(hy), int(hx) - 4:int(hx) - 2] = hexc("#ff4a2a")
+        for up in (-1, 1):                                 # mandibles
+            for k in range(6):
+                xx, yy = int(hx - 7 - k), int(hy + up * (2 + (k * k) // 6))
+                sc.rgb[yy, xx] = hexc("#c8b898") if k < 5 else hexc("#f0e6c8")
+        for k in range(14):                                # antennae sweeping back over the body
+            xx, yy = int(hx - 3 + k * 1.6), int(hy - b - 1 - 6 * np.sin(k / 14 * np.pi))
+            if 0 <= yy < sc.h:
+                sc.rgb[yy, xx] = hexc("#6a5e7e")
+        tx = int(bx1 + 1)                                  # the tail's cerci
+        for up in (-1, 1):
+            for k in range(8):
+                xx, yy = tx + k, int(cy + up * (k * 0.6))
+                sc.rgb[yy, xx] = hexc("#6a5e7e") if k < 6 else hexc("#a898c0")
+    lx = int(bx0 + limit * w)                               # the bone pin at the limit
+    sc.rgb[int(y0 - 7):int(y0 + h + 7), lx - 1:lx + 1] = hexc("#e8dcc0")
+    sc.rgb[int(y0 - 7):int(y0 + h + 7), lx + 1] = OUTL
+    sc.rgb[int(y0 - 10):int(y0 - 6), lx - 2:lx + 2] = hexc("#f4ecd8")
+    sc.rgb[int(y0 - 10), lx - 2:lx + 2] = OUTL
+    return bx0, w
 
 
 def meter(sc, x0, y0, x1, h, n, filled, col="#b04a3a"):
-    """A short row of segments: how many of n are filled (kills by trait and the like)."""
+    """A short row of gem scales: how many of n are lit (kills by trait and the like)."""
     w = (x1 - x0) / n
+    kind = "over" if col in ("#c04a3a", "#b04a3a") else "violet"
     for i in range(n):
-        a, b = x0 + i * w + 1, x0 + (i + 1) * w - 1
-        mm = (sc.xx >= a) & (sc.xx < b) & (sc.yy >= y0) & (sc.yy < y0 + h)
-        sc.rgb[mm] = hexc(col) if i < filled else hexc("#2a2232")
-        if i < filled:
-            sc.rgb[mm & (sc.yy < y0 + 2)] = hexc(col) * 1.4
-        o, _, _ = edges(mm)
-        sc.rgb[o] = OUTL
+        gem(sc, x0 + (i + 0.5) * w, y0 + h / 2, max(2.5, w * 0.6), h / 2 + 1.5, kind if i < filled else "dim")
 
 
 def round_button(sc, cx, cy, r, kind="chitin"):

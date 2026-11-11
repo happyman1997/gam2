@@ -91,9 +91,9 @@ def brood():
     letters(sc, "улей тесен:", 24, 58, "text", 16, col=INK)
     letters(sc, f"{total}/{B.LIMIT}", 24, 74, "title", 16, col=(255, 140, 110), col2=(170, 50, 40), jitter=1)
     letters(sc, f"лишних {total - B.LIMIT}, к съедению {eaten}", 132, 74, "text", 16, col=MUTED)
-    bx0, bx1 = 330, 936
-    UI.segbar(sc, bx0, 62, bx1, 12, total, B.LIMIT, eaten)
-    letters(sc, "предел", bx0 + B.LIMIT * (bx1 - bx0) / total, 77, "title", 8, col=(240, 230, 200), align="center")
+    bx0, bx1 = 322, 938
+    sb0, sw = UI.segbar(sc, bx0, 62, bx1, 16, total, B.LIMIT, eaten)
+    letters(sc, "предел", sb0 + B.LIMIT * sw, 84, "title", 8, col=(240, 230, 200), align="center")
     UI.drips(sc, 300, 900, 96, "#7a9a30", n=3, seed=7, Lmax=9)
     # the groups: comb cells
     GX0, GY0, GCW, GCH = 12, 104, 232, 96
