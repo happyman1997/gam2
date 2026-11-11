@@ -929,7 +929,7 @@ def big_card(spec, name):
     letters(sc, "Закрыть", 159, HH - 42, "title", 16, col=INK, align="center")
     # middle: the numbers, then the attacks — each its own row
     x0, x1 = 316, 616
-    heading(sc, "ЧИСЛА", x0, 62, seed=3)
+    heading(sc, "СУДЬБА", x0, 62, seed=3)
     y = 86
     for lab, val in spec["stats"]:
         letters(sc, lab, x0, y, "text", 16, col=MUTED)
@@ -938,7 +938,7 @@ def big_card(spec, name):
         letters(sc, val, x1, y, "text", 16, col=INK, align="right")
         y += 19
     y += 12
-    heading(sc, "УДАРЫ", x0, y, seed=4)
+    heading(sc, "ВОЗМОЖНОСТИ", x0, y, seed=4)
     y += 26
     cols = (x0 + 20, x0 + 112, x0 + 172, x0 + 252)
     for cx, lab in zip(cols, ("удар", "урон", "тип", "дальн.")):
@@ -966,12 +966,29 @@ def big_card(spec, name):
             if note:
                 letters(sc, note, x1, y + 1, "text", 16, col=MUTED, align="right")
             y += 18
-    # right: what it can, and what it can't
-    x0 = 632
+    # right: what it can and what it can't — a column of names; the text shows when the mouse is over one
+    x0, x1 = 632, WW - 18
     heading(sc, spec.get("right", "СПОСОБНОСТИ"), x0, 62, seed=5)
-    y = 88
-    for key, lab, nm, desc, col in spec["abilities"]:
-        y = section(sc, x0, y, WW - 24 - x0, key, lab, nm, desc, col=col, seed=len(nm))
+    y = 90
+    hov = spec.get("hover", len(spec["abilities"]) - 1)
+    for i, (key, lab, nm, desc, col) in enumerate(spec["abilities"]):
+        if i == hov:
+            UI.cell(sc, x0 - 6, y - 4, x1, y + 38, "hi")
+        icon(sc, key, x0, y, 2)
+        letters(sc, nm, x0 + 42, y + 2, "text", 16, col=col, jitter=1, seed=len(nm))
+        letters(sc, lab, x0 + 42, y + 21, "title", 8, col=PALE, outline=False)
+        if i == hov:
+            hy, hx = y, x0 + 42 + UI.text_width(nm, "text", 16)
+        y += 44
+    # the hovered one: its text in a tooltip under the cursor
+    key, lab, nm, desc, col = spec["abilities"][hov]
+    lines = wrap(desc, x1 - x0 - 40)
+    tx0, ty0 = x0 + 10, hy + 46
+    UI.cell(sc, tx0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
+    letters(sc, nm, tx0 + 12, ty0 + 8, "text", 16, col=col)
+    for j, ln in enumerate(lines):
+        letters(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
+    cursor(sc, int(hx) - 30, int(hy) + 10)
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out(name))
@@ -995,8 +1012,10 @@ def cards():
                    ("wings", "деталь", "Крылья", "перепархивает: свой строй её не держит, проходит над своими", GOLD),
                    ("m_blister", "мутация · общий пул", "Нарывник", "кто ранит её вплотную, обжигается: его удар слабее", SILVER),
                    ("evo_vise", "эволюция формы", "Клешни-тиски", "держит соседнего врага, клешни бьют дробящим", (150, 220, 120)),
-                   ("ant", "класс", "Хитин · Стая · Пожирание", "держит рубящий, ломается от дробящего; смелее рядом со своими; съев убитого, лечится", INK),
-                   ("fear", "слабость", "Медленнее других", "скорпионы приходят к бою последними", RED)]),
+                   ("carapace", "класс", "Хитин", "держит рубящий, ломается от дробящего", INK),
+                   ("ant", "класс", "Стая", "+1 к боевому духу за каждого своего соседа, до +4: вместе смелые, поодиночке бегут", INK),
+                   ("biomass", "класс", "Пожирание", "убив врага, съедает труп и лечится на четверть здоровья; после боя это биомасса", INK),
+                   ("fear", "слабость", "Медленнее других", "скорость 2, а не 3, как у других рабочих: скорпионы приходят к бою последними", RED)]),
         "swarm_card.png")
     big_card(dict(
         seed=57, title="МАТКА", sub="лидер роя · число и порода", cell="mut",
@@ -1013,7 +1032,7 @@ def cards():
                    ("larva", "постоянно", "Сердце роя", "своя, погибшая в 2 клетках от неё, роняет яйцо: через 2 хода — личинка", GOLD),
                    ("feed", "правило похода", "Плодовитость", "в выводке на одного потомка больше, кормление вдвое дешевле", (214, 196, 150)),
                    ("matka", "стаи роя", "Тесные стаи", "в клетке до 6 мелких, а не 4: на фронте бьёт больше особей, но удары по площади задевают больше", (214, 196, 150)),
-                   ("fear", "слабость", "Медлительная", "держится в тылу; погибнет — рой обезглавлен, все проверяют страх 1–9", RED)]),
+                   ("fear", "слабость", "Медлительная", "скорость 1, держится в тылу. Погибнет — рой обезглавлен: все особи проверяют страх 1–9", RED)]),
         "swarm_card_leader.png")
 
 
