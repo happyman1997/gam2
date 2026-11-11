@@ -61,9 +61,31 @@ def put(sc, spr, cx, by, sw=10):
     sc.blit(spr, int(cx - spr.ox), int(by - spr.oy))
 
 
-def title(sc, text, sub, x=16, seed=0):
-    """The screen's name in dripping, bristling letters, a line under it in the swarm's script."""
+EPITHET = {"Матка": ("мать роя", (240, 200, 90)), "Разум улья": ("мысль роя", (196, 150, 255)),
+           "Пожиратель": ("голод роя", (236, 96, 80)), "Кукушка": ("чужая кладка", (150, 220, 90))}
+
+
+def epithet(sc, text, x, y, col, seed=0, px=16, curls=True):
+    """A leader's by-name, written by the swarm itself: pixel letters in the leader's colour, dripping and
+    bristling, a curl of silk at each end."""
+    c2 = tuple(int(v * 0.42) for v in col)
+    w = letters(sc, text, x, y, "title", px, col=col, col2=c2, jitter=1, drips=4, hairs=5, seed=seed)
+    if curls:
+        hx = "#%02x%02x%02x" % tuple(int(v * 0.8) for v in col)
+        UI.silk(sc, (x - 24, y + px // 2 + 2), (x - 6, y + px // 2), sag=-6, col=hx)
+        UI.silk(sc, (x + w + 6, y + px // 2), (x + w + 24, y + px // 2 + 2), sag=-6, col=hx)
+        for cx in (x - 25, x + w + 24):
+            sc.rgb[int(y + px // 2 + 1):int(y + px // 2 + 4), int(cx):int(cx) + 2] = hexc(hx)
+    return w
+
+
+def title(sc, text, sub, x=16, seed=0, epi=None):
+    """The screen's name in dripping, bristling letters, a line under it in the swarm's script — or, for a leader,
+    its by-name written in its colour."""
     w = letters(sc, text, x, 6, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=6, hairs=9, seed=seed)
+    if epi:
+        epithet(sc, sub, x + w + 44, 10, epi, seed=seed + 1)
+        return w
     letters(sc, sub, x + w + 16, 6, "text", 16, col=(196, 182, 206), jitter=1, seed=seed + 1)
     scribble(sc, x + w + 16, 27, UI.text_width(sub) + 4, seed=seed + 2)
     return w
@@ -781,13 +803,13 @@ def leaders_pick():
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=18)
     title(sc, "ЛИДЕР", "кто поведёт рой в этот поход", seed=35)
     # start armies as in the concept (workers; soldiers), the flock rule, the key mutation of the leader's pool
-    data = [("Матка", "matka", "число и порода", "тесные стаи", "Наследница",
+    data = [("Матка", "matka", "плодит рой, выводит породу", "тесные стаи", "Наследница",
              [((), 12), (("wings",), 3), (("stinger",), 3)], [((), 2), (("horn",), 1), (("carapace",), 1)]),
-            ("Разум улья", "razum", "пси мимо брони, захват", "одна мысль на стаю", "Ретранслятор",
+            ("Разум улья", "razum", "бьёт мыслью мимо брони", "одна мысль на стаю", "Ретранслятор",
              [((), 9), (("firefly",), 3)], [((), 3), (("scythes",), 2), (("stinger",), 1)]),
-            ("Пожиратель", "pozh", "зверь растёт в бою", "свора", "Питательная суть",
+            ("Пожиратель", "pozh", "ест в бою и растёт", "свора", "Питательная суть",
              [((), 15), (("jumper",), 3)], [((), 2)]),
-            ("Кукушка", "kuk", "рой растёт за счёт врага", "пёстрые стаи", "Королевская кладка",
+            ("Кукушка", "kuk", "кладёт яйца во врагов", "пёстрые стаи", "Королевская кладка",
              [((), 15), (("stinger",), 3), (("acid",), 3)], [((), 3)])]
     PW_ = 232
     for k_, (name, ik, what, rule, key, army, soldiers) in enumerate(data):
@@ -795,13 +817,15 @@ def leaders_pick():
         UI.cell(sc, x0, 52, x0 + PW_, 452, "hi" if k_ == 0 else "normal")
         spr = SL.build(name, "idle", 1.0)
         kk = min(1.75, 172 / spr.w, 116 / spr.h)
-        put(sc, SL.build(name, "idle", kk), x0 + PW_ / 2 + 6, 180, 30)
-        icon(sc, ik, x0 + 12, 202, 2)
-        letters(sc, name, x0 + 50, 206, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
-        letters(sc, what, x0 + 12, 236, "text", 16, col=INK)
-        letters(sc, "стаи:", x0 + 12, 264, "title", 8, col=PALE, outline=False)
-        letters(sc, rule, x0 + 54, 260, "text", 16, col=GOLD)
-        for r, (lab, row, sold, by) in enumerate((("рабочие:", army, False, 330), ("солдаты:", soldiers, True, 394))):
+        put(sc, SL.build(name, "idle", kk), x0 + PW_ / 2 + 6, 174, 30)
+        icon(sc, ik, x0 + 12, 190, 2)
+        letters(sc, name, x0 + 50, 198, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
+        ep, ecol = EPITHET[name]
+        epithet(sc, ep, x0 + 12, 228, ecol, seed=k_ + 7, px=16, curls=False)
+        letters(sc, what, x0 + 12, 252, "text", 16, col=INK)
+        letters(sc, "стаи:", x0 + 12, 276, "title", 8, col=PALE, outline=False)
+        letters(sc, rule, x0 + 54, 272, "text", 16, col=GOLD)
+        for r, (lab, row, sold, by) in enumerate((("рабочие:", army, False, 338), ("солдаты:", soldiers, True, 400))):
             letters(sc, lab, x0 + 12, by - 46, "title", 8, col=PALE, outline=False)
             for j, (tr, n) in enumerate(row):
                 b_ = bug(tr, "idle", 1.0, 180 + j + k_ * 5 + r * 20, soldier=sold)
@@ -809,8 +833,8 @@ def leaders_pick():
                 put(sc, b_, cx, by, 8)
                 right = np.nonzero(b_.a.any(axis=0))[0].max()
                 letters(sc, f"×{n}", cx - b_.ox + right + 3, by - 6, "title", 8, col=INK)
-        letters(sc, "ключ:", x0 + 12, 422, "title", 8, col=PALE, outline=False)
-        letters(sc, key, x0 + 54, 418, "text", 16, col=(196, 160, 236))
+        letters(sc, "ключ:", x0 + 12, 428, "title", 8, col=PALE, outline=False)
+        letters(sc, key, x0 + 54, 424, "text", 16, col=(196, 160, 236))
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
     UI.button(sc, 690, 466, 948, 524, "amber")
@@ -959,16 +983,18 @@ PICT = {"Брачный полёт": (pict_flight, "пару выбираешь 
 def leader_comb(sc, x0, y, rows, key, hover):
     """The leader's mutations as a comb: a row of cells per branch, the key one a big royal cell at the end."""
     r, step = 21, 21 * 1.732
-    pos = {}
+    off = max(UI.text_width(br) for br, _ in rows) + 16 + r
+    pos, right = {}, 0
     for j, (branch, cells) in enumerate(rows):
         cy = y + j * r * 1.5
         UI.rich(sc, branch, x0, cy - 8, "text", 16, col=MUTED)
         for i, (k_, st, nm, desc) in enumerate(cells):
-            cx = x0 + 88 + i * step + (step / 2 if j % 2 else 0)
+            cx = x0 + off + i * step + (step / 2 if j % 2 else 0)
             comb_cell(sc, cx, cy, r, "hover" if nm == hover else st, k_)
             pos[nm] = (cx, cy, nm, desc)
+            right = max(right, cx + r)
     k_, st, nm, desc = key
-    kx, ky = x0 + 88 + 4 * step + 12, y + r * 0.75
+    kx, ky = right + 40, y + r * 1.5 * (len(rows) - 1) / 2
     sc.glow(kx, ky, 40, hexc("#f0c050"), 0.25)
     comb_cell(sc, kx, ky, 30, st, k_)
     crown(sc, kx, ky - 30 - 13)
@@ -983,7 +1009,7 @@ def big_card(spec, name):
     sc = frame_screen(spec["seed"])
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=spec["seed"])
-    title(sc, spec["title"], spec["sub"], seed=spec["seed"] + 1)
+    title(sc, spec["title"], spec["sub"], seed=spec["seed"] + 1, epi=spec.get("epi"))
     UI.plate(sc, 6, 50, WW - 6, HH - 6, antennae=False)
     # left: the creature large, where it came from
     UI.cell(sc, 18, 62, 300, 300, spec.get("cell", "hi"))
@@ -1043,6 +1069,7 @@ def big_card(spec, name):
         y += 10
         heading(sc, "МУТАЦИИ", x0, y, seed=6)
         pos, yb = leader_comb(sc, x0, y + 60, rows, key, hover)
+    if spec.get("comb") and hover:
         cx, cy, nm, desc = pos[hover]
         draw_pict, line = PICT[nm]
         ty0 = int(yb + 4)
@@ -1116,7 +1143,7 @@ def cards():
                    ("carapace", "класс", "Хитин", "Урон {руб} по ней в два раза меньше, {дроб} в два раза больше.", INK)]),
         "swarm_card.png")
     big_card(dict(
-        seed=57, title="МАТКА", sub="мать роя", cell="mut",
+        seed=57, title="МАТКА", sub=EPITHET["Матка"][0], epi=EPITHET["Матка"][1], cell="mut",
         sprite=leader("Матка", "idle", 1.45), dx=14, sw=56,
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
                ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
@@ -1135,6 +1162,69 @@ def cards():
                    ("matka", "стаи роя", "Тесные стаи", "В одной клетке помещается до 6 мелких особей вместо 4. Удары по площади и растаптывание задевают их всех.", (214, 196, 150)),
                    ("fear", "слабость", "Медлительная", "Скорость 1. Если Матка погибнет, каждая особь роя проходит проверку страха 1–9.", RED)]),
         "swarm_card_leader.png")
+    PSI, MEAT, KUK, RULE = VIOLET, (236, 120, 96), (150, 220, 90), (214, 196, 150)
+    big_card(dict(
+        seed=61, title="РАЗУМ УЛЬЯ", sub=EPITHET["Разум улья"][0], epi=EPITHET["Разум улья"][1], cell="find",
+        sprite=leader("Разум улья", "idle", 2.6), dx=4, sw=46,
+        facts=[("val", "развитие", "ещё не выбрано", MUTED),
+               ("val", "на выбор", ["пси-удар на 4 клетки", "Захват раз в 4 хода", "или Помутнение на 3 клетки"], INK)],
+        stats=[("здоровье", "22"), ("броня", "0 · мягкое тело"), ("скорость", "1"), ("размер", "4")],
+        attacks=[("razum", "Пси-удар", "1–6", "{пси}", "3", "мимо брони, копит надлом")],
+        hover=None,
+        comb=([("Основа", [("m_psi_gland", "lived", "Пси-железа", "")]),
+               ("Безумие", [("m_psi_reson", "open", "Резонатор", ""), ("m_psi_dread", "sealed", "Чутьё на страх", "")]),
+               ("Ужас", [("m_psi_whisper", "sealed", "Жуткий шёпот", ""), ("m_strider", "sealed", "Стрекот", "")]),
+               ("Крик", [("m_psi_echo", "sealed", "Эхо крика", ""), ("m_psi_last", "sealed", "Последняя воля", "")]),
+               ("Кукловод", [("m_psi_leash", "sealed", "Пси-поводок", "")])],
+              ("m_psi_relay", "keysealed", "Ретранслятор", ""), None),
+        abilities=[("m_psi_reson", "каждые 3 хода", "Помутнение", "Враги в 2 клетках от самой плотной их группы на раунд путают цели и бьют своих. У машин сбой: шаг пропущен, способности молчат.", PSI),
+                   ("m_psi_echo", "постоянно", "Предсмертный крик", "Когда особь роя погибает, её убийца получает 1 {пси} мимо брони. Машина — 1 {пси} за каждые две смерти.", PSI),
+                   ("m_psi_leash", "раз в 6 ходов", "Захват разума", "Враг ниже половины здоровья переходит к рою: размер 1–3 на 5 ходов, 4–5 на 2 хода. Размер 6–7 только оглушает на раунд.", PSI),
+                   ("m_psi_gland", "правило похода", "Мыслящая порода", "В выводке выпадают мутации на {пси} и страх, чаще у потомков тех, кто стоял рядом с Разумом.", RULE),
+                   ("razum", "стаи роя", "Одна мысль на стаю", "Вся стая бьёт ту цель, на которую напала первая её особь.", RULE),
+                   ("fear", "слабость", "Хрупкий мозг", "Мягкое тело. Если Разум погибнет, каждая особь роя проходит проверку страха 1–9.", RED)]),
+        "swarm_card_razum.png")
+    big_card(dict(
+        seed=65, title="ПОЖИРАТЕЛЬ", sub=EPITHET["Пожиратель"][0], epi=EPITHET["Пожиратель"][1], cell="eat",
+        sprite=leader("Пожиратель", "idle", 2.1), dx=8, sw=56,
+        facts=[("val", "развитие", "ещё не выбрано", MUTED),
+               ("val", "на выбор", ["стартует крупнее", "растёт с каждого тела", "или лечится вдвое"], INK)],
+        stats=[("здоровье", "41"), ("броня", "2 · тяж. хитин"), ("скорость", "2"), ("размер", "5–7")],
+        attacks=[("pozh", "Пасть", "1–8 +2", "{руб}", "1", "")],
+        hover=None,
+        comb=([("Корм", [("m_sated", "lived", "Сытная", ""), ("m_bait", "sealed", "Приманка", ""),
+                         ("m_fattened", "sealed", "Откормленная", "")]),
+               ("Пир", [("m_frenzy", "open", "Кормовое безумие", ""), ("m_table", "sealed", "За столом", "")]),
+               ("Голод", [("m_hungry", "sealed", "Голодная", ""), ("m_devblood", "sealed", "Кровь Пожирателя", "")])],
+              ("m_essence", "keysealed", "Питательная суть", ""), None),
+        abilities=[("pozh", "каждые 2 тела", "Рост", "За каждые 2 съеденных тела, своих или чужих: здоровье ×1,4 и +2 к удару. До двух раз за бой, до размера 7.", MEAT),
+                   ("m_table", "постоянно", "Каннибал", "Ест погибших своих рядом так же, как чужих: лечится и растёт.", MEAT),
+                   ("biomass", "правило похода", "Всё в пасть", "Каждое съеденное им в бою тело — +1 биомасса после боя. Её можно отдать на его рост. Рой меньше.", RULE),
+                   ("m_frenzy", "стаи роя", "Свора", "Стаи бросаются туда же, куда он, и оставляют ему тела убитых. Сами особи пожиранием не лечатся.", RULE),
+                   ("m_hungry", "слабость", "Ненасытный", "Три раунда без еды: хватает самую мелкую свою особь рядом и съедает. Если рядом никого, теряет десятую часть здоровья за раунд.", RED)]),
+        "swarm_card_pozh.png")
+    big_card(dict(
+        seed=69, title="КУКУШКА", sub=EPITHET["Кукушка"][0], epi=EPITHET["Кукушка"][1], cell="new",
+        sprite=leader("Кукушка", "idle", 2.4), dx=6, sw=44,
+        facts=[("val", "развитие", "ещё не выбрано", MUTED),
+               ("val", "на выбор", ["личинок 3", "заражает и яд скорпионов", "или подкидышей двое"], INK)],
+        stats=[("здоровье", "12"), ("броня", "1 · хитин"), ("скорость", "2"), ("размер", "3")],
+        attacks=[("kuk", "Яйцеклад", "1–6", "{кол}", "2", "раньше всех; пробил броню — заражает")],
+        hover=None,
+        comb=([("Заражение", [("m_parasitoid", "lived", "Паразитоид", ""), ("m_bloodeggs", "sealed", "Яйца в крови", ""),
+                              ("m_spores", "open", "Споры", "")]),
+               ("Хозяин", [("m_call", "sealed", "Зов кладки", ""), ("m_bodyguard", "sealed", "Телохранитель", ""),
+                           ("m_gnaw", "sealed", "Прожорливая кладка", "")]),
+               ("Мутации", [("m_mutagen", "sealed", "Мутагенная кладка", ""), ("m_unstable", "open", "Нестабильная", "")])],
+              ("m_royal", "keysealed", "Королевская кладка", ""), None),
+        abilities=[("m_parasitoid", "атака", "Заражение", "Пробил броню — цель заражена. Живой, погибнув, выпускает 2 личинки. В машине кладка зреет в топке: каждые 3 хода личинка, сломанная выпускает ещё 2.", KUK),
+                   ("kuk", "постоянно", "Длинный яйцеклад", "Колет на 2 клетки, инициатива +3: бьёт раньше всех.", KUK),
+                   ("ant", "в начале боя", "Подкидыш", "Одна рабочая начинает бой в тылу врага.", KUK),
+                   ("hand", "постоянно", "Дети хозяина", "Личинка из заражённого берёт черту хозяина: у человека руку, у голема железный панцирь, у нежити чужие кости. Дожившие до конца боя уходят в выводок химерами.", KUK),
+                   ("m_mutagen", "правило похода", "Чужие черты", "Чужие черты выпадают чаще и сильнее, у особи их может быть две.", RULE),
+                   ("m_call", "стаи роя", "Пёстрые стаи", "В одну стаю можно ставить разные виды. Пары в выводке складываются и внутри стаи.", RULE),
+                   ("fear", "слабость", "Хрупкая кладка", "{огонь} выжигает кладку: заражённый, получив {огонь}, даже свой, очищается.", RED)]),
+        "swarm_card_kuk.png")
 
 
 # ---------------------------------------------------------------- the leaders on the field: all the battle shows of them
