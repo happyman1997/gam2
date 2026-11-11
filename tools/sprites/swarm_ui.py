@@ -112,8 +112,18 @@ def comb(sc, m, x0, y0, col, k, R=7):
 
 
 
+WOBBLE = [0.0]          # how far edges wander, in pixels (0 — straight); set by the screens that want a hand-drawn look
+
+
 def chamfer_mask(sc, x0, y0, x1, y1, c):
     X, Y = sc.xx, sc.yy
+    if WOBBLE[0]:
+        rnd = np.random.RandomState(int(x0 * 7 + y0 * 13 + x1) % 100000)
+        kx, ky = np.arange(0, sc.w + 12, 12), np.arange(0, sc.h + 12, 12)
+        oy = np.interp(np.arange(sc.w), kx, rnd.uniform(-1, 1, len(kx)))
+        ox = np.interp(np.arange(sc.h), ky, rnd.uniform(-1, 1, len(ky)))
+        X = X + np.round(ox * WOBBLE[0])[:, None].astype(int)
+        Y = Y + np.round(oy * WOBBLE[0])[None, :].astype(int)
     m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
     m &= (X - x0) + (Y - y0) >= c
     m &= (x1 - 1 - X) + (Y - y0) >= c
@@ -336,6 +346,185 @@ def meter(sc, x0, y0, x1, h, n, filled, col="#b04a3a"):
 
 def round_button(sc, cx, cy, r, kind="chitin"):
     button(sc, cx - r, cy - r, cx + r, cy + r, kind)
+
+
+# ---------------------------------------------------------------- soul: lettering, the swarm's script, drips, webs, crawlers
+FONT_FILE = {"title": "PressStart2P-Regular.ttf"}
+
+
+def _font(kind, px):
+    if kind == "title":
+        return ImageFont.truetype(font(FONT_FILE["title"]), px)
+    if os.path.exists(UNIFONT):
+        return ImageFont.truetype(UNIFONT, px)
+    return ImageFont.truetype(font("PTSerif-Bold.ttf"), px)
+
+
+def text_width(text, kind="text", px=16):
+    return int(_font(kind, px).getlength(text))
+
+
+def letters(sc, text, x, y, kind="text", px=16, col=INK, col2=None, outline=True, shadow=True, jitter=0, drips=0,
+            hairs=0, align="left", seed=0):
+    """Text drawn into the scene itself, on its pixel grid: dark outline, a shadow, a light top on each stroke,
+    the letters dancing off the baseline (jitter), ichor running down (drips), bristles on top (hairs)."""
+    from PIL import Image, ImageDraw
+    f_ = _font(kind, px)
+    rnd = np.random.RandomState((abs(hash(text)) + seed) % 2 ** 31)
+    W_ = int(f_.getlength(text)) + 8
+    H_ = px + 8 + jitter * 2 + drips + 4
+    im = Image.new("L", (W_, H_), 0)
+    d = ImageDraw.Draw(im)
+    d.fontmode = "1"
+    cx = 3
+    for ch in text:
+        dy = rnd.randint(-jitter, jitter + 1) if jitter else 0
+        d.text((cx, 2 + jitter + dy), ch, font=f_, fill=255)
+        cx += f_.getlength(ch)
+    m = np.array(im) > 127
+    ys, xs = np.nonzero(m)
+    if not len(xs):
+        return 0
+    if align == "center":
+        x = x - (xs.max() + 1) / 2
+    elif align == "right":
+        x = x - (xs.max() + 1)
+    X0, Y0 = int(round(x)) - 3, int(round(y)) - 2 - jitter
+    h, w = m.shape
+    big = np.zeros((sc.h, sc.w), bool)
+    ya, yb, xa, xb = max(0, Y0), min(sc.h, Y0 + h), max(0, X0), min(sc.w, X0 + w)
+    if yb <= ya or xb <= xa:
+        return 0
+    big[ya:yb, xa:xb] = m[ya - Y0:yb - Y0, xa - X0:xb - X0]
+    if drips:                                    # runs of ichor from the bottoms of some strokes
+        bottom = big & ~np.roll(big, -1, 0)
+        by_, bx_ = np.nonzero(bottom)
+        for k in rnd.choice(len(bx_), size=min(len(bx_), max(1, len(text) // 3)), replace=False):
+            L = rnd.randint(2, drips + 1)
+            yy, xx = by_[k], bx_[k]
+            big[yy:min(sc.h, yy + L), xx] = True
+            if yy + L + 1 < sc.h and xx + 1 < sc.w:
+                big[yy + L - 1:yy + L + 1, xx:xx + 2] = True
+    if hairs:
+        topm = big & ~np.roll(big, 1, 0)
+        ty, tx = np.nonzero(topm)
+        for k in rnd.choice(len(tx), size=min(len(tx), hairs), replace=False):
+            L = rnd.randint(2, 4)
+            sd = rnd.choice((-1, 1))
+            for j in range(1, L + 1):
+                yy, xx = ty[k] - j, tx[k] + (sd if j > 1 else 0)
+                if 0 <= yy and 0 <= xx < sc.w:
+                    big[yy, xx] = True
+    if shadow:
+        sh = np.roll(np.roll(big, 1, 0), 1, 1) & ~big
+        sc.rgb[sh] = sc.rgb[sh] * 0.35
+    if outline:
+        dil = big | np.roll(big, 1, 0) | np.roll(big, -1, 0) | np.roll(big, 1, 1) | np.roll(big, -1, 1)
+        sc.rgb[dil & ~big] = OUTL
+        sc.occ[dil] = True
+        sc.light[dil] = 0
+    c1 = np.array(col, float)
+    c2 = np.array(col2 if col2 is not None else tuple(v * 0.62 for v in col), float)
+    ty0, ty1 = ys.min() + Y0, ys.max() + Y0
+    t = np.clip((sc.yy - ty0) / max(1, ty1 - ty0), 0, 1)[..., None]
+    fill = c1 * (1 - t) + c2 * t
+    sc.rgb[big] = fill[big]
+    top = big & ~np.roll(big, 1, 0)
+    sc.rgb[top] = np.minimum(255, sc.rgb[top] * 1.25 + 18)
+    return int(xs.max() + 1)
+
+
+SCRIPT = ["x.x/.x.", ".x./x.x", "xx./.xx", "x.x/xxx", ".x./xxx", "x../.xx", "xxx/x.x", "x.x/.x.", "..x/xx.", "xx./x.."]
+
+
+def scribble(sc, x, y, w, col=hexc("#6a4a9a"), seed=0, k=0.85):
+    """The swarm's own script: a row of little leg-and-body glyphs, like a translation nobody asked for."""
+    rnd = np.random.RandomState(seed)
+    cx = x
+    while cx < x + w - 6:
+        g = SCRIPT[rnd.randint(len(SCRIPT))].split("/")
+        tall = rnd.rand() < 0.25
+        for j, row in enumerate(g):
+            for i, ch in enumerate(row):
+                if ch == "x":
+                    yy, xx = int(y + j * 2 - (2 if tall and j == 0 else 0)), int(cx + i * 1.5)
+                    sc.rgb[yy:yy + 2, xx:xx + 1] = sc.rgb[yy:yy + 2, xx:xx + 1] * (1 - k) + col * k
+        if rnd.rand() < 0.3:                                   # a leg dropping below the line
+            sc.rgb[int(y + 4):int(y + 7), int(cx + 2)] = sc.rgb[int(y + 4):int(y + 7), int(cx + 2)] * (1 - k) + col * k
+        cx += 6 + rnd.randint(0, 2) + (4 if rnd.rand() < 0.15 else 0)
+
+
+def drips(sc, x0, x1, y, col="#c07018", n=4, seed=0, Lmax=14):
+    """Resin (or ichor) running off the bottom edge of something."""
+    rnd = np.random.RandomState(seed)
+    c = hexc(col)
+    for _ in range(n):
+        x = int(rnd.uniform(x0 + 6, x1 - 6))
+        L = rnd.randint(3, Lmax)
+        for k in range(L):
+            w = 2 if k < L * 0.6 else 1
+            sc.rgb[y + k, x:x + w] = c * (1.0 - 0.25 * k / L)
+            sc.rgb[y + k, x + w] = OUTL
+        sc.rgb[y + L - 1:y + L + 2, x - 1:x + 2] = c * 1.15
+        sc.rgb[y + L - 1, x - 1] = np.minimum(255, c * 1.6)
+        sc.occ[y:y + L + 2, x - 1:x + 3] = True
+
+
+def silk(sc, a, b, sag=8, col="#d8d0c0", k=0.75):
+    c = hexc(col)
+    n = int(np.hypot(b[0] - a[0], b[1] - a[1])) + 2
+    for i, t in enumerate(np.linspace(0, 1, n)):
+        x = a[0] + (b[0] - a[0]) * t
+        y = a[1] + (b[1] - a[1]) * t + sag * 4 * t * (1 - t)
+        if 0 <= int(y) < sc.h and 0 <= int(x) < sc.w and i % 5 != 4:
+            sc.rgb[int(y), int(x)] = sc.rgb[int(y), int(x)] * (1 - k) + c * k
+
+
+def cobweb(sc, x, y, r, quad=(1, 1), col="#b8b0a8"):
+    """A cobweb filling a corner: spokes, and threads strung between them."""
+    c = hexc(col)
+    angs = np.linspace(0, np.pi / 2, 6)
+    sx, sy = quad
+    for a in angs:
+        hexline(sc, (x, y), (x + sx * np.cos(a) * r, y + sy * np.sin(a) * r), c, 0.55)
+    for f_ in (0.3, 0.5, 0.72, 0.95):
+        pts = [(x + sx * np.cos(a) * r * f_, y + sy * np.sin(a) * r * f_) for a in angs]
+        for p, q in zip(pts[:-1], pts[1:]):
+            mid = ((p[0] + q[0]) / 2 - sx * 2 * f_, (p[1] + q[1]) / 2 - sy * 2 * f_)
+            hexline(sc, p, mid, c, 0.45)
+            hexline(sc, mid, q, c, 0.45)
+
+
+def engrave(sc, spr, x, by, col="#2c2238", k=0.9, flip=False):
+    """A sprite as an old engraving behind the interface: its outline and sparse hatching, in one dull colour."""
+    a = spr.a[:, ::-1] if flip else spr.a
+    ox = spr.w - 1 - spr.ox if flip else spr.ox
+    up = np.zeros_like(a); up[1:] = a[:-1]
+    dn = np.zeros_like(a); dn[:-1] = a[1:]
+    lf = np.zeros_like(a); lf[:, 1:] = a[:, :-1]
+    rt = np.zeros_like(a); rt[:, :-1] = a[:, 1:]
+    edge = a & ~(up & dn & lf & rt)
+    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+    lum = (spr.rgb[:, ::-1] if flip else spr.rgb).mean(axis=2)
+    hatch = a & ~edge & ((xx + yy) % 4 == 0) & (lum < 70)
+    X0, Y0 = int(x - ox), int(by - spr.oy)
+    c = hexc(col)
+    for msk in (edge, hatch):
+        ys, xs = np.nonzero(msk)
+        ys, xs = ys + Y0, xs + X0
+        ok = (ys >= 0) & (ys < sc.h) & (xs >= 0) & (xs < sc.w)
+        ys, xs = ys[ok], xs[ok]
+        sc.rgb[ys, xs] = sc.rgb[ys, xs] * (1 - k) + c * k
+
+
+def creature(sc, spr, x, by, shadow=True):
+    """A live one sitting on the interface."""
+    if shadow:
+        e = ((sc.xx - x) / max(4, spr.w * 0.3)) ** 2 + ((sc.yy - by) / 2.5) ** 2
+        sc.rgb[e <= 1] *= 0.6
+    sc.blit(spr, int(x - spr.ox), int(by - spr.oy))
+    ys, xs = np.nonzero(spr.a)
+    sc.occ[ys + int(by - spr.oy), xs + int(x - spr.ox)] = True
 
 
 # ---------------------------------------------------------------- a look at the kit

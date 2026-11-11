@@ -377,19 +377,8 @@ def pools_overlay(img, xs, PW_):
 
 
 if __name__ == "__main__":
+    # the screens themselves are drawn by swarm_hud (hand-made, text in the picture); this module keeps their data
     import sys
-    if sys.argv[1:] == ["finds"]:
-        finds()
-        raise SystemExit
-    if sys.argv[1:] == ["pools"]:
-        sc, xs, PW_ = pools()
-        img = sc.image(S)
-        pools_overlay(img, xs, PW_)
-        img.save(out("brood_pools.png"))
-        print("brood_pools.png", img.size)
-        raise SystemExit
-    sc = build()
-    img = sc.image(S)
-    overlay(img)
-    img.save(out("brood.png"))
-    print(img.size)
+    import swarm_hud
+    arg = sys.argv[1] if len(sys.argv) > 1 else "brood"
+    swarm_hud.SCREENS[arg]()

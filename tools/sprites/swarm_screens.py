@@ -269,6 +269,7 @@ def deploy_screen():
 
 
 if __name__ == "__main__":
-    evolution_screen()
-    camp_screen()
-    deploy_screen()
+    # the screens themselves are drawn by swarm_hud (hand-made, text in the picture); this module keeps their data
+    import swarm_hud
+    for k in ("evolution", "camp", "deploy"):
+        swarm_hud.SCREENS[k]()
