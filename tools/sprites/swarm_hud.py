@@ -468,13 +468,13 @@ def pools():
     sc = UI.nest(WW_, HH_, 35)
     UI.wing(sc, 0, 0, WW_, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=14)
-    title(sc, "ПУЛЫ", "что лидеры приносят в выводок", seed=29)
+    title(sc, "МУТАЦИИ ЛИДЕРОВ", "что лидеры приносят в выводок", seed=29)
     PW_ = 232
     xs = [12 + i * (PW_ + 2) for i in range(4)]
     for x0 in xs:
         UI.cell(sc, x0, 52, x0 + PW_, 352, "find")
     heads = [("Брачный полёт", "пару выбираешь сам", "m_flight"), ("Гибрид", "бесплоден", "m_hybrid"),
-             ("Откормленная", "у Пожирателя", "m_fattened"), ("Чей пул", "тот и цвет", "m_nest")]
+             ("Откормленная", "у Пожирателя", "m_fattened"), ("Чья мутация", "тот и цвет", "m_nest")]
     for x0, (h, sub, key) in zip(xs, heads):
         icon(sc, key, x0 + 12, 60, 2)
         letters(sc, h, x0 + 50, 62, "text", 16, col=GOLD, jitter=1, seed=len(h))
@@ -517,7 +517,7 @@ def pools():
         letters(sc, ln, x0 + 16, 224 + j * 17, "text", 16, col=INK)
     UI.button(sc, x0 + 14, 300, x0 + PW_ - 14, 338, "blood")
     letters(sc, "СКОРМИТЬ", x0 + PW_ / 2, 312, "title", 16, col=INK, align="center")
-    # whose pool
+    # whose mutation
     x0 = xs[3]
     rows = [("m_nest", "Матки", B.POOL_COL["Матка"]), ("m_psi_gland", "Разума", B.POOL_COL["Разум улья"]),
             ("m_sated", "Пожирателя", B.POOL_COL["Пожиратель"]), ("m_spores", "Кукушки", B.POOL_COL["Кукушка"]),
@@ -815,7 +815,7 @@ def leaders_pick():
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
     UI.button(sc, 690, 466, 948, 524, "amber")
     letters(sc, "В ПОХОД", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "у каждого лидера свой пул мутаций", 495, 480, "text", 16, col=MUTED, align="center")
+    letters(sc, "у каждого лидера свои мутации", 495, 480, "text", 16, col=MUTED, align="center")
     scribble(sc, 400, 500, 190, seed=53)
     UI.cobweb(sc, 958, 46, 34, quad=(-1, 1))
     img = sc.image(S)
@@ -893,6 +893,56 @@ def dots(sc, x0, x1, y):
         sc.rgb[y, x] = sc.rgb[y, x] * 0.4 + np.array(PALE, float) * 0.6
 
 
+def hexmask(sc, cx, cy, r):
+    X, Y = np.abs(sc.xx - cx), np.abs(sc.yy - cy)
+    return (X <= r * 0.866) & (Y <= r - X * 0.577)
+
+
+def comb_cell(sc, cx, cy, r, state, key=None):
+    """One cell of a leader's comb. lived — such a one is in the swarm now; open — it has woken this run;
+    sealed — it has not woken yet (a wax cap, nothing to see); hover — the one under the mouse."""
+    m, inner = hexmask(sc, cx, cy, r), hexmask(sc, cx, cy, r - 3)
+    rim = {"lived": "#7ac040", "open": "#c88a2a", "hover": "#ffd070", "sealed": "#4a3e5c",
+           "key": "#f0c050", "keysealed": "#8a6a2a"}[state]
+    sc.rgb[m] = hexc(rim)
+    if state in ("sealed", "keysealed"):                   # a wax cap: domed, a little lighter on top
+        t = np.clip((sc.yy - (cy - r)) / (2 * r), 0, 1)[..., None]
+        cap = hexc("#4a3c34") * (1 - t) + hexc("#241a1c") * t
+        sc.rgb[inner] = cap[inner]
+        dome = hexmask(sc, cx - r * 0.18, cy - r * 0.28, r * 0.32)
+        sc.rgb[dome & inner] = sc.rgb[dome & inner] * 0.6 + hexc("#8a7458") * 0.4
+    else:
+        sc.rgb[inner] = hexc("#1c1420")
+        if state == "hover":
+            sc.glow(cx, cy, r * 1.6, hexc("#ffd070"), 0.35)
+    o, _, _ = UI.edges(m)
+    sc.rgb[o] = UI.OUTL
+    sc.occ[m] = True
+    sc.light[m] = 0
+    if key and state not in ("sealed", "keysealed"):
+        icon(sc, key, cx - 16, cy - 16, 2)
+
+
+def leader_comb(sc, x0, y, rows, key, hover):
+    """The leader's mutations as a comb: a row of cells per branch, the key one a big royal cell at the end."""
+    r, step = 21, 21 * 1.732
+    pos = {}
+    for j, (branch, cells) in enumerate(rows):
+        cy = y + j * r * 1.5
+        UI.rich(sc, branch, x0, cy - 8, "text", 16, col=MUTED)
+        for i, (k_, st, nm, desc) in enumerate(cells):
+            cx = x0 + 88 + i * step + (step / 2 if j % 2 else 0)
+            comb_cell(sc, cx, cy, r, "hover" if nm == hover else st, k_)
+            pos[nm] = (cx, cy, nm, desc)
+    k_, st, nm, desc = key
+    kx, ky = x0 + 88 + 4 * step + 12, y + r * 0.75
+    sc.glow(kx, ky, 40, hexc("#f0c050"), 0.25)
+    comb_cell(sc, kx, ky, 30, st, k_)
+    letters(sc, "ключ", kx, ky + 32, "title", 8, col=PALE, outline=False, align="center")
+    pos[nm] = (kx, ky, nm, desc)
+    return pos, y + r * 1.5 * (len(rows) - 1) + 34
+
+
 def big_card(spec, name):
     """A creature's card as big as the screen, as in Conquest of Elysium: the creature large on the left with where
     it came from; the numbers in a column; every attack in a column of its own — damage, type, reach, what it does
@@ -954,7 +1004,23 @@ def big_card(spec, name):
             UI.rich(sc, ln, x0 + 20, y, "text", 16, col=MUTED)
             y += 15
         y += 4
-    # under the attacks: what it hands down, or the leader's pool — icons in a column
+    # under the attacks: the leader's comb of mutations; what woke shows its icon, what didn't is sealed
+    if spec.get("comb"):
+        rows, key, hover = spec["comb"]
+        y += 10
+        heading(sc, "МУТАЦИИ", x0, y, seed=6)
+        pos, yb = leader_comb(sc, x0, y + 46, rows, key, hover)
+        letters(sc, "запечатаны — ещё не проснулись", x0, yb, "text", 16, col=MUTED)
+        yb += 22
+        cx, cy, nm, desc = pos[hover]
+        lines = wrap(desc, x1 - x0 - 28)
+        ty0 = int(yb + 6)
+        UI.cell(sc, x0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
+        letters(sc, nm, x0 + 12, ty0 + 8, "text", 16, col=GOLD)
+        for j, ln in enumerate(lines):
+            UI.rich(sc, ln, x0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
+        cursor(sc, int(cx) + 4, int(cy) + 2)
+    # under the attacks: what it hands down — icons in a column
     if spec.get("below"):
         head, rows = spec["below"]
         y += 10
@@ -970,7 +1036,7 @@ def big_card(spec, name):
     x0, x1 = 632, WW - 18
     heading(sc, spec.get("right", "СПОСОБНОСТИ"), x0, 62, seed=5)
     y = 90
-    hov = spec.get("hover", len(spec["abilities"]) - 1)
+    hov = spec.get("hover", len(spec["abilities"]) - 1)        # None: the mouse is elsewhere
     for i, (key, lab, nm, desc, col) in enumerate(spec["abilities"]):
         if i == hov:
             UI.cell(sc, x0 - 6, y - 4, x1, y + 38, "hi")
@@ -981,14 +1047,15 @@ def big_card(spec, name):
             hy, hx = y, x0 + 42 + UI.text_width(nm, "text", 16)
         y += 44
     # the hovered one: its text in a tooltip under the cursor
-    key, lab, nm, desc, col = spec["abilities"][hov]
-    lines = wrap(desc, x1 - x0 - 40)
-    tx0, ty0 = x0 + 10, hy + 46
-    UI.cell(sc, tx0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
-    letters(sc, nm, tx0 + 12, ty0 + 8, "text", 16, col=col)
-    for j, ln in enumerate(lines):
-        UI.rich(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
-    cursor(sc, int(hx) - 30, int(hy) + 10)
+    if hov is not None:
+        key, lab, nm, desc, col = spec["abilities"][hov]
+        lines = wrap(desc, x1 - x0 - 40)
+        tx0, ty0 = x0 + 10, hy + 46
+        UI.cell(sc, tx0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
+        letters(sc, nm, tx0 + 12, ty0 + 8, "text", 16, col=col)
+        for j, ln in enumerate(lines):
+            UI.rich(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
+        cursor(sc, int(hx) - 30, int(hy) + 10)
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out(name))
@@ -1010,7 +1077,7 @@ def cards():
                             ("m_blister", "Нарывник", "мутация", SILVER)]),
         abilities=[("stinger", "форма", "Жало", "Если удар жалом пробивает броню, цель получает 1–4 {яд} и теряет 1 броню до конца боя. {яд} накапливается. С одной цели снимается не больше 2 брони. Машинам {яд} не страшен, но броню жало снимает и с них.", GOLD),
                    ("wings", "деталь", "Крылья", "Может проходить через клетки, занятые своими.", GOLD),
-                   ("m_blister", "мутация · общий пул", "Нарывник", "Враг, который ранит её в ближнем бою, до конца боя бьёт слабее. На одного врага срабатывает один раз. Действует и на машины.", SILVER),
+                   ("m_blister", "мутация · общая", "Нарывник", "Враг, который ранит её в ближнем бою, до конца боя бьёт слабее. На одного врага срабатывает один раз. Действует и на машины.", SILVER),
                    ("evo_vise", "эволюция формы", "Клешни-тиски", "Клешни бьют {дроб}. Враг, в которого они попали, не может уйти со своей клетки.", (150, 220, 120)),
                    ("fear", "слабость", "Медленнее других", "Скорость 2, у других рабочих 3.", RED),
                    ("ant", "класс", "Стая", "Боевой дух +1 за каждую свою особь в соседних клетках, но не больше +4.", INK),
@@ -1024,10 +1091,13 @@ def cards():
                ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
         stats=[("здоровье", "80"), ("броня", "2 · хитин"), ("скорость", "1"), ("размер", "6")],
         attacks=[("matka", "Жвалы", "1–6 +2", "{руб}", "1", "")],
-        below=("ПУЛ МУТАЦИЙ", [("m_nest", "Малое гнездо", "Гнездо", GOLD), ("m_nurse", "Кормилица", "Гнездо", GOLD),
-                               ("m_vivi", "Живородящая", "Гнездо", GOLD), ("m_bud", "Почкование", "Гнездо", GOLD),
-                               ("m_dominant", "Доминантная линия", "Порода", GOLD), ("m_flight", "Брачный полёт", "Порода", GOLD),
-                               ("m_hybrid", "Гибрид", "Порода", GOLD), ("m_heir", "Наследница", "ключ", (196, 160, 236))]),
+        hover=None,
+        comb=([("Гнездо", [("m_nest", "lived", "Малое гнездо", ""), ("m_nurse", "open", "Кормилица", ""),
+                            ("m_vivi", "sealed", "Живородящая", ""), ("m_bud", "sealed", "Почкование", "")]),
+               ("Порода", [("m_dominant", "sealed", "Доминантная линия", ""),
+                           ("m_flight", "open", "Брачный полёт", "Пару ей в выводке выбираешь сам из всех выживших, а не из соседей по бою."),
+                           ("m_hybrid", "sealed", "Гибрид", "")])],
+              ("m_heir", "keysealed", "Наследница", ""), "Брачный полёт"),
         abilities=[("clutch", "каждые 3 хода", "Кладка", "Каждые 3 хода рядом с Маткой вылупляются 2 личинки. В бой они вступают со следующего раунда. Личинки, которые доживут до конца боя, попадут в выводок с чертой, убившей в этом бою больше всего врагов.", GOLD),
                    ("larva", "постоянно", "Сердце роя", "Если особь роя погибает в 2 клетках от Матки, на её месте остаётся яйцо. Через 2 хода из него вылупляется личинка.", GOLD),
                    ("feed", "правило похода", "Плодовитость", "В выводке на одного потомка больше. Кормление лидера стоит в два раза дешевле.", (214, 196, 150)),

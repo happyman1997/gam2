@@ -330,11 +330,11 @@ def pools():
 def pools_overlay(img, xs, PW_):
     d = ImageDraw.Draw(img)
     f = UI.f
-    d.text((20, 18), "Выводок: что добавляют пулы лидеров", font=f(1, 24), fill=INK)
+    d.text((20, 18), "Выводок: что добавляют мутации лидеров", font=f(1, 24), fill=INK)
     heads = [("Брачный полёт", "пару ей выбираешь сам", "m_flight"),
              ("Гибрид", "бесплоден: в пары не встаёт", "m_hybrid"),
              ("Откормленная", "только у Пожирателя", "m_fattened"),
-             ("Отметки мутаций", "чей пул — тот и цвет", "m_nest")]
+             ("Отметки мутаций", "чья мутация — тот и цвет", "m_nest")]
     for (x0, (h, sub, key)) in zip(xs, heads):
         cx = (x0 + PW_ / 2) * S
         w = d.textlength(h, font=f(1, 19))
