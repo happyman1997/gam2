@@ -923,6 +923,39 @@ def comb_cell(sc, cx, cy, r, state, key=None):
         icon(sc, key, cx - 16, cy - 16, 2)
 
 
+def crown(sc, cx, top):
+    """A small crown over the royal cell: the key mutation."""
+    rows = ["o..o..o..o", "oAoAooAoAo", "oAAAAAAAAo", "oaAaAAaAao", "oAAAAAAAAo", "oooooooooo"]
+    col = dict(o=UI.OUTL, A=hexc("#e8a838"), a=hexc("#fff0a0"))
+    z = 2
+    for j, row in enumerate(rows):
+        for i, ch in enumerate(row):
+            if ch != ".":
+                yy, xx = int(top) + j * z, int(cx) - 5 * z + i * z
+                sc.rgb[yy:yy + z, xx:xx + z] = col[ch]
+    sc.glow(cx, top + 6, 16, hexc("#f0c050"), 0.35)
+
+
+def pict_flight(sc, x0, y, x1):
+    """Брачный полёт, without words: she, a thread, three of the survivors — the player's cursor on one of them."""
+    me = bug(("wings",), "idle", 1.3, 41, rare="flight")
+    put(sc, me, x0 + 34, y + 40, 10)
+    cands = [(("horn",), 42), (("stinger",), 43), (("wings",), 44)]
+    xs = [x0 + 150 + i * 52 for i in range(3)]
+    sc.glow(xs[1], y + 32, 26, hexc("#ffd070"), 0.35)
+    for t in np.linspace(0, 2 * np.pi, 80):                # the chosen one, ringed
+        sc.rgb[int(y + 42 + np.sin(t) * 5), int(xs[1] + np.cos(t) * 20)] = hexc("#ffd070")
+    UI.silk(sc, (x0 + 56, y + 22), (xs[1] - 14, y + 22), sag=-10, col="#f0c040")
+    for i, ((tr, sd), cx) in enumerate(zip(cands, xs)):
+        put(sc, bug(tr, "idle", 1.0, sd), cx, y + 40, 8)
+    letters(sc, "?", xs[0], y - 4, "title", 8, col=PALE, outline=False, align="center")
+    letters(sc, "?", xs[2], y - 4, "title", 8, col=PALE, outline=False, align="center")
+    cursor(sc, int(xs[1]) + 2, int(y) + 22)
+
+
+PICT = {"Брачный полёт": (pict_flight, "пару выбираешь сам")}
+
+
 def leader_comb(sc, x0, y, rows, key, hover):
     """The leader's mutations as a comb: a row of cells per branch, the key one a big royal cell at the end."""
     r, step = 21, 21 * 1.732
@@ -938,7 +971,7 @@ def leader_comb(sc, x0, y, rows, key, hover):
     kx, ky = x0 + 88 + 4 * step + 12, y + r * 0.75
     sc.glow(kx, ky, 40, hexc("#f0c050"), 0.25)
     comb_cell(sc, kx, ky, 30, st, k_)
-    letters(sc, "ключ", kx, ky + 32, "title", 8, col=PALE, outline=False, align="center")
+    crown(sc, kx, ky - 30 - 13)
     pos[nm] = (kx, ky, nm, desc)
     return pos, y + r * 1.5 * (len(rows) - 1) + 34
 
@@ -1009,16 +1042,14 @@ def big_card(spec, name):
         rows, key, hover = spec["comb"]
         y += 10
         heading(sc, "МУТАЦИИ", x0, y, seed=6)
-        pos, yb = leader_comb(sc, x0, y + 46, rows, key, hover)
-        letters(sc, "запечатаны — ещё не проснулись", x0, yb, "text", 16, col=MUTED)
-        yb += 22
+        pos, yb = leader_comb(sc, x0, y + 60, rows, key, hover)
         cx, cy, nm, desc = pos[hover]
-        lines = wrap(desc, x1 - x0 - 28)
-        ty0 = int(yb + 6)
-        UI.cell(sc, x0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
+        draw_pict, line = PICT[nm]
+        ty0 = int(yb + 4)
+        UI.cell(sc, x0, ty0, x1, ty0 + 104, "normal")
         letters(sc, nm, x0 + 12, ty0 + 8, "text", 16, col=GOLD)
-        for j, ln in enumerate(lines):
-            UI.rich(sc, ln, x0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
+        draw_pict(sc, x0 + 12, ty0 + 36, x1 - 12)
+        UI.rich(sc, line, x0 + 12, ty0 + 82, "text", 16, col=INK)
         cursor(sc, int(cx) + 4, int(cy) + 2)
     # under the attacks: what it hands down — icons in a column
     if spec.get("below"):
