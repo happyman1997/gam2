@@ -250,11 +250,11 @@ def sheet():
     caps.append((248, by - 62, "2 тела"))
     caps.append((568, by - 62, "ещё 2"))
 
-    # ---- Кукушка: the egg-layer and the changeling
+    # ---- Чума: the egg-layer and the changeling
     y0 += RH
     by = y0 + RH - 44
-    heads.append((y0, "Кукушка", "Длинный яйцеклад, дети хозяина, Подкидыш", "развитие: личинок 3, заражает и яд скорпионов, или подкидышей двое", 3))
-    ku = SL.build("Кукушка", "attack", k)
+    heads.append((y0, "Чума", "Длинный яйцеклад, дети хозяина, Подкидыш", "развитие: личинок 3, заражает и яд скорпионов, или подкидышей двое", 3))
+    ku = SL.build("Чума", "attack", k)
     put(sc, ku, 70, by, 24)
     put(sc, W.build((), 0.02, "attack", False, k=k, genes=W.genes_for(12)), 118, by + 2, 8)      # its own, in front of it
     inv = flip(GH.build(LH.INVENTOR, "idle", 0.9 * k))

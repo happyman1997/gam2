@@ -138,13 +138,13 @@ def dead_bug(hue, seed):
     return spr
 
 
-POOL = {"Матка": "matka", "Разум улья": "razum", "Пожиратель": "devourer", "Кукушка": "cuckoo"}   # its mutation pool
+POOL = {"Матка": "matka", "Разум улья": "razum", "Пожиратель": "devourer", "Чума": "cuckoo"}   # its mutation pool
 
 LEADERS = {   # the swarm's leader: (name, size, file, evolutions bred by now: form → its evolutions)
     "Матка": ("матка", 6, "battle.png", {}),
     "Разум улья": ("Разум улья", 4, "battle_razum.png", {None: ("phalanx",), "wings": ("syringe",), "scythes": ("saws",)}),
     "Пожиратель": ("Пожиратель", 7, "battle_pozh.png", {None: ("formic",), "horn": ("forked",), "stinger": ("vise",)}),
-    "Кукушка": ("Кукушка", 3, "battle_kuk.png", {"acid": ("scent",), "wings": ("tough",), "firefly": ("hood",)}),
+    "Чума": ("Чума", 3, "battle_kuk.png", {"acid": ("scent",), "wings": ("tough",), "firefly": ("hood",)}),
 }
 
 
@@ -286,7 +286,7 @@ def build(leader="Матка"):
                 near_front = fr is not None and fx < fr + 30
                 pose = "attack" if (near_front or c <= 8) and rnd.random() < 0.7 else "idle"
                 rare = rnd.choice(pool) if "giant" not in traits and rnd.random() < 0.07 else None
-                chim = rnd.choice(W.CHIMERAS) if leader == "Кукушка" and rnd.random() < 0.07 else None
+                chim = rnd.choice(W.CHIMERAS) if leader == "Чума" and rnd.random() < 0.07 else None
                 state = None
                 if pack and np.hypot(fx - (gx + 150), fy - gy) < 80 and rnd.random() < 0.12:
                     state = "frenzy"                # Кормовое безумие: those beside him while he eats
@@ -320,8 +320,8 @@ def build(leader="Матка"):
     elif leader == "Разум улья":
         qs = SL.build("Разум улья", "idle", 1.0)
         items.append((qy, lambda: (shadow(sc, qx + 4, qy, 60, 10), put(sc, qs, qx, qy, mirror=True))))
-    elif leader == "Кукушка":
-        qs = SL.build("Кукушка", "idle", 1.0)
+    elif leader == "Чума":
+        qs = SL.build("Чума", "idle", 1.0)
         items.append((qy, lambda: (shadow(sc, qx + 4, qy, 50, 8), put(sc, qs, qx, qy, mirror=True))))
         cx_, cy_ = lx - 26, ly + 4                  # the changeling: a worker in the Foundry's rear, at the Architect's back
         ch = W.build((), 0.02, "attack", False, k=1.0, genes=W.genes_for(77))
@@ -352,7 +352,7 @@ def build(leader="Матка"):
     ST.glyph(sc, "shred", sx_ + 8, ST.top_of(sspr, sy_) - 12)
     for state, x, top in marks:
         ST.glyph(sc, state, x, top)
-    if leader == "Кукушка":                       # the Architect bitten from behind: infected
+    if leader == "Чума":                       # the Architect bitten from behind: infected
         ST.on_body(sc, lead, lx, ly, "infected", seed=4)
         ST.glyph(sc, "infected", lx, ST.top_of(lead, ly) - 12)
     if leader == "Разум улья":                    # one thought per flock: the whole flock's threads meet on one golem
@@ -373,7 +373,7 @@ def build(leader="Матка"):
             SA.ring(sc, gx - 10, gy + 2, r, r * 0.3, SA.PHERO, 0.45)
         for k_ in range(8):                           # the machines' cores stall: sparks over them
             sc.rgb[int(gy - 96 - (k_ * 7) % 20), int(gx - 20 + (k_ * 11) % 40)] = hexc("#e0e0f0")
-    if leader == "Кукушка":                       # the Architect bitten from behind: infected
+    if leader == "Чума":                       # the Architect bitten from behind: infected
         SA.spots(sc, int(lx) + 2, int(ly) - 30, [(0, 0), (-3, 7), (2, 13)])
         SA.splat(sc, lx - 26, ly + 6, 14, col=hexc("#5a4030"), k=0.7)
     for (a, b) in shots:                    # tracers along the shells' path
@@ -399,7 +399,7 @@ def overlay(img, count, ng, leader="Матка"):
     d.text((WW * S - 24 - d.textlength(t2, font=fs), HH * S - 34), t2, font=fs, fill=(196, 186, 214))
 
 
-def overview(names=("Разум улья", "Пожиратель", "Кукушка")):
+def overview(names=("Разум улья", "Пожиратель", "Чума")):
     """The other swarm leaders' battles side by side, half size."""
     from PIL import Image
     ims = [Image.open(out(LEADERS[n][2])).convert("RGB").resize((WW, HH), Image.LANCZOS) for n in names]

@@ -70,7 +70,7 @@ pub struct Unit {
     pub kills: u32,
     pub growth: u32,
     pub last_meal: u32,
-    /// Side whose larvae hatch from this unit when it dies (Кукушка).
+    /// Side whose larvae hatch from this unit when it dies (Чума).
     pub infected: Option<u8>,
     pub curled: bool,
     /// Silent (no spells, no modules) up to and including this round (Замыкание).

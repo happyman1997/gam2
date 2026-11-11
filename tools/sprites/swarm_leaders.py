@@ -7,7 +7,7 @@ their abilities hatch.
                         glow with pheromone violet; a small face with a cluster of eyes under the brain.
   Пожиратель (5→7)    — a low heavy beast that is mostly maw: four jaws with rows of teeth, armour plates, spines;
                         it grows in battle — three stages, more plates and spines, and at the last its cracks glow.
-  Кукушка (size 3)    — a parasitoid wasp: slender, a sickle abdomen banded rust, an egg bulb, and an ovipositor longer
+  Чума (size 3)    — a parasitoid wasp: slender, a sickle abdomen banded rust, an egg bulb, and an ovipositor longer
                         than its body that it swings forward under itself to strike.
   личинка             — a pale grub with a dark head and jaws: hatched by the Matka's laying and the Cuckoo's eggs.
 
@@ -25,7 +25,7 @@ from swarm1 import (pivot, spike, leg_pairs, antennae, mandibles, rings, chitin,
                     M_ICHOR, M_SHEEN, M_DARKEYE, M_WING, M_WING_NEAR, M_VEIN, M_EGG, M_MEMBRANE, AMBER, CRIMSON)
 
 SCALE = {1: 1.0, 2: 1.45, 3: 1.9, 4: 2.3, 5: 2.7, 6: 3.1, 7: 3.5}
-SIZE = {"Матка": 6, "Разум улья": 4, "Пожиратель": 5, "Кукушка": 3, "личинка": 1}
+SIZE = {"Матка": 6, "Разум улья": 4, "Пожиратель": 5, "Чума": 3, "личинка": 1}
 
 M_GRUB = Mat(ramp("#241a12", "#54442e", "#8a7656", "#bea98a", "#ece0c4"))
 M_GRUB_SEG = Mat(ramp("#1a120c", "#3a2c1e", "#5e4c36", "#8a765a", "#b8a484"))
@@ -272,7 +272,7 @@ def pozhiratel(pose="idle", stage=0, hue=0.0):
     return m
 
 
-# ---------------------------------------------------------------- Кукушка
+# ---------------------------------------------------------------- Чума
 def kukushka(pose="idle", hue=0.0):
     m = Model()
     mc = mat(CUCKOO, hue)
@@ -376,7 +376,7 @@ def larva(pose="idle", hue=0.0, host=None):
     return m
 
 
-BUILD = {"Матка": matka, "Разум улья": razum, "Пожиратель": pozhiratel, "Кукушка": kukushka, "личинка": larva}
+BUILD = {"Матка": matka, "Разум улья": razum, "Пожиратель": pozhiratel, "Чума": kukushka, "личинка": larva}
 
 
 def trim(spr, pad=2):
@@ -405,7 +405,7 @@ DEV = {
     "Пожиратель": [("bigger", "Стартует крупнее", "бой начинает размером 6"),
                    ("every_kill", "Растёт с каждого тела", "раздутое брюхо светится ихором"),
                    ("heal", "Лечится вдвое", "второй желудок-мешок на спине")],
-    "Кукушка": [("three", "Личинок 3", "мешочек с тремя крупными яйцами"),
+    "Чума": [("three", "Личинок 3", "мешочек с тремя крупными яйцами"),
                 ("venom", "Заражает и яд скорпионов", "ядовитая железа, яйцеклад сочится ядом"),
                 ("two", "Подкидышей двое", "несёт рабочую под брюхом")],
 }
@@ -476,7 +476,7 @@ def add_dev(m, name, dev, pose, hue=0.0):
             for z in (1, -1):
                 m.limb([c + (-3.0, 1.2, 2.6 * z), c + (0.0, 2.6, 3.0 * z), c + (3.0, 1.0, 2.4 * z)], 1, M_VEIN_R, band=2)
             m.ell(c + (1.4, 1.6, 2.0), (1.0, 0.6, 0.8), M_BLOODY)
-    elif name == "Кукушка":
+    elif name == "Чума":
         curl = pose == "attack"
         tip = np.array((-14.4, 5.8, 0)) if not curl else np.array((-4.6, 1.8, 0))
         bulb = tip + (np.array((-1.4, -0.6, 0)) if not curl else np.array((1.0, -0.4, 0)))
@@ -532,7 +532,7 @@ LEADERS = [
       ("Каннибал", "постоянно: ест погибших своих рядом, как чужих"),
       ("Всё в пасть", "поход: съеденное в бою — биомасса, она идёт в его рост; рой меньше"),
       ("Ненасытный", "слабость: три раунда без еды — съедает живую свою особь рядом", 1)]),
-    ("Кукушка", "размер 3 · рой растёт за счёт врага", 2.2,
+    ("Чума", "размер 3 · рой растёт за счёт врага", 2.2,
      [("Длинный яйцеклад", "постоянно: колет на 2 клетки и раньше всех — инициатива +3"),
       ("Яйцеклад", "атака: заражает; живой, погибнув, выпускает 2 личинки, машина — гнездо"),
       ("Дети хозяина", "постоянно: личинки берут черту хозяина и уходят в выводок химерами"),
@@ -574,7 +574,7 @@ def sheet():
            (F.build("Страж", "idle", k=2.2 * r), "Страж · 6"),
            (build("Пожиратель", "idle", r), "Пожиратель · 5"),
            (build("Разум улья", "idle", r), "Разум улья · 4"),
-           (build("Кукушка", "idle", r), "Кукушка · 3"),
+           (build("Чума", "idle", r), "Чума · 3"),
            (W.build((), 0.0, "idle", soldier=True, k=r), "солдат · 2"),
            (W.build((), 0.0, "idle", k=r), "рабочая · 1"),
            (build("личинка", "idle", r), "личинка")]
@@ -612,8 +612,8 @@ def dev_sheet():
     from PIL import ImageFont
     from leaders_sheet import canvas, put, fonts, S as SS, GOLD, INK, MUT
     from paths import out, font
-    K = {"Матка": 0.95, "Разум улья": 1.7, "Пожиратель": 1.1, "Кукушка": 1.55}
-    RH = {"Матка": 150, "Разум улья": 142, "Пожиратель": 132, "Кукушка": 124}
+    K = {"Матка": 0.95, "Разум улья": 1.7, "Пожиратель": 1.1, "Чума": 1.55}
+    RH = {"Матка": 150, "Разум улья": 142, "Пожиратель": 132, "Чума": 124}
     WW, Y0, CWD = 960, 60, 240
     HH = Y0 + sum(RH.values()) + 8
     sc = canvas(WW, HH, 47)
@@ -663,7 +663,7 @@ if __name__ == "__main__":
     if "check" not in sys.argv[1:]:
         sheet()
         raise SystemExit
-    items = [("Матка", 0), ("Разум улья", 0), ("Пожиратель", 0), ("Пожиратель", 1), ("Пожиратель", 2), ("Кукушка", 0),
+    items = [("Матка", 0), ("Разум улья", 0), ("Пожиратель", 0), ("Пожиратель", 1), ("Пожиратель", 2), ("Чума", 0),
              ("личинка", 0)]
     K = 1.4
     sprs = [[build(n, p, K, st) for p in ("idle", "attack")] for n, st in items]

@@ -55,7 +55,7 @@ SELECTION = (("жало", 23, "stinger"), ("рог", 11, "horn"), ("кислот
 KID_ICON = {"химера": "hand", "новая форма": "scythes"}
 # mutations in the groups: (key, mark); a leader's own pool is marked in the leader's colour, the common pool in silver
 MUTS = {5: ("nest", "мутация Матки"), 7: ("spinner", "общая мутация"), 8: ("hybrid", "гибрид · бесплоден")}
-POOL_COL = {"Матка": (240, 200, 90), "Разум улья": (196, 150, 255), "Пожиратель": (236, 96, 80), "Кукушка": (150, 220, 90),
+POOL_COL = {"Матка": (240, 200, 90), "Разум улья": (196, 150, 255), "Пожиратель": (236, 96, 80), "Чума": (150, 220, 90),
             "общая": (206, 206, 222), "бесплоден": (240, 140, 140)}
 MARK_COL = {"мутация Матки": POOL_COL["Матка"], "общая мутация": POOL_COL["общая"], "гибрид · бесплоден": POOL_COL["бесплоден"]}
 GX0, GY0, GCW, GCH, GCOLS = 12, 92, 232, 100, 4
@@ -366,7 +366,7 @@ def pools_overlay(img, xs, PW_):
     d.text(((xs[2] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 286 * S), t, font=f(1, 16), fill=INK)
     x = xs[3] * S
     rows = [("m_nest", "мутация Матки", POOL_COL["Матка"]), ("m_psi_gland", "пси-мутация Разума", POOL_COL["Разум улья"]),
-            ("m_sated", "мутация Пожирателя", POOL_COL["Пожиратель"]), ("m_spores", "мутация Кукушки", POOL_COL["Кукушка"]),
+            ("m_sated", "мутация Пожирателя", POOL_COL["Пожиратель"]), ("m_spores", "мутация Чумы", POOL_COL["Чума"]),
             ("m_spinner", "общая мутация", POOL_COL["общая"]), ("m_hybrid", "гибрид · бесплоден", POOL_COL["бесплоден"])]
     for k, (key, t, col) in enumerate(rows):
         y = (100 + k * 34) * S

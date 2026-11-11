@@ -73,19 +73,19 @@ fn main() {
         ("Старт Отца колосса против старта Матки", start_otets(), start_matka()),
         ("Старт Отца колосса против старта Разума улья", start_otets(), start_razum()),
         ("Старт Отца колосса против старта Пожирателя", start_otets(), start_pozhiratel()),
-        ("Старт Отца колосса против старта Кукушки", start_otets(), start_kukushka()),
+        ("Старт Отца колосса против старта Чумы", start_otets(), start_kukushka()),
         ("Старт Изобретателя против старта Матки", start_izobretatel(), start_matka()),
         ("Старт Изобретателя против старта Разума улья", start_izobretatel(), start_razum()),
         ("Старт Изобретателя против старта Пожирателя", start_izobretatel(), start_pozhiratel()),
-        ("Старт Изобретателя против старта Кукушки", start_izobretatel(), start_kukushka()),
+        ("Старт Изобретателя против старта Чумы", start_izobretatel(), start_kukushka()),
         ("Старт Маньяка против старта Матки", start_manyak(), start_matka()),
         ("Старт Маньяка против старта Разума улья", start_manyak(), start_razum()),
         ("Старт Маньяка против старта Пожирателя", start_manyak(), start_pozhiratel()),
-        ("Старт Маньяка против старта Кукушки", start_manyak(), start_kukushka()),
+        ("Старт Маньяка против старта Чумы", start_manyak(), start_kukushka()),
         ("Старт Зодчего против старта Матки", start_zodchiy(), start_matka()),
         ("Старт Зодчего против старта Разума улья", start_zodchiy(), start_razum()),
         ("Старт Зодчего против старта Пожирателя", start_zodchiy(), start_pozhiratel()),
-        ("Старт Зодчего против старта Кукушки", start_zodchiy(), start_kukushka()),
+        ("Старт Зодчего против старта Чумы", start_zodchiy(), start_kukushka()),
     ];
     println!("{} боёв на сценарий\n", n);
     println!("| Сценарий | Литейщик | Противник | Ничья | Раундов | Осталось прочности у победившего Литейщика |");
@@ -113,7 +113,7 @@ fn main() {
         ("Старт Матки", start_matka()),
         ("Старт Разума улья", start_razum()),
         ("Старт Пожирателя", start_pozhiratel()),
-        ("Старт Кукушки", start_kukushka()),
+        ("Старт Чумы", start_kukushka()),
     ];
     let m = (n / 4).max(100);
     for (name, a) in armies {

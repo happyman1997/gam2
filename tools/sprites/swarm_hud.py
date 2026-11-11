@@ -62,7 +62,7 @@ def put(sc, spr, cx, by, sw=10):
 
 
 EPITHET = {"Матка": ("мать роя", (240, 200, 90)), "Разум улья": ("мысль роя", (196, 150, 255)),
-           "Пожиратель": ("голод роя", (236, 96, 80)), "Кукушка": ("чужая кладка", (150, 220, 90))}
+           "Пожиратель": ("голод роя", (236, 96, 80)), "Чума": ("чума роя", (150, 220, 90))}
 
 
 def epithet(sc, text, x, y, col, seed=0, px=16, curls=True):
@@ -542,7 +542,7 @@ def pools():
     # whose mutation
     x0 = xs[3]
     rows = [("m_nest", "Матки", B.POOL_COL["Матка"]), ("m_psi_gland", "Разума", B.POOL_COL["Разум улья"]),
-            ("m_sated", "Пожирателя", B.POOL_COL["Пожиратель"]), ("m_spores", "Кукушки", B.POOL_COL["Кукушка"]),
+            ("m_sated", "Пожирателя", B.POOL_COL["Пожиратель"]), ("m_spores", "Чумы", B.POOL_COL["Чума"]),
             ("m_spinner", "общая", B.POOL_COL["общая"]), ("m_hybrid", "бесплоден", B.POOL_COL["бесплоден"])]
     for k_, (key, t, col) in enumerate(rows):
         y = 108 + k_ * 36
@@ -571,7 +571,7 @@ def flocks():
     for x0 in xs:
         UI.cell(sc, x0, 52, x0 + PW_, 322, "find")
     heads = [("Матка", "Тесные стаи", "в клетке 6, а не 4"), ("Разум улья", "Одна мысль", "вся стая — в одну цель"),
-             ("Пожиратель", "Свора", "за вожаком, тела — ему"), ("Кукушка", "Пёстрые стаи", "разные виды вперемешку")]
+             ("Пожиратель", "Свора", "за вожаком, тела — ему"), ("Чума", "Пёстрые стаи", "разные виды вперемешку")]
     for x0, (who, name, sub) in zip(xs, heads):
         letters(sc, who, x0 + 12, 60, "title", 8, col=PALE, outline=False)
         letters(sc, name, x0 + 12, 72, "text", 16, col=GOLD, jitter=1, seed=len(name))
@@ -619,7 +619,7 @@ def flocks():
         sc.glow(x0 + dx, dy - 6, 14, hexc("#d02a1e"), 0.4)
     letters(sc, "ему", x0 + 204, 226, "title", 8, col=(255, 140, 110), outline=False, align="center")
     letters(sc, "сами не лечатся", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
-    # Кукушка: one flock of all kinds, pairs inside it
+    # Чума: one flock of all kinds, pairs inside it
     x0 = xs[3]
     cellbox(x0 + 24, 140, 184, 130, "#9ae060")
     kinds = [((), 130), (("wings",), 131), (("stinger",), 132), (("horn",), 133), (("acid",), 134), (("spitter",), 135)]
@@ -809,7 +809,7 @@ def leaders_pick():
              [((), 9), (("firefly",), 3)], [((), 3), (("scythes",), 2), (("stinger",), 1)]),
             ("Пожиратель", "pozh", "ест в бою и растёт", "свора", "Питательная суть",
              [((), 15), (("jumper",), 3)], [((), 2)]),
-            ("Кукушка", "kuk", "кладёт яйца во врагов", "пёстрые стаи", "Королевская кладка",
+            ("Чума", "kuk", "кладёт яйца во врагов", "пёстрые стаи", "Королевская кладка",
              [((), 15), (("stinger",), 3), (("acid",), 3)], [((), 3)])]
     PW_ = 232
     for k_, (name, ik, what, rule, key, army, soldiers) in enumerate(data):
@@ -1204,8 +1204,8 @@ def cards():
                    ("m_hungry", "слабость", "Ненасытный", "Три раунда без еды: хватает самую мелкую свою особь рядом и съедает. Если рядом никого, теряет десятую часть здоровья за раунд.", RED)]),
         "swarm_card_pozh.png")
     big_card(dict(
-        seed=69, title="КУКУШКА", sub=EPITHET["Кукушка"][0], epi=EPITHET["Кукушка"][1], cell="new",
-        sprite=leader("Кукушка", "idle", 2.4), dx=6, sw=44,
+        seed=69, title="ЧУМА", sub=EPITHET["Чума"][0], epi=EPITHET["Чума"][1], cell="new",
+        sprite=leader("Чума", "idle", 2.4), dx=6, sw=44,
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
                ("val", "на выбор", ["личинок 3", "заражает и яд скорпионов", "или подкидышей двое"], INK)],
         stats=[("здоровье", "12"), ("броня", "1 · хитин"), ("скорость", "2"), ("размер", "3")],
@@ -1360,9 +1360,9 @@ def leaders_field():
     pop(sc, "feed", px + 110, py + 96, "Ненасытный", col=RED, seed=4)
     caption(3, "Пожиратель голоден", "три раунда без еды — красные камни; хватает свою, самую мелкую")
 
-    # 5 — Кукушка: the eggs ripen in a machine's warm firebox; a grub crawls out every 3 turns
+    # 5 — Чума: the eggs ripen in a machine's warm firebox; a grub crawls out every 3 turns
     px, py = P(4)
-    k_spr = SL.build("Кукушка", "attack", 1.0)
+    k_spr = SL.build("Чума", "attack", 1.0)
     kx, ky = px + 250, py + 206
     BT.shadow(sc, kx + 4, ky, 50, 8)
     BT.put(sc, k_spr, kx, ky, mirror=True)
@@ -1375,7 +1375,7 @@ def leaders_field():
     BT.put(sc, SL.build("личинка", "attack", 0.9), gx_ + 30, gy_ + 8)       # a grub already out of the grate
     mob(4, ((160, 222),))
     pop(sc, "kuk", px + 190, py + 98, "Яйцеклад", col=GREEN, seed=5)
-    caption(4, "Кукушка", "в машине зреет кладка: камни до следующей личинки")
+    caption(4, "Чума", "в машине зреет кладка: камни до следующей личинки")
 
     # 6 — the leader is dead: the swarm beheaded, everyone tests fear
     px, py = P(5)

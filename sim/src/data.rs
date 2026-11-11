@@ -380,7 +380,7 @@ pub fn pozhiratel() -> Template {
 }
 
 pub fn kukushka() -> Template {
-    swarm_leader("Кукушка", 3, 12, 6, 0, Dmg::Pierce, 7, 1, 11, 2, ArmorType::Chitin)
+    swarm_leader("Чума", 3, 12, 6, 0, Dmg::Pierce, 7, 1, 11, 2, ArmorType::Chitin)
         .with_trait(Trait::Infects)
         .with_trait(Trait::Changeling)
 }
