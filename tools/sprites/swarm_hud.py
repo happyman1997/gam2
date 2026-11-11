@@ -796,51 +796,195 @@ def aftermath():
 
 
 # ---------------------------------------------------------------- choosing the leader at the start of the run
-def leaders_pick():
+ACID, ACID2 = (176, 244, 70), (236, 255, 140)
+
+
+def dilate(m, d=1):
+    out = m.copy()
+    for _ in range(d):
+        out = out | np.roll(out, 1, 0) | np.roll(out, -1, 0) | np.roll(out, 1, 1) | np.roll(out, -1, 1)
+    return out
+
+
+def neon(sc, m, col, width=5, k=0.55):
+    """A glowing rim around a shape: a hard line of light, then a fading haze outside it."""
+    col = np.array(col, float)
+    prev = m
+    for d in range(1, width + 1):
+        ring = dilate(prev, 1) & ~prev
+        a = k * (1 - (d - 1) / width) ** 1.6
+        sc.rgb[ring] = sc.rgb[ring] * (1 - a) + col * a
+        prev = prev | ring
+    o, _, _ = UI.edges(m)
+    sc.rgb[o] = np.minimum(255, col * 1.1 + 20)
+
+
+def ellipse(sc, cx, cy, rx, ry, p=2.0):
+    return (np.abs(sc.xx - cx) / rx) ** p + (np.abs(sc.yy - cy) / ry) ** p <= 1
+
+
+def thick(sc, pts, w, col, hi=None):
+    """A thick jointed line through points: a dark outline, a body, a lit top edge."""
+    for (a_, b_) in zip(pts[:-1], pts[1:]):
+        n = int(max(abs(b_[0] - a_[0]), abs(b_[1] - a_[1]))) + 1
+        for t in np.linspace(0, 1, n):
+            x, y = int(a_[0] + (b_[0] - a_[0]) * t), int(a_[1] + (b_[1] - a_[1]) * t)
+            sc.rgb[y - w:y + w + 1, x - w:x + w + 1] = UI.OUTL
+    for (a_, b_) in zip(pts[:-1], pts[1:]):
+        n = int(max(abs(b_[0] - a_[0]), abs(b_[1] - a_[1]))) + 1
+        for t in np.linspace(0, 1, n):
+            x, y = int(a_[0] + (b_[0] - a_[0]) * t), int(a_[1] + (b_[1] - a_[1]) * t)
+            sc.rgb[y - w + 1:y + w, x - w + 1:x + w] = col
+            if hi is not None:
+                sc.rgb[y - w + 1, x] = hi
+    sc.occ[...] |= False
+
+
+def bug_card(sc, cx, y0, name, sel, seed):
+    """A leader's card shaped as a beetle: a head with compound eyes, sickle mandibles and elbowed antennae; the
+    pronotum bearing the name and the by-name, spined at the shoulders; the elytra holding the leader, a seam down
+    the middle, rows of pits, parting at the tips over a glowing wing; six jointed legs; acid dripping off the tips.
+    The chosen one burns acid-bright; the others smoulder."""
     import swarm_leaders as SL
+    ep, ecol = EPITHET[name]
+    glow = ACID if sel else tuple(int(v * 0.5) for v in ACID)
+    G = np.array(glow, float)
+    rnd = np.random.RandomState(seed)
+    X, Y = sc.xx, sc.yy
+    dy = Y - y0
+    if sel:
+        sc.glow(cx, y0 + 200, 185, hexc("#9ae030"), 0.32)
+    # six legs from under the elytra: femur up and out, tibia down with spikes, a hooked tarsus
+    for side in (-1, 1):
+        for j, ly in enumerate((y0 + 116, y0 + 168, y0 + 220)):
+            p0 = (cx + side * 80, ly)
+            p1 = (cx + side * 100, ly - 14 + j * 5)
+            p2 = (cx + side * 110, ly + 24 + j * 5)
+            p3 = (cx + side * 114, ly + 36 + j * 5)
+            thick(sc, [p0, p1], 2, hexc("#3a2c46"), G * 0.8)
+            thick(sc, [p1, p2, p3], 1, hexc("#4a3a58"), G * 0.8)
+            sc.rgb[int(p1[1]) - 1:int(p1[1]) + 2, int(p1[0]) - 1:int(p1[0]) + 2] = G
+            for t in (0.35, 0.7):
+                x, y = int(p1[0] + (p2[0] - p1[0]) * t), int(p1[1] + (p2[1] - p1[1]) * t)
+                sc.rgb[y - 4:y, x + side * 2] = UI.OUTL
+                sc.rgb[y - 3:y, x + side * 2] = hexc("#8a7a9a")
+    # elbowed antennae with glowing clubs
+    for side in (-1, 1):
+        base, elbow, tipp = (cx + side * 12, y0 + 6), (cx + side * 22, y0 - 10), (cx + side * 48, y0 - 6)
+        thick(sc, [base, elbow, tipp], 1, hexc("#4a3a58"), G * 0.7)
+        sc.rgb[int(tipp[1]) - 2:int(tipp[1]) + 3, int(tipp[0]) - 2:int(tipp[0]) + 3] = np.array(ACID2 if sel else glow, float)
+        sc.glow(tipp[0], tipp[1], 9, G, 0.5)
+    # the body outline, row by row
+    hw = np.zeros(Y.shape, float)
+    r_head = (dy >= 0) & (dy < 36)
+    hw[r_head] = 34 * np.sqrt(np.clip(1 - ((dy[r_head] - 18) / 19) ** 2, 0, 1))
+    r_pro = (dy >= 34) & (dy < 88)
+    hw_pro = np.where(dy < 70, 78 + 10 * np.sin(np.pi / 2 * np.clip((dy - 34) / 36, 0, 1)), 88 - 4 * (dy - 70) / 18)
+    hw[r_pro] = hw_pro[r_pro]
+    r_ely = (dy >= 90) & (dy < 384)
+    hw_ely = np.where(dy < 300, 86, 86 * np.sqrt(np.clip(1 - ((dy - 300) / 84) ** 2, 0, 1)) ** 0.9)
+    hw[r_ely] = hw_ely[r_ely]
+    body = (np.abs(X - cx) <= hw) & (hw > 0)
+    pron = body & r_pro
+    ely = body & r_ely
+    parted = ely & (dy > 318) & (np.abs(X - cx) < (dy - 318) * 0.42)   # the elytra part at the tips
+    ely = ely & ~parted
+    for side in (-1, 1):                                       # shoulder spines on the pronotum
+        for k_ in range(12):
+            yy, xx = y0 + 62 - k_ * 0.5, cx + side * (87 + k_)
+            body[int(yy) - max(0, 2 - k_ // 4):int(yy) + 1, int(xx)] = True
+    neon(sc, body, glow, 6 if sel else 4, 0.6 if sel else 0.4)
+    t = np.clip(dy / 384, 0, 1)[..., None]
+    fill = hexc("#30223a") * (1 - t) + hexc("#0c0810") * t
+    sc.rgb[body] = fill[body]
+    # the wing glowing in the parting
+    sc.rgb[parted] = sc.rgb[parted] * 0.3 + G * 0.55
+    for k_ in range(3):
+        vein = parted & (np.abs((X - cx) - (dy - 318) * (k_ - 1) * 0.2) < 0.6)
+        sc.rgb[vein] = np.array(ACID2, float)
+    # elytra: a faint comb, rows of pits, a seam with the scutellum at its top, a sheen down each side
+    UI.comb(sc, ely, cx - 86, y0 + 90, G, 0.1, R=7)
+    for col_ in (-64, -44, -24, 24, 44, 64):
+        for yy in range(int(y0 + 100), int(y0 + 330), 7):
+            if ely[yy, int(cx + col_)]:
+                sc.rgb[yy, int(cx + col_)] = sc.rgb[yy, int(cx + col_)] * 0.45
+    seam = ely & (np.abs(X - cx) < 1)
+    sc.rgb[seam] = UI.OUTL
+    scut = (dy >= 88) & (dy < 108) & (np.abs(X - cx) <= (108 - dy) * 0.55)
+    sc.rgb[scut] = hexc("#46345a")
+    for side in (-1, 1):
+        d_ = np.abs(X - (cx + side * 60))
+        sh = ely & (d_ < 9) & (dy > 96) & (dy < 320)
+        a_ = (0.16 * (1 - d_ / 9))[..., None]
+        sc.rgb[sh] = (sc.rgb * (1 - a_) + hexc("#6a9a7e") * a_)[sh]
+    groove = body & (dy >= 86) & (dy < 90)                     # the joint between pronotum and elytra
+    sc.rgb[groove] = UI.OUTL
+    psheen = pron & (((X - cx) / 60) ** 2 + ((Y - (y0 + 44)) / 7) ** 2 <= 1)
+    sc.rgb[psheen] = sc.rgb[psheen] * 0.7 + hexc("#5a7a66") * 0.3
+    # compound eyes, sickle mandibles
+    for side in (-1, 1):
+        eye = ellipse(sc, cx + side * 27, y0 + 18, 8, 12) & ~ellipse(sc, cx + side * 17, y0 + 20, 5, 9)
+        sc.rgb[eye] = np.array(ecol, float) * (0.85 if sel else 0.5)
+        fac = eye & (((X + Y) % 3 == 0) | ((X - Y) % 3 == 0))
+        sc.rgb[fac] = sc.rgb[fac] * 0.6
+        hi = ellipse(sc, cx + side * 29, y0 + 11, 2, 3)
+        sc.rgb[hi & eye] = hexc("#ffffff") * 0.85
+        sc.glow(cx + side * 27, y0 + 18, 14, np.array(ecol, float), 0.3 if sel else 0.15)
+        eo, _, _ = UI.edges(eye)
+        sc.rgb[eo] = UI.OUTL
+    for side in (-1, 1):
+        pts = [(cx + side * (20 - 26 * tt), y0 + 28 + 12 * np.sin(tt * 2.2)) for tt in np.linspace(0, 1, 9)]
+        thick(sc, pts[:6], 2, hexc("#bda97a"), hexc("#fff4d0"))
+        thick(sc, pts[5:], 1, hexc("#e8dcb0"), hexc("#ffffff"))
+    # the name and the by-name on the pronotum
+    letters(sc, name.upper(), cx, y0 + 40, "title", 16, col=ACID2 if sel else INK, col2=(90, 150, 40) if sel else None,
+            jitter=1, hairs=4, seed=seed, align="center")
+    w = UI.text_width(ep, "title", 16)
+    epithet(sc, ep, cx - w / 2, y0 + 62, ecol, seed=seed + 3, px=16, curls=False)
+    # the leader on the elytra
+    spr = SL.build(name, "idle", 1.0)
+    kk = min(2.2, 158 / spr.w, 176 / spr.h)
+    lead = SL.build(name, "idle", kk)
+    if not sel:
+        import swarm_effects as E
+        lead = E.lit(lead, (20, 30, 16), 0.25)
+    put(sc, lead, cx + 4, y0 + 262, 44)
+    # acid off the tips
+    for side in (-1, 1):
+        x = cx + side * 9
+        for i in range(6):
+            sc.rgb[int(y0 + 380 + i), int(x)] = np.array(ACID2 if sel else glow, float)
+        drop = ellipse(sc, x, y0 + 389, 2.2, 3)
+        sc.rgb[drop] = np.array(ACID2, float)
+        sc.glow(x, y0 + 388, 9, hexc("#b8f040"), 0.5 if sel else 0.25)
+    pud = ellipse(sc, cx, y0 + 398, 24 + rnd.randint(0, 6), 3)
+    sc.rgb[pud] = sc.rgb[pud] * 0.4 + G * 0.6
+    sc.glow(cx, y0 + 398, 26, hexc("#9ae030"), 0.3 if sel else 0.15)
+
+
+def leaders_pick():
     sc = frame_screen(41)
+    X, Y = sc.xx, sc.yy
+    fog = np.clip((Y - 300) / 240, 0, 1)[..., None] * 0.22    # acid haze rising from the floor
+    sc.rgb[:] = sc.rgb * (1 - fog) + np.array((60, 110, 20), float) * fog
+    rnd = np.random.RandomState(7)
+    for _ in range(40):                                          # bubbles
+        bx, by, br = rnd.randint(10, 950), rnd.randint(300, 470), rnd.choice((1, 1, 2, 3))
+        ring = (np.abs(np.hypot(X - bx, Y - by) - br) < 0.7)
+        sc.rgb[ring] = sc.rgb[ring] * 0.4 + np.array(ACID, float) * 0.6
     UI.wing(sc, 0, 0, WW, 44)
-    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=18)
-    title(sc, "ЛИДЕР", "кто поведёт рой в этот поход", seed=35)
-    # start armies as in the concept (workers; soldiers), the flock rule, the key mutation of the leader's pool
-    data = [("Матка", "matka", "плодит рой, выводит породу", "тесные стаи", "Наследница",
-             [((), 12), (("wings",), 3), (("stinger",), 3)], [((), 2), (("horn",), 1), (("carapace",), 1)]),
-            ("Разум улья", "razum", "бьёт мыслью мимо брони", "одна мысль на стаю", "Ретранслятор",
-             [((), 9), (("firefly",), 3)], [((), 3), (("scythes",), 2), (("stinger",), 1)]),
-            ("Пожиратель", "pozh", "ест в бою и растёт", "свора", "Питательная суть",
-             [((), 15), (("jumper",), 3)], [((), 2)]),
-            ("Чума", "kuk", "кладёт яйца во врагов", "пёстрые стаи", "Королевская кладка",
-             [((), 15), (("stinger",), 3), (("acid",), 3)], [((), 3)])]
-    PW_ = 232
-    for k_, (name, ik, what, rule, key, army, soldiers) in enumerate(data):
-        x0 = 12 + k_ * (PW_ + 4)
-        UI.cell(sc, x0, 52, x0 + PW_, 452, "hi" if k_ == 0 else "normal")
-        spr = SL.build(name, "idle", 1.0)
-        kk = min(1.75, 172 / spr.w, 116 / spr.h)
-        put(sc, SL.build(name, "idle", kk), x0 + PW_ / 2 + 6, 174, 30)
-        icon(sc, ik, x0 + 12, 190, 2)
-        letters(sc, name, x0 + 50, 198, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
-        ep, ecol = EPITHET[name]
-        epithet(sc, ep, x0 + 12, 228, ecol, seed=k_ + 7, px=16, curls=False)
-        letters(sc, what, x0 + 12, 252, "text", 16, col=INK)
-        letters(sc, "стаи:", x0 + 12, 276, "title", 8, col=PALE, outline=False)
-        letters(sc, rule, x0 + 54, 272, "text", 16, col=GOLD)
-        for r, (lab, row, sold, by) in enumerate((("рабочие:", army, False, 338), ("солдаты:", soldiers, True, 400))):
-            letters(sc, lab, x0 + 12, by - 46, "title", 8, col=PALE, outline=False)
-            for j, (tr, n) in enumerate(row):
-                b_ = bug(tr, "idle", 1.0, 180 + j + k_ * 5 + r * 20, soldier=sold)
-                cx = x0 + 32 + j * 72
-                put(sc, b_, cx, by, 8)
-                right = np.nonzero(b_.a.any(axis=0))[0].max()
-                letters(sc, f"×{n}", cx - b_.ox + right + 3, by - 6, "title", 8, col=INK)
-        letters(sc, "ключ:", x0 + 12, 428, "title", 8, col=PALE, outline=False)
-        letters(sc, key, x0 + 54, 424, "text", 16, col=(196, 160, 236))
+    UI.drips(sc, 60, 900, 44, "#7ab020", n=8, seed=18)
+    w = letters(sc, "ЛИДЕР", 16, 6, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=6, hairs=9, seed=35)
+    epithet(sc, "КТО СОЖРЕТ ИХ ВСЕХ", 16 + w + 44, 10, ACID, seed=36, px=24)
+    names = ["Матка", "Разум улья", "Пожиратель", "Чума"]
+    for i, name in enumerate(names):
+        bug_card(sc, 132 + i * 232, 60, name, i == 0, seed=40 + i)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
-    UI.button(sc, 690, 466, 948, 524, "amber")
-    letters(sc, "В ПОХОД", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "у каждого лидера свои мутации", 495, 480, "text", 16, col=MUTED, align="center")
-    scribble(sc, 400, 500, 190, seed=53)
+    UI.button(sc, 326, 470, 634, 520, "chitin")
+    letters(sc, "ПОЛНОЕ ОПИСАНИЕ", 480, 486, "title", 16, col=ACID2, align="center")
+    UI.button(sc, 660, 466, 948, 524, "acid")
+    letters(sc, "В ПОХОД", 804, 486, "title", 16, col=ACID2, col2=(110, 170, 40), align="center", jitter=1, hairs=4)
     UI.cobweb(sc, 958, 46, 34, quad=(-1, 1))
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
