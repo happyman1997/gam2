@@ -73,6 +73,32 @@ def egg_hatching():
     return m
 
 
+def psi_wave(sc, a, b, col=None):
+    """The psionic blow: a wavy violet line with a glow where it lands."""
+    col = hexc("#c8a0ff") if col is None else col
+    a, b = np.array(a, float), np.array(b, float)
+    n = int(np.hypot(*(b - a)))
+    d = (b - a) / max(1, n)
+    nrm = np.array((-d[1], d[0]))
+    for i in range(n):
+        p = a + d * i + nrm * np.sin(i * 0.45) * 4
+        if i % 3:
+            x, y = int(p[0]), int(p[1])
+            sc.rgb[y, x] = sc.rgb[y, x] * 0.2 + col * 0.8
+    sc.glow(b[0], b[1], 22, PHERO, 0.6)
+
+
+def zigzag2d(sc, a, b, col):
+    a, b = np.array(a, float), np.array(b, float)
+    pts = [a + (b - a) * t + np.array((0, (-3 if k % 2 else 3) if 0 < k < 6 else 0)) for k, t in enumerate(np.linspace(0, 1, 7))]
+    for p, q in zip(pts[:-1], pts[1:]):
+        m = int(np.hypot(*(q - p))) + 1
+        for t in np.linspace(0, 1, m):
+            x, y = (p + (q - p) * t).astype(int)
+            sc.rgb[y, x] = sc.rgb[y, x] * 0.25 + col * 0.75
+    sc.glow(b[0], b[1], 10, PHERO, 0.3)
+
+
 def thread(sc, a, b, col=PHERO, sag=10.0, k=0.9):
     """A pheromone thread: a sagging dotted line with a faint glow along it."""
     a, b = np.array(a, float), np.array(b, float)
@@ -166,39 +192,40 @@ def sheet():
     put(sc, render_small(egg_hatching(), k * 1.9), 880, by + 2, 10)
     caps.append((866, by + 10, "Сердце роя: погибшая у Матки — яйцо"))
 
-    # ---- Разум улья: one mind and the mark
+    # ---- Разум улья: psi — the blow through armour, the dying scream, the clouding, the seized mind
     y0 += RH
     by = y0 + RH - 44
-    heads.append((y0, "Разум улья", "Пси: Единый разум, Метка, Захват разума", "развитие: две метки, пси-удар на 4 клетки или +1 пси от Метки", 1))
-    rz = SL.build("Разум улья", "idle", k)
-    put(sc, rz, 120, by, 36)
-    bugs = [((), False, 230, by - 40), (("wings",), False, 260, by - 4), (("stinger",), True, 205, by + 2),
-            (("scythes",), False, 300, by - 30)]
-    for traits, sold, x, yb in bugs:
-        b = W.build(traits, 0.05, "idle", soldier=sold, k=k)
-        put(sc, b, x, yb, 10)
-        thread(sc, (120 + 8, by - 52), (x, yb - 10), sag=-12)
-    caps.append((200, by + 10, "Стая на всё поле: +4 к духу каждой особи"))
-    tg = flip(F.build("Орудие", "idle", k=1.6 * k))
-    put(sc, tg, 720, by, 34)
-    ring(sc, 720, by + 2, 34, 8)
-    top = by - (tg.oy - int(np.nonzero(tg.a.any(axis=1))[0].min()))
-    sigil(sc, 716, top - 14, 10)
-    for traits, sold, x in ((("horn",), True, 600), ((), False, 640), (("jumper",), False, 572)):
-        put(sc, W.build(traits, -0.05, "attack", soldier=sold, k=k), x, by + (0 if sold else -2), 10)
-    for x in (600, 640, 572):
-        thread(sc, (x + 6, by - 24), (700, by - 70), sag=10, k=0.6)
-    for t in np.linspace(0, 1, 120):                    # the psionic blow: a wave from the brain to the mark, through armour
-        x = 140 + (700 - 140) * t
-        y = by - 44 + (by - 70 - (by - 44)) * t + np.sin(t * 40) * 4
-        if int(t * 120) % 3:
-            sc.rgb[int(y), int(x)] = sc.rgb[int(y), int(x)] * 0.2 + hexc("#c8a0ff") * 0.8
-    sc.glow(700, by - 70, 24, hexc("#b070ff"), 0.6)
-    caps.append((640, by + 10, "Метка и пси-удар: мимо брони"))
-    cap_ = flip(E.lit(GH.build(LH.INVENTOR, "attack", 0.9 * k), (176, 112, 255), 0.35))   # a captured mind turns on its own
-    put(sc, cap_, 812, by, 14)
-    sigil(sc, 806, by - 64, 6)
-    caps.append((830, by + 10, "Захват разума: бьёт своих"))
+    heads.append((y0, "Разум улья", "Пси: удар, Предсмертный крик, Помутнение, Захват разума",
+                  "развитие: пси-удар на 4 клетки, Захват чаще или Помутнение шире", 1))
+    import swarm_effects as E
+    put(sc, SL.build("Разум улья", "attack", k), 70, by, 30)
+    tx = 290                                            # the psionic blow goes through the Gun's armour
+    put(sc, flip(F.build("Орудие", "attack", k=1.6 * k)), tx, by, 30)
+    psi_wave(sc, (118, by - 46), (tx - 14, by - 66))
+    for dx, dy, sd in ((-62, 4, 51), (-44, -8, 52)):     # two of the swarm fall to it — and scream into its mind
+        put(sc, E.lit(W.build((), 0.0, "idle", False, k=k, genes=W.genes_for(sd)), (30, 20, 20), 0.6), tx + dx, by + dy, 0)
+        zigzag2d(sc, (tx + dx, by + dy - 8), (tx - 6, by - 52), hexc("#c8a0ff"))
+    caps.append((130, by + 10, "Пси-удар мимо брони"))
+    caps.append((260, by + 10, "Предсмертный крик бьёт убийцу"))
+    # the clouding: a wave over a knot of enemies — the living hit each other, the machine stalls
+    cx = 600
+    for r in (20, 34, 48):
+        ring(sc, cx, by - 4, r, r * 0.3, PHERO, 0.5)
+    put(sc, flip(GH.build(LH.ZODCHIY, "idle", 1.05 * k)), cx + 34, by - 6, 0)
+    inv = E.lit(GH.build(LH.INVENTOR, "attack", 0.9 * k), (176, 112, 255), 0.3)
+    put(sc, inv, cx - 4, by + 6, 0)                    # turned round: it strikes the Architect
+    mh = E.lit(flip(F.build("Механик", "idle", k=1.15 * k)), (150, 150, 160), 0.35)
+    put(sc, mh, cx - 50, by - 4, 0)
+    for k_ in range(6):                                 # its core stalls: sparks, no step, no module
+        E.dot(sc, cx - 50 + (k_ * 7) % 22 - 10, by - 50 - (k_ * 5) % 18, hexc("#d8d8e8"), r=1)
+    caps.append((cx, by + 10, "Помутнение: живые бьют своих, у машин сбой"))
+    # the seized mind: a small machine fights for the swarm
+    mx = 820
+    cap_ = E.lit(F.build("Механик", "attack", k=1.15 * k), (176, 112, 255), 0.35)        # facing the enemy now
+    put(sc, cap_, mx, by, 14)
+    sigil(sc, mx - 4, by - 76, 6)
+    put(sc, flip(F.build("Орудие", "idle", k=1.6 * k)), mx + 78, by, 30)
+    caps.append((mx + 20, by + 10, "Захват: Механик 2 хода за рой"))
 
     # ---- Пожиратель: growing
     y0 += RH

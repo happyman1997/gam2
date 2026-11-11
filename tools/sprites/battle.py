@@ -258,12 +258,12 @@ def build(leader="Матка"):
         f()
     for (tx, ty) in targets:
         spark(sc, int(tx), int(ty) - 6, True)
-    if leader == "Разум улья":                    # one mind: threads from the brain across the swarm; the mark on the Guard
-        prnd = random.Random(5)
-        for (x, y) in prnd.sample(placed, 12):
-            SA.thread(sc, (qx - 6, qy - 34), (x, y - 8), sag=-14, k=0.55)
-        SA.ring(sc, gx, gy + 2, 52, 11)
-        SA.sigil(sc, gx - 4, gy - 112, 9)
+    if leader == "Разум улья":                    # psi: a blow from the brain into the Guard, the clouding over its line
+        SA.psi_wave(sc, (qx - 10, qy - 34), (gx + 10, gy - 70))
+        for r in (40, 62, 84):
+            SA.ring(sc, gx - 10, gy + 2, r, r * 0.3, SA.PHERO, 0.45)
+        for k_ in range(8):                           # the machines' cores stall: sparks over them
+            sc.rgb[int(gy - 96 - (k_ * 7) % 20), int(gx - 20 + (k_ * 11) % 40)] = hexc("#e0e0f0")
     if leader == "Кукушка":                       # the Architect bitten from behind: infected
         SA.spots(sc, int(lx) + 2, int(ly) - 30, [(0, 0), (-3, 7), (2, 13)])
         SA.splat(sc, lx - 26, ly + 6, 14, col=hexc("#5a4030"), k=0.7)
