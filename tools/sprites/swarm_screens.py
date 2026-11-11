@@ -177,10 +177,10 @@ def camp_screen():
 CW_, CH_, GX0, GY0 = 40, 30, 20, 70           # deployment grid: the swarm's zone on the left, the enemy on the right
 ZD = 0.62                                     # everyone at the same zoom: the true relative sizes
 FLOCKS = [  # (traits, soldier, name, count, cells (col, row) it covers, colour, placed)
-    ((), False, "муравьи", 19, [(c, r) for c in (6, 7) for r in range(2, 9)] + [(5, 4), (5, 5)], "#c9b27a", True),
+    ((), False, "муравьи", 19, [(5, 4), (5, 5), (5, 6), (5, 7)], "#c9b27a", True),      # Матка: tight flocks, 5 to a cell
     (("stinger",), False, "скорпионы", 7, [(4, 3), (4, 4), (4, 5), (4, 6)], "#d0603e", True),
-    (("horn",), True, "жуки-солдаты", 2, [(7, 9), (7, 10)], "#c07040", True),
-    (("acid",), False, "бочонки", 2, [(3, 4), (3, 5)], "#8ae04a", True),
+    (("horn",), True, "жуки-солдаты", 2, [(6, 6), (6, 7)], "#c07040", True),
+    (("acid",), False, "бочонки", 2, [(3, 2), (3, 3)], "#8ae04a", True),
     (("wings",), False, "осы", 4, [(5, 0), (6, 0), (6, 1)], "#e0b040", True),
     (("scythes",), False, "богомол", 1, [], "#9ab098", False),
     ((), True, "муравьи-солдаты", 2, [], "#c9b27a", False),

@@ -3,8 +3,11 @@ letters, the headings dripping and bristling, the swarm's own script under them)
 interface, silk and cobwebs, resin running off the plates, old engravings showing through.
 
     python3 tools/sprites/swarm_hud.py            -> out/brood.png, out/swarm_camp.png, out/swarm_evolution_screen.png,
-                                                     out/swarm_deploy.png, out/brood_finds.png, out/brood_pools.png
-    python3 tools/sprites/swarm_hud.py brood      -> one screen (brood, camp, evolution, deploy)
+                                                     out/swarm_deploy.png, out/brood_finds.png, out/brood_pools.png,
+                                                     out/swarm_flocks.png, out/swarm_battle_hud.png, out/swarm_aftermath.png,
+                                                     out/swarm_leader_pick.png, out/swarm_development_screen.png
+    python3 tools/sprites/swarm_hud.py brood      -> one screen (a key of SCREENS: brood, camp, evolution, deploy, finds,
+                                                     pools, flocks, battle, aftermath, leader, development)
 """
 import sys
 from functools import lru_cache
@@ -329,6 +332,10 @@ def deploy():
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=9)
     title(sc, "РАССТАНОВКА", "стаи ложатся на поле; выходит вся армия", seed=25)
     letters(sc, "Литейщик: 4 голема", 944, 8, "text", 16, col=(214, 196, 150), align="right")
+    UI.plate(sc, 600, 50, 948, 92)
+    icon(sc, "matka", 610, 56, 2)
+    letters(sc, "СТАИ МАТКИ: ТЕСНЫЕ", 648, 57, "title", 8, col=GOLD, outline=False)
+    letters(sc, "в клетке до 6 мелких, а не 4", 648, 70, "text", 16, col=INK)
     CW_, CH_, GX0, GY0 = SS.CW_, SS.CH_, SS.GX0, SS.GY0 + 4
     cols, rows = 21, 12
     for c in range(cols):
@@ -356,8 +363,12 @@ def deploy():
             for j in range(per):
                 if placed_n >= n:
                     break
-                x = GX0 + c * CW_ + 10 + (j % 2) * 18 + rnd.uniform(-3, 3)
-                y = GY0 + r * CH_ + 14 + (j // 2) * 10 + rnd.uniform(-2, 2)
+                if per > 4:                                         # a tight cell: three abreast
+                    x = GX0 + c * CW_ + 8 + (j % 3) * 12 + (j // 3) * 5 + rnd.uniform(-2, 2)
+                    y = GY0 + r * CH_ + 13 + (j // 3) * 11 + rnd.uniform(-1, 1)
+                else:
+                    x = GX0 + c * CW_ + 10 + (j % 2) * 18 + rnd.uniform(-3, 3)
+                    y = GY0 + r * CH_ + 14 + (j // 2) * 10 + rnd.uniform(-2, 2)
                 items.append((y, W.build(traits, rnd.uniform(-0.1, 0.1), "idle", soldier, k=SS.ZD, genes=W.genes_for(k_ * 50 + placed_n)), x))
                 placed_n += 1
     for (y, spr, x) in sorted(items, key=lambda t: t[0]):
@@ -376,15 +387,16 @@ def deploy():
         c = min(cells, key=lambda t: (t[1], t[0]))
         letters(sc, f"{name} ×{n}", GX0 + c[0] * CW_, GY0 + c[1] * CH_ - 18, "text", 16, col=tuple(int(v) for v in hexc(col)),
                 jitter=1, seed=k_)
-    letters(sc, "пара: кладка", GX0 + 4 * CW_ + 24, GY0 + 4 * CH_ + 22, "title", 8, col=(130, 230, 90))
+    letters(sc, "← пара: кладка", GX0 + 6 * CW_ + 10, GY0 + 4 * CH_ + 10, "text", 16, col=(130, 230, 90))
     UI.plate(sc, 4, HH - 92, WW - 4, HH - 2)
     for k_, (traits, soldier, name, n, cells, col, placed) in enumerate([fl for fl in SS.FLOCKS if not fl[6]]):
         x0 = 12 + k_ * 150
         UI.cell(sc, x0, HH - 84, x0 + 142, HH - 10, "normal", col=col)
         put(sc, W.build(traits, 0.0, "idle", soldier, k=1.1, genes=W.genes_for(90 + k_)), x0 + 34, HH - 22, 10)
-        for j, ln in enumerate(wrap(name, 76)):
-            letters(sc, ln, x0 + 62, HH - 78 + j * 17, "text", 16, col=INK, jitter=1, seed=k_ + j)
-        letters(sc, f"×{n} не стоит", x0 + 64, HH - 36, "title", 8, col=PALE, outline=False)
+        for j, ln in enumerate(wrap(name.replace("-", "- "), 76)):
+            letters(sc, ln.replace("- ", "-"), x0 + 62, HH - 80 + j * 16, "text", 16, col=INK, jitter=1, seed=k_ + j)
+        letters(sc, f"×{n}", x0 + 62, HH - 42, "title", 8, col=GOLD, outline=False)
+        letters(sc, "не стоит", x0 + 62, HH - 28, "title", 8, col=PALE, outline=False)
     for k_, t in enumerate(("в линию", "в кулак", "разделить", "как в прошлый")):
         x0 = 316 + k_ * 158
         UI.button(sc, x0, HH - 66, x0 + 150, HH - 26, "chitin")
@@ -603,8 +615,215 @@ def flocks():
     print("swarm_flocks.png", img.size)
 
 
+# ---------------------------------------------------------------- the battle itself, with the swarm's interface over it
+def battle_hud():
+    import battle as BT
+    sc, count, ng = BT.build("Матка")
+    UI.WOBBLE[0] = 1.0
+    # top: a thin wing with the turn, the swarm and the enemy, the speed
+    UI.wing(sc, 0, 0, WW, 34)
+    letters(sc, "ХОД 5", 400, 4, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=4, hairs=5, align="center")
+    letters(sc, f"рой {count - 1}", 16, 5, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
+    letters(sc, "съедено 14", 16, 22, "text", 16, col=MUTED)
+    letters(sc, f"Литейщик · {ng} големов", 700, 6, "text", 16, col=(214, 196, 150), align="right")
+    for k_, t in enumerate(("II", "×1", "×2", "×4")):
+        x0 = 716 + k_ * 58
+        UI.button(sc, x0, 6, x0 + 52, 28, "amber" if t == "×2" else "chitin")
+        letters(sc, t, x0 + 26, 9, "text", 16, col=DARK if t == "×2" else INK, outline=t != "×2", align="center")
+    # bottom left: the leader — health, abilities, their cooldowns; the leader itself sits on the plate's edge
+    UI.plate(sc, 4, 448, 324, 536, antennae=True)
+    put(sc, leader("Матка", "idle", 0.74), 62, 530, 30)
+    letters(sc, "МАТКА", 124, 456, "title", 16, col=GOLD, jitter=1, seed=3)
+    UI.meter(sc, 124, 478, 316, 10, 16, 13, "#c04a3a")
+    abil = [("clutch", "1"), ("larva", ""), ("feed", "")]
+    for k_, (key, cd) in enumerate(abil):
+        x0 = 124 + k_ * 66
+        UI.cell(sc, x0, 494, x0 + 60, 532, "hi" if k_ == 0 else "normal")
+        icon(sc, key, x0 + 4, 497, 2)
+        if cd:
+            letters(sc, cd, x0 + 50, 512, "title", 8, col=(255, 200, 120), align="center")
+    # bottom: the flocks — kind, alive of all, a state if any
+    import swarm_status as ST
+    UI.plate(sc, 330, 448, 956, 536)
+    flocks_ = [((), "муравьи", 16, 23, None), (("stinger",), "скорпионы", 6, 7, "poison"), (("horn",), "жуки", 2, 2, None),
+               (("acid",), "бочонки", 1, 2, None), (("wings",), "осы", 3, 4, "fear"), (("spitter",), "пауки", 2, 2, None)]
+    for k_, (tr, name, alive, tot, st) in enumerate(flocks_):
+        x0 = 338 + k_ * 102
+        UI.cell(sc, x0, 456, x0 + 96, 530, "new" if alive == tot else "normal")
+        letters(sc, name, x0 + 8, 459, "text", 16, col=INK, jitter=1, seed=k_)
+        icon(sc, tr[0] if tr else "ant", x0 + 6, 476, 2)
+        letters(sc, f"{alive}/{tot}", x0 + 44, 488, "title", 8, col=GOLD if alive == tot else (255, 150, 120), outline=False)
+        UI.meter(sc, x0 + 8, 514, x0 + 88, 7, min(tot, 10), round(min(tot, 10) * alive / tot), "#8a6aa8")
+        if st:
+            ST.glyph(sc, st, x0 + 84, 484)
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_battle_hud.png"))
+    print("swarm_battle_hud.png", img.size)
+
+
+# ---------------------------------------------------------------- after the battle: the battle changes the breed
+def aftermath():
+    import brood as B
+    import swarm_effects as E
+    sc = frame_screen(37)
+    UI.wing(sc, 0, 0, WW, 44)
+    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=17)
+    title(sc, "ПОБЕДА", "бой меняет породу", seed=33)
+    # losses
+    UI.plate(sc, 12, 52, 300, 446, antennae=True)
+    heading(sc, "ПОТЕРИ", 26, 64, seed=6)
+    for j in range(9):
+        put(sc, E.lit(bug(((), ("stinger",), ("wings",))[j % 3], "idle", 1.25, 160 + j), (26, 18, 16), 0.7), 56 + (j % 3) * 76 + (j // 3) * 14, 132 + (j // 3) * 34, 9)
+    letters(sc, "погибло", 26, 240, "text", 16, col=MUTED)
+    letters(sc, "23", 26, 258, "title", 24, col=(255, 140, 110), col2=(170, 50, 40), jitter=1, drips=3)
+    letters(sc, "съедено врагов", 26, 300, "text", 16, col=MUTED)
+    letters(sc, "14", 26, 318, "title", 24, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    icon(sc, "biomass", 90, 316, 2)
+    letters(sc, "+14 биомассы", 130, 326, "text", 16, col=BIO)
+    scribble(sc, 26, 380, 250, seed=51)
+    letters(sc, "погибшие не вернутся", 26, 400, "text", 16, col=PALE)
+    # what the battle gave: the leader's own gift
+    UI.plate(sc, 310, 52, 652, 446, antennae=True)
+    UI.engrave(sc, leader("Матка", "idle", 1.6), 560, 470, col="#2a2234", k=0.9)
+    heading(sc, "ДАР МАТКИ", 324, 64, seed=7)
+    letters(sc, "личинки, дожившие до конца боя,", 324, 88, "text", 16, col=MUTED)
+    letters(sc, "уходят в выводок", 324, 106, "text", 16, col=MUTED)
+    for j, dx in enumerate((380, 440, 500)):
+        put(sc, larva("idle", 1.5), dx, 196, 12)
+    icon(sc, "stinger", 560, 168, 2)
+    for j, ln in enumerate(("рождаются с жалом —", "оно убивало больше всех")):
+        letters(sc, ln, 324, 220 + j * 18, "text", 16, col=INK)
+    UI.cell(sc, 320, 268, 642, 340, "mut")
+    letters(sc, "Сердце роя: 5 яиц у Матки", 334, 278, "text", 16, col=GOLD)
+    letters(sc, "вылупились — бились — живы", 334, 296, "text", 16, col=INK)
+    put(sc, clutch(1.0), 580, 330, 0)
+    UI.cell(sc, 320, 352, 642, 436, "normal")
+    letters(sc, "по чертам: кто убивал", 334, 362, "text", 16, col=MUTED)
+    for i, (name, kills, key) in enumerate(B.SELECTION):
+        x, y = 334 + i * 76, 384
+        icon(sc, key, x, y)
+        letters(sc, str(kills), x + 20, y + 4, "title", 8, col=PALE, outline=False)
+        UI.meter(sc, x, y + 24, x + 64, 6, 8, round(8 * kills / 23), "#c04a3a" if i == 0 else "#8a6aa8")
+    # pairs at the seams of the flocks, and the find
+    UI.plate(sc, 662, 52, 948, 446, antennae=True)
+    heading(sc, "ПАРЫ", 676, 64, seed=8)
+    letters(sc, "стыки стай: 3 пары", 676, 88, "text", 16, col=MUTED)
+    pairs = [(((), ("stinger",)), 170), ((("horn",), ("wings",)), 230), ((("acid",), ()), 290)]
+    for (a_, b_), y in pairs:
+        put(sc, bug(a_, "idle", 1.2, y), 712, y, 10)
+        put(sc, bug(b_, "idle", 1.2, y + 1), 800, y, 10)
+        UI.silk(sc, (724, y - 16), (790, y - 16), sag=8, col="#f0c040")
+        letters(sc, "→", 846, y - 22, "text", 16, col=MUTED)
+        put(sc, clutch(1.6), 896, y, 8)
+    UI.cell(sc, 670, 316, 940, 436, "find")
+    letters(sc, "находка", 684, 326, "title", 8, col=PALE, outline=False)
+    letters(sc, "Взросление", 684, 340, "text", 16, col=GOLD, jitter=1)
+    for j, ln in enumerate(("рабочая убила больше", "всех — выйдет солдатом")):
+        letters(sc, ln, 684, 360 + j * 18, "text", 16, col=INK)
+    put(sc, bug(("ant", "stinger"), "idle", 1.1, 77, soldier=True), 900, 426, 10)
+    UI.button(sc, 690, 466, 948, 524, "amber")
+    letters(sc, "В ВЫВОДОК", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
+    letters(sc, "выжившие отдыхают, пары кладут яйца", 480, 480, "text", 16, col=MUTED, align="center")
+    scribble(sc, 380, 500, 200, seed=52)
+    UI.creature(sc, bug((), "idle", 1.0, 170), 250, 54)
+    UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_aftermath.png"))
+    print("swarm_aftermath.png", img.size)
+
+
+# ---------------------------------------------------------------- choosing the leader at the start of the run
+def leaders_pick():
+    import swarm_leaders as SL
+    sc = frame_screen(41)
+    UI.wing(sc, 0, 0, WW, 44)
+    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=18)
+    title(sc, "ЛИДЕР", "кто поведёт рой в этот поход", seed=35)
+    # start armies as in the concept (workers; soldiers), the flock rule, the key mutation of the leader's pool
+    data = [("Матка", "matka", "число и порода", "тесные стаи", "Наследница",
+             [((), 12), (("wings",), 3), (("stinger",), 3)], [((), 2), (("horn",), 1), (("carapace",), 1)]),
+            ("Разум улья", "razum", "пси мимо брони, захват", "одна мысль на стаю", "Ретранслятор",
+             [((), 9), (("firefly",), 3)], [((), 3), (("scythes",), 2), (("stinger",), 1)]),
+            ("Пожиратель", "pozh", "зверь растёт в бою", "свора", "Питательная суть",
+             [((), 15), (("jumper",), 3)], [((), 2)]),
+            ("Кукушка", "kuk", "рой растёт за счёт врага", "пёстрые стаи", "Королевская кладка",
+             [((), 15), (("stinger",), 3), (("acid",), 3)], [((), 3)])]
+    PW_ = 232
+    for k_, (name, ik, what, rule, key, army, soldiers) in enumerate(data):
+        x0 = 12 + k_ * (PW_ + 4)
+        UI.cell(sc, x0, 52, x0 + PW_, 452, "hi" if k_ == 0 else "normal")
+        spr = SL.build(name, "idle", 1.0)
+        kk = min(1.75, 172 / spr.w, 116 / spr.h)
+        put(sc, SL.build(name, "idle", kk), x0 + PW_ / 2 + 6, 180, 30)
+        icon(sc, ik, x0 + 12, 202, 2)
+        letters(sc, name, x0 + 50, 206, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
+        letters(sc, what, x0 + 12, 236, "text", 16, col=INK)
+        letters(sc, "стаи:", x0 + 12, 264, "title", 8, col=PALE, outline=False)
+        letters(sc, rule, x0 + 54, 260, "text", 16, col=GOLD)
+        for r, (lab, row, sold, by) in enumerate((("рабочие:", army, False, 330), ("солдаты:", soldiers, True, 394))):
+            letters(sc, lab, x0 + 12, by - 46, "title", 8, col=PALE, outline=False)
+            for j, (tr, n) in enumerate(row):
+                b_ = bug(tr, "idle", 1.0, 180 + j + k_ * 5 + r * 20, soldier=sold)
+                cx = x0 + 32 + j * 72
+                put(sc, b_, cx, by, 8)
+                right = np.nonzero(b_.a.any(axis=0))[0].max()
+                letters(sc, f"×{n}", cx - b_.ox + right + 3, by - 6, "title", 8, col=INK)
+        letters(sc, "ключ:", x0 + 12, 422, "title", 8, col=PALE, outline=False)
+        letters(sc, key, x0 + 54, 418, "text", 16, col=(196, 160, 236))
+    UI.button(sc, 12, 470, 300, 520, "chitin")
+    letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
+    UI.button(sc, 690, 466, 948, 524, "amber")
+    letters(sc, "В ПОХОД", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
+    letters(sc, "у каждого лидера свой пул мутаций", 495, 480, "text", 16, col=MUTED, align="center")
+    scribble(sc, 400, 500, 190, seed=53)
+    UI.cobweb(sc, 958, 46, 34, quad=(-1, 1))
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_leader_pick.png"))
+    print("swarm_leader_pick.png", img.size)
+
+
+# ---------------------------------------------------------------- the leader grows: choose its development
+def development():
+    import swarm_leaders as SL
+    sc = frame_screen(47)
+    UI.wing(sc, 0, 0, WW, 44)
+    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=19)
+    title(sc, "РАЗВИТИЕ", "Разум улья созрел: во что ему прорасти", seed=37)
+    UI.plate(sc, 12, 52, 300, 446, antennae=True)
+    heading(sc, "СЕЙЧАС", 26, 64, seed=9)
+    icon(sc, "razum", 26, 90, 2)
+    letters(sc, "Разум улья", 64, 94, "text", 16, col=INK, jitter=1, seed=4)
+    put(sc, SL.build("Разум улья", "idle", 2.1), 156, 276, 34)
+    for j, ln in enumerate(("Пси-удар на 3 клетки", "Захват раз в 6 ходов", "Помутнение на 2 клетки")):
+        letters(sc, ln, 26, 300 + j * 20, "text", 16, col=INK)
+    scribble(sc, 26, 370, 240, seed=61)
+    letters(sc, "слабость: хрупкий мозг", 26, 400, "text", 16, col=(200, 120, 110))
+    for j, (key, name, look) in enumerate(SL.DEV["Разум улья"]):
+        x0 = 312 + j * 214
+        UI.cell(sc, x0, 52, x0 + 206, 446, "hi" if j == 1 else "normal")
+        put(sc, SL.build("Разум улья", "idle", 1.9, dev=key), x0 + 103, 232, 30)
+        letters(sc, name, x0 + 14, 252, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
+        for k_, ln in enumerate(wrap(look, 180)):
+            letters(sc, ln, x0 + 14, 278 + k_ * 17, "text", 16, col=MUTED)
+    UI.button(sc, 12, 470, 300, 520, "chitin")
+    letters(sc, "Позже", 156, 486, "title", 16, col=INK, align="center")
+    UI.button(sc, 690, 466, 948, 524, "amber")
+    letters(sc, "ПРОРАСТИ", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
+    letters(sc, "развитие — навсегда, на весь поход", 495, 480, "text", 16, col=MUTED, align="center")
+    scribble(sc, 400, 500, 190, seed=62)
+    UI.creature(sc, bug((), "idle", 1.0, 190), 540, 54)
+    UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_development_screen.png"))
+    print("swarm_development_screen.png", img.size)
+
+
 SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools,
-           "flocks": flocks}
+           "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
