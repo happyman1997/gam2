@@ -1146,7 +1146,7 @@ def leader_comb(sc, x0, y, rows, key, hover):
     return pos, y + r * 1.5 * (len(rows) - 1) + 34
 
 
-def big_card(spec, name):
+def big_card(spec, name, save=True):
     """A creature's card as big as the screen, as in Conquest of Elysium: the creature large on the left with where
     it came from; the numbers in a column; every attack in a column of its own — damage, type, reach, what it does
     besides; on the right what it can and what it can't, each with its icon."""
@@ -1258,10 +1258,36 @@ def big_card(spec, name):
         for j, ln in enumerate(lines):
             UI.rich(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
         cursor(sc, int(hx) - 30, int(hy) + 10)
+    if not save:
+        return sc
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out(name))
     print(name, img.size)
+
+
+def matka_spec(hover="Брачный полёт"):
+    spec = dict(
+        seed=57, title="МАТКА", sub=EPITHET["Матка"][0], epi=EPITHET["Матка"][1], cell="mut",
+        sprite=leader("Матка", "idle", 1.45), dx=14, sw=56,
+        facts=[("val", "развитие", "ещё не выбрано", MUTED),
+               ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
+        stats=[("здоровье", "80"), ("броня", "2 · хитин"), ("скорость", "1"), ("размер", "6")],
+        attacks=[("matka", "Жвалы", "1–6 +2", "{руб}", "1", "")],
+        hover=None,
+        comb=([("Гнездо", [("m_nest", "lived", "Малое гнездо", ""), ("m_nurse", "open", "Кормилица", ""),
+                            ("m_vivi", "sealed", "Живородящая", ""), ("m_bud", "sealed", "Почкование", "")]),
+               ("Порода", [("m_dominant", "sealed", "Доминантная линия", ""),
+                           ("m_flight", "open", "Брачный полёт", "Пару ей в выводке выбираешь сам из всех выживших, а не из соседей по бою."),
+                           ("m_hybrid", "sealed", "Гибрид", "")])],
+              ("m_heir", "keysealed", "Наследница", ""), "Брачный полёт"),
+        abilities=[("clutch", "каждые 3 хода", "Кладка", "Каждые 3 хода рядом с Маткой вылупляются 2 личинки. В бой они вступают со следующего раунда. Личинки, которые доживут до конца боя, попадут в выводок с чертой, убившей в этом бою больше всего врагов.", GOLD),
+                   ("larva", "постоянно", "Сердце роя", "Если особь роя погибает в 2 клетках от Матки, на её месте остаётся яйцо. Через 2 хода из него вылупляется личинка.", GOLD),
+                   ("feed", "правило похода", "Плодовитость", "В выводке на одного потомка больше. Кормление лидера стоит в два раза дешевле.", (214, 196, 150)),
+                   ("matka", "стаи роя", "Тесные стаи", "В одной клетке помещается до 6 мелких особей вместо 4. Удары по площади и растаптывание задевают их всех.", (214, 196, 150)),
+                   ("fear", "слабость", "Медлительная", "Скорость 1. Если Матка погибнет, каждая особь роя проходит проверку страха 1–9.", RED)])
+    spec["comb"] = spec["comb"][:2] + (hover,)
+    return spec
 
 
 def cards():
@@ -1286,26 +1312,7 @@ def cards():
                    ("biomass", "класс", "Пожирание", "Убив врага, съедает труп и восстанавливает четверть здоровья. После боя съеденное идёт в биомассу.", INK),
                    ("carapace", "класс", "Хитин", "Урон {руб} по ней в два раза меньше, {дроб} в два раза больше.", INK)]),
         "swarm_card.png")
-    big_card(dict(
-        seed=57, title="МАТКА", sub=EPITHET["Матка"][0], epi=EPITHET["Матка"][1], cell="mut",
-        sprite=leader("Матка", "idle", 1.45), dx=14, sw=56,
-        facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
-        stats=[("здоровье", "80"), ("броня", "2 · хитин"), ("скорость", "1"), ("размер", "6")],
-        attacks=[("matka", "Жвалы", "1–6 +2", "{руб}", "1", "")],
-        hover=None,
-        comb=([("Гнездо", [("m_nest", "lived", "Малое гнездо", ""), ("m_nurse", "open", "Кормилица", ""),
-                            ("m_vivi", "sealed", "Живородящая", ""), ("m_bud", "sealed", "Почкование", "")]),
-               ("Порода", [("m_dominant", "sealed", "Доминантная линия", ""),
-                           ("m_flight", "open", "Брачный полёт", "Пару ей в выводке выбираешь сам из всех выживших, а не из соседей по бою."),
-                           ("m_hybrid", "sealed", "Гибрид", "")])],
-              ("m_heir", "keysealed", "Наследница", ""), "Брачный полёт"),
-        abilities=[("clutch", "каждые 3 хода", "Кладка", "Каждые 3 хода рядом с Маткой вылупляются 2 личинки. В бой они вступают со следующего раунда. Личинки, которые доживут до конца боя, попадут в выводок с чертой, убившей в этом бою больше всего врагов.", GOLD),
-                   ("larva", "постоянно", "Сердце роя", "Если особь роя погибает в 2 клетках от Матки, на её месте остаётся яйцо. Через 2 хода из него вылупляется личинка.", GOLD),
-                   ("feed", "правило похода", "Плодовитость", "В выводке на одного потомка больше. Кормление лидера стоит в два раза дешевле.", (214, 196, 150)),
-                   ("matka", "стаи роя", "Тесные стаи", "В одной клетке помещается до 6 мелких особей вместо 4. Удары по площади и растаптывание задевают их всех.", (214, 196, 150)),
-                   ("fear", "слабость", "Медлительная", "Скорость 1. Если Матка погибнет, каждая особь роя проходит проверку страха 1–9.", RED)]),
-        "swarm_card_leader.png")
+    big_card(matka_spec(), "swarm_card_leader.png")
     PSI, MEAT, KUK, RULE = VIOLET, (236, 120, 96), (150, 220, 90), (214, 196, 150)
     big_card(dict(
         seed=61, title="РАЗУМ УЛЬЯ", sub=EPITHET["Разум улья"][0], epi=EPITHET["Разум улья"][1], cell="find",
@@ -1369,6 +1376,142 @@ def cards():
                    ("m_call", "стаи роя", "Пёстрые стаи", "В одну стаю можно ставить разные виды. Пары в выводке складываются и внутри стаи.", RULE),
                    ("fear", "слабость", "Хрупкая кладка", "{огонь} выжигает кладку: заражённый, получив {огонь}, даже свой, очищается.", RED)]),
         "swarm_card_kuk.png")
+
+
+# ---------------------------------------------------------------- a mutation's own card: clicked on any card, opens over it
+MUT_CARD = {   # key: (name, whose · branch, state, carriers, the line, body traits for the carrier)
+    "nest": ("Малое гнездо", "мутация Матки · Гнездо", "в рое", 3,
+             "Погибла своя рядом с ней — на её месте яйцо. Через 2 хода из него личинка.", ("carapace",)),
+}
+
+
+def mutation_card(key="nest"):
+    """A mutation opened from a card: over the dimmed card, a plate with the mutation large — who carries it, the
+    moment it works in battle as a picture, one line of what it does, what it hands down."""
+    import swarm_mut as M
+    name, whose, state, n, line, tr = MUT_CARD[key]
+    sc = big_card(matka_spec(hover=None), None, save=False)
+    sc.rgb *= 0.38                                              # the card underneath, dimmed
+    x0, y0, x1, y1 = 176, 64, 784, 476
+    UI.plate(sc, x0, y0, x1, y1, antennae=True)
+    neon(sc, UI.chamfer_mask(sc, x0, y0, x1, y1, 9), (232, 192, 80), 4, 0.35)
+    # the header: the icon large, the name, whose it is, how many carry it now
+    sc.glow(x0 + 46, y0 + 44, 34, hexc("#f0c050"), 0.35)
+    icon(sc, "m_" + key, x0 + 22, y0 + 20, 3)
+    letters(sc, name.upper(), x0 + 86, y0 + 18, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1,
+            drips=4, hairs=6, seed=11)
+    letters(sc, whose, x0 + 88, y0 + 50, "text", 16, col=(240, 200, 90))
+    chip = f"{state}: {n}"
+    w = UI.text_width(chip)
+    UI.cell(sc, x1 - w - 46, y0 + 20, x1 - 16, y0 + 50, "new")
+    letters(sc, chip, x1 - 31, y0 + 27, "text", 16, col=GREEN, align="right")
+    # the carrier, large, in a comb cell
+    UI.cell(sc, x0 + 18, y0 + 84, x0 + 196, y0 + 300, "new")
+    M.Z, M.F = 2.7, 2.5
+    put(sc, M.bug(tr, "idle", key=key, seed=5, k=4.2), x0 + 108, y0 + 262, 36)
+    # the moment it works, as a picture
+    UI.cell(sc, x0 + 206, y0 + 84, x1 - 18, y0 + 300, "normal")
+    gx0, gx1 = x0 + 214, x1 - 26
+    floor = (sc.yy > y0 + 250) & (sc.yy < y0 + 292) & (sc.xx > gx0) & (sc.xx < gx1)
+    sc.rgb[floor] = sc.rgb[floor] * 0.75 + hexc("#2a2018") * 0.25
+    M.scene(sc, key, (gx0 + gx1) / 2 - 10, y0 + 266)
+    # one line, and what it hands down
+    for j, ln in enumerate(wrap(line, x1 - x0 - 44)):
+        UI.rich(sc, ln, x0 + 22, y0 + 316 + j * 20, "text", 16, col=INK)
+    icon(sc, "ant", x0 + 22, y0 + 368, 1)
+    letters(sc, "передаётся потомкам", x0 + 42, y0 + 369, "text", 16, col=MUTED)
+    UI.button(sc, x1 - 220, y1 - 54, x1 - 20, y1 - 16, "chitin")
+    letters(sc, "Закрыть", x1 - 120, y1 - 44, "title", 16, col=INK, align="center")
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_mutation_card.png"))
+    print("swarm_mutation_card.png", img.size)
+
+
+# ---------------------------------------------------------------- a button under the mouse: the swarm takes a bite
+def button_gif():
+    """The hover on a clickable button, the swarm's way: a quick feed — mandibles at both tips snap shut twice,
+    bites come out of the edges with crumbs flying, then the button glows, bitten; the mouse leaves and it heals."""
+    from PIL import Image
+    Wd, Hd = 480, 140
+    bg = UI.nest(Wd, Hd, 12)
+    x0, y0, x1, y1 = 110, 52, 370, 98
+    cy = (y0 + 1 + y1) / 2
+
+    def jaws(sc, open_, flip):
+        """A pair of sickle mandibles on a little head at one tip; open_ 1 — wide, 0 — shut on the button."""
+        tipx = x0 if not flip else x1
+        sgn = 1 if not flip else -1
+        hx = tipx - sgn * 18
+        head = ellipse(sc, hx, cy, 9, 8)
+        sc.rgb[head] = hexc("#2a2034")
+        ho, _, _ = UI.edges(head)
+        sc.rgb[ho] = UI.OUTL
+        for ey_ in (-3, 3):
+            sc.rgb[int(cy + ey_), int(hx + sgn * 3)] = hexc("#e04030")
+        for up in (-1, 1):
+            base = (hx + sgn * 6, cy + up * 4)
+            reach = 14 + 6 * (1 - open_)
+            tip = (tipx + sgn * (reach - 10), cy + up * (2 + 16 * open_))
+            mid = ((base[0] + tip[0]) / 2 + sgn * 2, (base[1] + tip[1]) / 2 + up * (6 * open_ + 2))
+            thick(sc, [base, mid, tip], 1, hexc("#cdbb8e"), hexc("#fff4d0"))
+
+    def bite(sc, bx, by, r):
+        m = (np.hypot(sc.xx - bx, sc.yy - by) <= r) & (sc.yy >= y0 - 2) & (sc.yy <= y1 + 2)
+        sc.rgb[m] = bg.rgb[m]
+        ring = (np.abs(np.hypot(sc.xx - bx, sc.yy - by) - r - 0.8) < 0.9) & ~m & (sc.yy >= y0) & (sc.yy <= y1)
+        sc.rgb[ring] = np.minimum(255, sc.rgb[ring] * 1.35 + 30)       # the bitten edge shows the bright inside
+
+    bites1 = [(x0 + 10, cy - 7, 5), (x1 - 10, cy + 6, 5)]
+    bites2 = [(x0 + 34, y0 + 1, 5), (x1 - 40, y0 + 1, 4), (x0 + 22, y1 - 1, 4)]
+    rnd = np.random.RandomState(4)
+    crumbs = [(bx + rnd.uniform(-4, 4), by, rnd.uniform(-3, 3), rnd.uniform(-5, -1)) for bx, by, _ in bites1 + bites2
+              for _ in range(5)]
+    seq = [  # (mouse in, jaws open (None — no jaws), bites done, crumbs age, glow, duration ms)
+        (False, None, 0, None, 0.0, 420),
+        (True, 1.0, 0, None, 0.15, 70),
+        (True, 0.0, 1, 0, 0.25, 70),
+        (True, 0.8, 1, 1, 0.3, 60),
+        (True, 0.0, 2, 2, 0.35, 70),
+        (True, 0.7, 2, 3, 0.4, 70),
+        (True, None, 2, 4, 0.45, 90),
+        (True, None, 2, None, 0.45, 600),
+        (False, None, 0, None, 0.0, 300),
+    ]
+    frames, durs = [], []
+    for mouse, jaw, nb, age, gl, dur in seq:
+        sc = Scene(Wd, Hd)
+        sc.rgb[:] = bg.rgb
+        UI.WOBBLE[0] = 0.0
+        if gl:
+            sc.glow((x0 + x1) / 2, cy, 150, hexc("#9ae030"), gl)
+        UI.button(sc, x0, y0, x1, y1, "acid")
+        if gl:
+            m = (sc.xx > x0) & (sc.xx < x1) & (sc.yy > y0) & (sc.yy < y1)
+            sc.rgb[m] = np.minimum(255, sc.rgb[m] * (1 + gl * 0.5))
+        letters(sc, "В ПОХОД", (x0 + x1) / 2, y0 + 15, "title", 16, col=ACID2, col2=(110, 170, 40), align="center", jitter=1)
+        for b_ in (bites1 if nb >= 1 else []) + (bites2 if nb >= 2 else []):
+            bite(sc, *b_)
+        if age is not None:
+            for (cx_, cy_, vx, vy) in crumbs:
+                t = age + 1
+                px, py = cx_ + vx * t, cy_ + vy * t + 0.9 * t * t
+                if 0 <= px < Wd - 2 and 0 <= py < Hd - 2:
+                    sc.rgb[int(py):int(py) + 2, int(px):int(px) + 2] = hexc("#8ac850") if (int(px) % 3) else UI.OUTL
+        if jaw is not None:
+            jaws(sc, jaw, False)
+            jaws(sc, jaw, True)
+        if mouse:
+            cursor(sc, int((x0 + x1) / 2) + 40, int(cy) + 4)
+        frames.append(sc.image(S).convert("P", palette=Image.ADAPTIVE, colors=255))
+        durs.append(dur)
+    frames[0].save(out("swarm_button_hover.gif"), save_all=True, append_images=frames[1:], duration=durs, loop=0,
+                   disposal=2)
+    strip = Image.new("RGB", (Wd * S, Hd * S * 3))
+    for i, fi in enumerate((0, 2, 7)):
+        strip.paste(frames[fi].convert("RGB"), (0, i * Hd * S))
+    strip.save(out("swarm_button_hover.png"))
+    print("swarm_button_hover.gif", frames[0].size, len(frames))
 
 
 # ---------------------------------------------------------------- the leaders on the field: all the battle shows of them
@@ -1543,7 +1686,7 @@ def leaders_field():
 
 SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools,
            "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development,
-           "card": cards, "field": leaders_field}
+           "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
