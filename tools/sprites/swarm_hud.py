@@ -861,8 +861,277 @@ def development():
     print("swarm_development_screen.png", img.size)
 
 
+# ---------------------------------------------------------------- the creature's card: who it is, what it can, where it came from
+SILVER = (200, 206, 220)
+
+
+def section(sc, x, y, w, key, label, title, text, col=GOLD, seed=0):
+    """One block of a card: an icon, a small label, the name, and what it does, wrapped."""
+    if key:
+        icon(sc, key, x, y, 1)
+    letters(sc, label, x + 20, y, "title", 8, col=PALE, outline=False)
+    letters(sc, title, x + 20, y + 9, "text", 16, col=col, jitter=1, seed=seed)
+    yy = y + 27
+    for ln in wrap(text, w - 4):
+        letters(sc, ln, x, yy, "text", 16, col=INK)
+        yy += 15
+    return yy + 6
+
+
+def stats(sc, x, y, rows):
+    """The numbers, two to a row: a small label over the value."""
+    for i, (lab, val) in enumerate(rows):
+        cx, cy = x + (i % 2) * 140, y + (i // 2) * 28
+        letters(sc, lab, cx, cy, "title", 8, col=PALE, outline=False)
+        letters(sc, val, cx, cy + 9, "text", 16, col=INK)
+    return y + ((len(rows) + 1) // 2) * 28 + 4
+
+
+def cards():
+    sc = frame_screen(53)
+    UI.wing(sc, 0, 0, WW, 44)
+    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=23)
+    title(sc, "КАРТОЧКА", "кто это, что умеет, откуда взялся", seed=41)
+    letters(sc, "в выводке, на расстановке, на паузе", 944, 28, "title", 8, col=PALE, outline=False, align="right")
+    CW_, X = 302, (10, 324, 638)
+    # 1 — a worker flock: form, part, mutation, the form's evolution, where it came from
+    x0, y0 = X[0], 52
+    UI.cell(sc, x0, y0, x0 + CW_, 530, "hi")
+    put(sc, bug(("stinger", "wings"), "idle", 2.3, 61, rare="blister", evo=("vise",)), x0 + 72, y0 + 112, 26)
+    letters(sc, "Скорпион", x0 + 146, y0 + 12, "text", 16, col=GOLD, jitter=1, seed=1)
+    letters(sc, "рабочая · в рое 7", x0 + 146, y0 + 30, "title", 8, col=PALE, outline=False)
+    letters(sc, "«Летучее жало»", x0 + 146, y0 + 42, "text", 16, col=(214, 196, 150))
+    letters(sc, "родители:", x0 + 146, y0 + 66, "title", 8, col=PALE, outline=False)
+    icon(sc, "stinger", x0 + 146, y0 + 76, 1)
+    letters(sc, "×", x0 + 166, y0 + 78, "text", 16, col=MUTED)
+    icon(sc, "wings", x0 + 178, y0 + 76, 1)
+    letters(sc, "убили в бою: 9", x0 + 146, y0 + 100, "text", 16, col=GREEN)
+    y = stats(sc, x0 + 12, y0 + 132, [("здоровье", "8"), ("удар", "жало 1–4 +1"), ("броня", "0 · хитин"),
+                                      ("скорость", "2"), ("дух", "6, стая до +4"), ("предел", "1 очко")])
+    y = section(sc, x0 + 12, y, CW_ - 24, "stinger", "форма", "Жало",
+                "пробивший удар травит (1–4 яда) и снимает 1 брони. Медленнее других", seed=2)
+    y = section(sc, x0 + 12, y, CW_ - 24, "wings", "деталь", "Крылья", "перепархивает: свой строй его не держит", seed=3)
+    y = section(sc, x0 + 12, y, CW_ - 24, "m_blister", "мутация · общий пул", "Нарывник",
+                "кто ранит её вплотную, обжигается: его удар слабее", col=SILVER, seed=4)
+    y = section(sc, x0 + 12, y, CW_ - 24, "evo_vise", "эволюция формы", "Клешни-тиски",
+                "держит соседнего врага, клешни бьют дробящим", col=(150, 220, 120), seed=5)
+    # 2 — a soldier: heavier numbers, the leader's own mutation
+    x0 = X[1]
+    UI.cell(sc, x0, y0, x0 + CW_, 530, "normal")
+    put(sc, bug(("horn",), "idle", 1.9, 62, soldier=True, rare="cutters", evo=("forked",)), x0 + 72, y0 + 112, 30)
+    letters(sc, "Жук-носорог", x0 + 146, y0 + 12, "text", 16, col=INK, jitter=1, seed=6)
+    letters(sc, "солдат · в рое 2", x0 + 146, y0 + 30, "title", 8, col=PALE, outline=False)
+    letters(sc, "«Таран»", x0 + 146, y0 + 42, "text", 16, col=(214, 196, 150))
+    letters(sc, "родители:", x0 + 146, y0 + 66, "title", 8, col=PALE, outline=False)
+    icon(sc, "horn", x0 + 146, y0 + 76, 1)
+    letters(sc, "×", x0 + 166, y0 + 78, "text", 16, col=MUTED)
+    icon(sc, "ant", x0 + 178, y0 + 76, 1)
+    letters(sc, "убили в бою: 4", x0 + 146, y0 + 100, "text", 16, col=GREEN)
+    y = stats(sc, x0 + 12, y0 + 132, [("здоровье", "12"), ("удар", "рог 1–8"), ("броня", "2 · тяж. хитин"),
+                                      ("скорость", "1"), ("дух", "9, стая до +4"), ("предел", "3 очка")])
+    y = section(sc, x0 + 12, y, CW_ - 24, "horn", "форма", "Разгон",
+                "первый удар боя ×1,5, дробящий, отбрасывает. Медленный", seed=7)
+    y = section(sc, x0 + 12, y, CW_ - 24, "m_cutters", "мутация · общий пул", "Кусачки",
+                "перекусывают щит: щит не спасает от её укуса", col=SILVER, seed=8)
+    y = section(sc, x0 + 12, y, CW_ - 24, "evo_forked", "эволюция формы", "Двойной рог",
+                "Разгон каждые 3 хода, а не один раз", col=(150, 220, 120), seed=9)
+    letters(sc, "детали: нет", x0 + 12, y, "title", 8, col=PALE, outline=False)
+    # 3 — the leader: abilities with when they fire, the flock rule, the run rule
+    x0 = X[2]
+    UI.cell(sc, x0, y0, x0 + CW_, 530, "mut")
+    put(sc, leader("Матка", "idle", 0.86), x0 + 112, y0 + 112, 34)
+    letters(sc, "Матка", x0 + 196, y0 + 12, "text", 16, col=GOLD, jitter=1, seed=10)
+    letters(sc, "лидер", x0 + 196, y0 + 30, "title", 8, col=PALE, outline=False)
+    y = stats(sc, x0 + 12, y0 + 132, [("здоровье", "80"), ("удар", "жвалы 1–6 +2"), ("броня", "2 · хитин"),
+                                      ("скорость", "1"), ("размер", "6"), ("стаи", "тесные")])
+    for key, when, name, text, col in (
+            ("clutch", "каждые 3 хода", "Кладка", "рядом вылупляются 2 личинки", GOLD),
+            ("larva", "постоянно", "Сердце роя", "своя, погибшая рядом, роняет яйцо", GOLD),
+            ("m_heir", "ключ пула", "Наследница", "если Матка погибла, станет Маткой", (196, 160, 236)),
+            ("feed", "правило похода", "Плодовитость", "в выводке на потомка больше", (214, 196, 150))):
+        y = section(sc, x0 + 12, y, CW_ - 24, key, when, name, text, col=col, seed=len(name))
+    for j, ln in enumerate(wrap("слабость: медлительная, держится в тылу", CW_ - 28)):
+        letters(sc, ln, x0 + 12, y + j * 15, "text", 16, col=RED)
+    UI.cobweb(sc, 958, 46, 30, quad=(-1, 1))
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_card.png"))
+    print("swarm_card.png", img.size)
+
+
+# ---------------------------------------------------------------- the leaders on the field: all the battle shows of them
+def pop(sc, key, x, y, label, col=GOLD, seed=0):
+    """An ability firing: its icon pops up with a glow, the name under it."""
+    sc.glow(x, y + 14, 24, np.array(col, float), 0.5)
+    icon(sc, key, x - 16, y, 2)
+    letters(sc, label, x, y + 34, "text", 16, col=col, align="center", jitter=1, seed=seed)
+
+
+def hp(sc, spr, x, by, lit, n=10, w=84):
+    top = W_top(spr, by)
+    UI.meter(sc, x - w / 2, top - 12, x + w / 2, 7, n, lit, "#c04a3a")
+    return top - 12
+
+
+def W_top(spr, by):
+    rows = np.nonzero(spr.a.any(axis=1))[0]
+    return by - spr.oy + rows.min()
+
+
+def flip_v(spr):
+    """A body on its back: the sprite turned upside down, darkened."""
+    f = Sprite(spr.w, spr.h)
+    f.rgb, f.a = spr.rgb[::-1] * 0.55, spr.a[::-1].copy()
+    f.ox, f.oy = spr.ox, spr.h - 1 - spr.oy + 6
+    return f
+
+
+def leaders_field():
+    import battle as BT
+    import frames as F
+    import swarm_leaders as SL
+    import swarm_status as ST
+    import swarm_abilities as SA
+    sc = Scene(WW, HH)
+    BT.ground(sc)
+    UI.WOBBLE[0] = 1.0
+    UI.wing(sc, 0, 0, WW, 44)
+    title(sc, "ЛИДЕРЫ НА ПОЛЕ", "всё, что бой показывает о лидере", seed=43)
+    PWd, PHd = 316, 242
+    rnd = np.random.RandomState(5)
+
+    def P(i):
+        return 4 + (i % 3) * (PWd + 2), 48 + (i // 3) * (PHd + 2)
+
+    def caption(i, name, sub):
+        px, py = P(i)
+        letters(sc, name, px + 10, py + 6, "text", 16, col=GOLD, jitter=1, seed=i)
+        for j, ln in enumerate(wrap(sub, PWd - 20)):
+            letters(sc, ln, px + 10, py + 24 + j * 15, "text", 16, col=MUTED)
+
+    def mob(i, xs, traits=((), ("stinger",), ("wings",)), states=()):
+        px, py = P(i)
+        for j, (dx, dy) in enumerate(xs):
+            spr = bug(traits[j % len(traits)], "attack", 1.0, 300 + i * 10 + j)
+            x, y = px + dx, py + dy
+            BT.shadow(sc, x, y, 14, 3)
+            BT.put(sc, spr, x, y, mirror=True)
+            if j < len(states) and states[j]:
+                ST.glyph(sc, states[j], x, W_top(spr, y) - 11)
+
+    def golem(i, name, dx, dy, pose="attack"):
+        px, py = P(i)
+        g = F.build(name, pose, k=BT.GK[4 if name == "Механик" else 5])
+        BT.shadow(sc, px + dx + 2, py + dy, 40, 7)
+        BT.put(sc, g, px + dx, py + dy)
+        return g, px + dx, py + dy
+
+    # 1 — Матка: health over her, «Кладка» pops up, the clutch hatching beside her
+    px, py = P(0)
+    q = W.queen(0.0, "attack", k=0.92)
+    qx, qy = px + 236, py + 200
+    BT.shadow(sc, qx + 30, qy, 150, 20)
+    BT.put(sc, q, qx, qy, mirror=True)
+    hp(sc, q, qx + 20, qy, 8)
+    cl = SA.render_small(SA.clutch(1), 1.0)
+    put(sc, cl, px + 140, py + 214, 0)
+    ST.glyph(sc, "hatching", px + 140, W_top(cl, py + 214) - 11)
+    for dx, dy in ((110, 206), (96, 222)):
+        BT.put(sc, SL.build("личинка", "attack", 1.0), px + dx, py + dy, mirror=True)
+    mob(0, ((30, 200), (52, 226), (24, 228)))
+    pop(sc, "clutch", px + 150, py + 112, "Кладка", seed=1)
+    caption(0, "Матка", "здоровье над ней; «Кладка» всплывает, кладка рядом вылупляется")
+
+    # 2 — Разум улья: «Помутнение» — rings over the golems; the psi piling up over one
+    px, py = P(1)
+    r_ = SL.build("Разум улья", "idle", 1.0)
+    rx, ry = px + 262, py + 196
+    BT.shadow(sc, rx + 4, ry, 56, 9)
+    BT.put(sc, r_, rx, ry, mirror=True)
+    hp(sc, r_, rx, ry, 6, n=6, w=54)
+    g, gx_, gy_ = golem(1, "Механик", 70, 214)
+    for rr in (26, 40, 54):
+        SA.ring(sc, gx_ + 6, gy_ + 2, rr, rr * 0.3, SA.PHERO, 0.45)
+    ST.on_body(sc, g, gx_, gy_, "stall")
+    ST.glyph(sc, "stall", gx_, W_top(g, gy_) - 12)
+    ST.pips(sc, gx_, W_top(g, gy_) - 18, 3)
+    SA.psi_wave(sc, (rx - 18, ry - 30), (gx_ + 14, gy_ - 34))
+    mob(1, ((150, 214), (172, 226)))
+    pop(sc, "m_psi_reson", px + 168, py + 100, "Помутнение", col=VIOLET, seed=2)
+    caption(1, "Разум улья", "«Помутнение» — кольца над врагом; над врагом копится пси, машина сбоит")
+
+    # 3 — Пожиратель, fed: the growth steps and the bodies left to the next one
+    px, py = P(2)
+    d = SL.build("Пожиратель", "attack", 0.9, stage=1)
+    dx_, dy_ = px + 210, py + 212
+    BT.shadow(sc, dx_ + 20, dy_, 110, 14)
+    BT.put(sc, d, dx_, dy_, mirror=True)
+    t_ = hp(sc, d, dx_ + 10, dy_, 9)
+    for k_ in range(2):                                   # growth: two steps a battle, one taken
+        UI.gem(sc, dx_ - 18 + k_ * 16, t_ - 10, 6, 6, "eat" if k_ == 0 else "dim")
+    for k_ in range(2):                                   # bodies eaten toward the next step
+        UI.gem(sc, dx_ + 22 + k_ * 10, t_ - 10, 3.5, 4.5, "ok" if k_ == 0 else "dim")
+    BT.put(sc, BT.dead_bug(0.05, 3), dx_ - 70, dy_ + 4, mirror=True)
+    mob(2, ((40, 214), (58, 230), (30, 232), (70, 198)), states=(None, "frenzy", None, "frenzy"))
+    pop(sc, "pozh", px + 120, py + 98, "Рост", col=(240, 130, 100), seed=3)
+    caption(2, "Пожиратель сыт", "ступени роста — крупные камни; тела до следующей — мелкие")
+
+    # 4 — Пожиратель, hungry: three rounds without food — he takes one of his own
+    px, py = P(3)
+    d = SL.build("Пожиратель", "attack", 0.9, stage=0)
+    dx_, dy_ = px + 210, py + 212
+    BT.shadow(sc, dx_ + 20, dy_, 100, 13)
+    BT.put(sc, d, dx_, dy_, mirror=True)
+    t_ = hp(sc, d, dx_ + 10, dy_, 5)
+    for k_ in range(3):                                   # rounds without food: all three gone
+        UI.gem(sc, dx_ - 10 + k_ * 12, t_ - 10, 4, 5, "over")
+    v = bug((), "idle", 1.0, 77)
+    BT.put(sc, BT.flash(v, 0.35), dx_ - 52, dy_ - 6, mirror=True)
+    ST.glyph(sc, "captured", dx_ - 52, W_top(v, dy_ - 6) - 11)
+    mob(3, ((60, 214), (40, 230), (84, 232)), states=("fear", None, "fear"))
+    pop(sc, "feed", px + 110, py + 96, "Ненасытный", col=RED, seed=4)
+    caption(3, "Пожиратель голоден", "три раунда без еды — красные камни; хватает свою, самую мелкую")
+
+    # 5 — Кукушка: the eggs ripen in a machine's warm firebox; a grub crawls out every 3 turns
+    px, py = P(4)
+    k_spr = SL.build("Кукушка", "attack", 1.0)
+    kx, ky = px + 250, py + 206
+    BT.shadow(sc, kx + 4, ky, 50, 8)
+    BT.put(sc, k_spr, kx, ky, mirror=True)
+    hp(sc, k_spr, kx, ky, 7, n=6, w=54)
+    g, gx_, gy_ = golem(4, "Механик", 84, 214, pose="idle")
+    ST.on_body(sc, g, gx_, gy_, "infected", seed=3)
+    ST.glyph(sc, "infected", gx_ - 8, W_top(g, gy_) - 12)
+    for k_ in range(3):                                   # turns to the next grub: two of three gone
+        UI.gem(sc, gx_ + 6 + k_ * 9, W_top(g, gy_) - 7, 3.5, 4.5, "ok" if k_ < 2 else "dim")
+    BT.put(sc, SL.build("личинка", "attack", 0.9), gx_ + 30, gy_ + 8)       # a grub already out of the grate
+    mob(4, ((160, 222),))
+    pop(sc, "kuk", px + 190, py + 98, "Яйцеклад", col=GREEN, seed=5)
+    caption(4, "Кукушка", "в машине зреет кладка: камни до следующей личинки")
+
+    # 6 — the leader is dead: the swarm beheaded, everyone tests fear
+    px, py = P(5)
+    dead = flip_v(SL.build("Разум улья", "idle", 1.0))
+    SA.splat(sc, px + 240, py + 192, 26, col=hexc("#5a3a6a"), k=0.6)
+    BT.put(sc, dead, px + 240, py + 190)
+    mob(5, ((70, 200), (100, 214), (60, 230), (130, 228), (150, 204), (40, 214)),
+        states=("fear", "fear", None, "fear", None, "fear"))
+    letters(sc, "РОЙ ОБЕЗГЛАВЛЕН", px + PWd / 2, py + 100, "title", 8, col=RED, align="center", jitter=1, seed=9)
+    caption(5, "Лидер погиб", "рой обезглавлен: все проверяют страх, у кого сдали нервы — бегут")
+
+    for i in range(6):                                    # thin dark seams between the panels
+        px, py = P(i)
+        sc.rgb[py:py + PHd, px + PWd:px + PWd + 2] = hexc("#0c0810")
+        sc.rgb[py + PHd:py + PHd + 2, px:px + PWd + 2] = hexc("#0c0810")
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_leader_field.png"))
+    print("swarm_leader_field.png", img.size)
+
+
 SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools,
-           "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development}
+           "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development,
+           "card": cards, "field": leaders_field}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
