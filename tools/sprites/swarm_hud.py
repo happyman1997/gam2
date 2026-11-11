@@ -887,76 +887,134 @@ def stats(sc, x, y, rows):
     return y + ((len(rows) + 1) // 2) * 28 + 4
 
 
-def cards():
-    sc = frame_screen(53)
+def dots(sc, x0, x1, y):
+    """A dotted leader line between a label and its value, as in an old ledger."""
+    for x in range(int(x0), int(x1), 4):
+        sc.rgb[y, x] = sc.rgb[y, x] * 0.4 + np.array(PALE, float) * 0.6
+
+
+def big_card(spec, name):
+    """A creature's card as big as the screen, as in Conquest of Elysium: the creature large on the left with where
+    it came from; the numbers in a column; every attack in a column of its own — damage, type, reach, what it does
+    besides; on the right what it can and what it can't, each with its icon."""
+    sc = frame_screen(spec["seed"])
     UI.wing(sc, 0, 0, WW, 44)
-    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=23)
-    title(sc, "КАРТОЧКА", "кто это, что умеет, откуда взялся", seed=41)
-    letters(sc, "в выводке, на расстановке, на паузе", 944, 28, "title", 8, col=PALE, outline=False, align="right")
-    CW_, X = 302, (10, 324, 638)
-    # 1 — a worker flock: form, part, mutation, the form's evolution, where it came from
-    x0, y0 = X[0], 52
-    UI.cell(sc, x0, y0, x0 + CW_, 530, "hi")
-    put(sc, bug(("stinger", "wings"), "idle", 2.3, 61, rare="blister", evo=("vise",)), x0 + 72, y0 + 112, 26)
-    letters(sc, "Скорпион", x0 + 146, y0 + 12, "text", 16, col=GOLD, jitter=1, seed=1)
-    letters(sc, "рабочая · в рое 7", x0 + 146, y0 + 30, "title", 8, col=PALE, outline=False)
-    letters(sc, "«Летучее жало»", x0 + 146, y0 + 42, "text", 16, col=(214, 196, 150))
-    letters(sc, "родители:", x0 + 146, y0 + 66, "title", 8, col=PALE, outline=False)
-    icon(sc, "stinger", x0 + 146, y0 + 76, 1)
-    letters(sc, "×", x0 + 166, y0 + 78, "text", 16, col=MUTED)
-    icon(sc, "wings", x0 + 178, y0 + 76, 1)
-    letters(sc, "убили в бою: 9", x0 + 146, y0 + 100, "text", 16, col=GREEN)
-    y = stats(sc, x0 + 12, y0 + 132, [("здоровье", "8"), ("удар", "жало 1–4 +1"), ("броня", "0 · хитин"),
-                                      ("скорость", "2"), ("дух", "6, стая до +4"), ("предел", "1 очко")])
-    y = section(sc, x0 + 12, y, CW_ - 24, "stinger", "форма", "Жало",
-                "пробивший удар травит (1–4 яда) и снимает 1 брони. Медленнее других", seed=2)
-    y = section(sc, x0 + 12, y, CW_ - 24, "wings", "деталь", "Крылья", "перепархивает: свой строй его не держит", seed=3)
-    y = section(sc, x0 + 12, y, CW_ - 24, "m_blister", "мутация · общий пул", "Нарывник",
-                "кто ранит её вплотную, обжигается: его удар слабее", col=SILVER, seed=4)
-    y = section(sc, x0 + 12, y, CW_ - 24, "evo_vise", "эволюция формы", "Клешни-тиски",
-                "держит соседнего врага, клешни бьют дробящим", col=(150, 220, 120), seed=5)
-    # 2 — a soldier: heavier numbers, the leader's own mutation
-    x0 = X[1]
-    UI.cell(sc, x0, y0, x0 + CW_, 530, "normal")
-    put(sc, bug(("horn",), "idle", 1.9, 62, soldier=True, rare="cutters", evo=("forked",)), x0 + 72, y0 + 112, 30)
-    letters(sc, "Жук-носорог", x0 + 146, y0 + 12, "text", 16, col=INK, jitter=1, seed=6)
-    letters(sc, "солдат · в рое 2", x0 + 146, y0 + 30, "title", 8, col=PALE, outline=False)
-    letters(sc, "«Таран»", x0 + 146, y0 + 42, "text", 16, col=(214, 196, 150))
-    letters(sc, "родители:", x0 + 146, y0 + 66, "title", 8, col=PALE, outline=False)
-    icon(sc, "horn", x0 + 146, y0 + 76, 1)
-    letters(sc, "×", x0 + 166, y0 + 78, "text", 16, col=MUTED)
-    icon(sc, "ant", x0 + 178, y0 + 76, 1)
-    letters(sc, "убили в бою: 4", x0 + 146, y0 + 100, "text", 16, col=GREEN)
-    y = stats(sc, x0 + 12, y0 + 132, [("здоровье", "12"), ("удар", "рог 1–8"), ("броня", "2 · тяж. хитин"),
-                                      ("скорость", "1"), ("дух", "9, стая до +4"), ("предел", "3 очка")])
-    y = section(sc, x0 + 12, y, CW_ - 24, "horn", "форма", "Разгон",
-                "первый удар боя ×1,5, дробящий, отбрасывает. Медленный", seed=7)
-    y = section(sc, x0 + 12, y, CW_ - 24, "m_cutters", "мутация · общий пул", "Кусачки",
-                "перекусывают щит: щит не спасает от её укуса", col=SILVER, seed=8)
-    y = section(sc, x0 + 12, y, CW_ - 24, "evo_forked", "эволюция формы", "Двойной рог",
-                "Разгон каждые 3 хода, а не один раз", col=(150, 220, 120), seed=9)
-    letters(sc, "детали: нет", x0 + 12, y, "title", 8, col=PALE, outline=False)
-    # 3 — the leader: abilities with when they fire, the flock rule, the run rule
-    x0 = X[2]
-    UI.cell(sc, x0, y0, x0 + CW_, 530, "mut")
-    put(sc, leader("Матка", "idle", 0.86), x0 + 112, y0 + 112, 34)
-    letters(sc, "Матка", x0 + 196, y0 + 12, "text", 16, col=GOLD, jitter=1, seed=10)
-    letters(sc, "лидер", x0 + 196, y0 + 30, "title", 8, col=PALE, outline=False)
-    y = stats(sc, x0 + 12, y0 + 132, [("здоровье", "80"), ("удар", "жвалы 1–6 +2"), ("броня", "2 · хитин"),
-                                      ("скорость", "1"), ("размер", "6"), ("стаи", "тесные")])
-    for key, when, name, text, col in (
-            ("clutch", "каждые 3 хода", "Кладка", "рядом вылупляются 2 личинки", GOLD),
-            ("larva", "постоянно", "Сердце роя", "своя, погибшая рядом, роняет яйцо", GOLD),
-            ("m_heir", "ключ пула", "Наследница", "если Матка погибла, станет Маткой", (196, 160, 236)),
-            ("feed", "правило похода", "Плодовитость", "в выводке на потомка больше", (214, 196, 150))):
-        y = section(sc, x0 + 12, y, CW_ - 24, key, when, name, text, col=col, seed=len(name))
-    for j, ln in enumerate(wrap("слабость: медлительная, держится в тылу", CW_ - 28)):
-        letters(sc, ln, x0 + 12, y + j * 15, "text", 16, col=RED)
-    UI.cobweb(sc, 958, 46, 30, quad=(-1, 1))
+    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=spec["seed"])
+    title(sc, spec["title"], spec["sub"], seed=spec["seed"] + 1)
+    UI.plate(sc, 6, 50, WW - 6, HH - 6, antennae=False)
+    # left: the creature large, where it came from
+    UI.cell(sc, 18, 62, 300, 300, spec.get("cell", "hi"))
+    spr = spec["sprite"]
+    put(sc, spr, 159 + spec.get("dx", 0), 268, spec.get("sw", 40))
+    y = 312
+    for kind, *row in spec["facts"]:
+        if kind == "parents":
+            letters(sc, "родители", 22, y, "title", 8, col=PALE, outline=False)
+            x = 22
+            for j, (key, nm) in enumerate(row[0]):
+                if j:
+                    letters(sc, "×", x + 2, y + 12, "text", 16, col=MUTED)
+                    x += 16
+                icon(sc, key, x, y + 10, 1)
+                letters(sc, nm, x + 18, y + 12, "text", 16, col=INK)
+                x += 18 + UI.text_width(nm, "text", 16) + 4
+            y += 34
+        else:
+            lab, vals, col = row
+            letters(sc, lab, 22, y, "title", 8, col=PALE, outline=False)
+            for j, val in enumerate([vals] if isinstance(vals, str) else vals):
+                letters(sc, val, 22, y + 10 + j * 16, "text", 16, col=col)
+            y += 32 + 16 * (0 if isinstance(vals, str) else len(vals) - 1)
+    UI.button(sc, 22, HH - 52, 296, HH - 16, "chitin")
+    letters(sc, "Закрыть", 159, HH - 42, "title", 16, col=INK, align="center")
+    # middle: the numbers, then the attacks — each its own row
+    x0, x1 = 316, 616
+    heading(sc, "ЧИСЛА", x0, 62, seed=3)
+    y = 86
+    for lab, val in spec["stats"]:
+        letters(sc, lab, x0, y, "text", 16, col=MUTED)
+        w = UI.text_width(val, "text", 16)
+        dots(sc, x0 + UI.text_width(lab, "text", 16) + 6, x1 - w - 6, y + 12)
+        letters(sc, val, x1, y, "text", 16, col=INK, align="right")
+        y += 19
+    y += 12
+    heading(sc, "УДАРЫ", x0, y, seed=4)
+    y += 26
+    cols = (x0 + 20, x0 + 112, x0 + 172, x0 + 252)
+    for cx, lab in zip(cols, ("удар", "урон", "тип", "дальн.")):
+        letters(sc, lab, cx, y, "title", 8, col=PALE, outline=False)
+    y += 12
+    for key, nm, dmg, typ, reach, note in spec["attacks"]:
+        sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.5 + hexc("#4a3e5c") * 0.5
+        icon(sc, key, x0, y + 5, 1)
+        for cx, val, col in zip(cols, (nm, dmg, typ, reach), (GOLD, INK, INK, INK)):
+            letters(sc, val, cx, y + 5, "text", 16, col=col)
+        y += 22
+        for ln in wrap(note, x1 - x0 - 24):
+            letters(sc, ln, x0 + 20, y, "text", 16, col=MUTED)
+            y += 15
+        y += 4
+    # under the attacks: what it hands down, or the leader's pool — icons in a column
+    if spec.get("below"):
+        head, rows = spec["below"]
+        y += 10
+        heading(sc, head, x0, y, seed=6)
+        y += 26
+        for key, nm, note, col in rows:
+            icon(sc, key, x0, y, 1)
+            letters(sc, nm, x0 + 20, y + 1, "text", 16, col=col)
+            if note:
+                letters(sc, note, x1, y + 1, "text", 16, col=MUTED, align="right")
+            y += 18
+    # right: what it can, and what it can't
+    x0 = 632
+    heading(sc, spec.get("right", "СПОСОБНОСТИ"), x0, 62, seed=5)
+    y = 88
+    for key, lab, nm, desc, col in spec["abilities"]:
+        y = section(sc, x0, y, WW - 24 - x0, key, lab, nm, desc, col=col, seed=len(nm))
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_card.png"))
-    print("swarm_card.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
+
+
+def cards():
+    big_card(dict(
+        seed=53, title="СКОРПИОН", sub="рабочая · «Летучее жало» · в рое 7",
+        sprite=bug(("stinger", "wings"), "idle", 4.2, 61, rare="blister", evo=("vise",)), dx=-6,
+        facts=[("parents", [("stinger", "скорпион"), ("wings", "оса")]),
+               ("val", "стая убила в прошлом бою", "9 врагов", GREEN),
+               ("val", "в рое таких же", "7", INK)],
+        stats=[("здоровье", "8"), ("броня", "0 · хитин"), ("скорость", "2"), ("боевой дух", "6"),
+               ("стая", "+1 за соседа, до +4"), ("размер", "1"), ("предел роя", "1 очко")],
+        attacks=[("stinger", "Жало", "1–4 +1", "колющий", "1", "пробивший удар: яд 1–4 (копится) и −1 брони цели, не больше −2 с одной"),
+                 ("evo_vise", "Клешни", "—", "дробящий", "1", "держат соседнего врага: он не уходит из клетки")],
+        below=("ПОТОМКАМ", [("stinger", "Жало", "черта", GOLD), ("wings", "Крылья", "черта", GOLD),
+                            ("m_blister", "Нарывник", "мутация — как черта", SILVER)]),
+        abilities=[("stinger", "форма", "Жало", "травит и разъедает броню; на машины яд не действует, но броню разъедает", GOLD),
+                   ("wings", "деталь", "Крылья", "перепархивает: свой строй её не держит, проходит над своими", GOLD),
+                   ("m_blister", "мутация · общий пул", "Нарывник", "кто ранит её вплотную, обжигается: его удар слабее", SILVER),
+                   ("evo_vise", "эволюция формы", "Клешни-тиски", "держит соседнего врага, клешни бьют дробящим", (150, 220, 120)),
+                   ("ant", "класс", "Хитин · Стая · Пожирание", "держит рубящий, ломается от дробящего; смелее рядом со своими; съев убитого, лечится", INK),
+                   ("fear", "слабость", "Медленнее других", "скорпионы приходят к бою последними", RED)]),
+        "swarm_card.png")
+    big_card(dict(
+        seed=57, title="МАТКА", sub="лидер роя · число и порода", cell="mut",
+        sprite=leader("Матка", "idle", 1.45), dx=14, sw=56,
+        facts=[("val", "развитие", "ещё не выбрано", MUTED),
+               ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
+        stats=[("здоровье", "80"), ("броня", "2 · хитин"), ("скорость", "1"), ("размер", "6")],
+        attacks=[("matka", "Жвалы", "1–6 +2", "рубящий", "1", "бьёт, только если враг дошёл до неё")],
+        below=("ПУЛ МУТАЦИЙ", [("m_nest", "Малое гнездо", "Гнездо", GOLD), ("m_nurse", "Кормилица", "Гнездо", GOLD),
+                               ("m_vivi", "Живородящая", "Гнездо", GOLD), ("m_bud", "Почкование", "Гнездо", GOLD),
+                               ("m_dominant", "Доминантная линия", "Порода", GOLD), ("m_flight", "Брачный полёт", "Порода", GOLD),
+                               ("m_hybrid", "Гибрид", "Порода", GOLD), ("m_heir", "Наследница", "ключ", (196, 160, 236))]),
+        abilities=[("clutch", "каждые 3 хода", "Кладка", "рядом вылупляются 2 личинки; дожившие до конца боя уходят в выводок с чертой, что убивала больше всех", GOLD),
+                   ("larva", "постоянно", "Сердце роя", "своя, погибшая в 2 клетках от неё, роняет яйцо: через 2 хода — личинка", GOLD),
+                   ("feed", "правило похода", "Плодовитость", "в выводке на одного потомка больше, кормление вдвое дешевле", (214, 196, 150)),
+                   ("matka", "стаи роя", "Тесные стаи", "в клетке до 6 мелких, а не 4: на фронте бьёт больше особей, но удары по площади задевают больше", (214, 196, 150)),
+                   ("fear", "слабость", "Медлительная", "держится в тылу; погибнет — рой обезглавлен, все проверяют страх 1–9", RED)]),
+        "swarm_card_leader.png")
 
 
 # ---------------------------------------------------------------- the leaders on the field: all the battle shows of them
