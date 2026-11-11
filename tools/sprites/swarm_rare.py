@@ -36,6 +36,9 @@ SECOND = {"alarm": ("horn",), "spinner": ("stinger",), "exploder": ("wings",), "
 
 
 def add(m, mc, a, rare, pose):
+    if rare.startswith("psi_"):                     # the Hive Mind's psi mutations
+        import swarm_psi
+        return swarm_psi.add(m, mc, a, rare, pose)
     y0, gc, gr, w = a["y0"], a["gc"], a["gr"], a["wing"]
     if rare == "alarm":
         for z in (1, -1):
