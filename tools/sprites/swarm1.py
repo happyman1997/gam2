@@ -40,6 +40,7 @@ FORM_CHITIN = {
     "jumper": ["#060804", "#151b0c", "#283216", "#424e22", "#808e4a"],    # grasshopper: rotten olive
     "scythes": ["#0a0c08", "#20281c", "#3a4630", "#5e6c52", "#a4b294"],   # mantis: pale sickly green
     "firefly": ["#080604", "#1c120a", "#322010", "#50361a", "#927040"],   # firefly: dark amber
+    "spitter": ["#0a0806", "#261c12", "#4a3820", "#7a6040", "#c4a878"],   # spitting spider: pale spotted ochre
 }
 
 
@@ -55,7 +56,7 @@ def chitin(hue_shift=0.0, form=None):
         out.append(np.array([r * 255, g * 255, b * 255], dtype=np.float32))
     return out
 
-TRAITS = ("wings", "stinger", "acid", "horn", "carapace", "jumper", "scythes", "firefly")
+TRAITS = ("wings", "stinger", "acid", "horn", "carapace", "jumper", "scythes", "firefly", "spitter")
 CHIMERAS = ("iron", "boil", "hand", "face", "bones", "quills", "snout", "slime", "worm")
 CHIMERA_NAMES = dict(iron="Железный панцирь", boil="Кипящая кровь", hand="Человеческая рука", face="Человеческое лицо",
                      bones="Чужие кости", quills="Иглы", snout="Волчий нюх", slime="Слизистая кожа", worm="Червь внутри")
@@ -70,9 +71,11 @@ M_SLIME = Mat(ramp("#0c2a2a", "#145a50", "#2a9a80", "#6ad8b8", "#d0fff0"), emiss
 M_SLIME_FILM = Mat(ramp("#0e2a2c", "#1a4a48", "#2a6e66", "#4aa894", "#9ae0cc"), dither=True)
 M_WORM = Mat(ramp("#3a1418", "#6a2a30", "#a04a50", "#d07a78", "#f4b0a8"))
 NAMES = dict(wings="Крылья", stinger="Жало", acid="Кислотная железа", horn="Рог", carapace="Панцирь",
-             jumper="Прыгучие ноги", scythes="Серпы", firefly="Светлячок", giant="Гигантизм")
+             jumper="Прыгучие ноги", scythes="Серпы", firefly="Светлячок", spitter="Клейкие железы", giant="Гигантизм")
 PLANS = dict(wings="Оса", stinger="Скорпион", acid="Бочонок", horn="Жук", carapace="Мокрица",
-             jumper="Кузнечик", scythes="Богомол", firefly="Светляк")
+             jumper="Кузнечик", scythes="Богомол", firefly="Светляк", spitter="Паук-плевун")
+M_SPIT = Mat(ramp("#2a2618", "#6a6040", "#b0a070", "#e8dcb0", "#fffbe8"), emissive=hexc("#f0e0a0"), glow_r=3, glow_k=0.25)
+M_GLAND = Mat(ramp("#2a2010", "#5a4826", "#9a8050", "#d0b884", "#f4e6c4"))
 
 
 def pivot(m, R, p):
@@ -421,8 +424,65 @@ def plan_firefly(m, mc, g, pose, soldier):
                 hind=np.array((-2.4, y0 - 0.8, 0)), fore=np.array((2.0, y0 + 0.2, 0)), length=16, has_firefly=True)
 
 
+def plan_spider(m, mc, g, pose, soldier):
+    """The spitting spider: a tall domed carapace full of glue glands, a small round abdomen, eight long arched legs."""
+    y0 = 5.2 * g["leg"]
+    gs, hs = g["gs"], g["hsz"] * (1.3 if soldier else 1.0)
+    spot = Mat(chitin_shift(mc, 0.0, sat=0.7, light=0.42))
+    ceph = np.array((1.0, y0 + 2.0, 0))
+    m.ell(ceph, (3.8, 3.3, 3.1), mc, rot_z(-0.14))                     # the dome — the glue glands are in there
+    gc = np.array((-4.8, y0 + 1.5, 0))
+    m.ell(gc, (3.0 * gs, 2.6 * gs, 2.7 * gs), mc, rot_z(0.15))
+    for (dx, dy, dz) in ((-0.8, 2.6, 1.2), (0.6, 2.9, -0.6), (1.6, 2.2, 1.6), (-1.6, 1.8, -1.4), (-0.2, 1.4, 2.4)):
+        m.ell(ceph + (dx, dy, dz), (0.7, 0.35, 0.6), spot)
+    for (dx, dy, dz) in ((0.6, 2.2, 1.2), (-1.2, 2.0, -1.0), (-2.0, 1.2, 1.8), (1.6, 1.4, -1.6)):
+        m.ell(gc + np.array((dx, dy, dz)) * gs, (0.7, 0.4, 0.6), spot)
+    hc = np.array((4.4, y0 + 1.6, 0))
+    m.ell(hc, (1.6 * hs, 1.6 * hs, 1.9 * hs), mc)
+    for z in (0.5, -0.5):                                              # eyes: a pair in front, a cluster behind
+        m.ell(hc + (1.3 * hs, 0.7 * hs, z * hs), (0.42, 0.42, 0.42), M_EYE)
+    for (dx, dy, dz) in ((0.8, 1.2, 1.0), (0.8, 1.2, -1.0), (0.4, 1.4, 0.5), (0.4, 1.4, -0.5)):
+        m.ell(hc + np.array((dx, dy, dz)) * hs, (0.3, 0.3, 0.3), M_DARKEYE)
+    for z in (0.7, -0.7):                                              # chelicerae and fangs
+        a_ = hc + (1.0 * hs, -0.8 * hs, z * hs)
+        b_ = a_ + (0.9, -1.8, 0)
+        m.cyl(a_, b_, 0.65 * hs, mc, r1=0.45 * hs, seg=5)
+        spike(m, b_, b_ + (0.6, -1.0, -z * 0.4), 0.35 * hs, M_FANG)
+    tip = gc + np.array((-3.0 * gs, -0.6, 0))
+    for z in (0.5, -0.5):
+        m.cyl(tip + (0.6, 0.2, z), tip + (-0.8, -0.4, z * 1.3), 0.45, M_BONE, r1=0.2, seg=5)
+    hips = (2.6, 1.4, 0.2, -1.0)
+    reach = (5.0, 2.4, -1.8, -4.6)
+    for side in (1, -1):                                               # eight long legs, knees high above the body
+        band = 3 if side > 0 else 1
+        for i, (hx, dx) in enumerate(zip(hips, reach)):
+            hip = np.array((hx, y0 + 1.0, 1.6 * side))
+            knee = np.array((hx + dx * 0.5, y0 + 6.6 + 0.4 * (i % 2), 4.6 * side))
+            foot = np.array((hx + dx * 1.7, 0.0, 7.4 * side))
+            if pose == "attack" and i == 0:
+                knee = np.array((hx + 3.0, y0 + 5.8, 3.6 * side))
+                foot = np.array((hx + 6.4, y0 + 3.4, 4.4 * side))
+            mid = knee + (foot - knee) * 0.5
+            m.limb([hip, knee], 1, mc, band=band)
+            m.limb([knee, mid], 1, mc, band=band - 1 if side > 0 else 1)
+            m.limb([mid, foot], 1, spot, band=band - 1 if side > 0 else 1)        # banded legs
+            m.ell(knee, (0.55, 0.55, 0.55), spot)
+            _FEET.append(foot)
+    if pose == "attack":                                               # the spit: a glob and a zigzag of glue
+        p0 = hc + (2.2 * hs, -1.6 * hs, 0)
+        pts = [p0 + (2.0 * k, 0.5 * k - 0.05 * k * k + (0.6 if k % 2 else -0.6), 0) for k in range(5)]
+        for p, q in zip(pts[:-1], pts[1:]):
+            m.cyl(p, q, 0.35, M_SPIT, seg=4)
+        m.ell(pts[-1] + (1.2, 0.2, 0), (1.4, 1.1, 1.1), M_SPIT)
+    return dict(y0=y0, hc=hc, hs=hs, tip=tip, gc=gc, gr=2.6 * gs,
+                back=[(-6.4, y0 + 1.5 + 2.2 * gs), (-4.4, y0 + 1.5 + 2.6 * gs), (-0.6, y0 + 5.0), (1.6, y0 + 5.2), (3.0, y0 + 4.4)],
+                wing=ceph + np.array((0.2, 1.7, 0)), hind=np.array((-1.0, y0 - 0.6, 0)), fore=np.array((2.6, y0 + 0.4, 0)),
+                length=14, has_spitter=True)
+
+
 PLAN_FN = {None: plan_ant, "wings": plan_wasp, "stinger": plan_scorpion, "acid": plan_honeypot, "horn": plan_beetle,
-           "carapace": plan_isopod, "jumper": plan_grasshopper, "scythes": plan_mantis, "firefly": plan_firefly}
+           "carapace": plan_isopod, "jumper": plan_grasshopper, "scythes": plan_mantis, "firefly": plan_firefly,
+           "spitter": plan_spider}
 
 
 def chitin_shift(mat, dh, sat=1.0, light=1.0):
@@ -483,6 +543,13 @@ def add_parts(m, mc, a, traits, pose):
             m.cyl(elbow, tip + (tip - elbow) * 0.35, 1.6, M_BONE, r1=0.15, seg=4)
     if "firefly" in traits and not a.get("has_firefly"):
         m.ell(a["tip"] + (0.6, 0.6, 0), (1.9, 1.7, 1.8), M_LANTERN)
+    if "spitter" in traits and not a.get("has_spitter"):             # swollen glue glands over the jaws
+        for z in (0.9, -0.9):
+            m.ell(hc + np.array((-0.2 * hs, 1.3 * hs, z * hs)), (1.3 * hs, 1.1 * hs, 1.0 * hs), M_GLAND)
+            m.ell(hc + np.array((0.2 * hs, 1.7 * hs, z * hs * 1.1)), (0.4, 0.3, 0.3), Mat(chitin_shift(M_GLAND, 0.0, light=0.5)))
+        m.ell(hc + np.array((2.0 * hs, -1.9 * hs, 0.4)), (0.45, 0.8, 0.45), M_SPIT)
+        if pose == "attack":
+            m.ell(hc + np.array((5.0 * hs, -1.2 * hs, 0)), (1.0, 0.8, 0.8), M_SPIT)
 
 
 def add_chimera(m, mc, a, kind, pose):
@@ -605,7 +672,7 @@ def body(hue=0.0, traits=(), pose="idle", soldier=False, genes=None, chimera=Non
     if pose == "attack":
         if primary == "jumper" or ("jumper" in traits and primary is None):
             m = pivot(m, rot_z(0.18), (0, 0, 0)).transformed(I3, (3, 5, 0))
-        elif primary in ("stinger", "scythes", "firefly", "acid"):
+        elif primary in ("stinger", "scythes", "firefly", "acid", "spitter"):
             m = m.transformed(I3, (2.0, 0, 0))
         else:
             lean = -0.35 if "wings" in traits else (-0.3 if "horn" in traits else -0.16)

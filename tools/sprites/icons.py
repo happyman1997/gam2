@@ -168,6 +168,7 @@ SWARM_ICONS = {
     "jumper": (841013, "Прыгучие ноги · кузнечик", "черта", dict(green="olive", grey="olive", brown="olive", warm="olive")),
     "scythes": (845234, "Серпы · богомол", "черта", dict(green="mantis", grey="bone", brown="mantis", warm="bone")),
     "firefly": (1140464, "Светлячок · светляк", "черта", dict(green="lantern", grey="chitin", warm="lantern", brown="amber")),
+    "spitter": (476648, "Клейкие железы · паук-плевун", "черта", dict(brown="bone", warm="amber", red="crimson", grey="chitin")),
     "iron": (644922, "Железный панцирь", "химера", dict(warm="iron", brown="iron", red="iron", grey="grub", green="grub")),
     "boil": (731424, "Кипящая кровь", "химера", dict(red="fire", warm="fire", grey="steel", brown="ember")),
     "hand": (622418, "Человеческая рука", "химера", dict(warm="skin", brown="skin", red="skin", grey="skin")),
@@ -217,6 +218,9 @@ SWARM_ICONS = {
     "evo_bright": (392718, "Яркий фонарь", "эволюция", dict(warm="lantern", red="lantern", grey="chitin", brown="amber")),
     "evo_hood": (1076579, "Капюшон", "эволюция", dict(brown="chitin", warm="lantern", grey="chitin", red="chitin")),
     "evo_lure": (434562, "Ложный сигнал", "эволюция", dict(warm="lure", red="lure", grey="chitin", blue="lantern")),
+    "evo_net": (1366120, "Ловчая сеть", "эволюция", dict(grey="bone", brown="chitin", warm="bone", red="amber")),
+    "evo_recoil": (299380, "Отскок на нити", "эволюция", dict(grey="bone", brown="amber", red="amber", blue="bone", warm="bone")),
+    "evo_pull": (1281104, "Стащить со стены", "эволюция", dict(red="amber", warm="amber", grey="bone", brown="chitin")),
     # mutations: the common pool and each leader's pool (keys as in swarm_mut, with "m_")
     "m_spinner": (420375, "Прядильные железы", "общий пул", dict(grey="bone", blue="bone", purple="bone")),
     "m_exploder": (1320474, "Взрывной муравей", "общий пул", dict(red="amber", warm="lantern", grey="chitin", brown="chitin")),

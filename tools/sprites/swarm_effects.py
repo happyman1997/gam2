@@ -447,6 +447,34 @@ def firefly_flash(giant=False):
                                                                    for i, (s, x, y) in enumerate(gs)]])]
 
 
+def spider_spit(giant=False):
+    """Паук-плевун: a glob of sticky venom across the field; the one it lands on is glued to its cell — it can still
+    strike, but it can't walk. The giant spits a net that glues a whole row."""
+    import swarm_status as ST
+    glue = hexc("#e8dcb0")
+    if not giant:
+        sp = lambda p: bug(("spitter",), p, seed=12)
+        t = human("Изобретатель")
+        path = arc_pts(X(0.6), GY - 20, X(3.0), GY - 30, 30)
+        base = [(t, X(3.0), GY), (golem("Механик"), X(1.8), GY + 6)]
+        return [frame(base + [(sp("idle"), X(0.2), GY)]),
+                frame(base + [(sp("attack"), X(0.3), GY)], fx=[lambda sc: trail(sc, path[:18], glue),
+                                                             lambda sc: blob(sc, *path[18], 3, glue, glow=0.3)],
+                      text=[(X(1.6), 22, "плевок липким ядом через строй")]),
+                frame(base + [(sp("idle"), X(0.2), GY)], fx=[lambda sc: splash(sc, X(3.0), GY + 2, 18, glue, 0.8),
+                                                           lambda sc: ST.ground(sc, "glued", X(3.0), GY, 18),
+                                                           lambda sc: ST.glyph(sc, "glued", X(3.0), ST.top_of(t, GY) - 12)],
+                      text=[(X(1.6), 22, "приклеен: не ходит, но бьёт")], key=True)]
+    sp = lambda p: bug(("spitter",), p, soldier=True, giant=True, seed=12)
+    row = [(human("Изобретатель"), X(2.6), GY - 18), (mason(), X(3.0), GY + 4), (human("Зодчий"), X(3.4), GY + 20)]
+    net = lambda sc: [ring(sc, X(3.0), GY + 2, 70, glue, 0.6, ry=26)] + [lines(sc, (X(1.0), GY - 30), (x, y - 20), glue, 0.7) for _, x, y in row]
+    return [frame(row + [(sp("idle"), X(0.0), GY)]),
+            frame(row + [(sp("attack"), X(0.2), GY)], fx=[net], text=[(X(1.6), 22, "плюёт сетью")]),
+            frame(row + [(sp("idle"), X(0.0), GY)], fx=[net] + [lambda sc, s_=s_, x=x, y=y: ST.glyph(sc, "glued", x, ST.top_of(s_, y) - 12)
+                                                                for s_, x, y in row],
+                  text=[(X(1.6), 22, "клеит всех в ряд до 3 клеток")], key=True)]
+
+
 def devour(giant=False):
     a = lambda p: bug((), p, soldier=True, seed=10)
     inv = human("Изобретатель")
@@ -463,7 +491,8 @@ def devour(giant=False):
 FORMS = [("Муравей · Закрыть брешь", ant_stroy), ("Оса · Полёт", wasp_flight), ("Скорпион · Жало", scorpion_sting),
          ("Бочонок · Плевок и лопается", barrel_spit), ("Жук · Разгон", beetle_charge),
          ("Мокрица · Шипы, сворачивается", isopod_thorns), ("Кузнечик · Прыжок и приземление", hopper_leap),
-         ("Богомол · Серпы", mantis_blades), ("Светляк · Вспышка", firefly_flash), ("Пожирание · все формы", devour)]
+         ("Богомол · Серпы", mantis_blades), ("Светляк · Вспышка", firefly_flash),
+         ("Паук-плевун · Плевок", spider_spit), ("Пожирание · все формы", devour)]
 
 
 # ---------------------------------------------------------------- the GIFs

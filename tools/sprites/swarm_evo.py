@@ -1,4 +1,4 @@
-"""Evolution of the swarm's forms: three evolutions for each of the nine forms. One is bought at a time in the brood,
+"""Evolution of the swarm's forms: three evolutions for each of the ten forms. One is bought at a time in the brood,
 for biomass, and acts on every creature whose body is that form — those alive and those still to hatch. Each shows on
 the sprite, so a bred line reads on the field: acid-glowing ant gasters, a wasp's long syringe of a sting, a
 scorpion's vice claws, a barrel's warning bands, a beetle's second horn, an isopod's lime crust, the locust's
@@ -51,12 +51,15 @@ EVO = {
     "scythes": [("saws", "Серпы-пилы", "третий удар за раунд по цели ниже половины здоровья", "зубья-пилы"),
                 ("orchid", "Цветочная мимикрия", "пока не ударил, стрелки и удары по площади его не видят", "лепестки"),
                 ("eyespots", "Глазчатые крылья", "в первом раунде соседние враги проверяют страх 1–6", "крылья с глазками")],
+    "spitter": [("net", "Ловчая сеть", "плевок клеит и соседнего врага", "зигзаги шёлка на брюшке"),
+                ("recoil", "Отскок на нити", "дошли вплотную — отпрыгивает на нити на 2 клетки назад", "нить петлёй со спины"),
+                ("pull", "Стащить со стены", "приклеенный стрелок на стене или башне падает вниз", "крючья на передних лапах")],
     "firefly": [("bright", "Яркий фонарь", "вспышка каждые 2 хода", "фонарь крупнее"),
                 ("hood", "Капюшон", "гасит фонарь: стрелки больше не целятся в него первым", "капюшон над фонарём"),
                 ("lure", "Ложный сигнал", "раз в 3 хода враг до 2 клеток шагает к нему", "двухцветный фонарь")],
 }
 FORM_NAME = {None: "Муравей", "wings": "Оса", "stinger": "Скорпион", "acid": "Бочонок", "horn": "Жук", "carapace": "Мокрица",
-             "jumper": "Кузнечик", "scythes": "Богомол", "firefly": "Светляк"}
+             "jumper": "Кузнечик", "scythes": "Богомол", "firefly": "Светляк", "spitter": "Паук-плевун"}
 
 
 def before(g, mc, primary, evo, hue):
@@ -222,6 +225,25 @@ def add(m, mc, a, primary, evo, pose, g):
             m.ell(c, (1.5, 1.5, 0.3), SPOT_RING)
             m.ell(c + (0, 0, 0.12 * s), (0.9, 0.9, 0.3), SPOT_IRIS)
             m.ell(c + (0.1, 0.1, 0.22 * s), (0.4, 0.4, 0.3), M_DARKEYE)
+    if primary == "spitter" and evo:
+        SILK = Mat(ramp("#2a2622", "#5a544a", "#948c7e", "#c8c0b0", "#f0eadc"))
+        if "net" in evo:                                       # zigzag silk bands over the abdomen
+            for k in range(7):
+                x = gc[0] - gr * 0.9 + k * gr * 0.3
+                y = gc[1] + gr * 0.95 + (0.5 if k % 2 else -0.3)
+                m.ell((x, y, 0), (0.55, 0.3, gr * 0.7), SILK)
+        if "recoil" in evo:                                    # a dragline looping up from the spinnerets
+            t = a["tip"]
+            pts = [t + (-1.0 * k, 1.6 * k - 0.1 * k * k, 0.3 * k) for k in range(8)]
+            pts += [pts[-1] + (1.2 * k, 0.6 * k, 0.2) for k in range(1, 5)]
+            for p, q in zip(pts[:-1], pts[1:]):
+                m.cyl(p, q, 0.22, SILK, seg=3)
+        if "pull" in evo:                                      # hooks on the front feet
+            for f in a["feet"]:
+                if f[0] > 3.0:
+                    s = np.sign(f[2]) or 1
+                    m.cyl(f, f + (1.6, 1.4, 0.3 * s), 0.45, M_BONE, r1=0.3, seg=5)
+                    m.cyl(f + (1.6, 1.4, 0.3 * s), f + (2.6, 0.6, 0.3 * s), 0.3, M_BONE, r1=0.06, seg=4)
     if primary == "firefly" and evo:
         lan = a["tip"]
         if "bright" in evo:
@@ -240,7 +262,7 @@ def sheet():
     from leaders_sheet import canvas, put, fonts, S, GOLD, INK, MUT
     from paths import out, font
     K = 2.6
-    forms = [None, "wings", "stinger", "acid", "horn", "carapace", "jumper", "scythes", "firefly"]
+    forms = [None, "wings", "stinger", "acid", "horn", "carapace", "jumper", "scythes", "firefly", "spitter"]
     RH, Y0, X0, CWD = 104, 92, 120, 168
     WW, HH = 960, Y0 + len(forms) * RH + 12
     sc = canvas(WW, HH, 41)

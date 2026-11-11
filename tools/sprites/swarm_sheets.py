@@ -39,11 +39,11 @@ def centered(d, x, y, text, fnt, fill):
 
 # ---------------------------------------------------------------- every form × every detail
 def combos():
-    WW, X0, CW, RH, Y0 = 960, 104, 95, 88, 96
-    HH = Y0 + RH * 9 + 40
+    WW, X0, CW, RH, Y0 = 960, 104, 85, 84, 96
+    HH = Y0 + RH * len(FORMS) + 20
     sc = canvas(WW, HH, 51)
     for r, (form, _) in enumerate(FORMS):
-        hue = -0.14 + r * 0.035
+        hue = -0.14 + r * 0.035 if form != "spitter" else 0.0
         for c, (det, _) in enumerate(DETAILS):
             cx, by = X0 + c * CW + CW // 2, Y0 + (r + 1) * RH - 14
             if det == form:
@@ -54,7 +54,8 @@ def combos():
     img = sc.image(S)
     d = ImageDraw.Draw(img)
     ft, fh, fb, fr, fs = fonts()
-    d.text((24, 14), "Рой: каждая форма с каждой деталью — 73 сочетания рабочей касты", font=ft, fill=INK)
+    n = len(FORMS) * len(DETAILS) - (len(FORMS) - 1)
+    d.text((24, 14), f"Рой: каждая форма с каждой деталью — {n} сочетаний рабочей касты", font=ft, fill=INK)
     d.text((24, 62), "Строки — главная черта (форма тела), столбцы — вторая черта (деталь). Окрас и пропорции наследуются, "
                      "поэтому и внутри клетки особи разные.", font=fr, fill=MUT)
     for c, (_, name) in enumerate(DETAILS):
@@ -70,7 +71,7 @@ def combos():
 # ---------------------------------------------------------------- castes and giants
 def castes():
     WW, BW, BH, Y0 = 960, 320, 168, 84
-    HH = Y0 + BH * 3 + 20
+    HH = Y0 + BH * ((len(FORMS) + 2) // 3) + 20
     sc = canvas(WW, HH, 61)
     cols = ((False, (), "рабочая · 1"), (True, (), "солдат · 2"), (False, ("giant",), "гигант · 2"), (True, ("giant",), "гигант-солдат · 3"))
     xs = (46, 112, 188, 268)
