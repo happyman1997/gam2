@@ -63,10 +63,10 @@ POOLS = {
         ("bolas", "Болас", "бросает липкий шарик на нити и подтягивает врага к рою", ("jumper",)),
         ("beeball", "Пчелиный шар", "облепившие одного врага давят его мимо брони", ("horn",)),
         ("pupa", "Куколка", "раненая окукливается и выходит крылатой; после боя умирает", ("scythes",)),
-        ("midge", "Мошкара", "убитая рассыпается облаком: жалит, слепит, стрелки не видят", ("acid",)),
-        ("honey", "Медовая бочка", "свои пьют из неё мёд; лопнув, заливает клетку — враги вязнут", ("carapace",)),
+        ("midge", "Мошкара", "убитая рассыпается облаком: жалит сквозь броню, стрелки не видят", ("acid",)),
+        ("honey", "Медовые соты", "соты с мёдом на спине: свои пьют; погибнув, заливает клетку — враги вязнут", ("carapace",)),
         ("blister", "Нарывник", "кто ранит её вплотную, обжигается: его удар слабее", ("firefly",)),
-        ("cutters", "Кусачки", "бронебойный укус: броня цели вдвое меньше", ("horn",)),
+        ("cutters", "Кусачки", "перекусывают щит: щит не спасает от её укуса", ("horn",)),
         ("guard", "Стража лидера", "рядом с лидером принимает удары по нему на себя", ("carapace",)),
         ("regen", "Живучая", "каждый раунд затягивает раны; пока горит — нет", ("wings",)),
     ]),
@@ -204,10 +204,21 @@ def add(m, mc, a, key, pose):
             m.ell(c, (0.55, 0.45, 0.45), M_DARKEYE)
             m.ell(c + (-0.3, 0.6, 0.4), (0.5, 0.25, 0.25), M_WING_NEAR)
     elif key == "honey":
-        m.ell(gc + (0, 0.4, 0), (gr * 1.5, gr * 1.38, gr * 1.38), HONEY, rot_z(0.2))
-        for x in (-0.8, -0.2, 0.4):
-            m.ell(gc + np.array((x * gr, gr * 1.32 - abs(x) * 0.8, 0)), (1.1, 0.35, 1.8), mc, rot_z(0.2 - x * 0.4))
-        m.ell(gc + (gr * 0.4, gr * 0.9, gr * 0.8), (gr * 0.35, gr * 0.22, gr * 0.25), M_SHEEN)
+        WAX = Mat(ramp("#2a2010", "#6a5420", "#b09040", "#e0c878", "#fff4c8"))
+        tops = [(-0.75, 0.0), (-0.25, 0.0), (0.25, 0.0), (-0.5, 0.42), (0.0, 0.42), (-0.5, -0.42), (0.0, -0.42), (0.45, 0.4)]
+        for i, (u, v) in enumerate(tops):                      # a slab of comb stuck to the back
+            x = gc[0] + u * gr * 1.1
+            y = gc[1] + gr * 0.85 - abs(u) * 0.9
+            z = v * gr * 1.05
+            base = np.array((x, y, z))
+            top = base + np.array((-0.3, 2.2 + 0.4 * (i % 2), 0))
+            m.cyl(base, top, 1.15, WAX, seg=6)
+            if i % 3 != 2:
+                m.ell(top + (0, 0.05, 0), (0.9, 0.3, 0.9), HONEY)
+            else:
+                m.ell(top + (0, 0.05, 0), (0.9, 0.25, 0.9), Mat(W.chitin_shift(WAX, 0.0, light=1.3)))
+        m.ell(gc + (gr * 0.2, gr * 0.2, gr * 0.85), (0.5, 0.8, 0.4), HONEY)
+        m.ell(gc + (gr * 0.2, -gr * 0.4, gr * 0.85), (0.35, 0.5, 0.3), HONEY)
     elif key == "blister":
         rings(m, gc, rot_z(0.25), gr * 1.3, gr * 0.99, WARN, n=2)
         m.ell(hc, (2.4 * hs, 2.2 * hs, 2.2 * hs), WARN)
@@ -766,8 +777,7 @@ def scene(sc, key, x, by):
         put(sc, golem("Механик", "attack"), x + 30 * F, by, 0)
         cloud(sc, x + 20 * F, by - 26 * F, 34, 22, 140, hexc("#3a3046"), 3)
         cloud(sc, x + 20 * F, by - 26 * F, 30, 18, 60, hexc("#9a92b4"), 4)
-        e.lines(sc, (x - 34 * F, by - 6 * F), (x + 2 * F, by - 22 * F), hexc("#9a92b4"), 0.5)
-        return "облако жалит, удары мимо", T
+        return "жалит сквозь броню; стрелки не видят", T
     if key == "honey":
         e.splash(sc, x + 26 * F, by + 2 * F, 34, hexc("#e8a028"), 0.8)
         put(sc, golem(), x + 30 * F, by, 0)
@@ -784,12 +794,14 @@ def scene(sc, key, x, by):
         T.append((x + 34 * F, by - 58 * F, "слабее"))
         return "обжёгся — бьёт слабее", T
     if key == "cutters":
-        put(sc, golem(), x + 30 * F, by, 0)
-        put(sc, bug((), "attack", key="cutters", seed=15), x - 24 * F, by)
-        e.burst(sc, x + 8 * F, by - 14 * F, 7)
-        for d in ((10, -26), (16, -30), (4, -34), (20, -20)):
-            e.dot(sc, x + d[0], by + d[1], hexc("#949ca8"), r=1)
-        return "броня цели вдвое меньше", T
+        put(sc, golem("Страж", k=0.6), x + 34 * F, by, 0)
+        put(sc, bug((), "attack", key="cutters", seed=15), x - 30 * F, by)
+        e.burst(sc, x - 2 * F, by - 20 * F, 8)
+        for d in ((-4, -30), (2, -36), (-8, -14), (6, -26), (0, -10)):
+            e.dot(sc, x + d[0] * F, by + d[1] * F, hexc("#8a7a66"), r=1)
+        for k_ in range(6):                                    # the bitten-out notch in the shield
+            e.dot(sc, x + (4 + k_) * F, by - (18 + (k_ % 2) * 3) * F, hexc("#140c18"), r=1)
+        return "перекусила щит", T
     if key == "guard":
         put(sc, leader("Разум улья", k=0.62), x - 52 * F, by, 10)
         put(sc, bug((), key="guard", seed=16), x - 6 * F, by)

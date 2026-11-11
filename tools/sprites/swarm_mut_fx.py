@@ -114,7 +114,7 @@ def midge():
             frame([(g, X(2.3), GY)], fx=[lambda sc: cloud(sc, X(1.8), GY - 26, 30, 20, 2)]),
             frame([(ga, X(2.3), GY), (mb((), "idle", None, 12), X(1.2), GY)],
                   fx=[lambda sc: cloud(sc, X(2.3), GY - 36, 34, 30, 3, n=170), lambda sc: lines(sc, (X(2.0), GY - 26), (X(1.6), GY - 52), hexc("#9a92b4"))],
-                  text=[(X(1.7), 22, "жалит; удары мимо, стрелки не видят")], key=True)]
+                  text=[(X(1.7), 22, "жалит сквозь броню; стрелки не видят")], key=True)]
 
 
 def pupa():

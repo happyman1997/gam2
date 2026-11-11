@@ -1,4 +1,4 @@
-"""The swarm's form abilities going off in battle, in the battle's own scale (zoomed): Строй, Полёт, Жало, Плевок and
+"""The swarm's form abilities going off in battle, in the battle's own scale (zoomed): Закрыть брешь, Полёт, Жало, Плевок and
 bursting, Разгон, Шипы and curling up, Прыжок, Серпы, Вспышка, Пожирание — and what gigantism blows each of them up
 into. The swarm comes from the left, its enemies (the Foundry: golems, and its human leaders for what only works on
 the living) face it from the right.
@@ -219,27 +219,30 @@ def cast_line(*items):
 
 # ---------------------------------------------------------------- the forms
 def ant_stroy(giant=False):
-    t = golem("Орудие")
+    """Закрыть брешь: a neighbour of the fallen ant steps into its cell at once — the line never tears."""
+    t, ta = golem("Орудие"), golem("Орудие", "attack")
+    dead_ = lambda s: lit(bug(seed=s), (26, 18, 16), 0.7)
     if not giant:
-        mates = [(bug(seed=2), X(0.4), GY - 16), (bug(seed=3), X(0.5), GY + 14), (bug(seed=4), X(-0.3), GY)]
-        hero = lambda p: (bug(pose=p, seed=5), X(1.2) + (6 if p == "attack" else 0), GY)
-        base = [(t, X(3), GY)] + mates
-        links = lambda sc: [lines(sc, (x, y - 8), (X(1.2), GY - 8)) for _, x, y in mates]
-        return [frame(base + [hero("idle")]),
-                frame(base + [hero("idle")], fx=[links], text=[(X(1.2), GY - 40, "трое рядом: +1")]),
-                frame(base + [hero("attack")], fx=[links, lambda sc: burst(sc, X(3) - 30, GY - 30, 10)],
-                      text=[(X(1.2), GY - 40, "+1 к удару")], key=True),
-                frame(base + [hero("idle")])]
-    g = lambda p: (bug(pose=p, soldier=True, giant=True, seed=9), X(0.6), GY)
-    ants = [(X(1.6), GY - 18), (X(1.7), GY + 14), (X(-0.6), GY - 16), (X(-0.5), GY + 16), (X(2.3), GY)]
-    base = [(t, X(3.4), GY)]
-    aura = lambda sc: ring(sc, X(0.6), GY, CW * 2.1, GOLD, 0.6)
-    return [frame(base + [g("idle")] + [(bug(seed=20 + i), x, y) for i, (x, y) in enumerate(ants)]),
-            frame(base + [g("idle")] + [(bug(seed=20 + i), x, y) for i, (x, y) in enumerate(ants)], fx=[aura],
-                  text=[(X(0.6), GY - 56, "Строй на радиус 2")]),
-            frame(base + [g("idle")] + [(bug(pose="attack", seed=20 + i), x + 5, y) for i, (x, y) in enumerate(ants)],
-                  fx=[aura, lambda sc: burst(sc, X(3.4) - 32, GY - 30, 10)], text=[(X(0.6), GY - 56, "+1 всем своим")],
-                  key=True)]
+        line_ = [(X(1.2), GY - 18, 2), (X(1.2), GY + 14, 3)]       # the front: two ants against the gun
+        back = (X(0.2), GY, 5)                                      # the one behind, ready to step in
+        hole = (X(1.2), GY - 2)
+        front = lambda: [(bug(seed=s), x, y) for x, y, s in line_]
+        return [frame([(t, X(3), GY)] + front() + [(bug(seed=4), hole[0], hole[1]), (bug(seed=back[2]), back[0], back[1])]),
+                frame([(ta, X(3), GY)] + front() + [(lit(bug(seed=4), WHITE, 0.5), hole[0], hole[1]), (bug(seed=back[2]), back[0], back[1])],
+                      fx=[lambda sc: burst(sc, X(1.3), GY - 14, 10)], text=[(X(1.4), 22, "муравей в строю погиб")]),
+                frame([(t, X(3), GY)] + front() + [(dead_(4), hole[0], hole[1] + 4), (bug(pose="attack", seed=back[2]), X(0.8), GY - 2)],
+                      fx=[lambda sc: speed(sc, X(0.7), GY - 4, 3, 16)], text=[(X(1.4), 22, "сосед тут же встаёт на его место")], key=True),
+                frame([(t, X(3), GY)] + front() + [(dead_(4), X(0.6), GY + 22), (bug(pose="attack", seed=back[2]), hole[0], hole[1])],
+                      fx=[lambda sc: burst(sc, X(3) - 30, GY - 30, 9)], text=[(X(1.4), 22, "строй не рвётся")])]
+    g = lambda p: (bug(pose=p, soldier=True, giant=True, seed=9), X(0.3), GY)
+    ring_ = [(X(1.4), GY - 20, 20), (X(1.5), GY + 14, 21), (X(1.0), GY - 2, 22), (X(-0.6), GY - 16, 23), (X(-0.5), GY + 16, 24)]
+    aura = lambda sc: ring(sc, X(0.3), GY, CW * 2.1, GOLD, 0.5)
+    return [frame([(t, X(3.2), GY), g("idle")] + [(bug(seed=s), x, y) for x, y, s in ring_]),
+            frame([(ta, X(3.2), GY), g("idle")] + [(bug(seed=s), x, y) for x, y, s in ring_[1:]] + [(dead_(20), ring_[0][0], ring_[0][1] + 4)],
+                  fx=[aura, lambda sc: burst(sc, X(1.5), GY - 34, 10)], text=[(X(1.3), 22, "гибнет любой в радиусе 2")]),
+            frame([(t, X(3.2), GY), g("idle")] + [(bug(pose="attack", seed=s), x + (X(1.4) - x) * 0.5, y + (GY - 20 - y) * 0.5)
+                                                   for x, y, s in ring_[1:]] + [(dead_(20), X(0.8), GY + 24)],
+                  fx=[aura], text=[(X(1.3), 22, "строй стягивается к бреши")], key=True)]
 
 
 def wasp_flight(giant=False):
@@ -383,8 +386,13 @@ def hopper_leap(giant=False):
             x, y = path[i]
             out_.append(frame(base + [(h("attack"), x, y, "air")], fx=[lambda sc, i=i: trail(sc, path[:i], hexc("#c8d0a0"))],
                               key=j == 2, text=[(X(2.4), 22, "в первом раунде — через строй к дальнему")] if j == 2 else []))
-        out_.append(frame(base + [(h("attack"), X(3.0), GY - 10)], fx=[lambda sc: burst(sc, X(3.9) - 26, GY - 40, 9)],
-                          text=[(X(2.4), 22, "после прыжка один и окружён")]))
+        m1, m2 = mason(), mason("attack")
+        out_.append(frame(base + [(m1, X(3.4), GY + 16), (m1, X(2.6), GY - 18), (h("attack"), X(3.0), GY - 10)],
+                          fx=[lambda sc: ring(sc, X(3.0), GY, 46, hexc("#e8d8a0")), lambda sc: stars(sc, X(3.4), GY - 26, 7),
+                              lambda sc: stars(sc, X(2.6), GY - 58, 7, phase=0.6)],
+                          text=[(X(2.4), 22, "приземление сбивает мелких с ног")]))
+        out_.append(frame(base + [(m2, X(3.4), GY + 16), (m1, X(2.6), GY - 18), (h("idle"), X(3.0), GY - 10)],
+                          fx=[lambda sc: burst(sc, X(3.1), GY - 4, 8)], text=[(X(2.4), 22, "но потом он один и окружён")]))
         return out_
     h = lambda p: bug(("jumper",), p, soldier=True, giant=True, seed=7)
     inv, mas = human("Изобретатель"), mason()
@@ -393,7 +401,7 @@ def hopper_leap(giant=False):
     out_ = [frame(base + [(h("idle"), X(-0.2), GY)])]
     for i in (14, 28):
         out_.append(frame(base + [(h("attack"), *path[i], "air")], fx=[lambda sc, i=i: trail(sc, path[:i], hexc("#c8d0a0"))]))
-    out_.append(frame(base + [(h("idle"), X(2.6), GY)], key=True, text=[(X(2.2), 22, "приземление оглушает мелких")],
+    out_.append(frame(base + [(h("idle"), X(2.6), GY)], key=True, text=[(X(2.2), 22, "прыгает каждые 3 хода")],
                       fx=[lambda sc: ring(sc, X(2.6), GY, 60, hexc("#e8d8a0")), lambda sc: stars(sc, X(3.3), GY - 70, 8),
                           lambda sc: stars(sc, X(3.4), GY - 40, 8, phase=0.6)]))
     return out_
@@ -452,9 +460,9 @@ def devour(giant=False):
                       lambda sc: [dot(sc, X(1.1) + dx, GY - 34 - dy, POISON, r=1) for dx, dy in ((0, 0), (8, 10), (-6, 16), (4, 24))]])]
 
 
-FORMS = [("Муравей · Строй", ant_stroy), ("Оса · Полёт", wasp_flight), ("Скорпион · Жало", scorpion_sting),
+FORMS = [("Муравей · Закрыть брешь", ant_stroy), ("Оса · Полёт", wasp_flight), ("Скорпион · Жало", scorpion_sting),
          ("Бочонок · Плевок и лопается", barrel_spit), ("Жук · Разгон", beetle_charge),
-         ("Мокрица · Шипы, сворачивается", isopod_thorns), ("Кузнечик · Прыжок", hopper_leap),
+         ("Мокрица · Шипы, сворачивается", isopod_thorns), ("Кузнечик · Прыжок и приземление", hopper_leap),
          ("Богомол · Серпы", mantis_blades), ("Светляк · Вспышка", firefly_flash), ("Пожирание · все формы", devour)]
 
 

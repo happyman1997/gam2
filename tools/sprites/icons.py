@@ -224,7 +224,7 @@ SWARM_ICONS = {
     "m_beeball": (687208, "Пчелиный шар", "общий пул", dict(warm="amber", brown="chitin", grey="bone", blue="bone")),
     "m_pupa": (581358, "Куколка", "общий пул", dict(grey="bone", warm="bone", brown="bone", green="bone")),
     "m_midge": (1063365, "Мошкара", "общий пул", dict(grey="slate", brown="chitin", red="crimson", blue="slate")),
-    "m_honey": (1027171, "Медовая бочка", "общий пул", dict(warm="amber", brown="chitin", red="amber", grey="bone")),
+    "m_honey": (1027171, "Медовые соты", "общий пул", dict(warm="amber", brown="chitin", red="amber", grey="bone")),
     "m_blister": (731424, "Нарывник", "общий пул", dict(red="crimson", warm="fire", grey="chitin")),
     "m_cutters": (742632, "Кусачки", "общий пул", dict(grey="steel", red="crimson", warm="bone", brown="chitin", blue="steel")),
     "m_guard": (1336617, "Стража лидера", "общий пул", dict(grey="elytra", brown="elytra", warm="bone", blue="slate", purple="slate")),
