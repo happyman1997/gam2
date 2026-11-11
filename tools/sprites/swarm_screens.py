@@ -12,22 +12,19 @@ from kit import *
 import swarm1 as W
 import swarm_evo as EV
 import frames as F
-from brood import frame, put, icon, INK, MUTED, GOLD, BIO, S, WW, HH
+from brood import put, icon, INK, MUTED, GOLD, BIO, S, WW, HH
+import swarm_ui as UI
 from noise import value_noise
 from paths import font, out
 
 RED = (240, 120, 96)
 GREEN = (150, 220, 120)
-f = lambda b, s: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s)
+f = UI.f
 
 
 def ground(seed):
-    sc = Scene(WW, HH)
-    n = value_noise(WW, HH, 14, seed) * 0.6 + value_noise(WW, HH, 5, seed + 1) * 0.4
-    th = BAYER[sc.yy % 4, sc.xx % 4]
-    lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
-    for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
-        sc.rgb[lv == i] = hexc(c)
+    sc = UI.nest(WW, HH, seed)
+    UI.wing(sc, 0, 0, WW, 30)
     return sc
 
 
@@ -52,26 +49,24 @@ COSTS = (15, 25, 40)
 
 def evolution_screen():
     sc = ground(71)
-    frame(sc, 0, 0, WW, 30)
-    frame(sc, 12, 40, 300, 446)
+    UI.plate(sc, 12, 40, 300, 446, antennae=True)
     for i, (form, name, n, taken) in enumerate(FORMS_IN_SWARM):
         y0 = 74 + i * 60
-        frame(sc, 20, y0, 292, y0 + 54, hi=(i == CHOSEN))
+        UI.cell(sc, 20, y0, 292, y0 + 54, "hi" if i == CHOSEN else "normal")
         put(sc, W.build(() if form is None else (form,), 0.0, "idle", False, k=1.4, genes=W.genes_for(60 + i), evo=taken), 60,
             y0 + 46, 12)
-    frame(sc, 310, 40, 948, 446)
+    UI.plate(sc, 310, 40, 948, 446, antennae=True)
     form, name, n, taken = FORMS_IN_SWARM[CHOSEN]
     for j, (key, ename, what, look) in enumerate(EV.EVO[form]):
         x0 = 322 + j * 208
         is_taken = key in taken
-        frame(sc, x0, 92, x0 + 200, 436, hi=(j == 1), col="#6ac040" if is_taken else None)
+        UI.cell(sc, x0, 92, x0 + 200, 436, "hi" if j == 1 else ("new" if is_taken else "normal"))
         put(sc, W.build((form,), -0.08, "idle", False, k=2.5, genes=W.genes_for(3), evo=(key,)), x0 + 104, 300, 22)
-    frame(sc, 0, 454, WW, HH)
-    frame(sc, 12, 466, 300, 530)
-    frame(sc, 714, 466, 948, 530, hi=True)
+    UI.button(sc, 12, 474, 300, 520, "chitin")
+    UI.button(sc, 714, 474, 948, 520, "amber")
     img = sc.image(S)
     d = ImageDraw.Draw(img)
-    d.text((20, 12), "Эволюция формы · все особи формы получают её сразу, и будущие тоже", font=f(1, 24), fill=INK)
+    d.text((20, 18), "Эволюция формы · все особи формы получают её сразу, и будущие тоже", font=f(1, 24), fill=INK)
     t = "Биомасса 39"
     tx = WW * S - 24 - d.textlength(t, font=f(1, 21))
     d.text((tx, 15), t, font=f(1, 21), fill=BIO)
@@ -95,9 +90,9 @@ def evolution_screen():
         for k, ln in enumerate(wrap(d, what, f(0, 15), 184 * S)):
             d.text((x0 + 16, 144 * S + k * 22), ln, font=f(0, 15), fill=INK)
         d.text((x0 + 16, 320 * S), "на спрайте: " + look, font=f(0, 14), fill=MUTED)
-    d.text((40 * S - 20, 488 * S), "Назад к выводку", font=f(1, 19), fill=INK)
+    d.text(((12 + 300) * S / 2 - d.textlength("Назад к выводку", font=f(1, 19)) / 2, 490 * S), "Назад к выводку", font=f(1, 19), fill=INK)
     t = f"Взять «{EV.EVO[form][1][1]}» · {nxt}"
-    d.text(((714 + 948) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 488 * S), t, font=f(1, 19), fill=(250, 226, 160))
+    d.text(((714 + 948) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 490 * S), t, font=f(1, 19), fill=UI.DARK)
     t = "Разум улья: эволюция дешевле на 1 биомассу"
     d.text(((300 + 714) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 490 * S), t, font=f(0, 15), fill=MUTED)
     img.save(out("swarm_evolution_screen.png"))
@@ -117,31 +112,27 @@ PICK = 3                                     # «Рог»
 
 def camp_screen():
     sc = ground(73)
-    frame(sc, 0, 0, WW, 30)
-    frame(sc, 12, 40, 286, 446)
+    UI.plate(sc, 12, 40, 286, 446, antennae=True)
     for i, (traits, soldier, name, n) in enumerate(CAMP_WHO):
         y0 = 74 + i * 60
-        frame(sc, 20, y0, 278, y0 + 54, hi=(i == 0))
+        UI.cell(sc, 20, y0, 278, y0 + 54, "hi" if i == 0 else "normal")
         put(sc, W.build(traits, 0.03, "idle", soldier, k=1.15 if soldier else 1.4, genes=W.genes_for(70 + i)), 58, y0 + 46, 12)
-    frame(sc, 296, 40, 652, 446)
+    UI.plate(sc, 296, 40, 652, 446, antennae=True)
     keys = [d[0] for d in DETAILS] + ["m_" + r[0] for r in MUTS_MET] + ["giant", "chimera"]
     for k, key in enumerate(keys):
         x0, y0 = 306 + (k % 4) * 86, 92 + (k // 4) * 100
         locked = key in ("giant", "chimera")
-        frame(sc, x0, y0, x0 + 80, y0 + 92, hi=(k == PICK), col="#3a3446" if locked else ("#c08a3a" if key.startswith("m_") else None))
-        if locked:
-            sc.rgb[y0 + 1:y0 + 91, x0 + 1:x0 + 79] = hexc("#120e16")
-    frame(sc, 662, 40, 948, 446)
+        UI.cell(sc, x0, y0, x0 + 80, y0 + 92, "locked" if locked else ("hi" if k == PICK else ("mut" if key.startswith("m_") else "normal")))
+    UI.plate(sc, 662, 40, 948, 446, antennae=True)
     before = W.build((), 0.03, "idle", True, k=2.0, genes=W.genes_for(70))
     after = W.build(("ant", "horn"), 0.03, "idle", True, k=2.0, genes=W.genes_for(70))
     put(sc, before, 730, 236, 22)
     put(sc, after, 870, 236, 22)
-    frame(sc, 0, 454, WW, HH)
-    frame(sc, 12, 466, 300, 530)
-    frame(sc, 714, 466, 948, 530, hi=True)
+    UI.button(sc, 12, 474, 300, 520, "chitin")
+    UI.button(sc, 714, 474, 948, 520, "amber")
     img = sc.image(S)
     d = ImageDraw.Draw(img)
-    d.text((20, 12), "Лагерь · рой сам выбирает мутацию для одной особи", font=f(1, 24), fill=INK)
+    d.text((20, 18), "Лагерь · рой сам выбирает мутацию для одной особи", font=f(1, 24), fill=INK)
     d.text((32 * S, 50 * S), "Кто", font=f(1, 19), fill=GOLD)
     for i, (traits, soldier, name, n) in enumerate(CAMP_WHO):
         y0 = (74 + i * 60) * S
@@ -173,9 +164,9 @@ def camp_screen():
                                    "против литого металла. Деталь наследуется: в кладках этой линии появятся рога.",
                                    f(0, 16), 260 * S)):
         d.text((680 * S, 280 * S + k * 24), ln, font=f(0, 16), fill=INK)
-    d.text((40 * S - 20, 488 * S), "Уйти из лагеря", font=f(1, 19), fill=INK)
+    d.text(((12 + 300) * S / 2 - d.textlength("Уйти из лагеря", font=f(1, 19)) / 2, 490 * S), "Уйти из лагеря", font=f(1, 19), fill=INK)
     t = "Мутировать"
-    d.text(((714 + 948) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 488 * S), t, font=f(1, 19), fill=(250, 226, 160))
+    d.text(((714 + 948) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 490 * S), t, font=f(1, 19), fill=UI.DARK)
     t = "Гигант — сюрприз выводка, чужие черты — от съеденных."
     d.text(((300 + 714) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 490 * S), t, font=f(0, 15), fill=MUTED)
     img.save(out("swarm_camp.png"))
@@ -198,7 +189,6 @@ FLOCKS = [  # (traits, soldier, name, count, cells (col, row) it covers, colour,
 
 def deploy_screen():
     sc = ground(75)
-    frame(sc, 0, 0, WW, 30)
     cols, rows = 21, 12
     for c in range(cols):                                       # the grid; the swarm's zone is the left 9 columns
         for r in range(rows):
@@ -245,19 +235,19 @@ def deploy_screen():
     # a pairing hint: two neighbouring flocks of different kinds — the brood's pairs
     for x in range(GX0 + 4 * CW_ + 30, GX0 + 5 * CW_ + 8, 3):
         sc.rgb[GY0 + 4 * CH_ + 15, x] = hexc("#7ae040")
-    frame(sc, 0, HH - 86, WW, HH)
+    UI.plate(sc, 4, HH - 86, WW - 4, HH - 2)
     for k, (traits, soldier, name, n, cells, col, placed) in enumerate([fl for fl in FLOCKS if not fl[6]]):
         x0 = 12 + k * 150
-        frame(sc, x0, HH - 76, x0 + 142, HH - 12, col=col)
+        UI.cell(sc, x0, HH - 78, x0 + 142, HH - 10, "normal", col=col)
         put(sc, W.build(traits, 0.0, "idle", soldier, k=1.1, genes=W.genes_for(90 + k)), x0 + 34, HH - 24, 10)
     for k, t in enumerate(("Вытянуть в линию", "Собрать в кулак", "Разделить стаю", "Как в прошлом бою")):
         x0 = 316 + k * 158
-        frame(sc, x0, HH - 76, x0 + 150, HH - 12)
+        UI.button(sc, x0, HH - 62, x0 + 150, HH - 28, "chitin")
     img = sc.image(S)
     d = ImageDraw.Draw(img)
-    d.text((20, 12), "Расстановка · рой ставится стаями · на поле выходит вся армия", font=f(1, 24), fill=INK)
+    d.text((20, 18), "Расстановка · рой ставится стаями · на поле выходит вся армия", font=f(1, 24), fill=INK)
     t = "Литейщик: 4 голема"
-    d.text((WW * S - 24 - d.textlength(t, font=f(1, 19)), 16), t, font=f(1, 19), fill=(214, 196, 150))
+    d.text((WW * S - 24 - d.textlength(t, font=f(0, 16)), 22), t, font=f(0, 16), fill=(214, 196, 150))
     for k, (traits, soldier, name, n, cells, col, placed) in enumerate(FLOCKS):
         if not placed:
             continue
@@ -273,7 +263,7 @@ def deploy_screen():
         d.text((x0 + 120, (HH - 70) * S + 24), f"×{n} · не поставлена", font=f(0, 13), fill=MUTED)
     for k, t in enumerate(("Вытянуть в линию", "Собрать в кулак", "Разделить стаю", "Как в прошлом бою")):
         x0 = 316 + k * 158
-        d.text(((x0 + 75) * S - d.textlength(t, font=f(1, 15)) / 2, (HH - 52) * S), t, font=f(1, 15), fill=INK)
+        d.text(((x0 + 75) * S - d.textlength(t, font=f(0, 15)) / 2, (HH - 50) * S), t, font=f(0, 15), fill=INK)
     img.save(out("swarm_deploy.png"))
     print("swarm_deploy.png", img.size)
 

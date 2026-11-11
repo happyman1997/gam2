@@ -6,6 +6,7 @@ import swarm1 as W
 from noise import value_noise
 from paths import font, out
 import icons as IC
+import swarm_ui as UI
 
 S = 2
 WW, HH = 960, 540
@@ -58,6 +59,7 @@ POOL_COL = {"Матка": (240, 200, 90), "Разум улья": (196, 150, 255)
             "общая": (206, 206, 222), "бесплоден": (240, 140, 140)}
 MARK_COL = {"мутация Матки": POOL_COL["Матка"], "общая мутация": POOL_COL["общая"], "гибрид · бесплоден": POOL_COL["бесплоден"]}
 GX0, GY0, GCW, GCH, GCOLS = 12, 92, 232, 100, 4
+BX0, BX1 = 300, 930
 
 
 def pts(g):
@@ -77,33 +79,17 @@ def icon(img, key, x, y, px):
 
 
 def build():
-    sc = Scene(WW, HH)
-    n = value_noise(WW, HH, 14, 31) * 0.6 + value_noise(WW, HH, 5, 32) * 0.4
-    th = BAYER[sc.yy % 4, sc.xx % 4]
-    lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
-    for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
-        sc.rgb[lv == i] = hexc(c)
-    frame(sc, 0, 0, WW, 30)
-    # the limit bar: the swarm in points, the limit, what is marked to be eaten
-    frame(sc, 12, 38, 948, 82)
+    sc = UI.nest(WW, HH, 31)
+    UI.wing(sc, 0, 0, WW, 30)
+    # the limit as an abdomen: one segment per point; the ones over the limit red, the marked hatched
+    UI.plate(sc, 12, 38, 948, 84)
     total, eaten = totals()
-    bx0, bx1 = 300, 930
-    scale = (bx1 - bx0) / (total + 4)
-    y0, y1 = 64, 74
-    sc.rgb[y0:y1, bx0:bx1] = hexc("#2a2232")
-    sc.rgb[y0:y1, bx0:bx0 + int(LIMIT * scale)] = hexc("#4a8a36")
-    sc.rgb[y0:y1, bx0 + int(LIMIT * scale):bx0 + int(total * scale)] = hexc("#a83a2e")
-    hatch = ((sc.xx + sc.yy) % 4 < 2)[y0:y1, bx0 + int((total - eaten) * scale):bx0 + int(total * scale)]
-    seg = sc.rgb[y0:y1, bx0 + int((total - eaten) * scale):bx0 + int(total * scale)]
-    seg[hatch] = hexc("#e2b968") * 0.8                                    # marked to be eaten: hatched
-    sc.rgb[y0 - 4:y1 + 4, bx0 + int(LIMIT * scale)] = hexc("#f0e6c8")
+    UI.segbar(sc, BX0, 62, BX1, 12, total, LIMIT, eaten)
     # the groups
     for k, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(GROUPS):
         x0 = GX0 + (k % GCOLS) * (GCW + 2)
         y0 = GY0 + (k // GCOLS) * (GCH + 4)
-        frame(sc, x0, y0, x0 + GCW, y0 + GCH, col="#c0503a" if eat else ("#6ac040" if new else None))
-        if eat:
-            sc.rgb[y0 + 1:y0 + GCH - 1, x0 + 1:x0 + GCW - 1] = hexc("#2a1218")
+        UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "eat" if eat else ("new" if new else "normal"))
         mut = MUTS.get(k, (None,))[0]
         spr = W.build(traits, hue, "idle", soldier, k=1.3 if soldier else 1.7, chimera=chim, genes=W.genes_for(k * 7 + 3), rare=mut)
         put(sc, spr, x0 + 52, y0 + GCH - 22, 14 if not soldier else 18)
@@ -111,36 +97,32 @@ def build():
             spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=1.05 if soldier else 1.35, chimera=chim, genes=W.genes_for(k * 7 + 4), rare=mut)
             put(sc, spr2, x0 + 30, y0 + GCH - 40, 0)
             sc.blit(spr, int(x0 + 52 - spr.ox), int(y0 + GCH - 22 - spr.oy))
-        for bx, col in ((x0 + GCW - 52, "#c0503a"), (x0 + GCW - 26, "#6c7083")):    # − and + buttons
-            frame(sc, bx, y0 + GCH - 28, bx + 20, y0 + GCH - 8, col=col)
-    frame(sc, 12, 404, 948, 440)
-    for i, (_, kills, _) in enumerate(SELECTION):
+        for bx, kind in ((x0 + GCW - 56, "blood"), (x0 + GCW - 30, "chitin")):    # − and + buttons
+            UI.button(sc, bx, y0 + GCH - 30, bx + 24, y0 + GCH - 8, kind)
+    UI.plate(sc, 12, 402, 948, 442)
+    for i, (_, kills, _) in enumerate(SELECTION):           # kills by trait: little abdomens too
         x = 250 + i * 176
-        sc.rgb[418:426, x + 70:x + 160] = hexc("#2a2232")
-        sc.rgb[418:426, x + 70:x + 70 + int(90 * kills / 23)] = hexc("#b04a3a") if i == 0 else hexc("#7a5a8a")
-    frame(sc, 0, 446, WW, HH)
+        UI.meter(sc, x + 70, 418, x + 160, 8, 12, round(12 * kills / 23), "#c04a3a" if i == 0 else "#8a6aa8")
     for (x0, x1) in ((12, 236), (246, 470), (480, 704), (714, 948)):
-        frame(sc, x0, 454, x1, 490, col="#6ac040")
-    for (x0, x1, hi) in ((12, 236, False), (246, 470, False), (714, 948, False)):
-        frame(sc, x0, 498, x1, 534, hi, col="#6c7083" if x0 == 714 else None)
+        UI.button(sc, x0, 452, x1, 490, "acid")
+    for (x0, x1, kind) in ((12, 236, "chitin"), (246, 470, "chitin"), (714, 948, "dim")):
+        UI.button(sc, x0, 498, x1, 534, kind)
     return sc
 
 
 def overlay(img):
     d = ImageDraw.Draw(img)
-    f = lambda b, s: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s)
+    f = UI.f
     total, eaten = totals()
     over = total - LIMIT
-    d.text((20, 12), "Выводок · после боя 5 из 14 · вылупились все — съешь лишних", font=f(1, 24), fill=INK)
+    d.text((20, 18), "Выводок · после боя 5 из 14 · вылупились все — съешь лишних", font=f(1, 24), fill=INK)
     t = f"Биомасса 34  +{eaten} за съеденных"
     tx = WW * S - 24 - d.textlength(t, font=f(1, 21))
     d.text((tx, 15), t, font=f(1, 21), fill=BIO)
     icon(img, "biomass", tx - 40, 10, 34)
     d.text((28, 44 * S), f"Предел роя: {total} / {LIMIT} очков", font=f(1, 20), fill=(240, 140, 110))
     d.text((28, 60 * S + 4), f"лишних {over} · отмечено к съедению {eaten} · осталось {over - eaten}", font=f(0, 16), fill=MUTED)
-    bx0, bx1 = 300, 930
-    scale = (bx1 - bx0) / (total + 4)
-    d.text(((bx0 + LIMIT * scale) * S - 20, 44 * S), "предел", font=f(0, 15), fill=INK)
+    d.text(((BX0 + LIMIT * (BX1 - BX0) / total) * S - 24, 44 * S), "предел", font=f(0, 15), fill=INK)
     for k, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(GROUPS):
         x0 = (GX0 + (k % GCOLS) * (GCW + 2)) * S
         y0 = (GY0 + (k // GCOLS) * (GCH + 4)) * S
@@ -162,10 +144,10 @@ def overlay(img):
             y += 22
         if eat:
             d.text((x0 + 200, y), f"съесть {eat}: +{eat * pts(GROUPS[k])} биомассы", font=f(1, 15), fill=(240, 120, 96))
-        bx = x0 + (GCW - 52) * S
-        by = y0 + (GCH - 28) * S
-        d.text((bx + 13, by - 2), "−", font=f(1, 26), fill=(240, 140, 110))
-        d.text((bx + 26 * S + 11, by - 2), "+", font=f(1, 26), fill=INK)
+        bx = x0 + (GCW - 56) * S
+        by = y0 + (GCH - 30) * S
+        d.text((bx + 20, by + 12), "−", font=f(0, 16), fill=INK)
+        d.text((bx + 26 * S + 20, by + 12), "+", font=f(0, 16), fill=INK)
     icon(img, "selection", 34, 405 * S, 34)
     d.text((74, 412 * S), "Естественный отбор — убийства по чертам:", font=f(1, 16), fill=INK)
     for i, (name, kills, key) in enumerate(SELECTION):
@@ -177,11 +159,11 @@ def overlay(img):
              (480, 704, "Ещё кладка · 10", "clutch"), (714, 948, "Перебросить · 5", "reroll")]
     for x0, x1, t, key in spend:
         tw = d.textlength(t, font=f(1, 17))
-        d.text(((x0 + x1) * S / 2 - tw / 2 + 20, 463 * S), t, font=f(1, 17), fill=BIO)
-        icon(img, key, (x0 + x1) * S / 2 - tw / 2 - 26, 457 * S, 40)
+        d.text(((x0 + x1) * S / 2 - tw / 2 + 20, 464 * S), t, font=f(1, 17), fill=UI.INK)
+        icon(img, key, (x0 + x1) * S / 2 - tw / 2 - 26, 455 * S, 40)
     for x0, x1, t, col in ((12, 236, "Автоотбор", INK), (246, 470, "Съесть всех новых", INK),
-                           (714, 948, f"В бой — съешь ещё {over - eaten}", MUTED)):
-        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(1, 19)) / 2, 507 * S), t, font=f(1, 19), fill=col)
+                           (714, 948, f"В бой — съешь ещё {over - eaten}", (130, 120, 140))):
+        d.text(((x0 + x1) * S / 2 - d.textlength(t, font=f(0, 16)) / 2, 509 * S), t, font=f(0, 16), fill=col)
     t = "Съеденное очко предела — биомасса."
     d.text(((480 + 704) * S / 2 - d.textlength(t, font=f(0, 15)) / 2, 508 * S), t, font=f(0, 15), fill=MUTED)
 
@@ -236,16 +218,12 @@ def giant_egg_model():
 def finds():
     from swarm_abilities import render_small
     WW_, HH_ = 960, 272
-    sc = Scene(WW_, HH_)
-    n = value_noise(WW_, HH_, 14, 33) * 0.6 + value_noise(WW_, HH_, 5, 34) * 0.4
-    th = BAYER[sc.yy % 4, sc.xx % 4]
-    lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
-    for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
-        sc.rgb[lv == i] = hexc(c)
+    sc = UI.nest(WW_, HH_, 33)
+    UI.wing(sc, 0, 0, WW_, 30)
     CW_ = 184
     xs = [12 + i * (CW_ + 4) for i in range(5)]
     for i, x0 in enumerate(xs):
-        frame(sc, x0, 44, x0 + CW_, 262, hi=False, col="#9a7ac0")
+        UI.cell(sc, x0, 44, x0 + CW_, 262, "find")
         sc.glow(x0 + CW_ / 2, 150, 90, hexc("#7ae040"), 0.10)
     by = 176
     # Чистая линия: three scorpions alike
@@ -270,8 +248,8 @@ def finds():
     put(sc, W.build(("ant",), 0.05, "idle", False, k=1.9, chimera="face", genes=W.genes_for(51)), x0 + 134, by, 14)
     img = sc.image(S)
     d = ImageDraw.Draw(img)
-    f = lambda b, s_: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s_)
-    d.text((20, 12), "Выводок: находки вместо одной из кладок", font=f(1, 24), fill=INK)
+    f = UI.f
+    d.text((20, 18), "Выводок: находки вместо одной из кладок", font=f(1, 24), fill=INK)
     t = "обычно две кладки и одна находка; какая — зависит от прошедшего боя"
     d.text((WW_ * S - 24 - d.textlength(t, font=f(0, 17)), 18), t, font=f(0, 17), fill=MUTED)
     icons_ = ["evolve", "larva", "ant", "clutch", "hand"]
@@ -300,16 +278,12 @@ def pools():
     import swarm_leaders as SL
     import swarm_status as ST
     WW_, HH_ = 960, 330
-    sc = Scene(WW_, HH_)
-    n = value_noise(WW_, HH_, 14, 35) * 0.6 + value_noise(WW_, HH_, 5, 36) * 0.4
-    th = BAYER[sc.yy % 4, sc.xx % 4]
-    lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
-    for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
-        sc.rgb[lv == i] = hexc(c)
+    sc = UI.nest(WW_, HH_, 35)
+    UI.wing(sc, 0, 0, WW_, 30)
     PW_ = 232
     xs = [12 + i * (PW_ + 2) for i in range(4)]
     for x0 in xs:
-        frame(sc, x0, 40, x0 + PW_, 320, col="#9a7ac0")
+        UI.cell(sc, x0, 40, x0 + PW_, 320, "find")
     # Брачный полёт: she, and the survivors to choose her pair from
     x0 = xs[0]
     she = W.build(("ant",), 0.05, "attack", False, k=1.9, genes=W.genes_for(61), rare="flight")
@@ -317,11 +291,11 @@ def pools():
     cands = [(("horn",), True, 62), (("stinger",), False, 63), (("wings",), False, 64)]
     for j, (tr, sol, sd) in enumerate(cands):
         cy = 92 + j * 62
-        frame(sc, x0 + 128, cy, x0 + 222, cy + 56, hi=(j == 1), col="#e2b968" if j == 1 else None)
+        UI.cell(sc, x0 + 128, cy, x0 + 222, cy + 56, "hi" if j == 1 else "normal")
         put(sc, W.build(tr, 0.0, "idle", sol, k=1.0 if sol else 1.35, genes=W.genes_for(sd)), x0 + 160, cy + 46, 8)
     import swarm_abilities as SA
     SA.thread(sc, (x0 + 76, 112), (x0 + 132, 178), hexc("#f0c040"), sag=8)
-    frame(sc, x0 + 16, 276, x0 + PW_ - 16, 308, col="#e2b968")
+    UI.button(sc, x0 + 16, 276, x0 + PW_ - 16, 308, "amber")
     # Гибрид: two parents of two forms; the hybrid, which will never pair
     x0 = xs[1]
     put(sc, W.build(("wings",), 0.0, "idle", False, k=1.3, genes=W.genes_for(65)), x0 + 60, 112, 8)
@@ -347,7 +321,7 @@ def pools():
         sc.rgb[183, cx_ - 5:cx_ + 5] = hexc("#140c18")
     SA.arrow(sc, x0 + 104, x0 + 128, 140)
     put(sc, SL.build("Пожиратель", "idle", 0.42, stage=1), x0 + 180, 160, 18)
-    frame(sc, x0 + 16, 276, x0 + PW_ - 16, 308, col="#c0503a")
+    UI.button(sc, x0 + 16, 276, x0 + PW_ - 16, 308, "blood")
     # the marks: whose pool a mutation is from
     x0 = xs[3]
     return sc, xs, PW_
@@ -355,8 +329,8 @@ def pools():
 
 def pools_overlay(img, xs, PW_):
     d = ImageDraw.Draw(img)
-    f = lambda b, s_: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s_)
-    d.text((20, 12), "Выводок: что добавляют пулы лидеров", font=f(1, 24), fill=INK)
+    f = UI.f
+    d.text((20, 18), "Выводок: что добавляют пулы лидеров", font=f(1, 24), fill=INK)
     heads = [("Брачный полёт", "пару ей выбираешь сам", "m_flight"),
              ("Гибрид", "бесплоден: в пары не встаёт", "m_hybrid"),
              ("Откормленная", "только у Пожирателя", "m_fattened"),
@@ -375,7 +349,7 @@ def pools_overlay(img, xs, PW_):
     d.text((x + 30, 230 * S), "с кем — решаешь ты,", font=f(0, 15), fill=INK)
     d.text((x + 30, 230 * S + 22), "не стык стай", font=f(0, 15), fill=INK)
     t = "Спарить со скорпионом"
-    d.text(((xs[0] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 284 * S), t, font=f(1, 16), fill=GOLD)
+    d.text(((xs[0] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 286 * S), t, font=f(1, 16), fill=UI.DARK)
     x = xs[1] * S
     for k, t in enumerate(("оса × скорпион", "тело осы, жало скорпиона —", "способности обеих форм;",
                            "в пары не встаёт, каждого", "выводят заново")):
@@ -389,7 +363,7 @@ def pools_overlay(img, xs, PW_):
     for k, t in enumerate(("чем дольше держишь —", "тем больше он вырастет;", "пока жива — производитель")):
         d.text((x + 26, 212 * S + k * 20), t, font=f(0, 15), fill=INK)
     t = "Скормить Пожирателю"
-    d.text(((xs[2] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 284 * S), t, font=f(1, 16), fill=(240, 140, 110))
+    d.text(((xs[2] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 286 * S), t, font=f(1, 16), fill=INK)
     x = xs[3] * S
     rows = [("m_nest", "мутация Матки", POOL_COL["Матка"]), ("m_psi_gland", "пси-мутация Разума", POOL_COL["Разум улья"]),
             ("m_sated", "мутация Пожирателя", POOL_COL["Пожиратель"]), ("m_spores", "мутация Кукушки", POOL_COL["Кукушка"]),
