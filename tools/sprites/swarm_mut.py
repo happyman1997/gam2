@@ -947,7 +947,7 @@ def scene(sc, key, x, by):
         put(sc, bug((), key="fattened", seed=42), x - 44 * F, by)
         arrow_r(sc, x - 20 * F, x, by - 14 * F)
         put(sc, e.lit(leader("Пожиратель", k=0.5, stage=1), (255, 220, 140), 0.1), x + 40 * F, by, 14)
-        return "в лагере на корм — он растёт", T
+        return "в Улье на корм — он растёт", T
     if key == "frenzy":
         put(sc, leader("Пожиратель", "attack", k=0.5), x + 34 * F, by, 14)
         for dx, dy, sd in ((-40, 0, 43), (-20, 8, 44)):
