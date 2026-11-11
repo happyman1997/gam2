@@ -523,7 +523,88 @@ def pools():
     print("brood_pools.png", img.size)
 
 
-SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools}
+# ---------------------------------------------------------------- how each leader changes the flocks
+def flocks():
+    import swarm_effects as E
+    WW_, HH_ = 960, 330
+    UI.WOBBLE[0] = 1.3
+    sc = UI.nest(WW_, HH_, 37)
+    UI.wing(sc, 0, 0, WW_, 44)
+    UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=16)
+    title(sc, "СТАИ", "у каждого лидера рой стоит по-своему", seed=31)
+    PW_ = 232
+    xs = [12 + i * (PW_ + 4) for i in range(4)]
+    for x0 in xs:
+        UI.cell(sc, x0, 52, x0 + PW_, 322, "find")
+    heads = [("Матка", "Тесные стаи", "в клетке 6, а не 4"), ("Разум улья", "Одна мысль", "вся стая — в одну цель"),
+             ("Пожиратель", "Свора", "за вожаком, тела — ему"), ("Кукушка", "Пёстрые стаи", "разные виды вперемешку")]
+    for x0, (who, name, sub) in zip(xs, heads):
+        letters(sc, who, x0 + 12, 60, "title", 8, col=PALE, outline=False)
+        letters(sc, name, x0 + 12, 72, "text", 16, col=GOLD, jitter=1, seed=len(name))
+        letters(sc, sub, x0 + 12, 90, "text", 16, col=MUTED)
+    ZD = 0.75
+
+    def cellbox(x, y, w, h, col):
+        for xx in range(int(x), int(x + w)):
+            for yy in (int(y), int(y + h - 1)):
+                if (xx + yy) % 3:
+                    sc.rgb[yy, xx] = hexc(col)
+        for yy in range(int(y), int(y + h)):
+            for xx in (int(x), int(x + w - 1)):
+                if (xx + yy) % 3:
+                    sc.rgb[yy, xx] = hexc(col)
+
+    # Матка: four in a cell, and six
+    x0 = xs[0]
+    for k_, (cx, n, lab) in enumerate(((x0 + 60, 4, "обычно"), (x0 + 166, 6, "у Матки"))):
+        cellbox(cx - 44, 150, 88, 70, "#c9b27a")
+        for j in range(n):
+            put(sc, bug((), "idle", ZD, 100 + j), cx - 26 + (j % 2) * 30 + (j // 2 % 2) * 6, 172 + (j // 2) * 18, 0)
+        letters(sc, str(n), cx, 226, "title", 16, col=GOLD if k_ else INK, align="center")
+        letters(sc, lab, cx, 248, "text", 16, col=MUTED, align="center")
+    letters(sc, "площадь бьёт больше тел", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
+    # Разум: the whole flock into one target, the other enemy left alone
+    x0 = xs[1]
+    t1, t2 = E.golem("Механик"), E.human("Изобретатель")
+    put(sc, t1, x0 + 186, 214, 0)
+    put(sc, t2, x0 + 196, 276, 0)
+    for j, (dx, dy) in enumerate(((40, 160), (30, 196), (56, 232), (80, 182), (70, 262))):
+        put(sc, bug(("scythes",), "attack", ZD, 110 + j), x0 + dx, dy, 0)
+        UI.silk(sc, (x0 + dx + 10, dy - 10), (x0 + 166, 190), sag=-4, col="#c8a0ff")
+    E.burst(sc, x0 + 170, 190, 9, hexc("#c8a0ff"))
+    letters(sc, "лишний урон пропадает", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
+    # Пожиратель: the pack runs where he ran; the bodies are left for him
+    x0 = xs[2]
+    put(sc, leader("Пожиратель", "attack", 0.6), x0 + 150, 214, 16)
+    E.speed(sc, x0 + 96, 204, 4, 22)
+    for j, (dx, dy) in enumerate(((60, 182), (44, 222), (84, 246), (28, 264))):
+        put(sc, bug((), "attack", ZD, 120 + j), x0 + dx, dy, 0)
+    for dx, dy in ((150, 266), (204, 250)):                   # the bodies, left lying for him
+        E.splash(sc, x0 + dx, dy, 18, hexc("#7a1a14"), 0.7)
+        put(sc, E.lit(bug((), "idle", ZD, 150 + dx), (40, 16, 14), 0.6), x0 + dx, dy - 1, 0)
+        sc.glow(x0 + dx, dy - 6, 14, hexc("#d02a1e"), 0.4)
+    letters(sc, "ему", x0 + 204, 226, "title", 8, col=(255, 140, 110), outline=False, align="center")
+    letters(sc, "сами не лечатся", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
+    # Кукушка: one flock of all kinds, pairs inside it
+    x0 = xs[3]
+    cellbox(x0 + 24, 140, 184, 130, "#9ae060")
+    kinds = [((), 130), (("wings",), 131), (("stinger",), 132), (("horn",), 133), (("acid",), 134), (("spitter",), 135)]
+    pos = [(60, 176), (120, 170), (176, 182), (66, 230), (128, 236), (182, 250)]
+    for (tr, sd), (dx, dy) in zip(kinds, pos):
+        put(sc, bug(tr, "idle", ZD, sd), x0 + dx, dy, 0)
+    UI.silk(sc, (x0 + 66, 214), (x0 + 128, 222), sag=8, col="#f0c040")
+    UI.silk(sc, (x0 + 120, 156), (x0 + 176, 166), sag=8, col="#f0c040")
+    letters(sc, "быстрые обгоняют", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
+    UI.creature(sc, bug((), "idle", 0.9, 140), 470, 54)
+    UI.cobweb(sc, 958, 46, 30, quad=(-1, 1))
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_flocks.png"))
+    print("swarm_flocks.png", img.size)
+
+
+SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools,
+           "flocks": flocks}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
