@@ -189,7 +189,7 @@ def camp():
     sc = frame_screen(73)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=5)
-    title(sc, "ЛАГЕРЬ", "рой сам решает, кем ему стать", seed=21)
+    title(sc, "ЛАГЕРЬ", "рой линяет. что-то в нём проросло", seed=21)
     # who
     UI.plate(sc, 12, 52, 286, 446, antennae=True)
     heading(sc, "КТО", 26, 64, seed=1)
@@ -199,26 +199,35 @@ def camp():
         put(sc, W.build(traits, 0.03, "idle", soldier, k=1.1 if soldier else 1.4, genes=W.genes_for(70 + i)), 62, y0 + 46, 12)
         letters(sc, name, 110, y0 + 9, "text", 16, col=GOLD if i == 0 else INK, jitter=1, seed=i)
         letters(sc, f"×{n}", 112, y0 + 30, "title", 8, col=PALE, outline=False)
-    # what it sprouts
+    # what fell out: three random offers, one of them or nothing
     UI.plate(sc, 296, 52, 652, 446, antennae=True)
-    heading(sc, "ЧЕМ ПРОРАСТИ", 310, 64, seed=2)
-    letters(sc, "деталь или встреченная мутация", 310, 86, "text", 16, col=MUTED)
-    keys = [d[0] for d in SS.DETAILS] + ["m_" + r[0] for r in SS.MUTS_MET] + ["giant", "chimera"]
-    names = {d_[0]: d_[1] for d_ in SS.DETAILS}
-    names.update({"m_" + r[0]: r[1] for r in SS.MUTS_MET})
-    names.update(giant="гигантизм", chimera="чужая черта")
-    for k_, key in enumerate(keys):
-        x0, y0 = 306 + (k_ % 4) * 86, 108 + (k_ // 4) * 112
-        locked = key in ("giant", "chimera")
-        UI.cell(sc, x0, y0, x0 + 80, y0 + 106, "locked" if locked else ("hi" if k_ == SS.PICK else ("mut" if key.startswith("m_") else "normal")))
-        if not locked:
-            icon(sc, key, x0 + 24, y0 + 10, 2)
-        lines = wrap(names[key], 74)
-        for n_, ln in enumerate(lines):
-            letters(sc, ln, x0 + 40, y0 + 50 + n_ * 17, "text", 16,
-                    col=PALE if locked else (GOLD if key.startswith("m_") or k_ == SS.PICK else INK), align="center")
-        if locked:
-            letters(sc, "в выводке", x0 + 40, y0 + 18, "title", 8, col=PALE, outline=False, align="center")
+    heading(sc, "ЧТО ВЫПАЛО", 310, 64, seed=2)
+    letters(sc, "три случайных: бери одно или ничего", 310, 86, "text", 16, col=MUTED)
+    offers = [("horn", "Рог", "деталь", "первый удар боя сильнее и дробящий", (236, 224, 196)),
+              ("m_spinner", "Прядильные железы", "общая мутация", "паутина на клетке: враг застревает, свои бегают", (206, 206, 222)),
+              ("m_nest", "Малое гнездо", "мутация Матки", "погибшая рядом своя роняет яйцо, как у Матки", (240, 200, 90))]
+    X, Y = sc.xx, sc.yy
+    for k_, (key, name, kind, what, kcol) in enumerate(offers):
+        y0 = 110 + k_ * 108
+        UI.cell(sc, 306, y0, 642, y0 + 100, "hi" if k_ == 0 else ("mut" if key.startswith("m_") else "normal"))
+        ex, ey = 346, y0 + 50                                   # each offer hatched from its own egg
+        egg = ((X - ex) / 26) ** 2 + ((Y - ey) / 34) ** 2 <= 1
+        sc.rgb[egg] = hexc("#2e3a22")
+        sc.rgb[egg & (Y < ey - 6)] = hexc("#46582e")
+        sc.rgb[egg & (((X - ex + 8) / 6) ** 2 + ((Y - ey + 18) / 8) ** 2 <= 1)] = hexc("#7a9a48")
+        eo, _, _ = UI.edges(egg)
+        sc.rgb[eo] = UI.OUTL
+        for t in range(9):                                     # the crack it came out of
+            cx_, cy_ = ex - 16 + t * 4, ey - 26 + (3 if t % 2 else -1)
+            sc.rgb[int(cy_):int(cy_) + 2, int(cx_):int(cx_) + 2] = UI.OUTL
+        sc.occ[egg] = True
+        sc.light[egg] = 0
+        icon(sc, key, ex - 16, ey - 12, 2)
+        letters(sc, name, 386, y0 + 10, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
+        letters(sc, kind, 386, y0 + 28, "title", 8, col=kcol, outline=False)
+        for n_, ln in enumerate(wrap(what, 244)):
+            letters(sc, ln, 386, y0 + 46 + n_ * 17, "text", 16, col=MUTED if k_ else INK)
+    scribble(sc, 316, 434, 200, seed=36)
     # what it becomes
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
     UI.engrave(sc, bug((), "idle", 4.2, 70, soldier=True), 820, 330, col="#2a2234", k=0.9)
@@ -236,11 +245,11 @@ def camp():
     scribble(sc, 676, 392, 180, seed=32)
     # leave / mutate
     UI.button(sc, 12, 470, 300, 520, "chitin")
-    letters(sc, "Уйти", 156, 486, "title", 16, col=INK, align="center")
+    letters(sc, "Отказаться", 156, 486, "title", 16, col=INK, align="center")
     UI.button(sc, 690, 466, 948, 524, "amber")
     letters(sc, "МУТИРОВАТЬ", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "гигант — сюрприз выводка,", 495, 470, "text", 16, col=MUTED, align="center")
-    letters(sc, "чужие черты — от съеденных", 495, 488, "text", 16, col=MUTED, align="center")
+    letters(sc, "выпадает из встреченного", 495, 470, "text", 16, col=MUTED, align="center")
+    letters(sc, "в походе; лагерь — подарок", 495, 488, "text", 16, col=MUTED, align="center")
     scribble(sc, 420, 512, 150, seed=33)
     # the living
     UI.creature(sc, bug(("stinger",), "idle", 1.0, 71), 230, 54)
