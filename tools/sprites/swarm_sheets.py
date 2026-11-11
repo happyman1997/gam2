@@ -96,10 +96,10 @@ def castes():
 
 
 # ---------------------------------------------------------------- foreign traits
-CHIMERA_TEXT = dict(iron=("литой металл", "молния +50%"), boil=("кипяток, огня не боится", "вода и холод ×2"),
+CHIMERA_TEXT = dict(iron=("литой металл", "{молния} +50%"), boil=("кипяток, {огонь} не страшен", "вода и {холод} ×2"),
                     hand=("хватка", "хватает и своих"), face=("жуть 1–6", "пугает своих"),
-                    bones=("встаёт раз за бой", "дробящий ×2"), quills=("иглы на 3 клетки", "3 залпа за бой"),
-                    snout=("по раненым +2", "бросает строй"), slime=("не горит, кислота ½", "сохнет на камне"),
+                    bones=("встаёт раз за бой", "{дроб} ×2"), quills=("иглы на 3 клетки", "3 залпа за бой"),
+                    snout=("по раненым +2", "бросает строй"), slime=("не горит, {кисл} ½", "сохнет на камне"),
                     worm=("червь кусает убийцу", "ест носителя"))
 EXAMPLES = (("jumper", "face", "Кузнечик с лицом"), ("carapace", "iron", "Мокрица в железе"), ("stinger", "hand", "Скорпион с рукой"),
             ("acid", "worm", "Бочонок с червём"), ("scythes", "quills", "Богомол в иглах"), ("firefly", "boil", "Светляк с кипятком"))
@@ -126,8 +126,9 @@ def chimeras():
         centered(d, cx, 180 * S, words[0], fs, GOLD)
         if len(words) > 1:
             centered(d, cx, 180 * S + 17, words[1], fs, GOLD)
-        centered(d, cx, 180 * S + 40, good, fs, (150, 220, 120))
-        centered(d, cx, 180 * S + 58, bad, fs, (236, 120, 96))
+        import dmg
+        dmg.rich_pil(img, d, cx, 180 * S + 40, good, fs, (150, 220, 120), anchor="center")
+        dmg.rich_pil(img, d, cx, 180 * S + 58, bad, fs, (236, 120, 96), anchor="center")
     d.text((24, 262 * S), "На других формах — в атаке", font=fh, fill=GOLD)
     for i, (_, _, label) in enumerate(EXAMPLES):
         centered(d, (80 + i * 160) * S, 424 * S, label, fb, INK)

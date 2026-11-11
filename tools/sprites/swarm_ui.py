@@ -489,6 +489,31 @@ def text_width(text, kind="text", px=16):
     return int(_font(kind, px).getlength(text))
 
 
+def rich_width(text, kind="text", px=16):
+    """The width of a text with damage-type glyphs in it ("{дроб}" and the like, see dmg.py)."""
+    import dmg
+    return sum(text_width(s, kind, px) if k == "t" else dmg.width(s) + 2 for k, s in dmg.parts(text))
+
+
+def rich(sc, text, x, y, kind="text", px=16, col=INK, align="left", **kw):
+    """letters(), with each damage type drawn as its glyph instead of the word."""
+    import dmg
+    w = rich_width(text, kind, px)
+    if align == "center":
+        x -= w / 2
+    elif align == "right":
+        x -= w
+    for k, s in dmg.parts(text):
+        if k == "t":
+            letters(sc, s, x, y, kind, px, col=col, **kw)
+            x += text_width(s, kind, px)
+        else:
+            gh = dmg.rgba(s).shape[0]
+            dmg.draw(sc, s, x + 1, y + px / 2 - gh / 2 + 1)
+            x += dmg.width(s) + 2
+    return w
+
+
 def letters(sc, text, x, y, kind="text", px=16, col=INK, col2=None, outline=True, shadow=True, jitter=0, drips=0,
             hairs=0, align="left", seed=0):
     """Text drawn into the scene itself, on its pixel grid: dark outline, a shadow, a light top on each stroke,

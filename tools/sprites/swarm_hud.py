@@ -173,7 +173,7 @@ def brood():
 def wrap(text, width, kind="text", px=16):
     words, lines, cur = text.split(" "), [], ""
     for wd in words:
-        if UI.text_width((cur + " " + wd).strip(), kind, px) > width and cur:
+        if UI.rich_width((cur + " " + wd).strip(), kind, px) > width and cur:
             lines.append(cur)
             cur = wd
         else:
@@ -206,7 +206,7 @@ def camp():
     UI.plate(sc, 296, 52, 652, 446, antennae=True)
     heading(sc, "ЧТО ВЫПАЛО", 310, 64, seed=2)
     letters(sc, "три случайных: бери одно или ничего", 310, 86, "text", 16, col=MUTED)
-    offers = [("horn", "Рог", "деталь", "первый удар боя сильнее и дробящий", (236, 224, 196)),
+    offers = [("horn", "Рог", "деталь", "первый удар боя сильнее и {дроб}", (236, 224, 196)),
               ("m_spinner", "Прядильные железы", "общая мутация", "паутина на клетке: враг застревает, свои бегают", (206, 206, 222)),
               ("m_nest", "Малое гнездо", "мутация Матки", "погибшая рядом своя роняет яйцо, как у Матки", (240, 200, 90))]
     X, Y = sc.xx, sc.yy
@@ -229,7 +229,7 @@ def camp():
         letters(sc, name, 386, y0 + 10, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
         letters(sc, kind, 386, y0 + 28, "title", 8, col=kcol, outline=False)
         for n_, ln in enumerate(wrap(what, 244)):
-            letters(sc, ln, 386, y0 + 46 + n_ * 17, "text", 16, col=MUTED if k_ else INK)
+            UI.rich(sc, ln, 386, y0 + 46 + n_ * 17, "text", 16, col=MUTED if k_ else INK)
     scribble(sc, 316, 434, 200, seed=36)
     # what it becomes
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
@@ -240,10 +240,10 @@ def camp():
     letters(sc, "сейчас", 730, 222, "text", 16, col=MUTED, align="center")
     letters(sc, "с рогом", 872, 222, "text", 16, col=GOLD, align="center")
     UI.silk(sc, (760, 180), (836, 180), sag=-6, col="#e8c050")
-    text = ("Муравей-солдат получает Рог: первый удар боя сильнее и дробящий — против литого металла. "
+    text = ("Муравей-солдат получает Рог: первый удар боя сильнее и {дроб}, против литого металла. "
             "Рог наследуется: в кладках этой линии появятся рога.")
     for n_, ln in enumerate(wrap(text, 262)):
-        letters(sc, ln, 676, 254 + n_ * 18, "text", 16, col=INK)
+        UI.rich(sc, ln, 676, 254 + n_ * 18, "text", 16, col=INK)
     scribble(sc, 676, 380, 250, seed=31)
     scribble(sc, 676, 392, 180, seed=32)
     # leave / mutate
@@ -301,7 +301,7 @@ def evolution():
         letters(sc, ename, x0 + 50, 120, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
         letters(sc, "взята" if is_taken else f"{nxt} биомассы", x0 + 50, 138, "text", 16, col=GREEN if is_taken else BIO)
         for k_, ln in enumerate(wrap(what, 180)):
-            letters(sc, ln, x0 + 12, 166 + k_ * 17, "text", 16, col=INK)
+            UI.rich(sc, ln, x0 + 12, 166 + k_ * 17, "text", 16, col=INK)
         put(sc, W.build((form,), -0.08, "idle", False, k=2.4, genes=W.genes_for(3), evo=(key,)), x0 + 104, 340, 22)
         for k_, ln in enumerate(wrap("на теле: " + look, 180)):
             letters(sc, ln, x0 + 12, 360 + k_ * 17, "text", 16, col=MUTED)
@@ -689,10 +689,10 @@ def battle_hud():
             icon(sc, "spitter", cx0 + 8, cy0 + 6, 2)
             letters(sc, "Паук-плевун", cx0 + 44, cy0 + 10, "text", 16, col=GOLD, jitter=1, seed=7)
             letters(sc, "рабочая", cx0 + 44, cy0 + 26, "title", 8, col=PALE, outline=False)
-            for j, (ln, col) in enumerate((("Плюёт раз в 2 хода", INK), ("на 3 клетки, урон ядом.", INK),
+            for j, (ln, col) in enumerate((("Плюёт раз в 2 хода", INK), ("на 3 клетки, урон {яд}.", INK),
                                            ("Цель прилипает к клетке", INK), ("на раунд, но бьёт.", INK),
                                            ("Плюнет снова через ход", GREEN), ("Вблизи кусается слабо", RED))):
-                letters(sc, ln, cx0 + 10, cy0 + 44 + j * 16, "text", 16, col=col)
+                UI.rich(sc, ln, cx0 + 10, cy0 + 44 + j * 16, "text", 16, col=col)
             cursor(sc, sx_ - 2, sy_ - 14)
             name = "swarm_battle_pause.png"
         img = sc.image(S)
@@ -873,7 +873,7 @@ def section(sc, x, y, w, key, label, title, text, col=GOLD, seed=0):
     letters(sc, title, x + 20, y + 9, "text", 16, col=col, jitter=1, seed=seed)
     yy = y + 27
     for ln in wrap(text, w - 4):
-        letters(sc, ln, x, yy, "text", 16, col=INK)
+        UI.rich(sc, ln, x, yy, "text", 16, col=INK)
         yy += 15
     return yy + 6
 
@@ -948,10 +948,10 @@ def big_card(spec, name):
         sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.5 + hexc("#4a3e5c") * 0.5
         icon(sc, key, x0, y + 5, 1)
         for cx, val, col in zip(cols, (nm, dmg, typ, reach), (GOLD, INK, INK, INK)):
-            letters(sc, val, cx, y + 5, "text", 16, col=col)
+            UI.rich(sc, val, cx, y + 5, "text", 16, col=col)
         y += 22
         for ln in (wrap(note, x1 - x0 - 24) if note else []):
-            letters(sc, ln, x0 + 20, y, "text", 16, col=MUTED)
+            UI.rich(sc, ln, x0 + 20, y, "text", 16, col=MUTED)
             y += 15
         y += 4
     # under the attacks: what it hands down, or the leader's pool — icons in a column
@@ -987,7 +987,7 @@ def big_card(spec, name):
     UI.cell(sc, tx0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
     letters(sc, nm, tx0 + 12, ty0 + 8, "text", 16, col=col)
     for j, ln in enumerate(lines):
-        letters(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
+        UI.rich(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
     cursor(sc, int(hx) - 30, int(hy) + 10)
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
@@ -1004,18 +1004,18 @@ def cards():
                ("val", "таких в рое", "7", INK)],
         stats=[("здоровье", "8"), ("броня", "0 · хитин"), ("скорость", "2"), ("боевой дух", "6"),
                ("размер", "1"), ("предел роя", "1 очко")],
-        attacks=[("stinger", "Жало", "1–4 +1", "колющий", "1", "если пробивает броню, отравляет на 1–4 и снимает 1 броню"),
-                 ("evo_vise", "Клешни", "—", "дробящий", "1", "цель не может уйти со своей клетки")],
+        attacks=[("stinger", "Жало", "1–4 +1", "{кол}", "1", "если пробивает броню: {яд} 1–4 и −1 к броне"),
+                 ("evo_vise", "Клешни", "—", "{дроб}", "1", "цель не может уйти со своей клетки")],
         below=("ПОТОМКАМ", [("stinger", "Жало", "черта", GOLD), ("wings", "Крылья", "черта", GOLD),
                             ("m_blister", "Нарывник", "мутация", SILVER)]),
-        abilities=[("stinger", "форма", "Жало", "Если удар жалом пробивает броню, цель получает 1–4 яда и теряет 1 броню до конца боя. Яд накапливается. С одной цели снимается не больше 2 брони. Машин яд не берёт, но броню жало снимает и с них.", GOLD),
+        abilities=[("stinger", "форма", "Жало", "Если удар жалом пробивает броню, цель получает 1–4 {яд} и теряет 1 броню до конца боя. {яд} накапливается. С одной цели снимается не больше 2 брони. Машинам {яд} не страшен, но броню жало снимает и с них.", GOLD),
                    ("wings", "деталь", "Крылья", "Может проходить через клетки, занятые своими.", GOLD),
                    ("m_blister", "мутация · общий пул", "Нарывник", "Враг, который ранит её в ближнем бою, до конца боя бьёт слабее. На одного врага срабатывает один раз. Действует и на машины.", SILVER),
-                   ("evo_vise", "эволюция формы", "Клешни-тиски", "Клешни бьют дробящим. Враг, в которого они попали, не может уйти со своей клетки.", (150, 220, 120)),
-                   ("carapace", "класс", "Хитин", "Рубящий урон по ней в два раза меньше, дробящий в два раза больше.", INK),
+                   ("evo_vise", "эволюция формы", "Клешни-тиски", "Клешни бьют {дроб}. Враг, в которого они попали, не может уйти со своей клетки.", (150, 220, 120)),
+                   ("fear", "слабость", "Медленнее других", "Скорость 2, у других рабочих 3.", RED),
                    ("ant", "класс", "Стая", "Боевой дух +1 за каждую свою особь в соседних клетках, но не больше +4.", INK),
                    ("biomass", "класс", "Пожирание", "Убив врага, съедает труп и восстанавливает четверть здоровья. После боя съеденное идёт в биомассу.", INK),
-                   ("fear", "слабость", "Медленнее других", "Скорость 2, у других рабочих 3.", RED)]),
+                   ("carapace", "класс", "Хитин", "Урон {руб} по ней в два раза меньше, {дроб} в два раза больше.", INK)]),
         "swarm_card.png")
     big_card(dict(
         seed=57, title="МАТКА", sub="лидер роя · число и порода", cell="mut",
@@ -1023,7 +1023,7 @@ def cards():
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
                ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
         stats=[("здоровье", "80"), ("броня", "2 · хитин"), ("скорость", "1"), ("размер", "6")],
-        attacks=[("matka", "Жвалы", "1–6 +2", "рубящий", "1", "")],
+        attacks=[("matka", "Жвалы", "1–6 +2", "{руб}", "1", "")],
         below=("ПУЛ МУТАЦИЙ", [("m_nest", "Малое гнездо", "Гнездо", GOLD), ("m_nurse", "Кормилица", "Гнездо", GOLD),
                                ("m_vivi", "Живородящая", "Гнездо", GOLD), ("m_bud", "Почкование", "Гнездо", GOLD),
                                ("m_dominant", "Доминантная линия", "Порода", GOLD), ("m_flight", "Брачный полёт", "Порода", GOLD),

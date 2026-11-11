@@ -149,7 +149,7 @@ STATES = [
     ("web", "В паутине", "застрял на раунд", "Прядильные железы"),
     ("honey", "В мёде", "вязнет", "Медовая бочка"),
     ("blister", "Ожог", "его удар слабее до конца боя", "Нарывник"),
-    ("shred", "Броня разъедена", "минус броня до конца боя", "скорпион, кислота"),
+    ("shred", "Броня разъедена", "минус броня до конца боя", "скорпион, {кисл}"),
     ("poison", "Яд", "копится и выходит каждый раунд", "жало"),
     ("frenzy", "Кормовое безумие", "своя особь бьёт сильнее, пока Пожиратель ест", "свои"),
     ("heal", "Лечится", "мёд, стол Пожирателя, Живучая", "свои"),
@@ -320,7 +320,8 @@ def sheet():
     for n, (key, name, what, who) in enumerate(STATES):
         cx, by = 16 + CW_ / 2 + (n % cols) * CW_, top0 + (n // cols) * RH + 96
         d.text(((cx - CW_ / 2 + 8) * S, (by + 8) * S), name, font=fbs, fill=GOLD)
-        d.text(((cx - CW_ / 2 + 8) * S + d.textlength(name, font=fbs) + 10, (by + 8) * S + 2), who, font=small, fill=MUT)
+        import dmg
+        dmg.rich_pil(img, d, (cx - CW_ / 2 + 8) * S + d.textlength(name, font=fbs) + 10, (by + 8) * S + 2, who, small, MUT)
         words, lines, cur = what.split(" "), [], ""
         for wd in words:
             if d.textlength(cur + " " + wd, font=small) > (CW_ - 16) * S and cur:

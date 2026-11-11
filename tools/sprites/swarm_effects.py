@@ -339,7 +339,7 @@ def beetle_charge(giant=False):
                 frame([(g, X(2.6), GY), (b("idle"), X(0.8), GY)], fx=[lambda sc: speed(sc, X(0.8) - 20, GY)]),
                 frame([(g, X(2.6), GY), (b("attack"), X(1.6), GY)], fx=[lambda sc: speed(sc, X(1.6) - 20, GY),
                                                                          lambda sc: burst(sc, X(2.6) - 46, GY - 18, 12)],
-                      text=[(X(1.8), 26, "первый удар ×1,5, дробящий")], key=True),
+                      text=[(X(1.8), 26, "первый удар ×1,5, {дроб}")], key=True),
                 frame([(lit(g, WHITE, 0.15), X(3.1), GY), (b("idle"), X(1.6), GY)], text=[(X(1.8), 26, "и отбрасывает")])]
     b = lambda p: bug(("horn",), p, soldier=True, giant=True, seed=5)
     inv, mas = human("Изобретатель"), mason()
@@ -460,7 +460,7 @@ def spider_spit(giant=False):
         return [frame(base + [(sp("idle"), X(0.2), GY)]),
                 frame(base + [(sp("attack"), X(0.3), GY)], fx=[lambda sc: trail(sc, path[:18], glue),
                                                              lambda sc: blob(sc, *path[18], 3, glue, glow=0.3)],
-                      text=[(X(1.6), 22, "плевок липким ядом через строй")]),
+                      text=[(X(1.6), 22, "липкий плевок {яд} через строй")]),
                 frame(base + [(sp("idle"), X(0.2), GY)], fx=[lambda sc: splash(sc, X(3.0), GY + 2, 18, glue, 0.8),
                                                            lambda sc: ST.ground(sc, "glued", X(3.0), GY, 18),
                                                            lambda sc: ST.glyph(sc, "glued", X(3.0), ST.top_of(t, GY) - 12)],
@@ -513,10 +513,11 @@ def render_panel(seq):
         im = draw(fr).image(2)
         d = ImageDraw.Draw(im)
         for x, y, t in fr["text"]:
-            tw = d.textlength(t, font=fh)
+            import dmg
+            tw = dmg.width_pil(d, t, fh)
             x2 = min(max(4, x * 2 - tw / 2), PW * 2 - tw - 4)
             d.rectangle((x2 - 5, y * 2 - 3, x2 + tw + 5, y * 2 + 23), fill=(20, 14, 26))
-            d.text((x2, y * 2), t, font=fh, fill=(240, 226, 190))
+            dmg.rich_pil(im, d, x2, y * 2, t, fh, (240, 226, 190))
         imgs.append(im)
     return imgs
 
