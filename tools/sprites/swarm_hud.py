@@ -616,53 +616,89 @@ def flocks():
 
 
 # ---------------------------------------------------------------- the battle itself, with the swarm's interface over it
+def tug(sc, x0, y0, x1, y1, share):
+    """Who is winning, at a glance: the swarm's acid-green comb pushing from the left, the Foundry's hot iron from the
+    right, a jagged seam throwing sparks where they meet."""
+    m = UI.chamfer_mask(sc, x0, y0, x1, y1, 4)
+    rim, _, _ = UI.edges(m)
+    X, Y = sc.xx, sc.yy
+    t = np.clip((Y - y0) / max(1, y1 - y0), 0, 1)[..., None]
+    mid = x0 + (x1 - x0) * share
+    seam = mid + np.where((Y // 2) % 2 == 0, 2, -2)
+    left, right = m & (X < seam), m & (X >= seam)
+    sw = hexc("#b4f47a") * (1 - t) + hexc("#2a6224") * t
+    fo = hexc("#f09a50") * (1 - t) + hexc("#5a2416") * t
+    sc.rgb[left] = sw[left]
+    sc.rgb[right] = fo[right]
+    UI.comb(sc, left, x0, y0, hexc("#1e4a1a"), 0.55, R=4)
+    for x in range(int(mid) + 8, x1 - 4, 12):              # rivets in the iron
+        yc = (y0 + y1) // 2
+        sc.rgb[yc - 1:yc + 1, x:x + 2] = hexc("#ffd0a0")
+        sc.rgb[yc + 1, x:x + 2] = hexc("#3a160e")
+    edge = m & (np.abs(X - seam) < 1)
+    sc.rgb[edge] = hexc("#fff4c8")
+    sc.rgb[rim] = hexc("#0a060e")
+    sc.glow(mid, (y0 + y1) / 2, 14, hexc("#ffd890"), 0.6)
+    for dx, dy in ((-3, -6), (4, -7), (6, 5), (-5, 6)):     # sparks off the seam
+        sc.rgb[int((y0 + y1) / 2 + dy), int(mid + dx)] = hexc("#ffe8a0")
+
+
+def cursor(sc, x, y):
+    """The mouse arrow, pixel by pixel."""
+    rows = ["o.........", "oo........", "o#o.......", "o##o......", "o###o.....", "o####o....", "o#####o...",
+            "o######o..", "o###oooo..", "o#o#o.....", "oo.o#o....", "o..o#o....", ".....oo..."]
+    for j, row in enumerate(rows):
+        for i, ch in enumerate(row):
+            if ch != ".":
+                sc.rgb[y + j, x + i] = hexc("#0a060e") if ch == "o" else hexc("#f4ecd8")
+
+
 def battle_hud():
+    """The battle runs itself: the interface is one thin wing — the sides' tug of war, the speed. Everything else is
+    on the field: the leader's health over the leader, an ability's icon popping up when it fires, states over the
+    units. On pause, pointing at anyone opens their card."""
+    import copy
     import battle as BT
-    sc, count, ng = BT.build("Матка")
-    UI.WOBBLE[0] = 1.0
-    # top: a thin wing with the swarm, the enemy, the speed and, small beside it, the turn
-    UI.wing(sc, 0, 0, WW, 34)
-    letters(sc, f"рой {count - 1}", 16, 5, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
-    letters(sc, "съедено 14", 16, 22, "text", 16, col=MUTED)
-    letters(sc, f"Литейщик · {ng} големов", WW / 2, 6, "text", 16, col=(214, 196, 150), align="center")
-    letters(sc, "ход 5", 706, 13, "title", 8, col=MUTED, outline=False, align="right")   # turns fly by: small, by the speed
-    for k_, t in enumerate(("II", "×1", "×2", "×4")):
-        x0 = 716 + k_ * 58
-        UI.button(sc, x0, 6, x0 + 52, 28, "amber" if t == "×2" else "chitin")
-        letters(sc, t, x0 + 26, 9, "text", 16, col=DARK if t == "×2" else INK, outline=t != "×2", align="center")
-    # bottom left: the leader — health, abilities, their cooldowns; the leader itself sits on the plate's edge
-    UI.plate(sc, 4, 448, 324, 536, antennae=True)
-    put(sc, leader("Матка", "idle", 0.74), 62, 530, 30)
-    letters(sc, "МАТКА", 124, 456, "title", 16, col=GOLD, jitter=1, seed=3)
-    UI.meter(sc, 124, 478, 316, 10, 16, 13, "#c04a3a")
-    abil = [("clutch", "1"), ("larva", ""), ("feed", "")]
-    for k_, (key, cd) in enumerate(abil):
-        x0 = 124 + k_ * 66
-        UI.cell(sc, x0, 494, x0 + 60, 532, "hi" if k_ == 0 else "normal")
-        icon(sc, key, x0 + 4, 497, 2)
-        if cd:
-            letters(sc, cd, x0 + 50, 512, "title", 8, col=(255, 200, 120), align="center")
-    # bottom: the flocks — kind, alive of all, a state if any
     import swarm_status as ST
-    UI.plate(sc, 330, 448, 956, 536)
-    others = [(("stinger",), "скорпионы", 31, 36, "poison"), (("horn",), "жуки", 12, 12, None),
-              (("acid",), "бочонки", 18, 24, None), (("wings",), "осы", 27, 33, "fear"), (("spitter",), "пауки", 3, 3, None)]
-    ants = count - 1 - sum(o[2] for o in others)                 # the strip adds up to the swarm counted on the field
-    flocks_ = [((), "муравьи", ants, ants + 27, None)] + others
-    for k_, (tr, name, alive, tot, st) in enumerate(flocks_):
-        x0 = 338 + k_ * 102
-        UI.cell(sc, x0, 456, x0 + 96, 530, "new" if alive == tot else "normal")
-        letters(sc, name, x0 + 8, 459, "text", 16, col=INK, jitter=1, seed=k_)
-        icon(sc, tr[0] if tr else "ant", x0 + 6, 476, 2)
-        letters(sc, f"{alive}", x0 + 44, 482, "title", 8, col=GOLD if alive == tot else (255, 150, 120), outline=False)
-        letters(sc, f"из {tot}", x0 + 44, 495, "title", 8, col=PALE, outline=False)
-        UI.meter(sc, x0 + 8, 514, x0 + 88, 7, min(tot, 10), round(min(tot, 10) * alive / tot), "#8a6aa8")
-        if st:
-            ST.glyph(sc, st, x0 + 87, 462)
-    img = sc.image(S)
-    UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_battle_hud.png"))
-    print("swarm_battle_hud.png", img.size)
+    sc0, count, ng = BT.build("Матка")
+    qx, qy = BT.X0 + 15.6 * BT.CW, BT.Y0 + 8.4 * BT.CH
+    qtop = ST.top_of(W.queen(0.0, "attack", k=0.92), qy)
+    for paused in (False, True):
+        sc = copy.deepcopy(sc0)
+        UI.WOBBLE[0] = 1.0
+        # on the field: the leader's health over the leader, and Кладка popping up as it fires
+        UI.meter(sc, qx - 46, qtop - 12, qx + 46, 7, 10, 8, "#c04a3a")
+        px_, py_ = qx - 104, qtop - 34
+        sc.glow(px_ + 16, py_ + 16, 22, hexc("#f0c060"), 0.45)
+        icon(sc, "clutch", px_, py_, 2)
+        letters(sc, "Кладка", px_ + 16, py_ + 34, "text", 16, col=GOLD, align="center", jitter=1, seed=5)
+        # the wing: the swarm against the Foundry, the speed, the turn small by it
+        UI.wing(sc, 0, 0, WW, 34)
+        letters(sc, f"рой {count - 1}", 16, 8, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
+        tug(sc, 144, 10, 520, 25, 0.6)
+        letters(sc, f"Литейщик: {ng - 1} из {ng}", 530, 9, "text", 16, col=(214, 196, 150))
+        letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
+        for x0, x1, t, on in ((736, 784, "II", paused), (790, 838, "×2", not paused), (844, 952, "в конец »", False)):
+            UI.button(sc, x0, 6, x1, 28, "amber" if on else "chitin")
+            letters(sc, t, (x0 + x1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
+        name = "swarm_battle_hud.png"
+        if paused:                                  # on pause: point at a spitter and read its card
+            sx_, sy_ = 566, 452
+            cx0, cy0, cx1, cy1 = 592, 316, 800, 452
+            UI.cell(sc, cx0, cy0, cx1, cy1, "hi")
+            icon(sc, "spitter", cx0 + 8, cy0 + 6, 2)
+            letters(sc, "Паук-плевун", cx0 + 44, cy0 + 10, "text", 16, col=GOLD, jitter=1, seed=7)
+            letters(sc, "рабочая", cx0 + 44, cy0 + 26, "title", 8, col=PALE, outline=False)
+            for j, (ln, col) in enumerate((("Плевок каждые 2 хода:", INK), ("липкий яд на 3 клетки,", INK),
+                                           ("цель не ходит, но бьёт", INK), ("до плевка: 1 ход", GREEN),
+                                           ("слабый укус вплотную", RED))):
+                letters(sc, ln, cx0 + 10, cy0 + 44 + j * 16, "text", 16, col=col)
+            cursor(sc, sx_ - 2, sy_ - 14)
+            name = "swarm_battle_pause.png"
+        img = sc.image(S)
+        UI.WOBBLE[0] = 0.0
+        img.save(out(name))
+        print(name, img.size)
 
 
 # ---------------------------------------------------------------- after the battle: the battle changes the breed
