@@ -620,12 +620,12 @@ def battle_hud():
     import battle as BT
     sc, count, ng = BT.build("Матка")
     UI.WOBBLE[0] = 1.0
-    # top: a thin wing with the turn, the swarm and the enemy, the speed
+    # top: a thin wing with the swarm, the enemy, the speed and, small beside it, the turn
     UI.wing(sc, 0, 0, WW, 34)
-    letters(sc, "ХОД 5", 400, 4, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=4, hairs=5, align="center")
     letters(sc, f"рой {count - 1}", 16, 5, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
     letters(sc, "съедено 14", 16, 22, "text", 16, col=MUTED)
-    letters(sc, f"Литейщик · {ng} големов", 700, 6, "text", 16, col=(214, 196, 150), align="right")
+    letters(sc, f"Литейщик · {ng} големов", WW / 2, 6, "text", 16, col=(214, 196, 150), align="center")
+    letters(sc, "ход 5", 706, 13, "title", 8, col=MUTED, outline=False, align="right")   # turns fly by: small, by the speed
     for k_, t in enumerate(("II", "×1", "×2", "×4")):
         x0 = 716 + k_ * 58
         UI.button(sc, x0, 6, x0 + 52, 28, "amber" if t == "×2" else "chitin")
