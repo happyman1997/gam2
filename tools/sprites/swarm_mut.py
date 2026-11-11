@@ -541,6 +541,7 @@ def add(m, mc, a, key, pose):
 
 # ------------------------------------------------------------------ the cast of the scenes (battle scale, zoomed)
 Z = 1.15
+F = 1.0                                   # stretches the scenes' offsets on sheets with wider columns
 PSI_C, GREEN, RED, AMBER_C, WHITE_C, SILK_C = hexc("#c8a0ff"), hexc("#9ae030"), hexc("#ff5a3a"), hexc("#f0b040"), hexc("#fff4dc"), hexc("#e8e0d0")
 _cache = {}
 
@@ -551,7 +552,8 @@ def cached(key, fn):
     return _cache[key]
 
 
-def bug(traits=(), pose="idle", key=None, seed=1, soldier=False, chimera=None, k=Z):
+def bug(traits=(), pose="idle", key=None, seed=1, soldier=False, chimera=None, k=None):
+    k = Z if k is None else k
     return cached(("bug", traits, pose, key, seed, soldier, chimera, k),
                   lambda: W.build(traits, 0.0, pose, soldier, k=k, genes=W.genes_for(seed), rare=key, chimera=chimera))
 
@@ -562,7 +564,7 @@ def golem(name="Механик", pose="idle", k=1.0, face_left=True):
     def mk():
         spr = F.build(name, pose, k=F.FRAMES[name][0] * Z * k)
         return E.mirror(spr) if face_left else spr
-    return cached(("golem", name, pose, k, face_left), mk)
+    return cached(("golem", name, pose, k, face_left, Z), mk)
 
 
 def man(pose="idle", who="inv", face_left=True):
@@ -573,25 +575,29 @@ def man(pose="idle", who="inv", face_left=True):
     def mk():
         spr = GH.build(S_, pose, k * Z)
         return E.mirror(spr) if face_left else spr
-    return cached(("man", pose, who, face_left), mk)
+    return cached(("man", pose, who, face_left, Z), mk)
 
 
 def leader(name, pose="idle", k=0.6, stage=0):
     import swarm_leaders as SL
+    k = k * Z / 1.15
     return cached(("leader", name, pose, k, stage), lambda: SL.build(name, pose, k, stage=stage))
 
 
-def larva(pose="idle", host=None, k=Z):
+def larva(pose="idle", host=None, k=None):
     import swarm_leaders as SL
+    k = Z if k is None else k
     return cached(("larva", pose, host, k), lambda: SL.build("личинка", pose, k, host=host))
 
 
 def clutch(stage=0, k=0.55):
     import swarm_abilities as SA
+    k = k * Z / 1.15
     return cached(("clutch", stage, k), lambda: SA.render_small(SA.clutch(stage), k))
 
 
-def devourer_winged(pose="attack", k=0.62):
+def devourer_winged(pose="attack", k=None):
+    k = 0.62 * Z / 1.15 if k is None else k
     """The Devourer with the wings it took from an eaten wasp (Питательная суть)."""
     import swarm_leaders as SL
     from r3d import render
@@ -612,7 +618,8 @@ def devourer_winged(pose="attack", k=0.62):
     return cached(("devw", pose, k), mk)
 
 
-def cocoon(k=Z):
+def cocoon(k=None):
+    k = Z if k is None else k
     from r3d import Model, render
     import swarm_leaders as SL
     def mk():
@@ -652,16 +659,8 @@ def dead(spr):
 
 
 def pips(sc, x, y, n, of=4):
-    for i in range(of):
-        cx = x + (i - (of - 1) / 2) * 7
-        for dx in range(-3, 4):
-            for dy in range(-3, 4):
-                if abs(dx) + abs(dy) <= 3:
-                    edge = abs(dx) + abs(dy) == 3
-                    if i < n or edge:
-                        E().dot(sc, cx + dx, y + dy, PSI_C if i < n else hexc("#6a5a8a"))
-        if i < n:
-            sc.glow(cx, y, 6, PSI_C, 0.25)
+    import swarm_status as ST
+    ST.pips(sc, x, y, n, of)
 
 
 def arrow_l(sc, x0, x1, y, col=hexc("#e2b968")):
@@ -726,306 +725,306 @@ def scene(sc, key, x, by):
     T = []
     if key == "spinner":
         for r in (8, 16, 24):
-            e.ring(sc, x + 26, by, r * 1.6, SILK_C, 0.55, ry=r * 0.45)
+            e.ring(sc, x + 26 * F, by, r * 1.6, SILK_C, 0.55, ry=r * 0.45)
         for t in np.linspace(0, np.pi, 7):
-            e.lines(sc, (x + 26, by), (x + 26 + np.cos(t) * 40, by + np.sin(t) * 12 - 4), SILK_C, 0.55)
-        put(sc, golem(), x + 30, by, 0)
+            e.lines(sc, (x + 26 * F, by), (x + 26 * F + np.cos(t) * 40, by + np.sin(t) * 12 - 4), SILK_C, 0.55)
+        put(sc, golem(), x + 30 * F, by, 0)
         for k_ in range(4):
-            e.lines(sc, (x + 16 + k_ * 6, by - 2), (x + 20 + k_ * 5, by - 26), SILK_C, 0.7)
-        put(sc, bug((), key="spinner", seed=5), x - 38, by)
+            e.lines(sc, (x + 16 * F + k_ * 6, by - 2 * F), (x + 20 * F + k_ * 5, by - 26 * F), SILK_C, 0.7)
+        put(sc, bug((), key="spinner", seed=5), x - 38 * F, by)
         return "враг застрял в паутине", T
     if key == "exploder":
-        put(sc, golem(), x + 24, by, 0)
-        e.splash(sc, x + 6, by + 2, 40, hexc("#e8c840"), 0.75)
-        e.drops(sc, x - 6, by - 10, hexc("#f0d050"), 12, 22, 1)
+        put(sc, golem(), x + 24 * F, by, 0)
+        e.splash(sc, x + 6 * F, by + 2 * F, 40, hexc("#e8c840"), 0.75)
+        e.drops(sc, x - 6 * F, by - 10 * F, hexc("#f0d050"), 12, 22, 1)
         return "лопнула: враг склеен", T
     if key == "bolas":
-        put(sc, bug(("ant",), "attack", key="bolas", seed=6), x - 42, by)
-        put(sc, man(), x + 40, by)
-        sa.thread(sc, (x - 22, by - 18), (x + 30, by - 26), hexc("#e8e0d0"), sag=-4)
-        e.blob(sc, x + 32, by - 26, 4, hexc("#f0c040"))
-        e.speed(sc, x + 66, by - 4, 3, 14, hexc("#c8bca8"))
-        arrow_l(sc, x + 30, x + 4, by + 6)
+        put(sc, bug(("ant",), "attack", key="bolas", seed=6), x - 42 * F, by)
+        put(sc, man(), x + 40 * F, by)
+        sa.thread(sc, (x - 22 * F, by - 18 * F), (x + 30 * F, by - 26 * F), hexc("#e8e0d0"), sag=-4)
+        e.blob(sc, x + 32 * F, by - 26 * F, 4, hexc("#f0c040"))
+        e.speed(sc, x + 66 * F, by - 4 * F, 3, 14, hexc("#c8bca8"))
+        arrow_l(sc, x + 30 * F, x + 4 * F, by + 6 * F)
         return "подтянула врага к рою", T
     if key == "beeball":
-        put(sc, golem(), x + 16, by, 0)
-        sc.glow(x + 16, by - 22, 40, hexc("#ff9a30"), 0.55)
-        e.ring(sc, x + 16, by - 20, 28, hexc("#ffb050"), 0.6, ry=22)
-        put(sc, bug((), "attack", key="beeball", seed=7), x - 22, by + 2)
-        put(sc, bug((), "attack", key="beeball", seed=8), x - 10, by - 30)
-        put(sc, e.mirror(bug((), "attack", key="beeball", seed=9)), x + 58, by + 2)
+        put(sc, golem(), x + 16 * F, by, 0)
+        sc.glow(x + 16 * F, by - 22 * F, 40, hexc("#ff9a30"), 0.55)
+        e.ring(sc, x + 16 * F, by - 20 * F, 28, hexc("#ffb050"), 0.6, ry=22)
+        put(sc, bug((), "attack", key="beeball", seed=7), x - 22 * F, by + 2 * F)
+        put(sc, bug((), "attack", key="beeball", seed=8), x - 10 * F, by - 30 * F)
+        put(sc, e.mirror(bug((), "attack", key="beeball", seed=9)), x + 58 * F, by + 2 * F)
         return "облепили — давят мимо брони", T
     if key == "pupa":
-        put(sc, cocoon(), x - 22, by, 10)
-        put(sc, golem("Механик", "attack"), x + 40, by, 0)
-        e.burst(sc, x - 10, by - 10, 6)
-        put(sc, e.lit(bug(("ant", "wings"), "attack", seed=10), (240, 220, 160), 0.2), x - 30, by - 30)
-        e.lines(sc, (x - 22, by - 8), (x - 28, by - 26), SILK_C, 0.6)
+        put(sc, cocoon(), x - 22 * F, by, 10)
+        put(sc, golem("Механик", "attack"), x + 40 * F, by, 0)
+        e.burst(sc, x - 10 * F, by - 10 * F, 6)
+        put(sc, e.lit(bug(("ant", "wings"), "attack", seed=10), (240, 220, 160), 0.2), x - 30 * F, by - 30 * F)
+        e.lines(sc, (x - 22 * F, by - 8 * F), (x - 28 * F, by - 26 * F), SILK_C, 0.6)
         return "кокон — выходит крылатой", T
     if key == "midge":
-        put(sc, dead(bug((), key="midge", seed=11)), x - 40, by)
-        put(sc, golem("Механик", "attack"), x + 30, by, 0)
-        cloud(sc, x + 20, by - 26, 34, 22, 140, hexc("#3a3046"), 3)
-        cloud(sc, x + 20, by - 26, 30, 18, 60, hexc("#9a92b4"), 4)
-        e.lines(sc, (x - 34, by - 6), (x + 2, by - 22), hexc("#9a92b4"), 0.5)
+        put(sc, dead(bug((), key="midge", seed=11)), x - 40 * F, by)
+        put(sc, golem("Механик", "attack"), x + 30 * F, by, 0)
+        cloud(sc, x + 20 * F, by - 26 * F, 34, 22, 140, hexc("#3a3046"), 3)
+        cloud(sc, x + 20 * F, by - 26 * F, 30, 18, 60, hexc("#9a92b4"), 4)
+        e.lines(sc, (x - 34 * F, by - 6 * F), (x + 2 * F, by - 22 * F), hexc("#9a92b4"), 0.5)
         return "облако жалит, удары мимо", T
     if key == "honey":
-        e.splash(sc, x + 26, by + 2, 34, hexc("#e8a028"), 0.8)
-        put(sc, golem(), x + 30, by, 0)
-        e.drops(sc, x + 26, by - 2, hexc("#ffd070"), 8, 14, 2)
-        put(sc, bug((), key="honey", seed=12), x - 38, by)
-        put(sc, bug((), "attack", seed=13), x - 12, by + 4)
-        plus(sc, x - 8, by - 26)
+        e.splash(sc, x + 26 * F, by + 2 * F, 34, hexc("#e8a028"), 0.8)
+        put(sc, golem(), x + 30 * F, by, 0)
+        e.drops(sc, x + 26 * F, by - 2 * F, hexc("#ffd070"), 8, 14, 2)
+        put(sc, bug((), key="honey", seed=12), x - 38 * F, by)
+        put(sc, bug((), "attack", seed=13), x - 12 * F, by + 4 * F)
+        plus(sc, x - 8 * F, by - 26 * F)
         return "свои пьют, враг вяз в мёде", T
     if key == "blister":
-        put(sc, bug((), key="blister", seed=14), x - 26, by)
-        put(sc, man("attack"), x + 32, by)
-        e.drops(sc, x + 6, by - 20, RED, 10, 12, 3)
-        sc.glow(x + 14, by - 26, 14, RED, 0.6)
-        T.append((x + 34, by - 58, "слабее"))
+        put(sc, bug((), key="blister", seed=14), x - 26 * F, by)
+        put(sc, man("attack"), x + 32 * F, by)
+        e.drops(sc, x + 6 * F, by - 20 * F, RED, 10, 12, 3)
+        sc.glow(x + 14 * F, by - 26 * F, 14, RED, 0.6)
+        T.append((x + 34 * F, by - 58 * F, "слабее"))
         return "обжёгся — бьёт слабее", T
     if key == "cutters":
-        put(sc, golem(), x + 30, by, 0)
-        put(sc, bug((), "attack", key="cutters", seed=15), x - 24, by)
-        e.burst(sc, x + 8, by - 14, 7)
+        put(sc, golem(), x + 30 * F, by, 0)
+        put(sc, bug((), "attack", key="cutters", seed=15), x - 24 * F, by)
+        e.burst(sc, x + 8 * F, by - 14 * F, 7)
         for d in ((10, -26), (16, -30), (4, -34), (20, -20)):
             e.dot(sc, x + d[0], by + d[1], hexc("#949ca8"), r=1)
         return "броня цели вдвое меньше", T
     if key == "guard":
-        put(sc, leader("Разум улья", k=0.62), x - 52, by, 10)
-        put(sc, bug((), key="guard", seed=16), x - 6, by)
-        put(sc, man("attack"), x + 44, by)
-        e.slash(sc, x + 12, by - 22, 14, 1.0, 2.6, WHITE_C)
-        e.lines(sc, (x + 22, by - 30), (x - 40, by - 34), hexc("#ff8a60"), 0.5)
+        put(sc, leader("Разум улья", k=0.62), x - 52 * F, by, 10)
+        put(sc, bug((), key="guard", seed=16), x - 6 * F, by)
+        put(sc, man("attack"), x + 44 * F, by)
+        e.slash(sc, x + 12 * F, by - 22 * F, 14, 1.0, 2.6, WHITE_C)
+        e.lines(sc, (x + 22 * F, by - 30 * F), (x - 40 * F, by - 34 * F), hexc("#ff8a60"), 0.5)
         return "удар по лидеру — на неё", T
     if key == "regen":
-        put(sc, bug((), key="regen", seed=17), x - 10, by)
+        put(sc, bug((), key="regen", seed=17), x - 10 * F, by)
         for (dx, dy) in ((-18, -30), (2, -40), (16, -26), (-30, -16)):
             plus(sc, x + dx, by + dy)
-        put(sc, man(), x + 50, by)
+        put(sc, man(), x + 50 * F, by)
         return "раны затягиваются", T
     # ---- Матка
     if key == "nest":
-        put(sc, dead(bug((), key="nest", seed=18)), x - 34, by)
-        put(sc, clutch(0, 1.7), x + 10, by, 14)
-        put(sc, leader("Матка", k=0.36), x + 58, by, 10)
+        put(sc, dead(bug((), key="nest", seed=18)), x - 34 * F, by)
+        put(sc, clutch(0, 1.7), x + 10 * F, by, 14)
+        put(sc, leader("Матка", k=0.36), x + 58 * F, by, 10)
         return "погибла — яйцо, как у Матки", T
     if key == "nurse":
-        put(sc, bug((), key="nurse", seed=19), x - 44, by)
-        put(sc, larva(k=Z * 1.4), x - 2, by)
-        arrow_r(sc, x + 16, x + 32, by - 10)
-        put(sc, e.lit(bug((), seed=20), (240, 220, 160), 0.15), x + 50, by)
+        put(sc, bug((), key="nurse", seed=19), x - 44 * F, by)
+        put(sc, larva(k=Z * 1.4), x - 2 * F, by)
+        arrow_r(sc, x + 16 * F, x + 32 * F, by - 10 * F)
+        put(sc, e.lit(bug((), seed=20), (240, 220, 160), 0.15), x + 50 * F, by)
         return "личинка дорастает до рабочей", T
     if key == "vivi":
-        put(sc, dead(bug(("acid",), key="vivi", seed=6)), x - 14, by + 2, 10)
-        put(sc, larva("attack"), x + 30, by, 6)
+        put(sc, dead(bug(("acid",), key="vivi", seed=6)), x - 14 * F, by + 2 * F, 10)
+        put(sc, larva("attack"), x + 30 * F, by, 6)
         return "погибла — личинка", T
     if key == "bud":
-        put(sc, golem("Механик", "attack"), x + 40, by, 0)
+        put(sc, golem("Механик", "attack"), x + 40 * F, by, 0)
         for dx, dy, sd in ((-14, -8, 8), (-22, 10, 9)):
             put(sc, bug(("scythes",), "attack", seed=sd), x + dx, by + dy)
-        e.burst(sc, x - 18, by - 2, 8, hexc("#c8a0e0"))
+        e.burst(sc, x - 18 * F, by - 2 * F, 8, hexc("#c8a0e0"))
         return "ранена — стала двумя", T
     if key == "dominant":
-        put(sc, e.lit(bug(("ant", "horn"), key="dominant", seed=21), (255, 220, 120), 0.12), x - 40, by)
+        put(sc, e.lit(bug(("ant", "horn"), key="dominant", seed=21), (255, 220, 120), 0.12), x - 40 * F, by)
         for dx, sd in ((18, 22), (48, 23)):
             put(sc, bug(("ant", "horn"), seed=sd, k=0.9), x + dx, by)
-            sa.thread(sc, (x - 30, by - 30), (x + dx, by - 24), hexc("#f0c040"), sag=8)
+            sa.thread(sc, (x - 30 * F, by - 30 * F), (x + dx, by - 24 * F), hexc("#f0c040"), sag=8)
         return "её черта — у всех потомков", T
     if key == "flight":
-        put(sc, bug(("ant",), "attack", key="flight", seed=24), x - 34, by - 18)
-        put(sc, e.mirror(bug(("ant", "horn"), "attack", key="flight", seed=25)), x + 34, by - 22)
-        sa.thread(sc, (x - 24, by - 46), (x + 24, by - 50), hexc("#f0c040"), sag=10)
-        e.stars(sc, x, by - 64, 8, 4)
+        put(sc, bug(("ant",), "attack", key="flight", seed=24), x - 34 * F, by - 18 * F)
+        put(sc, e.mirror(bug(("ant", "horn"), "attack", key="flight", seed=25)), x + 34 * F, by - 22 * F)
+        sa.thread(sc, (x - 24 * F, by - 46 * F), (x + 24 * F, by - 50 * F), hexc("#f0c040"), sag=10)
+        e.stars(sc, x, by - 64 * F, 8, 4)
         return "пару ей выбираешь сам", T
     if key == "hybrid":
-        put(sc, bug(("wings",), seed=26, k=0.85), x - 56, by - 26)
-        put(sc, bug(("stinger",), seed=27, k=0.85), x - 50, by + 2)
-        arrow_r(sc, x - 26, x - 6, by - 12)
-        put(sc, bug(("wings", "stinger"), key="hybrid", seed=28), x + 34, by)
-        ex, ey = x + 44, by + 8
+        put(sc, bug(("wings",), seed=26, k=0.85), x - 56 * F, by - 26 * F)
+        put(sc, bug(("stinger",), seed=27, k=0.85), x - 50 * F, by + 2 * F)
+        arrow_r(sc, x - 26 * F, x - 6 * F, by - 12 * F)
+        put(sc, bug(("wings", "stinger"), key="hybrid", seed=28), x + 34 * F, by)
+        ex, ey = x + 52 * F, by - 22 * F
         e.blob(sc, ex, ey, 4, hexc("#a8d060"), glow=0.2)
         for d in range(-6, 7):
             e.dot(sc, ex + d, ey + d * 0.8, RED)
             e.dot(sc, ex + d, ey - d * 0.8, RED)
         return "оса с жалом скорпиона; бесплоден", T
     if key == "heir":
-        put(sc, dead(leader("Матка", k=0.4)), x - 34, by, 10)
-        put(sc, bug(("ant",), key="heir", seed=29), x + 38, by)
-        sc.glow(x + 38, by - 24, 30, hexc("#f0c040"), 0.45)
-        e.ring(sc, x + 42, by - 40, 8, hexc("#f0c040"), 0.8, ry=3)
+        put(sc, dead(leader("Матка", k=0.4)), x - 34 * F, by, 10)
+        put(sc, bug(("ant",), key="heir", seed=29), x + 38 * F, by)
+        sc.glow(x + 38 * F, by - 24 * F, 30, hexc("#f0c040"), 0.45)
+        e.ring(sc, x + 42 * F, by - 40 * F, 8, hexc("#f0c040"), 0.8, ry=3)
         return "Матка пала — новая Матка", T
     # ---- Разум улья
     if key == "psi_gland":
-        put(sc, bug((), "attack", key="psi_gland", seed=30), x - 26, by)
-        put(sc, man(), x + 34, by)
-        sc.glow(x + 24, by - 26, 18, PSI_C, 0.6)
-        pips(sc, x + 34, by - 62, 3)
+        put(sc, bug((), "attack", key="psi_gland", seed=30), x - 26 * F, by)
+        put(sc, man(), x + 34 * F, by)
+        sc.glow(x + 24 * F, by - 26 * F, 18, PSI_C, 0.6)
+        pips(sc, x + 34 * F, by - 62 * F, 3)
         return "укус пси — копит надлом", T
     if key == "psi_reson":
         for i, dx in enumerate((-56, -30)):
             put(sc, bug((), key="psi_reson", seed=31 + i), x + dx, by)
-        put(sc, golem(), x + 34, by, 0)
-        for i, (cx_, r_) in enumerate(((x - 48, 10), (x - 20, 14), (x + 30, 22))):
-            sa.ring(sc, cx_, by - 30 - i * 2, r_, r_ * 0.45, PSI_C, 0.75)
-        sa.thread(sc, (x - 48, by - 30), (x + 26, by - 36), PSI_C, sag=6)
+        put(sc, golem(), x + 34 * F, by, 0)
+        for i, (cx_, r_) in enumerate(((x - 48 * F, 10), (x - 20 * F, 14), (x + 30 * F, 22))):
+            sa.ring(sc, cx_, by - 30 * F - i * 2, r_, r_ * 0.45, PSI_C, 0.75)
+        sa.thread(sc, (x - 48 * F, by - 30 * F), (x + 26 * F, by - 36 * F), PSI_C, sag=6)
         return "волна бежит по цепочке", T
     if key == "psi_dread":
-        put(sc, man(), x + 34, by)
-        daze(sc, x + 34, by - 60)
-        put(sc, bug(("jumper",), "attack", key="psi_dread", seed=33), x - 24, by)
-        e.burst(sc, x + 18, by - 24, 10, hexc("#ff80b0"))
+        put(sc, man(), x + 34 * F, by)
+        daze(sc, x + 34 * F, by - 60 * F)
+        put(sc, bug(("jumper",), "attack", key="psi_dread", seed=33), x - 24 * F, by)
+        e.burst(sc, x + 18 * F, by - 24 * F, 10, hexc("#ff80b0"))
         return "бьёт надломленного сильнее", T
     if key == "psi_whisper":
-        put(sc, bug((), key="psi_whisper", seed=34), x - 30, by)
-        put(sc, man(), x + 34, by)
+        put(sc, bug((), key="psi_whisper", seed=34), x - 30 * F, by)
+        put(sc, man(), x + 34 * F, by)
         for r_ in (8, 14, 20):
-            sa.ring(sc, x - 4, by - 26, r_ * 0.5, r_, PSI_C, 0.4)
-        fear(sc, x + 34, by - 60)
+            sa.ring(sc, x - 4 * F, by - 26 * F, r_ * 0.5, r_, PSI_C, 0.4)
+        fear(sc, x + 34 * F, by - 60 * F)
         return "соседи проверяют страх", T
     if key == "strider":
-        put(sc, bug(("jumper",), "attack", key="strider", seed=7), x - 34, by)
+        put(sc, bug(("jumper",), "attack", key="strider", seed=7), x - 34 * F, by)
         for r_ in (10, 18, 26):
-            sa.ring(sc, x - 20, by - 18, r_, r_ * 0.8, hexc("#e0d8a0"), 0.5)
-        put(sc, golem(), x + 34, by, 0)
+            sa.ring(sc, x - 20 * F, by - 18 * F, r_, r_ * 0.8, hexc("#e0d8a0"), 0.5)
+        put(sc, golem(), x + 34 * F, by, 0)
         for dy in (-50, -34, -18):
             for k_ in range(3):
-                e.dot(sc, x + 50 + k_ * 3, by + dy + (k_ % 2) * 2, hexc("#e0d8a0"))
+                e.dot(sc, x + 50 * F + k_ * 3, by + dy + (k_ % 2) * 2, hexc("#e0d8a0"))
         return "страх; машины дребезжат", T
     if key == "psi_echo":
-        put(sc, dead(bug(("acid",), key="psi_echo", seed=35)), x - 30, by + 2, 10)
-        put(sc, man(), x + 22, by)
-        put(sc, man(who="mason"), x + 58, by + 2)
-        for (tx, ty) in ((x + 20, by - 40), (x + 56, by - 30)):
-            sa.zigzag2d(sc, (x - 26, by - 20), (tx, ty), PSI_C)
+        put(sc, dead(bug(("acid",), key="psi_echo", seed=35)), x - 30 * F, by + 2 * F, 10)
+        put(sc, man(), x + 22 * F, by)
+        put(sc, man(who="mason"), x + 58 * F, by + 2 * F)
+        for (tx, ty) in ((x + 20 * F, by - 40 * F), (x + 56 * F, by - 30 * F)):
+            sa.zigzag2d(sc, (x - 26 * F, by - 20 * F), (tx, ty), PSI_C)
         return "крик бьёт всех рядом", T
     if key == "psi_last":
-        put(sc, dead(bug(("acid",), key="psi_last", seed=36)), x - 50, by + 2, 10)
-        put(sc, man("attack", face_left=False), x - 2, by)
-        put(sc, golem(), x + 50, by, 0)
-        sa.zigzag2d(sc, (x - 44, by - 20), (x - 2, by - 54), PSI_C)
-        e.slash(sc, x + 26, by - 26, 12, -1.0, 1.2, WHITE_C)
+        put(sc, dead(bug(("acid",), key="psi_last", seed=36)), x - 50 * F, by + 2 * F, 10)
+        put(sc, man("attack", face_left=False), x - 2 * F, by)
+        put(sc, golem(), x + 50 * F, by, 0)
+        sa.zigzag2d(sc, (x - 44 * F, by - 20 * F), (x - 2 * F, by - 54 * F), PSI_C)
+        e.slash(sc, x + 26 * F, by - 26 * F, 12, -1.0, 1.2, WHITE_C)
         return "убийца бьёт своих", T
     if key == "psi_leash":
-        put(sc, bug(("ant", "horn"), key="psi_leash", seed=37), x - 34, by)
-        put(sc, e.lit(man(who="mason", face_left=False), (200, 160, 255), 0.25), x + 30, by)
-        sa.thread(sc, (x - 44, by - 22), (x + 28, by - 40), PSI_C, sag=-12)
-        e.ring(sc, x + 30, by - 50, 8, PSI_C, 0.8, ry=3)
+        put(sc, bug(("ant", "horn"), key="psi_leash", seed=37), x - 34 * F, by)
+        put(sc, e.lit(man(who="mason", face_left=False), (200, 160, 255), 0.25), x + 30 * F, by)
+        sa.thread(sc, (x - 44 * F, by - 22 * F), (x + 28 * F, by - 40 * F), PSI_C, sag=-12)
+        e.ring(sc, x + 30 * F, by - 50 * F, 8, PSI_C, 0.8, ry=3)
         return "захваченный держится, пока она жива", T
     if key == "psi_relay":
-        put(sc, leader("Разум улья", k=0.42), x - 58, by, 10)
-        put(sc, bug((), key="psi_relay", seed=38), x - 6, by)
-        sa.thread(sc, (x - 50, by - 44), (x - 12, by - 44), PSI_C, sag=6)
-        sa.psi_wave(sc, (x - 4, by - 44), (x + 44, by - 30))
-        put(sc, man(), x + 50, by)
+        put(sc, leader("Разум улья", k=0.42), x - 58 * F, by, 10)
+        put(sc, bug((), key="psi_relay", seed=38), x - 6 * F, by)
+        sa.thread(sc, (x - 50 * F, by - 44 * F), (x - 12 * F, by - 44 * F), PSI_C, sag=6)
+        sa.psi_wave(sc, (x - 4 * F, by - 44 * F), (x + 44 * F, by - 30 * F))
+        put(sc, man(), x + 50 * F, by)
         return "Разум бьёт с её места", T
     # ---- Пожиратель
     if key == "sated":
-        put(sc, leader("Пожиратель", "attack", k=0.55), x + 26, by, 14)
-        put(sc, dead(bug((), key="sated", seed=40)), x - 44, by)
-        T.append((x - 44, by - 30, "×2"))
+        put(sc, leader("Пожиратель", "attack", k=0.55), x + 26 * F, by, 14)
+        put(sc, dead(bug((), key="sated", seed=40)), x - 44 * F, by)
+        T.append((x - 44 * F, by - 30 * F, "×2"))
         return "съел — как двоих", T
     if key == "bait":
-        e.splash(sc, x + 50, by + 2, 18, RED, 0.8)
-        put(sc, dead(bug(("wings",), key="bait", seed=41)), x + 50, by, 0)
-        put(sc, leader("Пожиратель", "attack", k=0.5), x - 16, by, 14)
-        e.speed(sc, x - 36, by - 14, 4, 18)
-        sa.thread(sc, (x + 48, by - 14), (x + 20, by - 30), RED, sag=-8)
+        e.splash(sc, x + 50 * F, by + 2 * F, 18, RED, 0.8)
+        put(sc, dead(bug(("wings",), key="bait", seed=41)), x + 50 * F, by, 0)
+        put(sc, leader("Пожиратель", "attack", k=0.5), x - 16 * F, by, 14)
+        e.speed(sc, x - 36 * F, by - 14 * F, 4, 18)
+        sa.thread(sc, (x + 48 * F, by - 14 * F), (x + 20 * F, by - 30 * F), RED, sag=-8)
         return "бросается к ней напролом", T
     if key == "fattened":
-        put(sc, bug((), key="fattened", seed=42), x - 44, by)
-        arrow_r(sc, x - 20, x, by - 14)
-        put(sc, e.lit(leader("Пожиратель", k=0.5, stage=1), (255, 220, 140), 0.1), x + 40, by, 14)
+        put(sc, bug((), key="fattened", seed=42), x - 44 * F, by)
+        arrow_r(sc, x - 20 * F, x, by - 14 * F)
+        put(sc, e.lit(leader("Пожиратель", k=0.5, stage=1), (255, 220, 140), 0.1), x + 40 * F, by, 14)
         return "в лагере на корм — он растёт", T
     if key == "frenzy":
-        put(sc, leader("Пожиратель", "attack", k=0.5), x + 34, by, 14)
+        put(sc, leader("Пожиратель", "attack", k=0.5), x + 34 * F, by, 14)
         for dx, dy, sd in ((-40, 0, 43), (-20, 8, 44)):
             put(sc, e.lit(bug(("scythes",), "attack", key="frenzy", seed=sd), (255, 60, 40), 0.18), x + dx, by + dy)
-        sc.glow(x - 30, by - 20, 30, RED, 0.4)
+        sc.glow(x - 30 * F, by - 20 * F, 30, RED, 0.4)
         return "пока он ест — бьют сильнее", T
     if key == "table":
-        put(sc, leader("Пожиратель", "attack", k=0.5), x + 34, by, 14)
+        put(sc, leader("Пожиратель", "attack", k=0.5), x + 34 * F, by, 14)
         for dx, dy, sd in ((-44, 0, 45), (-22, 8, 46)):
             put(sc, bug((), key="table", seed=sd), x + dx, by + dy)
         for (dx, dy) in ((-44, -30), (-22, -24)):
             plus(sc, x + dx, by + dy)
         return "едят с ним и лечатся", T
     if key == "hungry":
-        put(sc, dead(man(who="mason")), x + 30, by + 2, 10)
-        put(sc, e.lit(bug(("acid",), "attack", key="hungry", seed=47, k=Z * 1.25), (255, 200, 160), 0.08), x - 16, by)
+        put(sc, dead(man(who="mason")), x + 30 * F, by + 2 * F, 10)
+        put(sc, e.lit(bug(("acid",), "attack", key="hungry", seed=47, k=Z * 1.25), (255, 200, 160), 0.08), x - 16 * F, by)
         return "ест павших и растёт", T
     if key == "devblood":
-        put(sc, bug((), key="devblood", seed=48), x - 44, by)
-        arrow_r(sc, x - 22, x - 4, by - 14)
-        put(sc, bug(("ant", "giant"), key="devblood", seed=49), x + 38, by, 12)
+        put(sc, bug((), key="devblood", seed=48), x - 44 * F, by)
+        arrow_r(sc, x - 22 * F, x - 4 * F, by - 14 * F)
+        put(sc, bug(("ant", "giant"), key="devblood", seed=49), x + 38 * F, by, 12)
         return "её потомки — гиганты", T
     if key == "essence":
-        put(sc, dead(bug(("wings",), key="essence", seed=50)), x - 48, by)
-        put(sc, devourer_winged(), x + 30, by, 14)
-        sa.thread(sc, (x - 44, by - 20), (x + 6, by - 40), hexc("#e8f070"), sag=10)
-        e.blob(sc, x - 20, by - 36, 3, hexc("#e8f070"))
+        put(sc, dead(bug(("wings",), key="essence", seed=50)), x - 48 * F, by)
+        put(sc, devourer_winged(), x + 30 * F, by, 14)
+        sa.thread(sc, (x - 44 * F, by - 20 * F), (x + 6 * F, by - 40 * F), hexc("#e8f070"), sag=10)
+        e.blob(sc, x - 20 * F, by - 36 * F, 3, hexc("#e8f070"))
         return "съел осу — у него крылья", T
     # ---- Кукушка
     if key == "parasitoid":
-        put(sc, bug(("ant",), "attack", key="parasitoid", seed=51), x - 30, by)
-        put(sc, man(), x + 38, by)
-        sa.spots(sc, int(x + 34), int(by - 30), [(-4, 0), (3, 6), (0, -8), (5, -2)])
+        put(sc, bug(("ant",), "attack", key="parasitoid", seed=51), x - 30 * F, by)
+        put(sc, man(), x + 38 * F, by)
+        sa.spots(sc, int(x + 34 * F), int(by - 30 * F), [(-4, 0), (3, 6), (0, -8), (5, -2)])
         return "укол — враг заражён", T
     if key == "bloodeggs":
-        put(sc, golem("Страж", k=0.62), x + 26, by, 0)
-        sa.spots(sc, int(x + 26), int(by - 40), [(-6, 0), (4, 8), (-2, -10), (6, -4), (0, 14)])
-        put(sc, larva("attack", host="iron", k=Z * 0.9), x - 22, by, 6)
-        put(sc, larva("attack", host="iron", k=Z * 0.9), x - 4, by - 26, 0)
-        e.burst(sc, x + 8, by - 30, 6, GREEN)
+        put(sc, golem("Страж", k=0.62), x + 26 * F, by, 0)
+        sa.spots(sc, int(x + 26 * F), int(by - 40 * F), [(-6, 0), (4, 8), (-2, -10), (6, -4), (0, 14)])
+        put(sc, larva("attack", host="iron", k=Z * 0.9), x - 22 * F, by, 6)
+        put(sc, larva("attack", host="iron", k=Z * 0.9), x - 4 * F, by - 26 * F, 0)
+        e.burst(sc, x + 8 * F, by - 30 * F, 6, GREEN)
         return "личинки вышли из живого", T
     if key == "spores":
-        put(sc, dead(man(who="mason")), x + 6, by + 2, 10)
-        cloud(sc, x + 6, by - 24, 46, 20, 120, hexc("#f09040"), 5)
-        put(sc, bug((), seed=52), x - 46, by)
-        put(sc, man(), x + 52, by)
-        sa.spots(sc, int(x - 46), int(by - 14), [(-3, 0), (3, 3)])
-        sa.spots(sc, int(x + 50), int(by - 30), [(-3, 0), (3, 5), (0, -6)])
+        put(sc, dead(man(who="mason")), x + 6 * F, by + 2 * F, 10)
+        cloud(sc, x + 6 * F, by - 24 * F, 46, 20, 120, hexc("#f09040"), 5)
+        put(sc, bug((), seed=52), x - 46 * F, by)
+        put(sc, man(), x + 52 * F, by)
+        sa.spots(sc, int(x - 46 * F), int(by - 14 * F), [(-3, 0), (3, 3)])
+        sa.spots(sc, int(x + 50 * F), int(by - 30 * F), [(-3, 0), (3, 5), (0, -6)])
         return "заражены все соседи", T
     if key == "call":
-        put(sc, bug((), seed=53), x - 54, by)
-        put(sc, bug(("ant",), key="call", seed=54), x - 32, by + 4)
+        put(sc, bug((), seed=53), x - 54 * F, by)
+        put(sc, bug(("ant",), key="call", seed=54), x - 32 * F, by + 4 * F)
         for dx, k_ in ((60, 0.75), (44, 0.5)):
             put(sc, e.lit(man(), (40, 30, 60), k_), x + dx, by, 0)
-        put(sc, man(), x + 20, by)
-        sc.glow(x + 20, by - 50, 12, GREEN, 0.6)
-        arrow_l(sc, x + 6, x - 14, by + 6)
+        put(sc, man(), x + 20 * F, by)
+        sc.glow(x + 20 * F, by - 50 * F, 12, GREEN, 0.6)
+        arrow_l(sc, x + 6 * F, x - 14 * F, by + 6 * F)
         return "заражённый бредёт в рой", T
     if key == "bodyguard":
-        put(sc, larva(), x + 2, by + 2, 6)
-        put(sc, larva("attack"), x + 18, by + 6, 6)
-        put(sc, e.lit(man("attack"), (150, 230, 90), 0.15), x + 46, by)
-        put(sc, bug((), "attack", seed=55), x - 40, by)
-        e.slash(sc, x - 24, by - 12, 10, 0.6, 2.4, WHITE_C)
+        put(sc, larva(), x + 2 * F, by + 2 * F, 6)
+        put(sc, larva("attack"), x + 18 * F, by + 6 * F, 6)
+        put(sc, e.lit(man("attack"), (150, 230, 90), 0.15), x + 46 * F, by)
+        put(sc, bug((), "attack", seed=55), x - 40 * F, by)
+        e.slash(sc, x - 24 * F, by - 12 * F, 10, 0.6, 2.4, WHITE_C)
         return "стоит над кладкой, бьёт любого", T
     if key == "gnaw":
-        put(sc, e.lit(golem(), (120, 200, 80), 0.18), x + 18, by, 0)
-        sa.spots(sc, int(x + 18), int(by - 30), [(-6, 0), (4, 6), (0, -8), (6, -2), (-3, 9)])
-        plus(sc, x + 52, by - 52, hexc("#70e0ff"))
-        arrow_l(sc, x + 46, x + 32, by - 40, hexc("#70e0ff"))
-        put(sc, bug(("ant",), key="gnaw", seed=56), x - 44, by)
-        T.append((x + 18, by - 72, "слабее"))
+        put(sc, e.lit(golem(), (120, 200, 80), 0.18), x + 18 * F, by, 0)
+        sa.spots(sc, int(x + 18 * F), int(by - 30 * F), [(-6, 0), (4, 6), (0, -8), (6, -2), (-3, 9)])
+        plus(sc, x + 52 * F, by - 52 * F, hexc("#70e0ff"))
+        arrow_l(sc, x + 46 * F, x + 32 * F, by - 40 * F, hexc("#70e0ff"))
+        put(sc, bug(("ant",), key="gnaw", seed=56), x - 44 * F, by)
+        T.append((x + 18 * F, by - 72 * F, "слабее"))
         return "кладка ест хозяина; починка — ей", T
     if key == "mutagen":
-        put(sc, clutch(2, 0.5), x, by + 4, 10)
-        put(sc, larva("attack", host="hand"), x - 44, by, 6)
-        put(sc, larva("attack", k=Z * 1.7), x + 4, by, 10)
-        put(sc, dead(larva(k=Z * 0.75)), x + 50, by, 4)
+        put(sc, clutch(2, 0.5), x, by + 4 * F, 10)
+        put(sc, larva("attack", host="hand"), x - 44 * F, by, 6)
+        put(sc, larva("attack", k=Z * 1.7), x + 4 * F, by, 10)
+        put(sc, dead(larva(k=Z * 0.75)), x + 50 * F, by, 4)
         return "вылупилось что попало", T
     if key == "unstable":
-        put(sc, bug((), key="spinner", seed=57), x - 40, by)
-        arrow_r(sc, x - 12, x + 8, by - 14)
-        put(sc, bug((), key="honey", seed=57), x + 40, by)
-        T += [(x - 40, by - 58, "раунд 5"), (x + 40, by - 58, "раунд 10")]
+        put(sc, bug((), key="spinner", seed=57), x - 40 * F, by)
+        arrow_r(sc, x - 12 * F, x + 8 * F, by - 14 * F)
+        put(sc, bug((), key="honey", seed=57), x + 40 * F, by)
+        T += [(x - 40 * F, by - 58 * F, "раунд 5"), (x + 40 * F, by - 58 * F, "раунд 10")]
         return "каждые 5 раундов — новая черта", T
     if key == "royal":
-        put(sc, dead(golem("Страж", k=0.55)), x + 40, by, 0)
-        put(sc, e.lit(bug(("horn", "giant"), "attack", chimera="iron", seed=58), (150, 230, 90), 0.12), x - 18, by, 12)
-        sc.glow(x - 18, by - 24, 34, GREEN, 0.35)
+        put(sc, dead(golem("Страж", k=0.55)), x + 40 * F, by, 0)
+        put(sc, e.lit(bug(("horn", "giant"), "attack", chimera="iron", seed=58), (150, 230, 90), 0.12), x - 18 * F, by, 12)
+        sc.glow(x - 18 * F, by - 24 * F, 34, GREEN, 0.35)
         return "из Стража — хитиновый Страж", T
     raise KeyError(key)
 
@@ -1059,6 +1058,9 @@ def sheet(pid):
     WW, BAND = 960, 334
     HEAD = 100 if lead else 76
     CWD = min(200, (WW - 40) // per)
+    global Z, F
+    F = 1.25 if CWD >= 200 else 1.0
+    Z = 1.15 * F
     HH = HEAD + BAND * len(rows) + 6
     sc = canvas(WW, HH, 60 + len(pid))
     if lead:
@@ -1076,8 +1078,8 @@ def sheet(pid):
                 nadlom(sc, cx, Y1, Y2)
                 marks.append((cx, Y1, Y2, Y3, name, what, "у голема гаснет искра в ядре", []))
                 continue
-            put(sc, W.build((), 0.03, "idle", False, k=2.6, genes=W.genes_for(80 + j + r * 7), rare=key), cx, Y1, 18)
-            put(sc, W.build(sec, 0.0, "idle", False, k=2.0, genes=W.genes_for(90 + j + r * 7), rare=key), cx, Y2, 16)
+            put(sc, W.build((), 0.03, "idle", False, k=2.6 * F, genes=W.genes_for(80 + j + r * 7), rare=key), cx, Y1, int(18 * F))
+            put(sc, W.build(sec, 0.0, "idle", False, k=2.0 * F, genes=W.genes_for(90 + j + r * 7), rare=key), cx, Y2, int(16 * F))
             cap, T = scene(sc, key, cx, Y3)
             marks.append((cx, Y1, Y2, Y3, name, what, cap, T))
     img = sc.image(S)
@@ -1109,6 +1111,7 @@ def sheet(pid):
         for (tx, ty, tt) in T:
             d.text((tx * S - d.textlength(tt, font=tiny) / 2, ty * S), tt, font=tiny, fill=(250, 226, 160))
     img.save(out(FILES[pid]))
+    Z, F = 1.15, 1.0
     print(FILES[pid], img.size)
 
 

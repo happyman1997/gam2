@@ -260,6 +260,9 @@ def build(leader="Матка"):
         spark(sc, int(tx), int(ty) - 6, True)
     if leader == "Разум улья":                    # psi: a blow from the brain into the Guard, the clouding over its line
         SA.psi_wave(sc, (qx - 10, qy - 34), (gx + 10, gy - 70))
+        import swarm_status as ST                 # the psi piling up over the Guard, the Mechanic beside it stalled
+        g_ = F.build("Страж", "attack", k=GK[6])
+        ST.pips(sc, gx, ST.top_of(g_, gy) - 10, 3)
         for r in (40, 62, 84):
             SA.ring(sc, gx - 10, gy + 2, r, r * 0.3, SA.PHERO, 0.45)
         for k_ in range(8):                           # the machines' cores stall: sparks over them

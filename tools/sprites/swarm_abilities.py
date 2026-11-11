@@ -200,12 +200,15 @@ def sheet():
     import swarm_effects as E
     put(sc, SL.build("Разум улья", "attack", k), 70, by, 30)
     tx = 290                                            # the psionic blow goes through the Gun's armour
-    put(sc, flip(F.build("Орудие", "attack", k=1.6 * k)), tx, by, 30)
+    gun = flip(F.build("Орудие", "attack", k=1.6 * k))
+    put(sc, gun, tx, by, 30)
     psi_wave(sc, (118, by - 46), (tx - 14, by - 66))
+    import swarm_status as ST                           # the psi piles up over it: three of four — one more and it breaks
+    ST.pips(sc, tx, ST.top_of(gun, by) - 8, 3)
     for dx, dy, sd in ((-62, 4, 51), (-44, -8, 52)):     # two of the swarm fall to it — and scream into its mind
         put(sc, E.lit(W.build((), 0.0, "idle", False, k=k, genes=W.genes_for(sd)), (30, 20, 20), 0.6), tx + dx, by + dy, 0)
         zigzag2d(sc, (tx + dx, by + dy - 8), (tx - 6, by - 52), hexc("#c8a0ff"))
-    caps.append((130, by + 10, "Пси-удар мимо брони"))
+    caps.append((130, by + 10, "Пси-удар мимо брони, копит надлом"))
     caps.append((260, by + 10, "Предсмертный крик бьёт убийцу"))
     # the clouding: a wave over a knot of enemies — the living hit each other, the machine stalls
     cx = 600
@@ -214,8 +217,10 @@ def sheet():
     put(sc, flip(GH.build(LH.ZODCHIY, "idle", 1.05 * k)), cx + 34, by - 6, 0)
     inv = E.lit(GH.build(LH.INVENTOR, "attack", 0.9 * k), (176, 112, 255), 0.3)
     put(sc, inv, cx - 4, by + 6, 0)                    # turned round: it strikes the Architect
+    ST.glyph(sc, "confused", cx - 4, ST.top_of(inv, by + 6) - 12)
     mh = E.lit(flip(F.build("Механик", "idle", k=1.15 * k)), (150, 150, 160), 0.35)
     put(sc, mh, cx - 50, by - 4, 0)
+    ST.glyph(sc, "stall", cx - 50, ST.top_of(mh, by - 4) - 12)
     for k_ in range(6):                                 # its core stalls: sparks, no step, no module
         E.dot(sc, cx - 50 + (k_ * 7) % 22 - 10, by - 50 - (k_ * 5) % 18, hexc("#d8d8e8"), r=1)
     caps.append((cx, by + 10, "Помутнение: живые бьют своих, у машин сбой"))
@@ -223,7 +228,7 @@ def sheet():
     mx = 820
     cap_ = E.lit(F.build("Механик", "attack", k=1.15 * k), (176, 112, 255), 0.35)        # facing the enemy now
     put(sc, cap_, mx, by, 14)
-    sigil(sc, mx - 4, by - 76, 6)
+    ST.glyph(sc, "captured", mx, ST.top_of(cap_, by) - 12)
     put(sc, flip(F.build("Орудие", "idle", k=1.6 * k)), mx + 78, by, 30)
     caps.append((mx + 20, by + 10, "Захват: Механик 2 хода за рой"))
 

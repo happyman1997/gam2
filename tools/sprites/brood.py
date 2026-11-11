@@ -37,21 +37,26 @@ def put(sc, spr, cx, by, sw=0):
 LIMIT = 45                       # the swarm's limit in points
 # the swarm after hatching, in groups: (traits, soldier, chimera, hue, name, count, new, badge, eat)
 GROUPS = [
-    ((), False, None, 0.05, "муравей", 19, 0, None, 4),
+    ((), False, None, 0.05, "муравей", 19, 0, None, 5),
     ((), True, None, 0.03, "муравей-солдат", 2, 0, None, 0),
     (("wings",), False, None, -0.05, "оса", 3, 0, None, 0),
     (("stinger",), False, None, -0.08, "скорпион", 5, 2, None, 0),
     (("stinger",), True, None, -0.1, "скорпион-солдат", 2, 1, None, 0),
-    (("ant", "stinger"), False, None, 0.04, "муравей с жалом", 1, 1, None, 0),
+    (("ant", "stinger"), False, None, 0.04, "муравей с гнездом", 1, 1, None, 0),
     (("horn",), True, None, 0.12, "жук-солдат", 2, 1, None, 0),
-    (("horn", "wings"), False, None, 0.1, "жук с крыльями", 1, 1, None, 0),
-    (("wings", "horn"), False, None, -0.04, "оса с рогом", 1, 1, None, 1),
+    (("horn", "wings"), False, None, 0.1, "жук-прядильщик", 1, 1, None, 0),
+    (("wings", "stinger"), False, None, -0.04, "оса-скорпион", 1, 1, None, 0),
     (("carapace",), True, None, 0.0, "мокрица-солдат", 1, 0, None, 0),
     (("acid",), False, "hand", 0.0, "бочонок с рукой", 1, 1, "химера", 0),
     (("scythes",), False, None, 0.06, "богомол", 1, 1, "новая форма", 0),
 ]
 SELECTION = (("жало", 23, "stinger"), ("рог", 11, "horn"), ("кислота", 7, "acid"), ("серпы", 4, "scythes"))
 KID_ICON = {"химера": "hand", "новая форма": "scythes"}
+# mutations in the groups: (key, mark); a leader's own pool is marked in the leader's colour, the common pool in silver
+MUTS = {5: ("nest", "мутация Матки"), 7: ("spinner", "общая мутация"), 8: ("hybrid", "гибрид · бесплоден")}
+POOL_COL = {"Матка": (240, 200, 90), "Разум улья": (196, 150, 255), "Пожиратель": (236, 96, 80), "Кукушка": (150, 220, 90),
+            "общая": (206, 206, 222), "бесплоден": (240, 140, 140)}
+MARK_COL = {"мутация Матки": POOL_COL["Матка"], "общая мутация": POOL_COL["общая"], "гибрид · бесплоден": POOL_COL["бесплоден"]}
 GX0, GY0, GCW, GCH, GCOLS = 12, 92, 232, 100, 4
 
 
@@ -99,10 +104,11 @@ def build():
         frame(sc, x0, y0, x0 + GCW, y0 + GCH, col="#c0503a" if eat else ("#6ac040" if new else None))
         if eat:
             sc.rgb[y0 + 1:y0 + GCH - 1, x0 + 1:x0 + GCW - 1] = hexc("#2a1218")
-        spr = W.build(traits, hue, "idle", soldier, k=1.3 if soldier else 1.7, chimera=chim, genes=W.genes_for(k * 7 + 3))
+        mut = MUTS.get(k, (None,))[0]
+        spr = W.build(traits, hue, "idle", soldier, k=1.3 if soldier else 1.7, chimera=chim, genes=W.genes_for(k * 7 + 3), rare=mut)
         put(sc, spr, x0 + 52, y0 + GCH - 22, 14 if not soldier else 18)
         if count > 1:                                  # a second one behind: it is a group
-            spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=1.05 if soldier else 1.35, chimera=chim, genes=W.genes_for(k * 7 + 4))
+            spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=1.05 if soldier else 1.35, chimera=chim, genes=W.genes_for(k * 7 + 4), rare=mut)
             put(sc, spr2, x0 + 30, y0 + GCH - 40, 0)
             sc.blit(spr, int(x0 + 52 - spr.ox), int(y0 + GCH - 22 - spr.oy))
         for bx, col in ((x0 + GCW - 52, "#c0503a"), (x0 + GCW - 26, "#6c7083")):    # − and + buttons
@@ -148,6 +154,11 @@ def overlay(img):
         if badge:
             icon(img, KID_ICON[badge], x0 + 198, y - 4, 26)
             d.text((x0 + 228, y), badge, font=f(1, 15), fill=BADGE[badge])
+            y += 22
+        if k in MUTS:
+            key, mark = MUTS[k]
+            icon(img, "m_" + key, x0 + 198, y - 4, 26)
+            d.text((x0 + 228, y), mark, font=f(1, 15), fill=MARK_COL[mark])
             y += 22
         if eat:
             d.text((x0 + 200, y), f"съесть {eat}: +{eat * pts(GROUPS[k])} биомассы", font=f(1, 15), fill=(240, 120, 96))
@@ -284,10 +295,124 @@ def finds():
     print("brood_finds.png", img.size)
 
 
+# ---------------------------------------------------------------- what the leaders' pools add to the brood
+def pools():
+    import swarm_leaders as SL
+    import swarm_status as ST
+    WW_, HH_ = 960, 330
+    sc = Scene(WW_, HH_)
+    n = value_noise(WW_, HH_, 14, 35) * 0.6 + value_noise(WW_, HH_, 5, 36) * 0.4
+    th = BAYER[sc.yy % 4, sc.xx % 4]
+    lv = np.clip(np.floor(n * 4 + (th - 0.5)), 0, 3).astype(int)
+    for i, c in enumerate(("#221a28", "#261e2c", "#2a2130", "#2e2434")):
+        sc.rgb[lv == i] = hexc(c)
+    PW_ = 232
+    xs = [12 + i * (PW_ + 2) for i in range(4)]
+    for x0 in xs:
+        frame(sc, x0, 40, x0 + PW_, 320, col="#9a7ac0")
+    # Брачный полёт: she, and the survivors to choose her pair from
+    x0 = xs[0]
+    she = W.build(("ant",), 0.05, "attack", False, k=1.9, genes=W.genes_for(61), rare="flight")
+    put(sc, she, x0 + 60, 150, 14)
+    cands = [(("horn",), True, 62), (("stinger",), False, 63), (("wings",), False, 64)]
+    for j, (tr, sol, sd) in enumerate(cands):
+        cy = 92 + j * 62
+        frame(sc, x0 + 128, cy, x0 + 222, cy + 56, hi=(j == 1), col="#e2b968" if j == 1 else None)
+        put(sc, W.build(tr, 0.0, "idle", sol, k=1.0 if sol else 1.35, genes=W.genes_for(sd)), x0 + 160, cy + 46, 8)
+    import swarm_abilities as SA
+    SA.thread(sc, (x0 + 76, 112), (x0 + 132, 178), hexc("#f0c040"), sag=8)
+    frame(sc, x0 + 16, 276, x0 + PW_ - 16, 308, col="#e2b968")
+    # Гибрид: two parents of two forms; the hybrid, which will never pair
+    x0 = xs[1]
+    put(sc, W.build(("wings",), 0.0, "idle", False, k=1.3, genes=W.genes_for(65)), x0 + 60, 112, 8)
+    put(sc, W.build(("stinger",), -0.08, "idle", False, k=1.3, genes=W.genes_for(66)), x0 + 170, 112, 10)
+    SA.thread(sc, (x0 + 70, 100), (x0 + 160, 100), hexc("#c0c0d0"), sag=6)
+    hyb = W.build(("wings", "stinger"), -0.04, "idle", False, k=2.1, genes=W.genes_for(67), rare="hybrid")
+    put(sc, hyb, x0 + 110, 236, 16)
+    ex, ey = x0 + 190, 214
+    sc.rgb[ey - 6:ey + 7, ex - 5:ex + 6] = hexc("#2a3a14")
+    E = __import__("swarm_effects")
+    E.blob(sc, ex, ey, 5, hexc("#a8d060"), glow=0.1)
+    for dd in range(-8, 9):
+        E.dot(sc, ex + dd, ey + dd * 0.9, hexc("#e04a3a"))
+        E.dot(sc, ex + dd, ey - dd * 0.9, hexc("#e04a3a"))
+    # Откормленная: fat grows battle by battle; fed to the Devourer between battles, he grows at once
+    x0 = xs[2]
+    fat = W.build((), 0.05, "idle", False, k=1.9, genes=W.genes_for(68), rare="fattened")
+    put(sc, fat, x0 + 56, 150, 14)
+    for i in range(5):                                # fat: battles survived
+        cx_ = x0 + 26 + i * 14
+        sc.rgb[176:184, cx_ - 5:cx_ + 5] = hexc("#e8c070") if i < 3 else hexc("#3a3040")
+        sc.rgb[176, cx_ - 5:cx_ + 5] = hexc("#140c18")
+        sc.rgb[183, cx_ - 5:cx_ + 5] = hexc("#140c18")
+    SA.arrow(sc, x0 + 104, x0 + 128, 140)
+    put(sc, SL.build("Пожиратель", "idle", 0.42, stage=1), x0 + 180, 160, 18)
+    frame(sc, x0 + 16, 276, x0 + PW_ - 16, 308, col="#c0503a")
+    # the marks: whose pool a mutation is from
+    x0 = xs[3]
+    return sc, xs, PW_
+
+
+def pools_overlay(img, xs, PW_):
+    d = ImageDraw.Draw(img)
+    f = lambda b, s_: ImageFont.truetype(font("PTSerif-Bold.ttf" if b else "PTSerif-Regular.ttf"), s_)
+    d.text((20, 12), "Выводок: что добавляют пулы лидеров", font=f(1, 24), fill=INK)
+    heads = [("Брачный полёт", "пару ей выбираешь сам", "m_flight"),
+             ("Гибрид", "бесплоден: в пары не встаёт", "m_hybrid"),
+             ("Откормленная", "только у Пожирателя", "m_fattened"),
+             ("Отметки мутаций", "чей пул — тот и цвет", "m_nest")]
+    for (x0, (h, sub, key)) in zip(xs, heads):
+        cx = (x0 + PW_ / 2) * S
+        w = d.textlength(h, font=f(1, 19))
+        icon(img, key, cx - w / 2 - 22, 50 * S - 4, 34)
+        d.text((cx - w / 2 + 18, 50 * S), h, font=f(1, 19), fill=GOLD)
+        d.text((cx - d.textlength(sub, font=f(0, 15)) / 2, 70 * S), sub, font=f(0, 15), fill=MUTED)
+    x = xs[0] * S
+    for j, t in enumerate(("жук-солдат", "скорпион", "оса")):
+        d.text(((xs[0] + 175) * S - d.textlength(t, font=f(0, 13)) / 2, (92 + j * 62 + 4) * S), t, font=f(0, 13),
+               fill=GOLD if j == 1 else MUTED)
+    d.text((x + 30, 214 * S), "она", font=f(0, 15), fill=INK)
+    d.text((x + 30, 230 * S), "с кем — решаешь ты,", font=f(0, 15), fill=INK)
+    d.text((x + 30, 230 * S + 22), "не стык стай", font=f(0, 15), fill=INK)
+    t = "Спарить со скорпионом"
+    d.text(((xs[0] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 284 * S), t, font=f(1, 16), fill=GOLD)
+    x = xs[1] * S
+    for k, t in enumerate(("оса × скорпион", "тело осы, жало скорпиона —", "способности обеих форм;",
+                           "в пары не встаёт, каждого", "выводят заново")):
+        if k == 0:
+            d.text(((xs[1] + PW_ / 2) * S - d.textlength(t, font=f(0, 14)) / 2, 122 * S), t, font=f(0, 14), fill=MUTED)
+        else:
+            d.text(((xs[1] + PW_ / 2) * S - d.textlength(t, font=f(0, 14)) / 2, (246 + (k - 1) * 9.5) * S), t,
+                   font=f(0, 14), fill=INK)
+    x = xs[2] * S
+    d.text((x + 26, 190 * S), "жир: пережила 3 боя", font=f(0, 15), fill=(232, 192, 112))
+    for k, t in enumerate(("чем дольше держишь —", "тем больше он вырастет;", "пока жива — производитель")):
+        d.text((x + 26, 212 * S + k * 20), t, font=f(0, 15), fill=INK)
+    t = "Скормить Пожирателю"
+    d.text(((xs[2] + PW_ / 2) * S - d.textlength(t, font=f(1, 16)) / 2, 284 * S), t, font=f(1, 16), fill=(240, 140, 110))
+    x = xs[3] * S
+    rows = [("m_nest", "мутация Матки", POOL_COL["Матка"]), ("m_psi_gland", "пси-мутация Разума", POOL_COL["Разум улья"]),
+            ("m_sated", "мутация Пожирателя", POOL_COL["Пожиратель"]), ("m_spores", "мутация Кукушки", POOL_COL["Кукушка"]),
+            ("m_spinner", "общая мутация", POOL_COL["общая"]), ("m_hybrid", "гибрид · бесплоден", POOL_COL["бесплоден"])]
+    for k, (key, t, col) in enumerate(rows):
+        y = (100 + k * 34) * S
+        icon(img, key, x + 24, y - 6, 40)
+        d.text((x + 76, y + 4), t, font=f(1, 16), fill=col)
+    t = "отметка у группы в выводке и на карточке особи"
+    d.text(((xs[3] + PW_ / 2) * S - d.textlength(t, font=f(0, 13)) / 2, 306 * S), t, font=f(0, 13), fill=MUTED)
+
+
 if __name__ == "__main__":
     import sys
     if sys.argv[1:] == ["finds"]:
         finds()
+        raise SystemExit
+    if sys.argv[1:] == ["pools"]:
+        sc, xs, PW_ = pools()
+        img = sc.image(S)
+        pools_overlay(img, xs, PW_)
+        img.save(out("brood_pools.png"))
+        print("brood_pools.png", img.size)
         raise SystemExit
     sc = build()
     img = sc.image(S)
