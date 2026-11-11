@@ -645,17 +645,20 @@ def battle_hud():
     # bottom: the flocks — kind, alive of all, a state if any
     import swarm_status as ST
     UI.plate(sc, 330, 448, 956, 536)
-    flocks_ = [((), "муравьи", 16, 23, None), (("stinger",), "скорпионы", 6, 7, "poison"), (("horn",), "жуки", 2, 2, None),
-               (("acid",), "бочонки", 1, 2, None), (("wings",), "осы", 3, 4, "fear"), (("spitter",), "пауки", 2, 2, None)]
+    others = [(("stinger",), "скорпионы", 31, 36, "poison"), (("horn",), "жуки", 12, 12, None),
+              (("acid",), "бочонки", 18, 24, None), (("wings",), "осы", 27, 33, "fear"), (("spitter",), "пауки", 3, 3, None)]
+    ants = count - 1 - sum(o[2] for o in others)                 # the strip adds up to the swarm counted on the field
+    flocks_ = [((), "муравьи", ants, ants + 27, None)] + others
     for k_, (tr, name, alive, tot, st) in enumerate(flocks_):
         x0 = 338 + k_ * 102
         UI.cell(sc, x0, 456, x0 + 96, 530, "new" if alive == tot else "normal")
         letters(sc, name, x0 + 8, 459, "text", 16, col=INK, jitter=1, seed=k_)
         icon(sc, tr[0] if tr else "ant", x0 + 6, 476, 2)
-        letters(sc, f"{alive}/{tot}", x0 + 44, 488, "title", 8, col=GOLD if alive == tot else (255, 150, 120), outline=False)
+        letters(sc, f"{alive}", x0 + 44, 482, "title", 8, col=GOLD if alive == tot else (255, 150, 120), outline=False)
+        letters(sc, f"из {tot}", x0 + 44, 495, "title", 8, col=PALE, outline=False)
         UI.meter(sc, x0 + 8, 514, x0 + 88, 7, min(tot, 10), round(min(tot, 10) * alive / tot), "#8a6aa8")
         if st:
-            ST.glyph(sc, st, x0 + 84, 484)
+            ST.glyph(sc, st, x0 + 87, 462)
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out("swarm_battle_hud.png"))
