@@ -26,6 +26,7 @@ CELL = {
     "locked": ("#2a2432", "#3a3446", "#100c14"),
     "mut": ("#a8822a", "#e8c050", "#1e1a16"),
     "find": ("#6a4a9a", "#b090e0", "#1a1426"),
+    "hover": ("#b8f030", "#f4ffb0", "#161c14"),     # under the mouse: bright acid and bites, whatever the cell is
 }
 BUTTON = {   # top → bottom of the resin, the shine, the text colour
     "amber": (("#ffe08a", "#f0a838", "#c06a14", "#6a3406"), "#fff8d8", DARK),
@@ -240,10 +241,18 @@ def cell(sc, x0, y0, x1, y1, state="normal", col=None):
                 sc.rgb[cy + k, cx + dx * k] = hexc(hi)
     sc.occ[m] = True
     sc.light[m] = 0
-    if state in ("hi", "mut", "find") or col is not None and state == "hi":
+    if state in ("hi", "mut", "find", "hover") or col is not None and state == "hi":
         halo = chamfer_mask(sc, x0 - 2, y0 - 2, x1 + 2, y1 + 2, c + 1) & ~m
         th = BAYER[sc.yy % 4, sc.xx % 4]
         sc.rgb[halo & (th < 0.6)] = sc.rgb[halo & (th < 0.6)] * 0.4 + hexc(hi) * 0.6
+    if state == "hover":                              # bitten: the swarm is already eating the edge, as on a button
+        w_ = x1 - x0
+        for bx, by, br in ((x0 + w_ * 0.23, y0, 4), (x0 + w_ * 0.31, y0 + 1, 2.5), (x1 - w_ * 0.28, y1 - 1, 4),
+                           (x1, y0 + (y1 - y0) * 0.55, 3)):
+            d = np.hypot(sc.xx - bx, sc.yy - by)
+            sc.rgb[d <= br] = hexc("#0a060e")
+            ring = (d > br) & (d <= br + 1.2) & (m | halo)
+            sc.rgb[ring] = hexc(rim)
 
 
 def _ramp_fill(sc, m, x0, y0, h, ramp_, X, Y):
