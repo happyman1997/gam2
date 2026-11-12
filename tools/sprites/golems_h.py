@@ -646,22 +646,24 @@ def cannon(G, side, sh, el, w, s, P, A, S):
     d = unit(w - el)
     up = arr((0, 1.0, 0)) - d * d[1]
     up = unit(up) if np.linalg.norm(up) > 1e-6 else arr((1.0, 0, 0))
-    hand, h, u = fist(G, "hand_" + side, w, w - el, up, s, P, th=1.1)
+    hand, h, u = fist(G, "hand_" + side, w, w - el, up, s, P, th=1.15)
     g = G["item_" + side]
     e = unit(np.cross(d, u))
     R = np.column_stack([d, u, e])
-    c = hand + u * 4.0 + d * 1.2                                                           # the gun's axis over the fist
-    g.cyl(hand - u * 2.2, c - u * 1.4, 0.95, M_IRON, seg=8)                                # pistol grip
-    g.box(c - u * 2.3 + d * 2.2, (2.8, 0.5, 0.6), M_STEEL, R)                              # trigger guard
-    g.box(c - u * 1.9 + d * 3.4, (0.5, 1.2, 0.6), M_STEEL, R)
+    c = hand + u * 2.9 + d * 1.6                                                           # the gun sits on the fist
+    g.cyl(hand - u * 1.8, c - u * 1.2, 1.05, M_IRON, seg=8)                                # pistol grip, in the fist
+    g.box(c - u * 2.3 + d * 2.6, (3.0, 0.5, 0.7), M_STEEL, R)                              # trigger guard
+    g.box(c - u * 1.9 + d * 4.0, (0.5, 1.2, 0.7), M_STEEL, R)
     g.box(c, (9.6, 3.6, 3.0), M_DIRON, R)                                                  # receiver
     g.box(c + u * 0.3 + d * 0.6, (7.2, 2.4, 3.3), P, R)                                    # painted side plates
     rivets(g, [c + d * t + u * 0.3 + e * 1.7 * sg for t in (-2.6, 0.6, 3.6) for sg in (1, -1)], r=0.3)
     g.box(c + u * 1.95 - d * 0.6, (5.0, 0.4, 2.2), M_IRON, R)                              # ejection port cover
-    # the stock: two steel struts back over the forearm to a rubber-padded butt plate
-    for a_, b_ in ((c - d * 4.6 + u * 0.8, c - d * 9.4 + u * 0.2), (c - d * 4.6 - u * 1.2, c - d * 9.0 - u * 1.4)):
-        g.cyl(a_, b_, 0.55, M_IRON, seg=6)
-    g.box(c - d * 9.8 - u * 0.6, (1.2, 3.6, 2.4), M_DIRON, R)
+    # the stock: two steel struts back and down onto the forearm, a padded cuff strapped round it
+    cuff = w - d * 5.2 + u * 1.2                                                           # on top of the forearm
+    for a_ in (c - d * 4.6 + u * 0.8, c - d * 4.6 - u * 1.2):
+        g.cyl(a_, cuff + u * 0.9, 0.55, M_IRON, seg=6)
+    g.box(cuff + u * 0.6, (3.0, 1.2, 3.4), M_DIRON, R)
+    g.cyl(cuff - u * 0.9 - d * 0.6, cuff - u * 0.9 + d * 0.6, 1.9, Mat(ramp("#141012", "#241c1a", "#3a2c26", "#523e34", "#6e5446")), seg=12)
     # a drum magazine under the receiver, ahead of the grip
     dm = c + d * 2.6 - u * 3.8
     g.cyl(dm - e * 1.5, dm + e * 1.5, 2.7, M_IRON, seg=16)
@@ -722,11 +724,11 @@ ORUDIE = dict(
            ("arm_n.ram", "item_n"), ("arm_f.ram", "item_f")],
     poses=dict(
         idle=dict(lean=0.0, t=(0.0, 0.0, 0.0), ank=((2.8, 3.6, 5.3), (-4.6, 3.6, -5.4)),
-                  hand_n=(7.6, -9.2, 2.8), pole_n=(-0.6, -0.2, 0.8), hand_f=(6.8, -9.6, -2.8), pole_f=(-0.6, -0.2, -0.8)),
+                  hand_n=(8.2, -8.6, 3.0), pole_n=(-1.0, -0.5, 0.6), hand_f=(8.0, -3.4, -3.6), pole_f=(-1.0, -0.8, -0.5)),
         # aimed at an enemy two or three rows off (about 100 units): at a bug, at a body of its own height, at a giant
-        attack=dict(lean=0.12, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(12.74, -7.2, -0.14), pole_n=(-1.29, -0.42, 0.88), hand_f=(12.9, -7.41, -0.18), pole_f=(-0.65, -0.42, -0.48), ram_n="front", ram_f="back", fx=True),
-        attack_level=dict(lean=0.09, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(8.46, -8.19, -0.1), pole_n=(-1.26, -0.63, 0.54), hand_f=(9.67, -7.73, -0.8), pole_f=(-0.87, -0.76, -0.59), ram_n="front", ram_f="back", fx=True),
-        attack_high=dict(lean=0.06, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(11.08, -5.19, 1.51), pole_n=(-0.74, -0.42, 0.43), hand_f=(9.22, -5.48, -1.68), pole_f=(-1.11, -0.66, -0.72), ram_n="front", ram_f="front", fx=True),
+        attack=dict(lean=0.12, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(12.74, -7.2, 2.4), pole_n=(-1.29, -0.42, 0.88), hand_f=(12.4, -3.6, -3.4), pole_f=(-0.9, -0.6, -0.5), ram_n="front", ram_f="back", fx=True),
+        attack_level=dict(lean=0.09, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(8.46, -8.19, 2.6), pole_n=(-1.26, -0.63, 0.54), hand_f=(9.4, -3.9, -3.6), pole_f=(-0.87, -0.76, -0.59), ram_n="front", ram_f="back", fx=True),
+        attack_high=dict(lean=0.06, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(11.08, -5.19, 2.6), pole_n=(-0.74, -0.42, 0.43), hand_f=(9.0, -1.8, -3.6), pole_f=(-1.11, -0.66, -0.72), ram_n="front", ram_f="front", fx=True),
     ),
     bands=dict(low="attack", level="attack_level", high="attack_high"),
     strike=lambda info: info["n"]["muzzle"] + info["n"]["d"] * (100.0 / np.hypot(info["n"]["d"][0], info["n"]["d"][2])),
