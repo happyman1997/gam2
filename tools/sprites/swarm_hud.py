@@ -16,6 +16,7 @@ from kit import *
 import swarm1 as W
 import swarm_ui as UI
 from swarm_ui import letters, scribble, INK, MUTED, GOLD, BIO, RED, GREEN, DARK, VIOLET
+from swarm_mut import GRUNT
 import icons as IC
 from paths import out
 
@@ -229,8 +230,8 @@ def camp():
     heading(sc, "ЧТО ВЫПАЛО", 310, 64, seed=2)
     letters(sc, "три случайных: бери одно или ничего", 310, 86, "text", 16, col=MUTED)
     offers = [("horn", "Рог", "деталь", "первый удар боя сильнее и {дроб}", (236, 224, 196)),
-              ("m_spinner", "Прядильные железы", "общая мутация", "паутина на клетке: враг застревает, свои бегают", (206, 206, 222)),
-              ("m_nest", "Малое гнездо", "мутация Матки", "погибшая рядом своя роняет яйцо, как у Матки", (240, 200, 90))]
+              ("m_spinner", "Прядильные железы", "общая мутация", GRUNT["spinner"], (206, 206, 222)),
+              ("m_nest", "Малое гнездо", "мутация Матки", GRUNT["nest"], (240, 200, 90))]
     X, Y = sc.xx, sc.yy
     for k_, (key, name, kind, what, kcol) in enumerate(offers):
         y0 = 110 + k_ * 108
@@ -495,7 +496,7 @@ def pools():
     xs = [12 + i * (PW_ + 2) for i in range(4)]
     for x0 in xs:
         UI.cell(sc, x0, 52, x0 + PW_, 352, "find")
-    heads = [("Брачный полёт", "пару выбираешь сам", "m_flight"), ("Гибрид", "бесплоден", "m_hybrid"),
+    heads = [("Брачный полёт", "пару выбирать ты", "m_flight"), ("Гибрид", "дети пустые", "m_hybrid"),
              ("Откормленная", "у Пожирателя", "m_fattened"), ("Чья мутация", "тот и цвет", "m_nest")]
     for x0, (h, sub, key) in zip(xs, heads):
         icon(sc, key, x0 + 12, 60, 2)
@@ -1071,9 +1072,11 @@ def comb_cell(sc, cx, cy, r, state, key=None):
     sealed — it has not woken yet (a wax cap, nothing to see); hover — the one under the mouse."""
     m, inner = hexmask(sc, cx, cy, r), hexmask(sc, cx, cy, r - 3)
     rim = {"lived": "#7ac040", "open": "#c88a2a", "hover": "#ffd070", "sealed": "#4a3e5c",
-           "key": "#f0c050", "keysealed": "#8a6a2a"}[state]
+           "key": "#f0c050", "keysealed": "#8a6a2a", "sealedhover": "#b8f040"}[state]
+    if state == "sealedhover":                                 # under the mouse it lights up, but stays shut
+        sc.glow(cx, cy, r * 1.7, hexc("#9ae030"), 0.35)
     sc.rgb[m] = hexc(rim)
-    if state in ("sealed", "keysealed"):                   # a wax cap: domed, a little lighter on top
+    if state in ("sealed", "keysealed", "sealedhover"):    # a wax cap: domed, a little lighter on top
         t = np.clip((sc.yy - (cy - r)) / (2 * r), 0, 1)[..., None]
         cap = hexc("#4a3c34") * (1 - t) + hexc("#241a1c") * t
         sc.rgb[inner] = cap[inner]
@@ -1087,7 +1090,7 @@ def comb_cell(sc, cx, cy, r, state, key=None):
     sc.rgb[o] = UI.OUTL
     sc.occ[m] = True
     sc.light[m] = 0
-    if key and state not in ("sealed", "keysealed"):
+    if key and state not in ("sealed", "keysealed", "sealedhover"):
         icon(sc, key, cx - 16, cy - 16, 2)
 
 
@@ -1121,7 +1124,7 @@ def pict_flight(sc, x0, y, x1):
     cursor(sc, int(xs[1]) + 2, int(y) + 22)
 
 
-PICT = {"Брачный полёт": (pict_flight, "пару выбираешь сам")}
+PICT = {"Брачный полёт": (pict_flight, "пара для неё — ты выбирать")}
 
 
 def leader_comb(sc, x0, y, rows, key, hover):
@@ -1134,15 +1137,17 @@ def leader_comb(sc, x0, y, rows, key, hover):
         UI.rich(sc, branch, x0, cy - 8, "text", 16, col=MUTED)
         for i, (k_, st, nm, desc) in enumerate(cells):
             cx = x0 + off + i * step + (step / 2 if j % 2 else 0)
-            comb_cell(sc, cx, cy, r, "hover" if nm == hover else st, k_)
-            pos[nm] = (cx, cy, nm, desc)
+            if nm == hover:
+                st = "sealedhover" if st == "sealed" else "hover"
+            comb_cell(sc, cx, cy, r, st, k_)
+            pos[nm] = (cx, cy, nm, desc, st)
             right = max(right, cx + r)
     k_, st, nm, desc = key
     kx, ky = right + 40, y + r * 1.5 * (len(rows) - 1) / 2
     sc.glow(kx, ky, 40, hexc("#f0c050"), 0.25)
     comb_cell(sc, kx, ky, 30, st, k_)
     crown(sc, kx, ky - 30 - 13)
-    pos[nm] = (kx, ky, nm, desc)
+    pos[nm] = (kx, ky, nm, desc, st)
     return pos, y + r * 1.5 * (len(rows) - 1) + 34
 
 
@@ -1213,8 +1218,10 @@ def big_card(spec, name, save=True):
         y += 10
         heading(sc, "МУТАЦИИ", x0, y, seed=6)
         pos, yb = leader_comb(sc, x0, y + 60, rows, key, hover)
-    if spec.get("comb") and hover:
-        cx, cy, nm, desc = pos[hover]
+    if spec.get("comb") and hover and pos[hover][4] == "sealedhover":     # sealed: it lights, nothing opens
+        cursor(sc, int(pos[hover][0]) + 4, int(pos[hover][1]) + 2)
+    elif spec.get("comb") and hover:
+        cx, cy, nm, desc, _ = pos[hover]
         draw_pict, line = PICT[nm]
         ty0 = int(yb + 4)
         UI.cell(sc, x0, ty0, x1, ty0 + 104, "normal")
@@ -1305,7 +1312,7 @@ def cards():
                             ("m_blister", "Нарывник", "мутация", SILVER)]),
         abilities=[("stinger", "форма", "Жало", "Если удар жалом пробивает броню, цель получает 1–4 {яд} и теряет 1 броню до конца боя. {яд} накапливается. С одной цели снимается не больше 2 брони. Машинам {яд} не страшен, но броню жало снимает и с них.", GOLD),
                    ("wings", "деталь", "Крылья", "Может проходить через клетки, занятые своими.", GOLD),
-                   ("m_blister", "мутация · общая", "Нарывник", "Враг, который ранит её в ближнем бою, до конца боя бьёт слабее. На одного врага срабатывает один раз. Действует и на машины.", SILVER),
+                   ("m_blister", "мутация · общая", "Нарывник", GRUNT["blister"], SILVER),
                    ("evo_vise", "эволюция формы", "Клешни-тиски", "Клешни бьют {дроб}. Враг, в которого они попали, не может уйти со своей клетки.", (150, 220, 120)),
                    ("fear", "слабость", "Медленнее других", "Скорость 2, у других рабочих 3.", RED),
                    ("ant", "класс", "Стая", "Боевой дух +1 за каждую свою особь в соседних клетках, но не больше +4.", INK),
@@ -1327,7 +1334,7 @@ def cards():
                ("Ужас", [("m_psi_whisper", "sealed", "Жуткий шёпот", ""), ("m_strider", "sealed", "Стрекот", "")]),
                ("Крик", [("m_psi_echo", "sealed", "Эхо крика", ""), ("m_psi_last", "sealed", "Последняя воля", "")]),
                ("Кукловод", [("m_psi_leash", "sealed", "Пси-поводок", "")])],
-              ("m_psi_relay", "keysealed", "Ретранслятор", ""), None),
+              ("m_psi_relay", "keysealed", "Ретранслятор", ""), "Жуткий шёпот"),
         abilities=[("m_psi_reson", "каждые 3 хода", "Помутнение", "Враги в 2 клетках от самой плотной их группы на раунд путают цели и бьют своих. У машин сбой: шаг пропущен, способности молчат.", PSI),
                    ("m_psi_echo", "постоянно", "Предсмертный крик", "Когда особь роя погибает, её убийца получает 1 {пси} мимо брони. Машина — 1 {пси} за каждые две смерти.", PSI),
                    ("m_psi_leash", "раз в 6 ходов", "Захват разума", "Враг ниже половины здоровья переходит к рою: размер 1–3 на 5 ходов, 4–5 на 2 хода. Размер 6–7 только оглушает на раунд.", PSI),
@@ -1380,8 +1387,7 @@ def cards():
 
 # ---------------------------------------------------------------- a mutation's own card: clicked on any card, opens over it
 MUT_CARD = {   # key: (name, whose · branch, state, carriers, the line, body traits for the carrier)
-    "nest": ("Малое гнездо", "мутация Матки · Гнездо", "в рое", 3,
-             "Погибла своя рядом с ней — на её месте яйцо. Через 2 хода из него личинка.", ("carapace",)),
+    "nest": ("Малое гнездо", "мутация Матки · Гнездо", "в рое", 3, None, ("carapace",)),
 }
 
 
@@ -1390,6 +1396,7 @@ def mutation_card(key="nest"):
     moment it works in battle as a picture, one line of what it does, what it hands down."""
     import swarm_mut as M
     name, whose, state, n, line, tr = MUT_CARD[key]
+    line = line or M.GRUNT[key]
     sc = big_card(matka_spec(hover=None), None, save=False)
     sc.rgb *= 0.38                                              # the card underneath, dimmed
     x0, y0, x1, y1 = 176, 64, 784, 476
@@ -1430,77 +1437,49 @@ def mutation_card(key="nest"):
 
 # ---------------------------------------------------------------- a button under the mouse: the swarm takes a bite
 def button_gif():
-    """The hover on a clickable button, the swarm's way: a quick feed — mandibles at both tips snap shut twice,
-    bites come out of the edges with crumbs flying, then the button glows, bitten; the mouse leaves and it heals."""
+    """The hover on a clickable button, the swarm's way: holes eat into it — bites out of the edges, then through
+    the gem — as if something unseen were feeding on it; the mouse leaves and it is whole again."""
     from PIL import Image
-    Wd, Hd = 480, 140
+    Wd, Hd = 480, 120
     bg = UI.nest(Wd, Hd, 12)
-    x0, y0, x1, y1 = 110, 52, 370, 98
-    cy = (y0 + 1 + y1) / 2
+    x0, y0, x1, y1 = 110, 40, 370, 86
+    cy = (y0 + y1) / 2
 
-    def jaws(sc, open_, flip):
-        """A pair of sickle mandibles on a little head at one tip; open_ 1 — wide, 0 — shut on the button."""
-        tipx = x0 if not flip else x1
-        sgn = 1 if not flip else -1
-        hx = tipx - sgn * 18
-        head = ellipse(sc, hx, cy, 9, 8)
-        sc.rgb[head] = hexc("#2a2034")
-        ho, _, _ = UI.edges(head)
-        sc.rgb[ho] = UI.OUTL
-        for ey_ in (-3, 3):
-            sc.rgb[int(cy + ey_), int(hx + sgn * 3)] = hexc("#e04030")
-        for up in (-1, 1):
-            base = (hx + sgn * 6, cy + up * 4)
-            reach = 14 + 6 * (1 - open_)
-            tip = (tipx + sgn * (reach - 10), cy + up * (2 + 16 * open_))
-            mid = ((base[0] + tip[0]) / 2 + sgn * 2, (base[1] + tip[1]) / 2 + up * (6 * open_ + 2))
-            thick(sc, [base, mid, tip], 1, hexc("#cdbb8e"), hexc("#fff4d0"))
+    def hole(sc, parts):
+        """A bite-shaped hole: a few overlapping circles; the background shows through, the cut edge lit."""
+        m = np.zeros(sc.yy.shape, bool)
+        for (bx, by, r) in parts:
+            m |= np.hypot(sc.xx - bx, sc.yy - by) <= r + 1
+        inside = (sc.xx >= x0 - 2) & (sc.xx <= x1 + 2) & (sc.yy >= y0 - 2) & (sc.yy <= y1 + 2)
+        m &= inside
+        sc.rgb[m] = bg.rgb[m] * 0.8
+        ring = dilate(m, 1) & ~m & inside
+        sc.rgb[ring] = UI.OUTL
+        lit = dilate(m, 2) & ~dilate(m, 1) & inside
+        sc.rgb[lit] = np.minimum(255, sc.rgb[lit] * 1.3 + 25)
 
-    def bite(sc, bx, by, r):
-        m = (np.hypot(sc.xx - bx, sc.yy - by) <= r) & (sc.yy >= y0 - 2) & (sc.yy <= y1 + 2)
-        sc.rgb[m] = bg.rgb[m]
-        ring = (np.abs(np.hypot(sc.xx - bx, sc.yy - by) - r - 0.8) < 0.9) & ~m & (sc.yy >= y0) & (sc.yy <= y1)
-        sc.rgb[ring] = np.minimum(255, sc.rgb[ring] * 1.35 + 30)       # the bitten edge shows the bright inside
-
-    bites1 = [(x0 + 10, cy - 7, 5), (x1 - 10, cy + 6, 5)]
-    bites2 = [(x0 + 34, y0 + 1, 5), (x1 - 40, y0 + 1, 4), (x0 + 22, y1 - 1, 4)]
-    rnd = np.random.RandomState(4)
-    crumbs = [(bx + rnd.uniform(-4, 4), by, rnd.uniform(-3, 3), rnd.uniform(-5, -1)) for bx, by, _ in bites1 + bites2
-              for _ in range(5)]
-    seq = [  # (mouse in, jaws open (None — no jaws), bites done, crumbs age, glow, duration ms)
-        (False, None, 0, None, 0.0, 420),
-        (True, 1.0, 0, None, 0.15, 70),
-        (True, 0.0, 1, 0, 0.25, 70),
-        (True, 0.8, 1, 1, 0.3, 60),
-        (True, 0.0, 2, 2, 0.35, 70),
-        (True, 0.7, 2, 3, 0.4, 70),
-        (True, None, 2, 4, 0.45, 90),
-        (True, None, 2, None, 0.45, 600),
-        (False, None, 0, None, 0.0, 300),
+    H = [  # each hole: its circles, one more per step as the bite widens
+        [(x0 + 22, y0 - 1, 4), (x0 + 28, y0 + 1, 4), (x0 + 34, y0 - 1, 3)],
+        [(x1 - 30, y1 + 1, 4), (x1 - 24, y1 - 1, 5), (x1 - 17, y1 + 1, 3)],
+        [(x0 + 8, cy + 2, 4), (x0 + 12, cy - 4, 3), (x0 + 16, cy + 6, 3)],
+        [(x1 - 46, y0 + 9, 3), (x1 - 41, y0 + 12, 3), (x1 - 44, y0 + 16, 2)],
+        [(x0 + 48, y1 - 7, 3), (x0 + 52, y1 - 3, 3)],
+        [(x1 - 9, cy - 5, 4), (x1 - 12, cy + 2, 3)],
     ]
+    steps = [(1, 1), (2, 2), (3, 2), (4, 3), (6, 3)]           # (holes open, circles in each)
+    seq = [(False, 0, 0, 0.0, 420)] + [(True, nh, nc, 0.15 + 0.06 * i, 60) for i, (nh, nc) in enumerate(steps)] + \
+          [(True, 6, 3, 0.4, 700), (False, 0, 0, 0.0, 300)]
     frames, durs = [], []
-    for mouse, jaw, nb, age, gl, dur in seq:
+    for mouse, nh, nc, gl, dur in seq:
         sc = Scene(Wd, Hd)
         sc.rgb[:] = bg.rgb
         UI.WOBBLE[0] = 0.0
         if gl:
             sc.glow((x0 + x1) / 2, cy, 150, hexc("#9ae030"), gl)
         UI.button(sc, x0, y0, x1, y1, "acid")
-        if gl:
-            m = (sc.xx > x0) & (sc.xx < x1) & (sc.yy > y0) & (sc.yy < y1)
-            sc.rgb[m] = np.minimum(255, sc.rgb[m] * (1 + gl * 0.5))
         letters(sc, "В ПОХОД", (x0 + x1) / 2, y0 + 15, "title", 16, col=ACID2, col2=(110, 170, 40), align="center", jitter=1)
-        for b_ in (bites1 if nb >= 1 else []) + (bites2 if nb >= 2 else []):
-            bite(sc, *b_)
-        if age is not None:
-            for (cx_, cy_, vx, vy) in crumbs:
-                t = age + 1
-                px, py = cx_ + vx * t, cy_ + vy * t + 0.9 * t * t
-                if 0 <= px < Wd - 2 and 0 <= py < Hd - 2:
-                    sc.rgb[int(py):int(py) + 2, int(px):int(px) + 2] = hexc("#8ac850") if (int(px) % 3) else UI.OUTL
-        if jaw is not None:
-            jaws(sc, jaw, False)
-            jaws(sc, jaw, True)
+        for parts in H[:nh]:
+            hole(sc, parts[:nc])
         if mouse:
             cursor(sc, int((x0 + x1) / 2) + 40, int(cy) + 4)
         frames.append(sc.image(S).convert("P", palette=Image.ADAPTIVE, colors=255))
@@ -1508,7 +1487,7 @@ def button_gif():
     frames[0].save(out("swarm_button_hover.gif"), save_all=True, append_images=frames[1:], duration=durs, loop=0,
                    disposal=2)
     strip = Image.new("RGB", (Wd * S, Hd * S * 3))
-    for i, fi in enumerate((0, 2, 7)):
+    for i, fi in enumerate((0, 3, 6)):
         strip.paste(frames[fi].convert("RGB"), (0, i * Hd * S))
     strip.save(out("swarm_button_hover.png"))
     print("swarm_button_hover.gif", frames[0].size, len(frames))
