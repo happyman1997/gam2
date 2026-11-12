@@ -92,12 +92,46 @@ def title(sc, text, sub=None, x=16, seed=0, epi=None):
 
 def frame_screen(seed):
     UI.WOBBLE[0] = 1.3
+    HOVER.clear()
     sc = UI.nest(WW, HH, seed)
     return sc
 
 
+HOVER = []        # every glyph and icon on the screen the mouse can point at: (key, x, y, w, h); «@key» — a trait's icon
+ALT = [False]     # Alt held: each line of terms is read out in small words under itself
+
+
+def glyph(sc, key, x, y, z=2):
+    """A term's glyph on its own, outside a line — it has its tooltip all the same."""
+    import fxg
+    a_ = fxg.rgba(key)
+    fxg.draw(sc, key, x, y, z)
+    HOVER.append((key, int(x), int(y), a_.shape[1] * z, a_.shape[0] * z))
+    return a_.shape[1] * z
+
+
+def help_button(sc, on=False, alt=False):
+    """«?» at the right of the wing: the glossary of glyphs, on every screen; beside it the Alt key while held."""
+    UI.button(sc, 912, 8, 950, 36, "amber" if on else "chitin")
+    letters(sc, "?", 931, 14, "title", 16, col=DARK if on else INK, outline=not on, align="center")
+    if alt:
+        keycap(sc, 860, 12, "Alt", lit=True)
+
+
+def keycap(sc, x, y, t, lit=False):
+    """A key of the keyboard, drawn small."""
+    w = UI.text_width(t, "title", 8) + 14
+    face, rim = (hexc("#f0c060"), hexc("#7a4a10")) if lit else (hexc("#4a4056"), hexc("#1a1420"))
+    sc.rgb[y:y + 20, x:x + w] = rim
+    sc.rgb[y + 1:y + 16, x + 1:x + w - 1] = face
+    sc.rgb[y + 1, x + 2:x + w - 2] = np.minimum(face + 40, 255)
+    sc.occ[y:y + 20, x:x + w] = True
+    letters(sc, t, x + w / 2, y + 5, "title", 8, col=DARK if lit else INK, outline=False, align="center")
+    return w
+
+
 # ---------------------------------------------------------------- the brood: everything hatched, eat the extra
-def brood():
+def brood(variant=None):
     import brood as B
     sc = frame_screen(31)
     UI.engrave(sc, leader("Матка", "idle", 2.2), 640, 560, k=0.8)
@@ -105,9 +139,10 @@ def brood():
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
     title(sc, "ВЫВОДОК", seed=5)
     # biomass, top right
-    icon(sc, "biomass", 770, 6, 2)
-    letters(sc, "34", 810, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
-    fx_line(sc, 856, 12, "{съедена:5} → +5")
+    icon(sc, "biomass", 712, 6, 2)
+    letters(sc, "34", 752, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    fx_line(sc, 798, 12, "{съедена:5} → +5")
+    help_button(sc)
     # the limit: an abdomen of segments
     total, eaten = B.totals()
     UI.plate(sc, 12, 50, 948, 96)
@@ -131,8 +166,7 @@ def brood():
         put(sc, spr, x0 + 50, y0 + GCH - 10, 12)
         letters(sc, name, x0 + 12, y0 + 6, "text", 16, col=INK, jitter=1, seed=k_)
         cw = letters(sc, f"×{count}", x0 + 100, y0 + 28, "title", 16, col=(236, 220, 190), col2=(160, 130, 100))
-        import fxg
-        fxg.draw(sc, "предел", x0 + 106 + cw, y0 + 31, 1)
+        glyph(sc, "предел", x0 + 106 + cw, y0 + 31, 1)
         letters(sc, str(B.pts(B.GROUPS[k_]) * count), x0 + 118 + cw, y0 + 34, "title", 8, col=PALE, outline=False)
         if eat:
             fx_line(sc, x0 + 100, y0 + 50, f"{{съедена:{eat}}} → +{eat * B.pts(B.GROUPS[k_])}")
@@ -185,10 +219,14 @@ def brood():
     UI.creature(sc, bug(("horn",), "idle", 0.8, 44), 742, 444)
     UI.cobweb(sc, 958, 444, 34, quad=(-1, 1))
     UI.cobweb(sc, 2, 444, 26, quad=(1, 1))
+    name = "brood.png"
+    if variant == "tip":                         # the mouse over «съедена» in the ants' cell
+        point_at(sc, "съедена", 2)
+        name = "swarm_tip_glyph.png"
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
-    img.save(out("brood.png"))
-    print("brood.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
 def wrap(text, width, kind="text", px=16):
@@ -214,6 +252,7 @@ def camp():
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=5)
     title(sc, "УЛЕЙ", seed=21)
+    help_button(sc)
     # who
     UI.plate(sc, 12, 52, 286, 446, antennae=True)
     heading(sc, "КТО", 26, 64, seed=1)
@@ -280,15 +319,17 @@ def camp():
 
 
 # ---------------------------------------------------------------- the evolution of a form
-def evolution():
+def evolution(variant=None):
     import swarm_screens as SS
     import swarm_evo as EV
     sc = frame_screen(71)
+    ALT[0] = variant == "alt"
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=8)
     title(sc, "ЭВОЛЮЦИЯ", seed=23)
-    icon(sc, "biomass", 830, 8, 2)
-    letters(sc, "39", 870, 10, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    help_button(sc, alt=ALT[0])
+    icon(sc, "biomass", 776 if ALT[0] else 830, 8, 2)
+    letters(sc, "39", 816 if ALT[0] else 870, 10, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "ФОРМЫ В РОЕ", 26, 64, seed=4)
     for i, (form, name, n, taken) in enumerate(SS.FORMS_IN_SWARM):
@@ -326,10 +367,12 @@ def evolution():
     UI.silk(sc, (700, 44), (700, 62), sag=0)
     UI.creature(sc, bug(("ant",), "attack", 0.85, 75, rare="spinner"), 706, 76, shadow=False)
     UI.cobweb(sc, 958, 448, 30, quad=(-1, 1))
+    name = "swarm_alt_words.png" if ALT[0] else "swarm_evolution_screen.png"
+    ALT[0] = False
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_evolution_screen.png"))
-    print("swarm_evolution_screen.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
 # ---------------------------------------------------------------- deployment by flocks
@@ -340,7 +383,8 @@ def deploy():
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=9)
     title(sc, "РАССТАНОВКА", seed=25)
-    letters(sc, "Литейщик: 4 голема", 944, 8, "text", 16, col=(214, 196, 150), align="right")
+    letters(sc, "Литейщик: 4 голема", 900, 12, "text", 16, col=(214, 196, 150), align="right")
+    help_button(sc)
     UI.plate(sc, 660, 50, 948, 122)
     icon(sc, "matka", 670, 58, 2)
     letters(sc, "ТЕСНЫЕ СТАИ", 708, 57, "title", 8, col=GOLD, outline=False)
@@ -715,13 +759,14 @@ def battle_hud():
 
 
 # ---------------------------------------------------------------- after the battle: the battle changes the breed
-def aftermath():
+def aftermath(variant=None):
     import brood as B
     import swarm_effects as E
     sc = frame_screen(37)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=17)
     title(sc, "ПОБЕДА", seed=33)
+    help_button(sc)
     # losses
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "ПОТЕРИ", 26, 64, seed=6)
@@ -772,10 +817,14 @@ def aftermath():
     letters(sc, "В ВЫВОДОК", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
     UI.creature(sc, bug((), "idle", 1.0, 170), 250, 54)
     UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
+    name = "swarm_aftermath.png"
+    if variant == "tip":                         # the mouse over the stinger: the trait itself
+        point_at(sc, "@stinger", 0, w=300)
+        name = "swarm_tip_trait.png"
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_aftermath.png"))
-    print("swarm_aftermath.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
 # ---------------------------------------------------------------- choosing the leader at the start of the run
@@ -959,6 +1008,7 @@ def leaders_pick():
     UI.drips(sc, 60, 900, 44, "#7ab020", n=8, seed=18)
     w = letters(sc, "ЛИДЕР", 16, 6, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=6, hairs=9, seed=35)
     epithet(sc, "КТО СОЖРЕТ ИХ ВСЕХ", 16 + w + 44, 10, ACID, seed=36, px=24)
+    help_button(sc)
     names = ["Матка", "Разум улья", "Пожиратель", "Чума"]
     for i, name in enumerate(names):
         bug_card(sc, 132 + i * 232, 60, name, i == 0, seed=40 + i)
@@ -982,6 +1032,7 @@ def development():
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=19)
     title(sc, "РАЗВИТИЕ", seed=37)
+    help_button(sc)
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "СЕЙЧАС", 26, 64, seed=9)
     icon(sc, "razum", 26, 90, 2)
@@ -1036,6 +1087,7 @@ def fx_line(sc, x, y, line, dim=False, draw=True, z=None):
             spr = IC.icon(part[1][1:], 1, "swarm")
             if draw:
                 icon(sc, part[1][1:], cx + 1, int(y + 9 - spr.h / 2))
+                HOVER.append((part[1], int(cx + 1), int(y + 9 - spr.h / 2), spr.w, spr.h))
             cx += spr.w + 4
             val = part[2]
             if val:
@@ -1049,6 +1101,7 @@ def fx_line(sc, x, y, line, dim=False, draw=True, z=None):
             gy = int(y + 9 - gh / 2)
             if draw:
                 fxg.draw(sc, key, cx + 1, gy, z)
+                HOVER.append((key, int(cx + 1), gy, gw, gh))
             spots.append((key, cx + 1, gy, gw, gh))
             cx += gw + 4
             if val:
@@ -1059,25 +1112,74 @@ def fx_line(sc, x, y, line, dim=False, draw=True, z=None):
 
 
 def fx_rows(sc, x, y, w, rows, lh=26, dim=False, draw=True):
-    """A column of effect lines. Returns the y under the last."""
+    """A column of effect lines. Returns the y under the last. With Alt held each line is read out under itself."""
     for line in rows:
         fx_line(sc, x, y, line, dim=dim, draw=draw)
         y += lh
+        if ALT[0]:
+            y = alt_words(sc, x, y - 4, w, line, draw) + 6
     return y
 
 
-def gloss_tip(sc, key, x, y, w=250):
-    """What a glyph means, under the mouse: the glyph large, its name, one line of meaning."""
+def alt_words(sc, x, y, w, line, draw=True):
+    """The Alt view: a line of terms in small words, wrapped to the width. Returns the y under it."""
     import fxg
+    text = fxg.words(line, names=lambda k: TRAIT_TIP.get(k, (k,))[0].lower())
+    parts_, cur = [], ""
+    for wd in text.split(" "):
+        if UI.text_width((cur + " " + wd).strip(), "text", 16) > w and cur:
+            parts_.append(cur)
+            cur = wd
+        else:
+            cur = (cur + " " + wd).strip()
+    for j, ln in enumerate(parts_ + [cur]):
+        if draw:
+            letters(sc, ln, x, y + j * 17, "text", 16, col=(200, 178, 118))
+    return y + 17 * (len(parts_) + 1)
+
+
+def gloss_tip(sc, key, x, y, w=250, draw=True):
+    """What a glyph means, under the mouse: the glyph large, its name, one line of meaning. A trait's icon
+    («@stinger») shows the trait: its name, what it is and what it does, in terms."""
+    import fxg
+    if key.startswith("@"):
+        nm, kind, rows = TRAIT_TIP[key[1:]]
+        h = fx_rows(sc, 0, 0, w - 24, rows, draw=False) + 46
+        if draw:
+            UI.cell(sc, x, y, x + w, y + h, "normal")
+            icon(sc, key[1:], x + 10, y + 8, 2)
+            letters(sc, nm, x + 48, y + 8, "text", 16, col=GOLD)
+            letters(sc, kind, x + 48, y + 26, "title", 8, col=PALE, outline=False)
+            fx_rows(sc, x + 12, y + 46, w - 24, rows)
+        return h
     nm, what, _ = fxg.TERMS[key]
     lines = wrap(what, w - 24)
     h = 46 + len(lines) * 16
-    UI.cell(sc, x, y, x + w, y + h, "normal")
-    fxg.draw(sc, key, x + 12, y + 10, 2)
-    letters(sc, nm, x + 44, y + 12, "text", 16, col=GOLD)
-    for j, ln in enumerate(lines):
-        UI.rich(sc, ln, x + 12, y + 36 + j * 16, "text", 16, col=INK)
+    if draw:
+        UI.cell(sc, x, y, x + w, y + h, "normal")
+        fxg.draw(sc, key, x + 12, y + 10, 2)
+        letters(sc, nm, x + 44, y + 12, "text", 16, col=GOLD)
+        for j, ln in enumerate(lines):
+            UI.rich(sc, ln, x + 12, y + 36 + j * 16, "text", 16, col=INK)
     return h
+
+
+def point_at(sc, key, nth=0, w=260):
+    """The mouse over a glyph already on the screen: the cursor on it, its tooltip under it (over it, near the bottom)."""
+    spots = [sp for sp in HOVER if sp[0] == key]
+    k_, gx, gy, gw, gh = spots[nth]
+    h = gloss_tip(sc, key, 0, 0, w, draw=False)
+    tx = int(min(max(8, gx + gw // 2 - 24), WW - 8 - w))
+    ty = gy + gh + 10 if gy + gh + 10 + h < HH - 8 else gy - h - 10
+    gloss_tip(sc, key, tx, ty, w)
+    cursor(sc, gx + gw // 2, gy + gh // 2)
+
+
+TRAIT_TIP = {   # a trait's icon in a line points at the trait itself: name, what it is, what it does
+    "stinger": ("Жало", "деталь формы", ["{пробой} → {яд:1–4} {броня:−1}", "{машина} → {яд:✕}"]),
+    "horn": ("Рог", "деталь", ["{начало} → {урон:+2} {дроб}"]),
+    "wings": ("Крылья", "деталь формы", ["{всегда} → {полёт}"]),
+}
 
 
 ABIL_FX = {   # the abilities on the cards, in terms (fxg.py)
@@ -1258,6 +1360,7 @@ def big_card(spec, name, save=True):
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=spec["seed"])
     title(sc, spec["title"], spec["sub"], seed=spec["seed"] + 1, epi=spec.get("epi"))
+    help_button(sc)
     UI.plate(sc, 6, 50, WW - 6, HH - 6, antennae=False)
     # left: the creature large, where it came from
     UI.cell(sc, 18, 62, 300, 300, spec.get("cell", "hi"))
@@ -1298,7 +1401,7 @@ def big_card(spec, name, save=True):
     for lab, val in spec["stats"]:
         k_ = STAT[lab]
         a_ = fxg.rgba(k_)
-        fxg.draw(sc, k_, x0, y + 9 - a_.shape[0], 2)
+        glyph(sc, k_, x0, y + 9 - a_.shape[0], 2)
         w, _ = fx_line(sc, 0, 0, val, draw=False)
         dots(sc, x0 + a_.shape[1] * 2 + 8, x1 - w - 6, y + 12)
         fx_line(sc, x1 - w, y, val)
@@ -1309,7 +1412,7 @@ def big_card(spec, name, save=True):
     cols = (x0 + 20, x0 + 112, x0 + 172, x0 + 252)
     for cx, lab in zip(cols, ("атака", "урон", None, "дальность")):
         if lab:
-            fxg.draw(sc, lab, cx, y - 6, 2)
+            glyph(sc, lab, cx, y - 6, 2)
     y += 12
     for key, nm, dmg, typ, reach, note in spec["attacks"]:
         sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.5 + hexc("#4a3e5c") * 0.5
@@ -1780,9 +1883,101 @@ def leaders_field():
     print("swarm_leader_field.png", img.size)
 
 
+# ---------------------------------------------------------------- the glossary: every glyph, behind «?» on any screen
+def uses(key, limit=4, width=280):
+    """Where a term is met: lines of abilities, mutations and evolutions that have it — (whose, line)."""
+    import swarm_mut as SM
+    import swarm_evo as EV
+    names = {k: nm for v in SM.POOLS.values() for k, nm, *_ in v[3]}
+    evo = {k: nm for rows in EV.EVO.values() for k, nm, *_ in rows}
+    src = ([(nm, rows) for nm, rows in ABIL_FX.items()] + [(names.get(k, k), rows) for k, rows in SM.FX.items()]
+           + [(evo.get(k, k), rows) for k, rows in EV.EVO_FX.items()])
+    out_, seen = [], set()
+    for who, rows in src:
+        for ln in rows:
+            if ("{" + key + "}" in ln or "{" + key + ":" in ln) and who not in seen:
+                w_, _ = fx_line(None, 0, 0, ln, draw=False)
+                if w_ <= width:
+                    out_.append((who, ln))
+                    seen.add(who)
+                    break
+        if len(out_) >= limit:
+            break
+    return out_
+
+
+def glossary_screen(chapter="Когда", term="гибель_своя"):
+    """«?»: the glyphs by chapter — when, time, what it does, states, fate, brood, enemies, damage; the chosen one
+    large with its meaning and the lines it is met in."""
+    import fxg
+    sc = frame_screen(91)
+    UI.wing(sc, 0, 0, WW, 44)
+    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=21)
+    title(sc, "ЗНАЧКИ", seed=41)
+    help_button(sc, on=True)
+    # chapters
+    UI.plate(sc, 12, 52, 196, 446, antennae=True)
+    for i, (ch, keys) in enumerate(fxg.GROUPS):
+        y0 = 60 + i * 47
+        on = ch == chapter
+        UI.cell(sc, 20, y0, 188, y0 + 41, "hi" if on else "normal")
+        a_ = fxg.rgba(keys[0])
+        fxg.draw(sc, keys[0], 30 + (22 - a_.shape[1] * 2) // 2, y0 + 20 - a_.shape[0], 2)
+        letters(sc, ch, 62, y0 + 8, "text", 16, col=GOLD if on else INK, jitter=1, seed=i)
+        letters(sc, str(len(keys)), 62, y0 + 26, "title", 8, col=PALE, outline=False)
+    # the chapter's glyphs, two columns
+    keys = dict(fxg.GROUPS)[chapter]
+    UI.plate(sc, 206, 52, 630, 446, antennae=True)
+    heading(sc, chapter.upper(), 220, 62, seed=7)
+    half = (len(keys) + 1) // 2
+    for j, k_ in enumerate(keys):
+        x0, y0 = 216 + (j // half) * 206, 90 + (j % half) * 34
+        if k_ == term:
+            UI.cell(sc, x0 - 4, y0 - 4, x0 + 202, y0 + 30, "hi")
+        a_ = fxg.rgba(k_)
+        glyph(sc, k_, x0 + (26 - a_.shape[1] * 2) // 2, y0 + 13 - a_.shape[0], 2)
+        letters(sc, fxg.TERMS[k_][0], x0 + 34, y0 + 5, "text", 16, col=GOLD if k_ == term else INK)
+    # the chosen one
+    nm, what, _ = fxg.TERMS[term]
+    UI.plate(sc, 640, 52, 948, 446, antennae=True)
+    a_ = fxg.rgba(term)
+    fxg.draw(sc, term, 654, 66, 4)
+    heading(sc, nm.upper(), 664 + a_.shape[1] * 4, 66 + a_.shape[0] * 2 - 10, seed=8)
+    y = 76 + a_.shape[0] * 4
+    for ln in wrap(what, 276):
+        UI.rich(sc, ln, 654, y, "text", 16, col=INK)
+        y += 18
+    y += 14
+    letters(sc, "ВСТРЕЧАЕТСЯ", 654, y, "title", 8, col=PALE, outline=False)
+    y += 16
+    for who, ln in uses(term, 4, 276):
+        letters(sc, who, 654, y, "text", 16, col=GOLD, jitter=1, seed=len(who))
+        fx_line(sc, 654, y + 22, ln)
+        y += 56
+    # leave; Alt
+    UI.button(sc, 12, 470, 300, 520, "chitin")
+    letters(sc, "Закрыть", 156, 486, "title", 16, col=INK, align="center")
+    kw = keycap(sc, 400, 484, "Alt")
+    letters(sc, "— подписи под значками", 408 + kw, 485, "text", 16, col=MUTED)
+    UI.creature(sc, bug(("wings",), "idle", 0.9, 93), 900, 52)
+    UI.cobweb(sc, 2, 448, 28, quad=(1, 1))
+    img = sc.image(S)
+    UI.WOBBLE[0] = 0.0
+    img.save(out("swarm_glossary_screen.png"))
+    print("swarm_glossary_screen.png", img.size)
+
+
+def hints():
+    """The mouse over a glyph, over a trait's icon; the Alt view."""
+    brood("tip")
+    aftermath("tip")
+    evolution("alt")
+
+
 SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools,
            "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development,
-           "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif}
+           "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif,
+           "glossary": glossary_screen, "hints": hints}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"

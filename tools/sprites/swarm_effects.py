@@ -385,7 +385,7 @@ def hopper_leap(giant=False):
         for j, i in enumerate((12, 26, 39)):
             x, y = path[i]
             out_.append(frame(base + [(h("attack"), x, y, "air")], fx=[lambda sc, i=i: trail(sc, path[:i], hexc("#c8d0a0"))],
-                              key=j == 2, text=[(X(2.4), 22, "в первом раунде — через строй к дальнему")] if j == 2 else []))
+                              key=j == 2, text=[(X(2.4), 22, "в первый ход — через строй к дальнему")] if j == 2 else []))
         m1, m2 = mason(), mason("attack")
         out_.append(frame(base + [(m1, X(3.4), GY + 16), (m1, X(2.6), GY - 18), (h("attack"), X(3.0), GY - 10)],
                           fx=[lambda sc: ring(sc, X(3.0), GY, 46, hexc("#e8d8a0")), lambda sc: stars(sc, X(3.4), GY - 26, 7),
@@ -414,7 +414,7 @@ def mantis_blades(giant=False):
         return [frame([(g, X(2.3), GY), (m("idle"), X(1.0), GY)]),
                 frame([(g, X(2.3), GY), (m("attack"), X(1.1), GY)], fx=[lambda sc: slash(sc, X(2.0), GY - 40, 26, 2.2, 0.6)],
                       text=[(X(1.6), 24, "первый удар")]),
-                frame([(g, X(2.3), GY), (m("attack"), X(1.1), GY)], key=True, text=[(X(1.6), 24, "и второй в том же раунде")],
+                frame([(g, X(2.3), GY), (m("attack"), X(1.1), GY)], key=True, text=[(X(1.6), 24, "и второй в тот же ход")],
                       fx=[lambda sc: slash(sc, X(2.0), GY - 40, 26, 2.2, 0.6, hexc("#a0a0a8"), 1),
                           lambda sc: slash(sc, X(2.0), GY - 24, 26, -0.6, 0.9)]),
                 frame([(g, X(2.3), GY), (m("idle"), X(1.0), GY)])]
@@ -435,7 +435,7 @@ def firefly_flash(giant=False):
         return [frame(base + [(f("idle"), X(0.6), GY)]),
                 frame([(lit(g1, WHITE, 0.25), X(1.8), GY - 12), (lit(g2, WHITE, 0.25), X(1.9), GY + 18), (f("attack"), X(0.6), GY)],
                       fx=[lambda sc: sc.glow(X(0.6) - 20, GY - 14, 90, hexc("#fff0a0"), 1.0)], key=True,
-                      text=[(X(1.4), 22, "вспышка: соседи раунд промахиваются")]),
+                      text=[(X(1.4), 22, "вспышка: соседи ход промахиваются")]),
                 frame(base + [(f("idle"), X(0.6), GY)], fx=[lambda sc: stars(sc, X(1.8), GY - 150, 10),
                                                              lambda sc: stars(sc, X(1.9), GY - 110, 10, phase=0.5)],
                       text=[(X(1.4), 22, "промах")])]

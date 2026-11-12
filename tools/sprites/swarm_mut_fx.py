@@ -64,7 +64,7 @@ def spinner():
     w = lambda r: (lambda sc: web(sc, X(1.7), GY + 4, r))
     return [frame([(b("idle"), X(0.5), GY), (g, X(3.0), GY)]),
             frame([(b("attack"), X(0.6), GY), (g, X(2.8), GY)], fx=[w(18), lambda sc: lines(sc, (X(0.2), GY - 10), (X(1.5), GY + 2), SILK_C)],
-                  text=[(X(1.6), 22, "плетёт — в этот раунд не бьёт")]),
+                  text=[(X(1.6), 22, "плетёт — в этот ход не бьёт")]),
             frame([(b("idle"), X(0.5), GY), (g, X(2.1), GY)], fx=[w(46)], text=[(X(1.6), 22, "паутина до конца боя")]),
             frame([(b("idle"), X(0.5), GY), (g, X(1.8), GY), (mb((), "attack", None, 6), X(1.2), GY + 10)],
                   fx=[w(46), mark(g, X(1.8), GY, "web")], text=[(X(1.6), 22, "враг застрял; свои бегают свободно")], key=True)]
@@ -82,7 +82,7 @@ def exploder():
                                          lambda sc: burst(sc, X(1.1), GY - 10, 14, GLUE)],
                   text=[(X(1.6), 22, "лопнула липким клеем")], key=True),
             frame([(g, X(2.4), GY)], fx=[lambda sc: ST.ground(sc, "glued", X(2.4), GY, 30), mark(g, X(2.4), GY, "glued")],
-                  text=[(X(1.6), 22, "склеен: раунд не ходит и не бьёт")])]
+                  text=[(X(1.6), 22, "склеен: ход не двигается и не бьёт")])]
 
 
 def bolas():
@@ -149,7 +149,7 @@ def nadlom():
                   lambda sc: [dot(sc, X(2.2) + np.cos(a) * 12, ST.top_of(inv, GY) - 4 + np.sin(a) * 3, PSI_C, r=1)
                               for a in (0.4, 2.5, 4.6)]]
             seq.append(frame([(b("idle", 14), X(1.2), GY), (b("idle", 15), X(1.0), GY + 14), (v, X(2.2), GY)], fx=fx,
-                             text=[(X(1.7), 22, "больше боевого духа — надлом: раунд стоит")], key=True))
+                             text=[(X(1.7), 22, "больше боевого духа — надлом: ход стоит")], key=True))
     return seq
 
 
