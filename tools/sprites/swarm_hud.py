@@ -397,7 +397,7 @@ FINDS_FX = [   # when each find comes, and what it gives (fxg.py)
     ("{рабочая} {убийство:№1}", ["{кокон} → {солдат}"]),
     ("{дикие}", ["{новая_форма:×3}"]),
     ("{босс}", ["{потомок} → {гигант}"]),
-    ("{добыча} {живой}", ["{потомок:1–2} → {химера}"]),
+    ("{тело} {живой}", ["{потомок:1–2} → {химера}"]),
 ]
 
 
@@ -670,7 +670,7 @@ def battle_hud():
         if paused:                                  # on pause: point at a spitter and read its card
             sx_, sy_ = 566, 452
             cx0, cy0, cx1 = 572, 296, 826
-            rows_ = ["{каждые:2} → {яд} {клей:1} {дальность:3}", "{перезарядка:1}", "минус: {атака} → {урон:−}"]
+            rows_ = ["{каждые:2} → {яд} {клей:1} {дальность:3}", "{через:1}", "минус: {атака} → {урон:−}"]
             cy1 = fx_rows(sc, cx0 + 10, cy0 + 44, cx1 - cx0 - 20, rows_, draw=False) + 10
             UI.cell(sc, cx0, cy0, cx1, cy1, "hi")
             icon(sc, "spitter", cx0 + 8, cy0 + 6, 2)
@@ -701,7 +701,7 @@ def aftermath(variant=None):
         put(sc, E.lit(bug(((), ("stinger",), ("wings",))[j % 3], "idle", 1.25, 160 + j), (26, 18, 16), 0.7), 56 + (j % 3) * 76 + (j // 3) * 14, 132 + (j // 3) * 34, 9)
     fx_line(sc, 26, 262, "{гибель_своя}")
     letters(sc, "23", 64, 254, "title", 24, col=(255, 140, 110), col2=(170, 50, 40), jitter=1, drips=3)
-    fx_line(sc, 26, 322, "{добыча}")
+    fx_line(sc, 26, 322, "{тело}")
     letters(sc, "14", 64, 314, "title", 24, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     fx_line(sc, 120, 322, "→ {биомасса:+14}")
     # what the battle gave: the leader's own gift
@@ -990,11 +990,54 @@ SILVER = (200, 206, 220)
 FXZ = 2                                       # glyphs in effect lines: twice their pixel size, as big as the letters
 
 
+def _cond_span(line, x, z):
+    """Where a line's condition lies — from its first term to its first arrow — or None if it has none."""
+    import fxg
+    cx = x
+    if line.startswith("минус:"):
+        cx += UI.text_width("минус: ")
+        line = line[len("минус:"):].strip()
+    x0 = cx
+    for part in fxg.parts(line):
+        if part[0] == "t":
+            if "→" in part[1]:
+                ax = cx + UI.text_width(part[1][:part[1].index("→")])
+                return (x0, ax) if ax - x0 > 12 else None
+            cx += UI.text_width(part[1])
+        elif part[1].startswith("@"):
+            cx += IC.icon(part[1][1:], 1, "swarm").w + 4 + (UI.text_width(part[2]) + 2 if part[2] else 0)
+        else:
+            cx += fxg.rgba(part[1]).shape[1] * z + 4 + (UI.text_width(part[2]) + 2 if part[2] else 0)
+    return None
+
+
+def cond_plate(sc, x0, y0, x1, y1):
+    """The condition's own dark plate: a line reads «when → what» at a glance."""
+    x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
+    x0, x1 = max(0, x0), min(sc.w, x1)
+    if x1 <= x0:
+        return
+    reg = sc.rgb[y0:y1, x0:x1]
+    reg[:] = reg * 0.3 + hexc("#0c0812") * 0.7
+    rim = hexc("#4a3e5c")
+    sc.rgb[y0, x0 + 2:x1 - 2] = rim
+    sc.rgb[y1 - 1, x0 + 2:x1 - 2] = hexc("#2a2234")
+    sc.rgb[y0 + 2:y1 - 2, x0] = rim
+    sc.rgb[y0 + 2:y1 - 2, x1 - 1] = hexc("#2a2234")
+    for cx_, cy_ in ((x0 + 1, y0 + 1), (x1 - 2, y0 + 1), (x0 + 1, y1 - 2), (x1 - 2, y1 - 2)):
+        sc.rgb[cy_, cx_] = rim
+
+
 def fx_line(sc, x, y, line, dim=False, draw=True, z=None):
-    """One line of terms (fxg.py): each term its glyph, its number after it in gold, arrows and words between.
-    A line starting «минус:» is a drawback, in red. Returns the width and where each glyph went."""
+    """One line of terms (fxg.py): each term its glyph, its number after it in gold, arrows and words between;
+    the condition — everything before the first arrow — on its own dark plate. A line starting «минус:» is
+    a drawback, in red. Returns the width and where each glyph went."""
     import fxg
     z = FXZ if z is None else z
+    if draw:
+        span = _cond_span(line, x, z)
+        if span:
+            cond_plate(sc, span[0] - 4, y - 3, span[1] - 3, y + 21)
     neg = line.startswith("минус:")
     tcol = (236, 150, 130) if neg else (MUTED if dim else INK)
     cx, spots = x, []
@@ -1143,15 +1186,15 @@ ABIL_FX = {   # the abilities on the cards, in terms (fxg.py)
 }
 
 
-DEV_FX = {   # a leader's growth, as what it changes (fxg.py)
-    "Матка": {"often": "{личинка:×2} {каждые:3} → {каждые:2}", "larva": "{каждые:3} {личинка:×2} → {личинка:×3}",
-              "size": "{размер:6} → {размер:7}"},
-    "Разум улья": {"two": "{захват} {каждые:6} → {каждые:4}", "every": "{пси} {дальность:3} → {дальность:4}",
-                   "strike": "{помутнение} {радиус:2} → {радиус:3}"},
-    "Пожиратель": {"bigger": "{начало} {размер:5} → {размер:6}", "every_kill": "{рост} {тело:2} → {тело:1}",
-                   "heal": "{лечение} → {лечение:×2}"},
-    "Чума": {"three": "{заражение} {личинка:×2} → {личинка:×3}", "venom": "{яд} → {заражение}",
-             "two": "{тыл} {рабочая:×1} → {рабочая:×2}"},
+DEV_FX = {   # a leader's growth, as what it changes (fxg.py); «⇒» is «was ⇒ becomes», not a condition
+    "Матка": {"often": "{личинка:×2} {каждые:3} ⇒ {каждые:2}", "larva": "{каждые:3} {личинка:×2} ⇒ {личинка:×3}",
+              "size": "{размер:6} ⇒ {размер:7}"},
+    "Разум улья": {"two": "{захват} {каждые:6} ⇒ {каждые:4}", "every": "{пси} {дальность:3} ⇒ {дальность:4}",
+                   "strike": "{помутнение} {радиус:2} ⇒ {радиус:3}"},
+    "Пожиратель": {"bigger": "{начало} {размер:5} ⇒ {размер:6}", "every_kill": "{рост} {тело:2} ⇒ {тело:1}",
+                   "heal": "{лечение} ⇒ {лечение:×2}"},
+    "Чума": {"three": "{заражение} {личинка:×2} ⇒ {личинка:×3}", "venom": "{яд} → {заражение}",
+             "two": "{тыл} {рабочая:×1} ⇒ {рабочая:×2}"},
 }
 
 
