@@ -581,7 +581,7 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
                 hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
     if hot and crane and (new_key or body_new):                       # the crane: the part over its mount
         pt = hot[0]
-        hx = int(pt[0])
+        hx = min(int(pt[0]), x1 - 10 - rw - 30)                       # never over the boxes of the right column
         if body_new:
             bottom = crane_hook(sc, hx, y0 + 8, y0 + 30, None, part=body_new)
         else:
