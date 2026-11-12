@@ -1032,10 +1032,14 @@ def development():
 SILVER = (200, 206, 220)
 
 
-def fx_line(sc, x, y, line, dim=False, draw=True):
+FXZ = 2                                       # glyphs in effect lines: twice their pixel size, as big as the letters
+
+
+def fx_line(sc, x, y, line, dim=False, draw=True, z=None):
     """One line of terms (fxg.py): each term its glyph, its number after it in gold, arrows and words between.
     A line starting «минус:» is a drawback, in red. Returns the width and where each glyph went."""
     import fxg
+    z = FXZ if z is None else z
     neg = line.startswith("минус:")
     tcol = (236, 150, 130) if neg else (MUTED if dim else INK)
     cx, spots = x, []
@@ -1052,11 +1056,12 @@ def fx_line(sc, x, y, line, dim=False, draw=True):
         else:
             _, key, val = part
             a_ = fxg.rgba(key)
-            gy = y + 9 - a_.shape[0] / 2
+            gh, gw = a_.shape[0] * z, a_.shape[1] * z
+            gy = int(y + 9 - gh / 2)
             if draw:
-                fxg.draw(sc, key, cx + 1, gy)
-            spots.append((key, cx + 1, gy, a_.shape[1], a_.shape[0]))
-            cx += a_.shape[1] + 3
+                fxg.draw(sc, key, cx + 1, gy, z)
+            spots.append((key, cx + 1, gy, gw, gh))
+            cx += gw + 4
             if val:
                 if draw:
                     letters(sc, val, cx - 1, y, "text", 16, col=(255, 214, 110) if not neg else RED)
@@ -1064,7 +1069,7 @@ def fx_line(sc, x, y, line, dim=False, draw=True):
     return cx - x, spots
 
 
-def fx_rows(sc, x, y, w, rows, lh=18, dim=False, draw=True):
+def fx_rows(sc, x, y, w, rows, lh=26, dim=False, draw=True):
     """A column of effect lines. Returns the y under the last."""
     for line in rows:
         fx_line(sc, x, y, line, dim=dim, draw=draw)
@@ -1300,11 +1305,11 @@ def big_card(spec, name, save=True):
         sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.5 + hexc("#4a3e5c") * 0.5
         icon(sc, key, x0, y + 5, 1)
         for cx, val, col in zip(cols, (nm, dmg, typ, reach), (GOLD, INK, INK, INK)):
-            fx_line(sc, cx, y + 5, val) if "{" in val else UI.rich(sc, val, cx, y + 5, "text", 16, col=col)
-        y += 22
+            fx_line(sc, cx, y + 6, val) if "{" in val else UI.rich(sc, val, cx, y + 6, "text", 16, col=col)
+        y += 28
         if note:
-            fx_line(sc, x0 + 20, y, note, dim=True)
-            y += 18
+            fx_line(sc, x0 + 20, y + 2, note, dim=True)
+            y += 26
         y += 4
     # under the attacks: the leader's comb of mutations; what woke shows its icon, what didn't is sealed
     if spec.get("comb"):
@@ -1521,12 +1526,12 @@ def mutation_card(key="nest"):
     # its effects, as standard lines, and what it hands down
     spots = []
     for j, ln in enumerate(rows):
-        spots += fx_line(sc, x0 + 22, y0 + 314 + j * 20, ln)[1]
-    fx_line(sc, x0 + 22, y0 + 368, "{выводок} → потомкам", dim=True)
+        spots += fx_line(sc, x0 + 22, y0 + 314 + j * 26, ln)[1]
+    fx_line(sc, x0 + 22, y0 + 318 + len(rows) * 26, "{выводок} → потомкам", dim=True)
     # the mouse over a glyph: what it means
     egg = next(sp for sp in spots if sp[0] == "яйцо")
     sc.glow(egg[1] + egg[3] / 2, egg[2] + egg[4] / 2, 10, hexc("#ffd070"), 0.5)
-    gloss_tip(sc, "яйцо", x0 + 128, y0 + 296, 252)
+    gloss_tip(sc, "яйцо", int(egg[1] + egg[3] + 26), y0 + 296, 252)
     cursor(sc, int(egg[1] + egg[3] / 2), int(egg[2] + egg[4] / 2))
 
     UI.button(sc, x1 - 220, y1 - 54, x1 - 20, y1 - 16, "chitin")
