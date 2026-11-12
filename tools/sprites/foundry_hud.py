@@ -162,137 +162,386 @@ def mod_icon(sc, key, x, y, z=1):
     return spr.w
 
 
-# ---------------------------------------------------------------- the workshop: one of three, on the golem, to battle
+# ---------------------------------------------------------------- building a golem: the slipway and the steps
 ARMY = [   # (frame, cells, modules {key: level}, core, state)
     ("Страж", 5, {"tower": 2, "intercept": 1, "plates": 1}, "cast", "normal"),
     ("Мудрец", 4, {"chain": 1, "fireball": 1, "overload": 2}, "volt", "broken"),
     ("Орудие", 4, {"mortar": 1, "canister": 1}, "cast", "hi"),
     ("Механик", 3, {"repair": 1, "oiler": 1}, "cast", "normal"),
 ]
-OFFERS = [   # (key, kind, cell state, what it is, for whom, lines)
+OFFERS = [   # (key, kind, cell state, its name, for whom, lines)
     ("long", "новый модуль", "new", "Длинный ствол", "Орудие", MOD_FX["long"]),
     ("repair", "улучшение", "hi", "Ремонт II", "Механик", ["{ремонт:4} ⇒ {ремонт:6}"]),
     ("grapple", "редкий", "rare", "Крюк-кошка", "любой", MOD_FX["grapple"]),
 ]
+# where each part sits on the frame, as an offset from the golem's foot at the slipway's scale 2.56 (frame scale 1.6):
+# a callout runs from that point to the part's box
+MOUNT = {
+    "Орудие": {"mortar": ("спина", (-13, -104)), "canister": ("рука", (6, -44)), "long": ("ствол", (40, -22)),
+               "free": ("плечо", (-24, -80)), "core": ("грудь · ядро", (10, -66))},
+}
+BLUE = hexc("#9ad8ff")
+
+
+def blueprint_sheet(sc, x0, y0, x1, y1, stamp=None, top=False):
+    """The drawing pinned behind the slipway: blue paper, a fine grid and a bolder one, a frame round it, tacks in
+    the corners, a title block in the corner."""
+    sc.rgb[y0:y1, x0:x1] = hexc("#14243a")
+    for x in range(x0, x1, 8):
+        sc.rgb[y0:y1, x] = sc.rgb[y0:y1, x] * 0.8 + hexc("#24405e") * 0.2
+    for y in range(y0, y1, 8):
+        sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.8 + hexc("#24405e") * 0.2
+    for x in range(x0, x1, 40):
+        sc.rgb[y0:y1, x] = sc.rgb[y0:y1, x] * 0.6 + hexc("#3a6a94") * 0.4
+    for y in range(y0, y1, 40):
+        sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.6 + hexc("#3a6a94") * 0.4
+    for k in (3, 4):
+        sc.rgb[y0 + k, x0 + k:x1 - k] = BLUE * 0.6
+        sc.rgb[y1 - 1 - k, x0 + k:x1 - k] = BLUE * 0.6
+        sc.rgb[y0 + k:y1 - k, x0 + k] = BLUE * 0.6
+        sc.rgb[y0 + k:y1 - k, x1 - 1 - k] = BLUE * 0.6
+    for (tx, ty) in ((x0 + 9, y0 + 9), (x1 - 10, y0 + 9), (x0 + 9, y1 - 10), (x1 - 10, y1 - 10)):
+        sc.rgb[ty - 2:ty + 3, tx - 2:tx + 3] = SU.OUTL
+        sc.rgb[ty - 1:ty + 2, tx - 1:tx + 2] = hexc("#c84a3a")
+    if stamp:
+        bx0, by0 = x1 - 190, (y0 + 20 if top else y1 - 46)
+        by1 = by0 + 41
+        sc.rgb[by0:by1, bx0:x1 - 5] = sc.rgb[by0:by1, bx0:x1 - 5] * 0.6 + hexc("#0c1828") * 0.4
+        sc.rgb[by0, bx0:x1 - 5] = BLUE * 0.6
+        sc.rgb[by1, bx0:x1 - 5] = BLUE * 0.6
+        sc.rgb[by0:by1, bx0] = BLUE * 0.6
+        for j, ln in enumerate(stamp):
+            letters(sc, ln, bx0 + 8, by0 + 5 + j * 18, "text", 16, col=(170, 220, 250), outline=False)
+    sc.occ[y0:y1, x0:x1] = True
+    sc.light[y0:y1, x0:x1] = 0
+
+
+def drawn(spr, col="#9ad8ff", fill="#1e3a5a"):
+    """A frame as a drawing on the blueprint: the outline and the inner edges in light lines, the body filled
+    with the paper's darker blue — not built yet."""
+    import numpy as np
+    s = spr.__class__(spr.w, spr.h)
+    s.a = spr.a.copy()
+    lum = spr.rgb.mean(axis=2)
+    s.rgb[:] = hexc(fill)
+    a = spr.a
+    edge = a & ~(np.roll(a, 1, 0) & np.roll(a, -1, 0) & np.roll(a, 1, 1) & np.roll(a, -1, 1))
+    gy = np.abs(np.roll(lum, 1, 0) - lum) + np.abs(np.roll(lum, 1, 1) - lum)
+    inner = a & (gy > 34)
+    s.rgb[inner] = hexc(col) * 0.55 + hexc(fill) * 0.45
+    s.rgb[edge] = hexc(col)
+    s.ox, s.oy = spr.ox, spr.oy
+    return s
+
+
+def callout(sc, p, q, col=BLUE, dash=False):
+    """A leader line from a point on the golem to a part's box: a dot at the point, a dogleg to the box."""
+    (px, py), (qx, qy) = p, q
+    mx = qx
+    pts = [(px, py), (mx, py), (qx, qy)] if abs(qy - py) > 2 else [(px, py), (qx, qy)]
+    pts = [(px, py), (px + (qx - px) * 0.5, py), (px + (qx - px) * 0.5, qy), (qx, qy)]
+    for (ax, ay), (bx, by) in zip(pts[:-1], pts[1:]):
+        n = int(max(abs(bx - ax), abs(by - ay))) + 1
+        for i in range(n):
+            if dash and (i // 3) % 2:
+                continue
+            x = int(round(ax + (bx - ax) * i / max(1, n - 1)))
+            y = int(round(ay + (by - ay) * i / max(1, n - 1)))
+            sc.rgb[y, x] = col
+    sc.rgb[int(py) - 2:int(py) + 3, int(px) - 2:int(px) + 3] = SU.OUTL
+    sc.rgb[int(py) - 1:int(py) + 2, int(px) - 1:int(px) + 2] = col
+
+
+def part_box(sc, x, y, key, label, lv=1, state="normal", w=118):
+    """A part's box at the end of a callout: the mount's name, the module's icon, its name, its level."""
+    FU.cell(sc, x, y, x + w, y + 46, state)
+    letters(sc, label.upper(), x + 8, y + 5, "title", 8, col=(150, 200, 230), outline=False)
+    if key:
+        mod_icon(sc, key, x + 8, y + 18)
+        H.HOVER.append(("@" + key, x + 8, y + 18, 16, 16))
+        letters(sc, MOD_NAME[key], x + 30, y + 18, "text", 16, col=INK if state != "new" else (170, 220, 250))
+        FU.levels(sc, x + w - 26, y + 6, lv)
+    else:
+        letters(sc, "свободно", x + 30, y + 18, "text", 16, col=PALE)
+    return x + w, y + 23
+
+
+def crane_hook(sc, x, y_top, y_hook, key):
+    """The gantry's trolley, its chain down, the hook, and the part hanging from it."""
+    sc.rgb[y_top:y_top + 8, x - 16:x + 17] = hexc("#3a3840")
+    sc.rgb[y_top, x - 16:x + 17] = hexc("#6a6870")
+    sc.rgb[y_top + 7, x - 16:x + 17] = SU.OUTL
+    FU.rivet(sc, x - 10, y_top + 4)
+    FU.rivet(sc, x + 10, y_top + 4)
+    FU.chain(sc, x, y_top + 8, y_hook)
+    for k in range(6):                                                # the hook
+        sc.rgb[y_hook + k, x - 1:x + 2] = hexc("#8a8890")
+    sc.rgb[y_hook + 5:y_hook + 8, x - 4:x + 2] = hexc("#8a8890")
+    sc.rgb[y_hook + 3:y_hook + 6, x - 5] = hexc("#8a8890")
+    spr = IC.icon(key, 3, "module")
+    sc.blit(spr, int(x - spr.w / 2), int(y_hook + 8))
+    sc.occ[int(y_hook + 8):int(y_hook + 8) + spr.h, int(x - spr.w / 2):int(x - spr.w / 2) + spr.w] |= spr.a
+    return int(y_hook + 8 + spr.h)
+
+
+def rack(sc, x0, y0, x1, sel="Орудие"):
+    """The army on its rack, one bay each: the golem small, its cells filled or not; and a bay for a new one."""
+    import frames as F
+    y = y0
+    for frame, ncell, mods, core, state in ARMY:
+        st = "hi" if frame == sel else ("broken" if state == "broken" else "normal")
+        FU.cell(sc, x0, y, x1, y + 86, st)
+        g = F.build(frame, "broken" if state == "broken" else "idle", k=F.FRAMES[frame][0] * 0.48)
+        if state == "broken":
+            from swarm_effects import lit
+            g = lit(g, (70, 70, 80), 0.45)
+        sc.blit(g, int(x0 + 34 - g.ox), int(y + 78 - g.oy))
+        letters(sc, frame, x0 + 66, y + 8, "text", 16, col=GOLD if st == "hi" else INK)
+        for j in range(ncell):                                      # its cells: lit if a module is in
+            cx_ = x0 + 68 + j * 12
+            filled = j < len(mods)
+            sc.rgb[y + 32:y + 42, cx_:cx_ + 9] = SU.OUTL
+            sc.rgb[y + 33:y + 41, cx_ + 1:cx_ + 8] = hexc("#e0b860") if filled else hexc("#24222a")
+        if state == "broken":
+            H.fx_line(sc, x0 + 66, y + 52, "{поломка}")
+        else:
+            H.glyph(sc, "ядро", x0 + 66, y + 54, 1)
+            letters(sc, MOD_NAME[core].split()[0].lower(), x0 + 84, y + 52, "text", 16, col=MUTED)
+        y += 92
+    FU.cell(sc, x0, y, x1, y + 44, "locked")
+    letters(sc, "+ новый голем", (x0 + x1) / 2, y + 14, "text", 16, col=PALE, align="center")
+    return y + 44
 
 
 def workshop(variant=None):
-    """The workshop: the golems on their stands, each with its cells of modules and its core; three offers on the
-    right — one of three; the chosen one is already shown in the golem's free cell, a chain to it from the card."""
+    """The slipway: the golem on the workbench before its drawing, a callout from every mount to its part — the
+    back, the arm, the barrel, the shoulder, the chest with the core; the chosen part hangs from the crane over its
+    free mount. On the left the army on its rack; on the right the crate with what the battle brought, one of three."""
+    import frames as F
     sc = screen(11)
     FU.wing(sc, 0, 0, WW, 44)
     title(sc, "МАСТЕРСКАЯ")
     metal(sc, 14)
     toolbar(sc)
-    # the golems
-    FU.plate(sc, 12, 52, 690, 462, seed=3)
-    cw = 168
-    slot_spots = {}
-    for i, (frame, ncell, mods, core, state) in enumerate(ARMY):
-        x0 = 20 + i * cw
-        cx = x0 + cw / 2 - 4
-        FU.cell(sc, x0, 60, x0 + cw - 8, 452, state)
-        letters(sc, frame, cx, 70, "text", 16, col=GOLD if state == "hi" else INK, align="center")
-        show = dict(mods)
-        if state == "hi":
-            show["long"] = 1                                            # the preview: the chosen module in place
-        spr = golem_sprite(frame, show, 1.08)
-        # the stand: an anvil-dark block, the core's lamp in front
-        sy = 296
-        sc.rgb[sy:sy + 14, int(cx - 52):int(cx + 52)] = hexc("#24222a")
-        sc.rgb[sy, int(cx - 52):int(cx + 52)] = hexc("#5a5860")
-        sc.rgb[sy + 13, int(cx - 52):int(cx + 52)] = SU.OUTL
-        core_col = {"cast": "#c8c8d0", "fire": "#ff8a2a", "volt": "#8ad8ff"}[core]
-        cc = (int(cx), sy + 7)
-        d = np.hypot(sc.xx - cc[0], sc.yy - cc[1])
-        sc.rgb[d < 5] = SU.OUTL
-        sc.rgb[d < 4] = hexc(core_col)
-        if state == "broken":                                          # broken: dark, slumped, the core out
-            sc.rgb[d < 4] = hexc("#3a3a40")
-            from swarm_effects import lit
-            spr = lit(spr, (70, 70, 80), 0.45)
-        put = int(cx - spr.ox), int(sy - spr.oy)
-        sc.blit(spr, *put)
-        if state == "broken":
-            FU.steam(sc, cx + 14, sy - 70, 10, seed=i)
-            H.glyph(sc, "поломка", int(cx - 10), 92, 2)
-        # its cells: icon, level notches; the empty ones dark
-        sw_ = 30
-        row_x = cx - (ncell * (sw_ + 2)) / 2
-        keys = list(mods) + (["long"] if state == "hi" else [])
-        for j in range(ncell):
-            sx = int(row_x + j * (sw_ + 2))
-            sy2 = 320
-            if j < len(keys):
-                k_ = keys[j]
-                new = state == "hi" and k_ == "long"
-                FU.cell(sc, sx, sy2, sx + sw_, sy2 + sw_, "new" if new else "normal")
-                mod_icon(sc, k_, sx + 7, sy2 + 7)
-                H.HOVER.append(("@" + k_, sx + 7, sy2 + 7, 16, 16))
-                FU.levels(sc, sx + 6, sy2 + sw_ + 3, show.get(k_, 1))
-                slot_spots[(frame, k_)] = (sx, sy2)
-            else:
-                FU.socket(sc, sx + 2, sy2 + 2, sx + sw_ - 2, sy2 + sw_ - 2)
-        # under the cells: its body and what keeps it whole
-        hp_full = {"Страж": 10, "Мудрец": 10, "Орудие": 10, "Механик": 10}[frame]
-        hp_now = {"Страж": 7, "Мудрец": 0, "Орудие": 10, "Механик": 9}[frame]
-        H.glyph(sc, "здоровье", int(x0 + 14), 374, 2)
-        SU.meter(sc, x0 + 40, 380, x0 + 140, 7, hp_full, hp_now, "#c04a3a")
-        if state == "broken":
-            H.fx_line(sc, x0 + 14, 404, "{ремонт} {металл:2}")
-        H.glyph(sc, "ядро", int(x0 + 14), 424, 2)
-        letters(sc, MOD_NAME[core].split()[0].lower(), x0 + 40, 424, "text", 16, col=MUTED)
-    # the offers: one of three
-    FU.plate(sc, 700, 52, 948, 462, seed=4)
-    heading(sc, "НАГРАДА", 714, 64)
-    H.fx_line(sc, 714, 86, "{выбор:1 из 3}", dim=True)
+    rack(sc, 10, 52, 168)
+    # the slipway: the drawing, the gantry, the golem on its stand
+    FU.plate(sc, 176, 52, 700, 462, seed=3)
+    blueprint_sheet(sc, 186, 62, 690, 408, stamp=["КАРКАС: ОРУДИЕ", "стрелок · размер 5"], top=True)
+    sc.rgb[70:78, 190:686] = hexc("#2a2830")                         # the gantry beam
+    sc.rgb[70, 190:686] = hexc("#5a5860")
+    sc.rgb[77, 190:686] = SU.OUTL
+    for x in range(196, 686, 14):
+        FU.rivet(sc, x, 74)
+    frame, ncell, mods, core, _ = ARMY[2]
+    K = 2.15                                                        # the slipway's frame scale, over the field's
+    spr = golem_sprite(frame, mods, K)
+    fx_, fy_ = 432, 388
+    sc.rgb[fy_ + 2:fy_ + 14, fx_ - 80:fx_ + 80] = hexc("#24222a")    # the stand
+    sc.rgb[fy_ + 2, fx_ - 80:fx_ + 80] = hexc("#6a6870")
+    sc.rgb[fy_ + 13, fx_ - 80:fx_ + 80] = SU.OUTL
+    sc.blit(spr, int(fx_ - spr.ox), int(fy_ - spr.oy))
+    sk = K / 1.6                                                     # the mounts were measured at 1.6
+    mp = {k: (fx_ + dx * sk, fy_ + dy * sk) for k, (lab, (dx, dy)) in MOUNT[frame].items()}
+    labs = {k: lab for k, (lab, _) in MOUNT[frame].items()}
+    # the boxes round the golem, a callout to each mount: the back, a free shoulder, the chest and its core on the
+    # left; the arm and the barrel — where the new part goes — on the right
+    for k_, by in (("mortar", 98), ("free", 182), ("core", 266)):
+        if k_ == "core":
+            FU.cell(sc, 198, by, 316, by + 46, "normal")
+            letters(sc, "ГРУДЬ · ЯДРО", 206, by + 5, "title", 8, col=(150, 200, 230), outline=False)
+            H.glyph(sc, "ядро", 206, by + 19, 2)
+            letters(sc, "литое", 230, by + 18, "text", 16, col=INK)
+            ex, ey = 316, by + 23
+        else:
+            ex, ey = part_box(sc, 198, by, None if k_ == "free" else k_, labs[k_], mods.get(k_, 1))
+        callout(sc, mp[k_], (ex, ey), dash=k_ == "free")
+    part_box(sc, 540, 222, "canister", labs["canister"], mods["canister"], w=140)
+    callout(sc, mp["canister"], (540, 245))
+    # the barrel's mount: the chosen part goes here — the box under the mouse, hot; the part on the crane above
+    FU.cell(sc, 540, 300, 680, 346, "hover" if variant is None else "new")
+    letters(sc, labs["long"].upper(), 548, 305, "title", 8, col=(150, 200, 230), outline=False)
+    letters(sc, "Длинный ствол", 568, 318, "text", 16, col=(255, 210, 150))
+    mod_icon(sc, "long", 548, 318)
+    callout(sc, mp["long"], (540, 323), col=hexc("#ffb060"))
+    hx = int(mp["long"][0])
+    bottom = crane_hook(sc, hx, 70, 108, "long")
+    sc.glow(mp["long"][0], mp["long"][1], 10, hexc("#ffb060"), 0.6)
+    for k in range(bottom + 4, int(mp["long"][1]) - 8, 4):           # where it goes
+        sc.rgb[k:k + 2, hx] = hexc("#ffb060")
+    # under the drawing: the frame's own and the cells' count
+    H.fx_line(sc, 190, 418, "Наводка: {дальность} → {урон} без потерь")
+    for j in range(ncell):
+        cx_ = 560 + j * 30
+        FU.cell(sc, cx_, 412, cx_ + 24, 436, "hi" if j < len(mods) else ("new" if j == len(mods) else "locked"))
+    letters(sc, "ячейки", 560, 440, "text", 16, col=MUTED)
+    # the crate: what the battle brought
+    FU.plate(sc, 708, 52, 948, 462, seed=4)
+    heading(sc, "ДЕТАЛИ", 720, 64)
+    H.fx_line(sc, 720, 86, "{выбор:1 из 3}", dim=True)
     for j, (key, kind, st, nm, who, lines) in enumerate(OFFERS):
-        y0 = 114 + j * 114
-        hov = variant is None and j == 2
-        FU.cell(sc, 710, y0, 938, y0 + 106, "hover" if hov else st)
-        FU.cell(sc, 718, y0 + 10, 770, y0 + 62, "locked")
-        mod_icon(sc, key, 728, y0 + 20, 2)
-        letters(sc, nm, 780, y0 + 10, "text", 16, col=GOLD if st == "hi" else INK)
-        letters(sc, kind, 780, y0 + 28, "text", 16, col={"new": (140, 200, 230), "hi": BRASS, "rare": (200, 150, 240)}[st])
-        letters(sc, who, 780, y0 + 46, "text", 16, col=PALE)
-        H.fx_rows(sc, 722, y0 + 74, 210, lines)
-        if j == 0:
-            a = (710, y0 + 40)
-    # a brass chain from the chosen card to the free cell it will take
-    bx, by = slot_spots[("Орудие", "long")]
-    tgt = (bx + 15, by - 2)
-    n = 40
-    for k in range(n + 1):
-        t = k / n
-        x = a[0] + (tgt[0] - a[0]) * t
-        y = a[1] + (tgt[1] - a[1]) * t + np.sin(t * np.pi) * 40
-        xi, yi = int(x), int(y)
-        if k % 2 == 0:                                                   # a link face-on
-            sc.rgb[yi - 2:yi + 3, xi - 3:xi + 4] = SU.OUTL
-            sc.rgb[yi - 1:yi + 2, xi - 2:xi + 3] = hexc("#e0b860")
-            sc.rgb[yi, xi - 1:xi + 2] = hexc("#5a4020")
-        else:                                                            # edge-on
-            sc.rgb[yi - 1:yi + 2, xi - 2:xi + 3] = SU.OUTL
-            sc.rgb[yi, xi - 1:xi + 2] = hexc("#f8d890")
+        y0 = 112 + j * 114
+        hov = False
+        FU.cell(sc, 716, y0, 940, y0 + 106, "hi" if j == 0 else st)
+        if j == 0:                                                 # it is on the hook: an empty nest in the straw
+            FU.socket(sc, 724, y0 + 10, 776, y0 + 62)
+            letters(sc, "на", 750, y0 + 20, "text", 16, col=BRASS, align="center")
+            letters(sc, "крюке", 750, y0 + 38, "text", 16, col=BRASS, align="center")
+        else:
+            FU.cell(sc, 724, y0 + 10, 776, y0 + 62, "locked")
+            mod_icon(sc, key, 734, y0 + 20, 2)
+        sc.rgb[y0 + 12:y0 + 30, 786:930] = hexc("#d8c8a0")                      # the paper tag
+        sc.rgb[y0 + 12, 786:930] = hexc("#f0e4c4")
+        sc.rgb[y0 + 29, 786:930] = hexc("#8a7a5a")
+        sc.rgb[y0 + 20:y0 + 22, 778:786] = hexc("#b8a880")                     # its string
+        letters(sc, kind, 792, y0 + 13, "text", 16,
+                col={"new": (40, 90, 130), "hi": (120, 80, 20), "rare": (100, 50, 150)}[st], outline=False, shadow=False)
+        letters(sc, nm, 786, y0 + 36, "text", 16, col=GOLD if j == 0 else INK)
+        letters(sc, who, 786, y0 + 54, "text", 16, col=PALE)
+        H.fx_rows(sc, 724, y0 + 76, 210, lines)
     # leaving
     action(sc, 12, 478, 210, 526, "Автосборка", "steel")
     action(sc, 220, 478, 450, 526, "Починить всё · 2", "hot")
     action(sc, 460, 478, 690, 526, "Пропустить · +4", "steel")
     action(sc, 700, 472, 948, 532, "В БОЙ", "hot", big=True)
-    # the living: a chain from the beam between the plates, sparks off the anvil
-    FU.chain(sc, 695, 44, 104)
-    sc.rgb[104:110, 691:700] = SU.OUTL
-    sc.rgb[105:109, 692:699] = hexc("#8a8890")
-    FU.sparks(sc, 20, 470, 12, seed=5)
+    FU.sparks(sc, 186, 400, 10, seed=5)
     name = "foundry_workshop.png"
-    if variant == "tip":
-        H.point_at(sc, "@long", 0, w=280)
-        name = "foundry_tip.png"
-    elif variant is None:
-        H.cursor(sc, 900, 360)
+    if variant is None:
+        H.cursor(sc, 640, 330)
     img = sc.image(S)
     img.save(out(name))
     print(name, img.size)
+
+
+STEPS = ["КАРКАС", "ЯДРО", "МОДУЛИ", "ПУСК"]
+
+
+def steps_bar(sc, cur, y=52):
+    """The four steps of a new golem across the top: done in brass, the current one hot, the next ones dull."""
+    x = 12
+    for i, st in enumerate(STEPS):
+        kind = "brass" if i < cur else ("hot" if i == cur else "dull")
+        FU.button(sc, x, y, x + 214, y + 34, kind)
+        letters(sc, f"{i + 1}. {st}", x + 107, y + 10, "text", 16, col=FU.BUTTON[kind][2], outline=kind == "dull",
+                align="center")
+        if i < len(STEPS) - 1:
+            letters(sc, "»", x + 226, y + 9, "text", 16, col=MUTED, align="center")
+        x += 238
+
+
+def assembly(step=0):
+    """A new golem, built from nothing: 1 — the frame (one of two, as drawings on blueprint paper: role, size, cells,
+    its own rule, price); 2 — the core (three, glowing in their cradles, one goes into the chest); 3 — the modules,
+    on the slipway (workshop()); 4 — the start: steam, sparks, and its passport — what it was built of."""
+    import frames as F
+    import golems_h as GH
+    sc = screen(23 + step)
+    FU.wing(sc, 0, 0, WW, 44)
+    title(sc, "НОВЫЙ ГОЛЕМ")
+    metal(sc, 22)
+    toolbar(sc)
+    steps_bar(sc, step)
+    if step == 0:
+        frames = [("Страж", "танк", 6, 5, "заслон: {радиус:1} → {цель:1}", 10, 6),
+                  ("Горн", "контроль", 5, 4, "{каждые:1} → {огонь} {радиус:1}", 8, 5)]
+        for i, (fr, role, size, cells, rule, price, lead) in enumerate(frames):
+            x0 = 12 + i * 472
+            x1 = x0 + 464
+            sel = i == 1
+            FU.cell(sc, x0, 96, x1, 462, "hi" if sel else "normal")
+            blueprint_sheet(sc, x0 + 10, 106, x1 - 10, 330, stamp=[f"КАРКАС: {fr.upper()}", f"{role} · размер {size}"])
+            g = drawn(F.build(fr, "idle", k=F.FRAMES[fr][0] * 1.25))
+            sc.blit(g, int((x0 + x1) / 2 - 40 - g.ox), int(318 - g.oy))
+            # its height as a dimension line
+            top = 318 - int(g.oy) + int(np.nonzero(g.a.any(axis=1))[0][0])
+            dx = x0 + 40
+            sc.rgb[top:318, dx] = BLUE
+            sc.rgb[top, dx - 4:dx + 5] = BLUE
+            sc.rgb[317, dx - 4:dx + 5] = BLUE
+            letters(sc, str(size), dx + 6, (top + 318) // 2 - 8, "text", 16, col=(170, 220, 250), outline=False)
+            letters(sc, fr, x0 + 18, 340, "title", 16, col=GOLD if sel else INK)
+            for j in range(cells):                                   # its empty cells, waiting
+                FU.socket(sc, x0 + 18 + j * 34, 366, x0 + 46 + j * 34, 394)
+            letters(sc, "ячеек " + str(cells), x0 + 30 + cells * 34, 372, "text", 16, col=MUTED)
+            H.fx_line(sc, x0 + 18, 404, rule)
+            H.fx_line(sc, x0 + 18, 432, f"{{металл:{price}}} · {{лидер:{lead}}}")
+        action(sc, 12, 478, 300, 526, "Назад", "steel")
+        action(sc, 660, 472, 948, 532, "ДАЛЕЕ: ЯДРО", "hot", big=True)
+        name = "foundry_new_frame.png"
+    elif step == 1:
+        FU.plate(sc, 12, 96, 948, 462, seed=9)
+        blueprint_sheet(sc, 22, 106, 420, 452, stamp=["КАРКАС: ГОРН", "ядро — в грудь"], top=True)
+        g = F.build("Горн", "idle", k=F.FRAMES["Горн"][0] * 2.0)
+        gx, gy = 200, 440
+        sc.blit(g, int(gx - g.ox), int(gy - g.oy))
+        rows_ = np.nonzero(g.a.any(axis=1))[0]
+        cols_ = np.nonzero(g.a.any(axis=0))[0]
+        top_, bot_ = gy - g.oy + rows_[0], gy - g.oy + rows_[-1]
+        cx = int(gx - g.ox + (cols_[0] + cols_[-1]) / 2)
+        cy = int(top_ + (bot_ - top_) * 0.52)                           # the chest, where the core goes
+        cores = [("cast", "литое", "#c8c8d0", MOD_FX["cast"]), ("fire", "огненное", "#ff8a2a", MOD_FX["fire"]),
+                 ("volt", "грозовое", "#8ad8ff", MOD_FX["volt"])]
+        for j, (k_, nm, col, lines) in enumerate(cores):
+            y0 = 112 + j * 114
+            sel = k_ == "fire"
+            FU.cell(sc, 436, y0, 940, y0 + 106, "hi" if sel else "normal")
+            ox, oy = 490, y0 + 52                                     # the core in its cradle
+            d = np.hypot(sc.xx - ox, sc.yy - oy)
+            sc.rgb[(d < 26) & (d >= 22)] = hexc("#5a5860")
+            sc.rgb[d < 22] = hexc("#14121a")
+            sc.rgb[d < 16] = hexc(col) * 0.5
+            sc.rgb[d < 11] = hexc(col)
+            sc.rgb[d < 5] = hexc("#ffffff") * 0.6 + hexc(col) * 0.4
+            sc.glow(ox, oy, 26, hexc(col), 0.5 if sel else 0.25)
+            letters(sc, nm + " ядро", 530, y0 + 14, "text", 16, col=GOLD if sel else INK)
+            H.fx_rows(sc, 530, y0 + 40, 400, lines)
+            if sel:
+                callout(sc, (cx, cy), (466, oy), col=hexc("#ff8a2a"))
+        action(sc, 12, 478, 300, 526, "Назад", "steel")
+        action(sc, 660, 472, 948, 532, "ДАЛЕЕ: МОДУЛИ", "hot", big=True)
+        name = "foundry_new_core.png"
+    else:
+        FU.plate(sc, 12, 96, 948, 462, seed=10)
+        g = F.build("Горн", "idle", k=F.FRAMES["Горн"][0] * 2.3)
+        sc.rgb[440:452, 190:410] = hexc("#24222a")                   # the stand
+        sc.rgb[440, 190:410] = hexc("#6a6870")
+        sc.blit(g, int(300 - g.ox), int(442 - g.oy))
+        FU.steam(sc, 270, 200, 18, seed=1)
+        FU.steam(sc, 340, 190, 14, seed=2)
+        FU.sparks(sc, 200, 440, 14, seed=3)
+        FU.sparks(sc, 400, 440, 12, seed=4)
+        letters(sc, "ГОРН ГОТОВ", 300, 116, "title", 24, col=(255, 200, 120), col2=(140, 60, 10), align="center")
+        # its passport: what it was built of, step by step
+        FU.cell(sc, 540, 116, 936, 450, "hi")
+        heading(sc, "ПАСПОРТ", 556, 128)
+        y = 160
+        for lab, val in (("каркас", "Горн · контроль · размер 5"), ("ядро", "огненное"), ("ячейки", "4")):
+            letters(sc, lab, 556, y, "text", 16, col=MUTED)
+            letters(sc, val, 650, y, "text", 16, col=INK)
+            y += 26
+        H.fx_line(sc, 556, y + 4, "Жар горна: {каждые:1} → {огонь} {радиус:1}")
+        y += 44
+        letters(sc, "модули", 556, y, "text", 16, col=MUTED)
+        for j, (k_, nm) in enumerate((("magnet", "Магнит"), ("maw", "Пасть топки"), (None, ""), (None, ""))):
+            yy = y + 22 + j * 38
+            if k_:
+                FU.cell(sc, 556, yy, 590, yy + 34, "normal")
+                mod_icon(sc, k_, 565, yy + 9)
+                letters(sc, nm, 600, yy + 9, "text", 16, col=INK)
+                FU.levels(sc, 880, yy + 14, 1)
+            else:
+                FU.socket(sc, 558, yy + 2, 588, yy + 32)
+                letters(sc, "свободно", 600, yy + 9, "text", 16, col=PALE)
+        action(sc, 12, 478, 300, 526, "Назад", "steel")
+        action(sc, 660, 472, 948, 532, "В МАСТЕРСКУЮ", "hot", big=True)
+        name = "foundry_new_start.png"
+    img = sc.image(S)
+    img.save(out(name))
+    print(name, img.size)
+
+
+def new_golem():
+    for st in (0, 1, 3):
+        assembly(st)
 
 
 # ---------------------------------------------------------------- the golem's card, as big as the screen
@@ -580,7 +829,7 @@ def battle():
     print("foundry_battle.png", img.size)
 
 
-SCREENS = {"workshop": workshop, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
+SCREENS = {"workshop": workshop, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
