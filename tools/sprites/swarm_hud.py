@@ -121,8 +121,13 @@ def help_button(sc, on=False, alt=False):
     keycap(sc, 900, 28, "F1")
 
 
+SILENT_KEYS = {"Enter", "Esc"}   # work on every screen, but are not written on the buttons
+
+
 def key_on(sc, x1, y0, t):
-    """A button's key, on its top edge near the right end."""
+    """A button's key, on its top edge near the right end — unless it is one everybody knows (Enter, Esc)."""
+    if t in SILENT_KEYS:
+        return
     w = UI.text_width(t, "title", 8) + 14
     keycap(sc, int(x1 - w - 26), int(y0 - 10), t)
 
@@ -204,7 +209,7 @@ def brood(variant=None):
     UI.engrave(sc, leader("Матка", "idle", 2.2), 640, 560, k=0.8)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
-    title(sc, "ВЫВОДОК", seed=5)
+    title(sc, "НАША СУДЬБА", seed=5)
     icon(sc, "biomass", 700, 6, 2)
     letters(sc, "34", 740, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     help_button(sc)
@@ -850,7 +855,7 @@ def aftermath(variant=None):
     letters(sc, "Взросление", 692 + nw, 330, "text", 16, col=GOLD, jitter=1)
     fx_rows(sc, 684, 366, 250, ["{рабочая} {убийство:№1}", "{кокон} → {солдат}"], lh=26)
     put(sc, bug(("ant", "stinger"), "idle", 1.1, 77, soldier=True), 900, 426, 10)
-    act_button(sc, 690, 466, 948, 524, "В ВЫВОДОК")
+    act_button(sc, 690, 466, 948, 524, "НАША СУДЬБА")
     UI.creature(sc, bug((), "idle", 1.0, 170), 250, 54)
     UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
     name = "swarm_aftermath.png"
