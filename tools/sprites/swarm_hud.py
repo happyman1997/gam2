@@ -139,97 +139,106 @@ def keycap(sc, x, y, t, lit=False):
 
 
 # ---------------------------------------------------------------- the brood: everything hatched, eat the extra
+SPEND = [   # what biomass buys in the brood: (icon, the button, what it does, cost)
+    ("feed", "Кормить Матку", "{выводок} → {потомок:+1}", 10),
+    ("evolve", "Эволюция формы", "→ {порода} {потомок}", 15),
+    ("clutch", "Ещё кладка", "{пара:+1} → {потомок}", 10),
+    ("reroll", "Перебросить кладки", "{потомок} → заново", 5),
+]
+
+
 def brood(variant=None):
+    """The brood: everything has hatched and the swarm is over its limit. The auto-selection has already eaten
+    the extra — those whose traits killed least — so the swarm fits and «В БОЙ» is open from the start; the player
+    only corrects it: a click on a group eats one more, a right click gives one back. Each creature is a gem in
+    its group's row, the eaten ones bitten. Biomass is spent in its own column, each button saying on whom."""
     import brood as B
     sc = frame_screen(31)
     UI.engrave(sc, leader("Матка", "idle", 2.2), 640, 560, k=0.8)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
     title(sc, "ВЫВОДОК", seed=5)
-    # biomass, top right
-    icon(sc, "biomass", 712, 6, 2)
-    letters(sc, "34", 752, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
-    fx_line(sc, 798, 12, "{съедена:5} → +5")
+    icon(sc, "biomass", 812, 6, 2)
+    letters(sc, "34", 852, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     help_button(sc)
-    # the limit: an abdomen of segments
-    total, eaten = B.totals()
-    UI.plate(sc, 12, 50, 948, 96)
-    fx_line(sc, 24, 54, "{предел}")
-    letters(sc, f"{total}/{B.LIMIT}", 50, 56, "title", 16, col=(255, 140, 110), col2=(170, 50, 40), jitter=1)
-    fx_line(sc, 24, 76, f"{{съедена:{eaten}}} из {total - B.LIMIT}", dim=True)
-    bx0, bx1 = 322, 938
-    sb0, sw = UI.segbar(sc, bx0, 62, bx1, 16, total, B.LIMIT, eaten)
-    letters(sc, "предел", sb0 + B.LIMIT * sw, 84, "title", 8, col=(240, 230, 200), align="center")
-    UI.drips(sc, 300, 900, 96, "#7a9a30", n=3, seed=7, Lmax=9)
-    # the groups: comb cells
-    GX0, GY0, GCW, GCH = 12, 104, 232, 96
-    for k_, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(B.GROUPS):
-        x0, y0 = GX0 + (k_ % 4) * (GCW + 2), GY0 + (k_ // 4) * (GCH + 3)
+    # the auto-selection, already done: plain ants go first, their traits killed least
+    groups = [list(g) for g in B.GROUPS]
+    total = sum(B.pts(g) * g[5] for g in groups)
+    over = total - B.LIMIT
+    for g in groups:
+        g[8] = 0
+    groups[0][8] = over
+    # the limit: an abdomen of segments, all within it now
+    UI.plate(sc, 12, 50, 948, 94)
+    fx_line(sc, 24, 60, "{предел}")
+    letters(sc, f"{total - over}/{B.LIMIT}", 50, 62, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    bx0, bx1 = 150, 938
+    sb0, sw = UI.segbar(sc, bx0, 62, bx1, 16, total, B.LIMIT, over)
+    letters(sc, "предел", sb0 + B.LIMIT * sw, 82, "title", 8, col=(240, 230, 200), align="center")
+    UI.drips(sc, 300, 900, 94, "#7a9a30", n=3, seed=7, Lmax=9)
+    # the groups: comb cells, three across
+    GX0, GY0, GCW, GCH = 12, 100, 224, 78
+    for k_, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(groups):
+        x0, y0 = GX0 + (k_ % 3) * (GCW + 8), GY0 + (k_ // 3) * (GCH + 6)
         UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "eat" if eat else ("new" if new else "normal"))
         mut = B.MUTS.get(k_, (None,))[0]
-        spr = W.build(traits, hue, "idle", soldier, k=1.25 if soldier else 1.6, chimera=chim, genes=W.genes_for(k_ * 7 + 3), rare=mut)
+        spr = W.build(traits, hue, "idle", soldier, k=1.05 if soldier else 1.35, chimera=chim, genes=W.genes_for(k_ * 7 + 3), rare=mut)
         if count > 1:
-            spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=1.0 if soldier else 1.3, chimera=chim, genes=W.genes_for(k_ * 7 + 4), rare=mut)
-            put(sc, spr2, x0 + 30, y0 + GCH - 26, 0)
-        put(sc, spr, x0 + 50, y0 + GCH - 10, 12)
-        letters(sc, name, x0 + 12, y0 + 6, "text", 16, col=INK, jitter=1, seed=k_)
-        cw = letters(sc, f"×{count}", x0 + 100, y0 + 28, "title", 16, col=(236, 220, 190), col2=(160, 130, 100))
-        glyph(sc, "предел", x0 + 106 + cw, y0 + 31, 1)
-        letters(sc, str(B.pts(B.GROUPS[k_]) * count), x0 + 118 + cw, y0 + 34, "title", 8, col=PALE, outline=False)
-        if eat:
-            fx_line(sc, x0 + 100, y0 + 50, f"{{съедена:{eat}}} → +{eat * B.pts(B.GROUPS[k_])}")
-        elif new:
-            fx_line(sc, x0 + 100, y0 + 50, f"{{потомок:+{new}}}")
-        mark = None
-        if k_ in B.MUTS:
-            key, m = B.MUTS[k_]
-            mark = ("m_" + key, {"мутация Матки": "Матки", "общая мутация": "общая", "гибрид · бесплоден": "бесплоден"}[m],
-                    B.MARK_COL[m])
+            spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=0.85 if soldier else 1.1, chimera=chim, genes=W.genes_for(k_ * 7 + 4), rare=mut)
+            put(sc, spr2, x0 + 26, y0 + GCH - 22, 0)
+        put(sc, spr, x0 + 44, y0 + GCH - 8, 12)
+        if k_ in B.MUTS:                                   # what it carries: the mutation's icon, top left
+            icon(sc, "m_" + B.MUTS[k_][0], x0 + 8, y0 + 6)
         elif badge:
-            mark = (B.KID_ICON[badge], badge, B.BADGE[badge])
-        if mark:
-            icon(sc, mark[0], x0 + 98, y0 + 70)
-            letters(sc, mark[1], x0 + 118, y0 + 71, "text", 16, col=mark[2])
-        UI.button(sc, x0 + 204, y0 + 28, x0 + 228, y0 + 50, "blood")
-        UI.button(sc, x0 + 204, y0 + 56, x0 + 228, y0 + 78, "chitin")
-        letters(sc, "−", x0 + 216, y0 + 31, "text", 16, col=INK, align="center")
-        letters(sc, "+", x0 + 216, y0 + 59, "text", 16, col=INK, align="center")
-    # natural selection
-    UI.plate(sc, 12, 402, 948, 440)
-    fx_line(sc, 24, 412, "{убийство} → {потомок}")
+            icon(sc, B.KID_ICON[badge], x0 + 8, y0 + 6)
+        letters(sc, name, x0 + 80, y0 + 6, "text", 16, col=INK, jitter=1, seed=k_)
+        cw = letters(sc, f"×{count}", x0 + 80, y0 + 28, "title", 16, col=(236, 220, 190), col2=(160, 130, 100))
+        glyph(sc, "предел", x0 + 86 + cw, y0 + 31, 1)
+        letters(sc, str(B.pts(groups[k_]) * count), x0 + 98 + cw, y0 + 34, "title", 8, col=PALE, outline=False)
+        if new:
+            fx_line(sc, x0 + 150, y0 + 28, f"{{потомок:+{new}}}")
+        # one gem per creature, the eaten ones bitten
+        step = min(14.0, 132.0 / max(1, count))
+        for j in range(count):
+            UI.gem(sc, x0 + 88 + j * step, y0 + 62, max(3.0, min(5.5, step * 0.46)), 7.0,
+                   "eat" if j >= count - eat else "ok", bite=j >= count - eat)
+    # natural selection: who killed, breeds
+    UI.plate(sc, 12, 438, 700, 474)
+    fx_line(sc, 24, 446, "{убийство} → {потомок}")
     for i, (name, kills, key) in enumerate(B.SELECTION):
-        x = 150 + i * 200
-        icon(sc, key, x, 412)
-        letters(sc, name, x + 20, 413, "text", 16, col=INK if i else (255, 170, 130))
-        UI.meter(sc, x + 84, 418, x + 144, 7, 10, round(10 * kills / 23), "#c04a3a" if i == 0 else "#8a6aa8")
-        letters(sc, str(kills), x + 150, 416, "title", 8, col=PALE, outline=False)
-    # spending and leaving
-    spend = [(12, 236, "Кормить · 10", "feed"), (246, 470, "Эволюция · 15", "evolve"),
-             (480, 704, "Ещё кладка · 10", "clutch"), (714, 948, "Перебросить · 5", "reroll")]
-    for x0, x1, t, key in spend:
-        UI.button(sc, x0, 450, x1, 486, "acid")
-        tw = UI.text_width(t)
-        icon(sc, key, (x0 + x1) / 2 - tw / 2 - 22, 459)
-        letters(sc, t, (x0 + x1) / 2 + 10, 459, "text", 16, col=INK, align="center")
-    for x0, x1, t, kind, col in ((12, 236, "Автоотбор", "chitin", INK), (246, 470, "Съесть новых", "blood", INK),
-                                 (714, 948, f"В бой · съешь ещё {total - B.LIMIT - eaten}", "dim", PALE)):
-        UI.button(sc, x0, 496, x1, 532, kind)
-        letters(sc, t, (x0 + x1) / 2, 505, "text", 16, col=col, align="center")
+        x = 140 + i * 140
+        icon(sc, key, x, 447)
+        UI.meter(sc, x + 22, 452, x + 92, 7, 10, round(10 * kills / 23), "#c04a3a" if i == 0 else "#8a6aa8")
+        letters(sc, str(kills), x + 100, 450, "title", 8, col=PALE, outline=False)
+    # correcting the selection
+    UI.button(sc, 12, 486, 236, 528, "chitin")
+    letters(sc, "Отбор заново", 124, 497, "text", 16, col=INK, align="center")
+    UI.button(sc, 246, 486, 470, 528, "blood")
+    letters(sc, "Съесть новых", 358, 497, "text", 16, col=INK, align="center")
     w_, _ = fx_line(sc, 0, 0, "{съедена} → {биомасса}", draw=False)
-    fx_line(sc, 592 - w_ // 2, 505, "{съедена} → {биомасса}", dim=True)
-    # the living: an ant walking the limit plate, one let down on silk, eggs in a corner, a wasp resting on «В бой»
+    fx_line(sc, 586 - w_ // 2, 498, "{съедена} → {биомасса}", dim=True)
+    # spending biomass: each button says on whom, a line says what it does, the price beside it
+    UI.plate(sc, 710, 100, 948, 474, antennae=True)
+    heading(sc, "БИОМАССА", 724, 110, seed=4)
+    for i, (key, label, line, cost) in enumerate(SPEND):
+        y0 = 138 + i * 82
+        UI.button(sc, 720, y0, 938, y0 + 34, "acid")
+        icon(sc, key, 744, y0 + 9)
+        letters(sc, label, 766, y0 + 9, "text", 16, col=INK)
+        fx_line(sc, 730, y0 + 42, line, dim=True)
+        wc, _ = fx_line(sc, 0, 0, f"{{биомасса:{cost}}}", draw=False)
+        fx_line(sc, 930 - wc, y0 + 42, f"{{биомасса:{cost}}}")
+    act_button(sc, 710, 482, 948, 534, "В БОЙ")
+    # the living: an ant walking the limit plate, one let down on silk, eggs in a corner
     UI.creature(sc, bug((), "idle", 1.0, 41), 272, 52)
     UI.silk(sc, (560, 44), (560, 50), sag=0)
     UI.creature(sc, bug(("ant",), "attack", 0.85, 42, rare="spinner"), 566, 64, shadow=False)
-    UI.creature(sc, clutch(0.95), 474, 446)
-    UI.creature(sc, larva("idle", 0.85), 40, 498)
-    UI.creature(sc, bug(("wings",), "idle", 0.95, 43), 934, 506)
-    UI.creature(sc, bug(("horn",), "idle", 0.8, 44), 742, 444)
-    UI.cobweb(sc, 958, 444, 34, quad=(-1, 1))
-    UI.cobweb(sc, 2, 444, 26, quad=(1, 1))
+    UI.creature(sc, larva("idle", 0.85), 690, 476)
+    UI.creature(sc, bug(("wings",), "idle", 0.95, 43), 930, 104)
+    UI.cobweb(sc, 2, 480, 26, quad=(1, 1))
     name = "brood.png"
-    if variant == "tip":                         # the mouse over «съедена» in the ants' cell
-        point_at(sc, "съедена", 2)
+    if variant == "tip":                         # the mouse over a group's newborn
+        point_at(sc, "потомок", 0)
         name = "swarm_tip_glyph.png"
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
