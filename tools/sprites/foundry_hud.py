@@ -134,11 +134,26 @@ def metal(sc, n, x=700):
 
 
 def action(sc, x0, y0, x1, y1, text, kind="hot", heated=False, big=False):
-    """A button: big ones (the screen's own action) in the title letters, the rest in text."""
-    FU.button(sc, x0, y0, x1, y1, kind, heated=heated)
-    col = FU.BUTTON[kind][2]
-    letters(sc, text, (x0 + x1) / 2, (y0 + y1) / 2 - (9 if big else 8), "title" if big else "text", 16, col=col,
-            outline=kind not in ("hot", "brass"), align="center")
+    """A control on the console at the foot of the screen. The screen's own action (big): a throttle lever beside a
+    cast nameplate. The rest: a push-button in a hex nut with its stamped tag on a wire; repairing: a valve's
+    handwheel. heated — the mouse on it: the lever thrown, the button pressed, the wheel turning."""
+    yc = (y0 + y1) // 2
+    if big:
+        FU.lever(sc, x0 + 18, y0 - 4, y1 + 2, pulled=heated)
+        FU.nameplate(sc, x0 + 44, y0 + 3, x1, y1 - 3, text, hot=kind == "hot", heated=heated)
+        return
+    r = 13
+    bx = x0 + r + 9
+    if text.startswith("Починить"):
+        FU.valve(sc, bx, yc, r + 2, turning=heated)
+        tk = "brass"
+    else:
+        cap = {"rust": "rust", "dull": "dull", "brass": "brass"}.get(kind, "steel")
+        FU.pushbutton(sc, bx, yc, r, kind=cap, pressed=heated)
+        tk = {"rust": "rust", "dull": "dull", "brass": "brass"}.get(kind, "steel")
+    tx0 = bx + r + 12
+    tw = SU.text_width(text, "text", 16)
+    FU.tag(sc, tx0, yc - 13, min(x1, int(tx0 + 13 * 1.6 + 6 + tw + 14)), yc + 13, text, tk, wire_to=bx + r + 6)
 
 
 def heading(sc, text, x, y):
@@ -645,6 +660,7 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None):
         letters(sc, nm, 786, y0 + 36, "text", 16, col=GOLD if on_hook else INK)
         letters(sc, who, 786, y0 + 54, "text", 16, col=PALE)
         H.fx_rows(sc, 724, y0 + 76, 210, lines)
+    FU.sill(sc, 468)
     action(sc, 12, 478, 210, 526, "Автосборка", "steel")
     action(sc, 220, 478, 450, 526, "Починить всё · 2", "hot")
     action(sc, 460, 478, 690, 526, "Пропустить · +4", "steel")
@@ -682,16 +698,12 @@ NEW_BODY = {"legs": "heavy", "arm_f": "shield"}       # the new Furnace in the e
 
 def steps_bar(sc, cur, y=52):
     """The five steps of a new golem across the top: done in brass, the current one hot, the next ones dull."""
-    x = 12
-    w = 168
+    n = len(STEPS)
+    w = (WW - 24 + 12 * (n - 1)) // n
     for i, st in enumerate(STEPS):
+        x = 12 + i * (w - 12)
         kind = "brass" if i < cur else ("hot" if i == cur else "dull")
-        FU.button(sc, x, y, x + w, y + 34, kind)
-        letters(sc, f"{i + 1}. {st}", x + w // 2, y + 10, "text", 16, col=FU.BUTTON[kind][2], outline=kind == "dull",
-                align="center")
-        if i < len(STEPS) - 1:
-            letters(sc, "»", x + w + 10, y + 9, "text", 16, col=MUTED, align="center")
-        x += w + 23
+        FU.step_plate(sc, x, y, x + w, y + 32, f"{i + 1}. {st}", kind, first=i == 0)
 
 
 def assembly(step=0):
@@ -730,6 +742,7 @@ def assembly(step=0):
             letters(sc, "ячеек " + str(cells), x0 + 30 + cells * 34, 372, "text", 16, col=MUTED)
             H.fx_line(sc, x0 + 18, 404, rule)
             H.fx_line(sc, x0 + 18, 432, f"{{металл:{price}}} · {{лидер:{lead}}}")
+        FU.sill(sc, 468)
         action(sc, 12, 478, 300, 526, "Назад", "steel")
         action(sc, 660, 472, 948, 532, "ДАЛЕЕ: ТЕЛО", "hot", big=True)
         name = "foundry_new_frame.png"
@@ -754,6 +767,7 @@ def assembly(step=0):
         H.fx_line(sc, 588, 430, "{лкм} гнездо слева → деталь справа", dim=True)
         if hot:
             H.cursor(sc, 900, 138 + 72 + 40)
+        FU.sill(sc, 468)
         action(sc, 12, 478, 300, 526, "Назад", "steel")
         action(sc, 660, 472, 948, 532, "ДАЛЕЕ: ЯДРО", "hot", big=True)
         name = "foundry_new_body.png"
@@ -786,6 +800,7 @@ def assembly(step=0):
             H.fx_rows(sc, 530, y0 + 40, 400, lines)
             if sel:
                 callout(sc, (cx, cy), (466, oy), col=hexc("#ff8a2a"))
+        FU.sill(sc, 468)
         action(sc, 12, 478, 300, 526, "Назад", "steel")
         action(sc, 660, 472, 948, 532, "ДАЛЕЕ: МОДУЛИ", "hot", big=True)
         name = "foundry_new_core.png"
@@ -829,6 +844,7 @@ def assembly(step=0):
             else:
                 FU.socket(sc, 558, yy + 2, 582, yy + 26)
                 letters(sc, "свободно", 596, yy + 6, "text", 16, col=PALE)
+        FU.sill(sc, 468)
         action(sc, 12, 478, 300, 526, "Назад", "steel")
         action(sc, 660, 472, 948, 532, "В МАСТЕРСКУЮ", "hot", big=True)
         name = "foundry_new_start.png"
@@ -863,16 +879,16 @@ def card(frame="Орудие", hover="mortar"):
     mods = {"mortar": 1, "canister": 1, "long": 1}
     ncell, core = 4, "cast"
     # left: the drawing
-    FU.plate(sc, 6, 50, 590, 532, seed=7)
-    hot = slipway(sc, frame, mods, core, ncell, (16, 60, 580, 452), hover=hover, crane=False, body=BODY.get(frame))
-    H.fx_line(sc, 20, 466, "Наводка: {дальность} → {урон} без потерь")
+    FU.plate(sc, 6, 50, 590, 476, seed=7)
+    hot = slipway(sc, frame, mods, core, ncell, (16, 60, 580, 432), hover=hover, crane=False, body=BODY.get(frame))
+    H.fx_line(sc, 20, 444, "Наводка: {дальность} → {урон} без потерь")
     for j in range(ncell):
         cx_ = 580 - (ncell - j) * 30
-        FU.cell(sc, cx_, 460, cx_ + 24, 484, "hi" if j < len(mods) else "locked")
-    letters(sc, "ячейки", 580 - ncell * 30, 490, "text", 16, col=MUTED)
+        FU.cell(sc, cx_, 440, cx_ + 24, 464, "hi" if j < len(mods) else "locked")
+    letters(sc, "ячейки", 580 - ncell * 30 - 8, 444, "text", 16, col=MUTED, align="right")
     # right: the passport
     x0, x1 = 612, WW - 18
-    FU.plate(sc, 598, 50, WW - 6, 466, seed=8)
+    FU.plate(sc, 598, 50, WW - 6, 476, seed=8)
     heading(sc, "ПАСПОРТ", x0, 62)
     H.fx_line(sc, x0, 90, "{лидер:5} · {ядро} литое · {убийство:3} в прошлом бою")
     y = 124
@@ -911,7 +927,8 @@ def card(frame="Орудие", hover="mortar"):
         letters(sc, nm, x0 + 30, y, "text", 16, col=col)
         letters(sc, lab, x1, y, "text", 16, col=MUTED, align="right")
         y += 24
-    action(sc, 598, 478, WW - 6, 528, "Закрыть", "steel")
+    FU.sill(sc, 482)
+    action(sc, 760, 488, WW - 10, 532, "Закрыть", "steel")
     # the module under the mouse: its tooltip under its box
     if hot:
         pt, cx, cy, bx, by, side = hot
@@ -992,6 +1009,7 @@ def leaders_pick():
         wl, _ = H.fx_line(sc, 0, 0, rule, draw=False)
         H.fx_line(sc, int(ax - wl / 2), 396, rule)
         sc.rgb[300:302, x0 + 16:x1 - 16] = hexc("#5a5860")
+    FU.sill(sc, 464)
     action(sc, 12, 474, 300, 526, "Назад", "steel")
     action(sc, 326, 474, 634, 526, "Полное описание", "steel")
     action(sc, 660, 470, 948, 530, "В ПОХОД", "hot", big=True)
@@ -1095,7 +1113,8 @@ def aftermath():
     lead = leader_sprite("zodchiy", 1.9)
     sc.blit(lead, int(800 - lead.ox), int(420 - lead.oy))
     FU.sparks(sc, 740, 420, 10, seed=8)
-    action(sc, 650, 470, 948, 530, "В МАСТЕРСКУЮ", "hot", big=True)
+    FU.sill(sc, 468)
+    action(sc, 650, 474, 948, 530, "В МАСТЕРСКУЮ", "hot", big=True)
     img = sc.image(S)
     img.save(out("foundry_aftermath.png"))
     print("foundry_aftermath.png", img.size)
@@ -1139,12 +1158,10 @@ def battle():
     FU.sparks(sc, mid, (y0 + y1) / 2, 8, seed=2)
     letters(sc, f"рой {count - 1}", 530, 9, "text", 16, col=(170, 240, 120))
     letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
-    for bx0, bx1, t_, on, key in ((736, 784, "II", False, "Пробел"), (790, 838, "×2", True, "Tab"),
-                                  (844, 952, "в конец »", False, "End")):
-        FU.button(sc, bx0, 5, bx1, 29, "brass" if on else "steel")
-        letters(sc, t_, (bx0 + bx1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
+    for cx, t_, on, key in ((770, "II", False, "Пробел"), (840, "×2", True, "Tab"), (910, "»", False, "End")):
+        FU.cap_button(sc, cx, 17, 11, t_, "brass" if on else "steel")
         kw = SU.text_width(key, "title", 8) + 14
-        H.keycap(sc, int((bx0 + bx1) / 2 - kw / 2), 32, key)
+        H.keycap(sc, int(cx - kw / 2), 36, key)
     img = sc.image(S)
     img.save(out("foundry_battle.png"))
     print("foundry_battle.png", img.size)

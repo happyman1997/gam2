@@ -2,7 +2,9 @@
 soot-black forge wall with the hearth's glow; panels are forged iron sheets with rivets and brass corners; cells are
 iron frames with screwed brass angles; buttons are bars of metal, and what a button does is what metal it is —
 hot metal for the action that moves the run on, dark tempered steel for going back, rust for what melts something
-down, brass for what is on, dull iron for what can't be pressed. Under the mouse the metal heats up. Letters,
+down, brass for what is on, dull iron for what can't be pressed. Under the mouse the metal heats up. At the foot of
+a screen the controls are a machine's console: the screen's own action a lever beside a cast nameplate, the rest
+push-buttons in hex nuts with stamped tags, repairing a valve's handwheel. Letters,
 glyphs and tooltips are the swarm's own (swarm_ui.letters, fxg).
 
     python3 tools/sprites/foundry_ui.py      -> out/foundry_ui_kit.png
@@ -236,6 +238,292 @@ def button(sc, x0, y0, x1, y1, kind="steel", heated=False):
     sc.light[outer] = 0
 
 
+# ---------------------------------------------------------------- the console: the screen's controls are a machine's
+def sill(sc, y0, y1=None):
+    """The console along the foot of the screen: an iron beam, hammered, a brass strip along its top and a row of
+    rivets along its foot; the controls are set into it."""
+    y1 = sc.h if y1 is None else y1
+    m = (sc.yy >= y0) & (sc.yy < y1)
+    t = np.clip((sc.yy - y0) / max(1, y1 - y0), 0, 1)[..., None]
+    sc.rgb[m] = (hexc("#1f1d22") * (1 - t) + hexc("#121115") * t)[m]
+    hammered(sc, m, 47, k=0.16)
+    sc.rgb[y0] = OUTL
+    sc.rgb[y0 + 1] = hexc("#c8a060")
+    sc.rgb[y0 + 2] = hexc("#8a6a34")
+    sc.rgb[y0 + 3] = OUTL
+    for x in range(12, sc.w, 26):
+        rivet(sc, x, y1 - 5)
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
+def _ramp_fill(sc, m, ramp_, t):
+    """Fill mask m from a 5-colour ramp by t in 0..1 (dark → light), with the 4×4 dither."""
+    pal = np.array([hexc(c) for c in ramp_])
+    th = BAYER[sc.yy % 4, sc.xx % 4]
+    idx = np.clip(np.floor(t * 4.0 + (th - 0.5) * 0.9), 0, 4).astype(int)
+    sc.rgb[m] = pal[idx][m]
+
+
+CAP = {   # the push-button's cap, dark → light
+    "steel": ("#14161c", "#262a32", "#3e4450", "#626c7c", "#a0aabc"),
+    "brass": ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"),
+    "rust": ("#2a0806", "#5a140c", "#8e2a16", "#c44a28", "#f08a5a"),
+    "hot": ("#5a1408", "#a8320e", "#e86a1a", "#ffb43a", "#fff3c0"),
+    "dull": ("#18181a", "#222224", "#2e2e30", "#3c3c3e", "#4e4e50"),
+}
+
+
+def pushbutton(sc, cx, cy, r=14, kind="steel", pressed=False):
+    """A mushroom push-button in a hex-nut bezel: the nut's facets lit from the top left, a dark well, the domed cap
+    with a hard highlight; pressed (the mouse on it) — the cap sinks a pixel and the nut warms."""
+    X, Y = sc.xx - cx, sc.yy - cy
+    d = np.hypot(X, Y)
+    ang = np.arctan2(Y, X)
+    R = r + 6
+    hexr = R * np.cos(np.pi / 6) / np.cos(np.mod(ang, np.pi / 3) - np.pi / 6)
+    nut = d <= hexr
+    facet = np.floor(np.mod(ang + np.pi / 6, 2 * np.pi) / (np.pi / 3))
+    nrm = facet * np.pi / 3                                    # the facet's outward direction
+    lit = 0.5 + 0.5 * np.cos(nrm - (-2.35))                    # light from the top left
+    base = hexc("#262428")[None, None, :] * (1 - lit[..., None]) + hexc("#8a8892")[None, None, :] * lit[..., None]
+    if pressed:
+        base = base * 0.75 + hexc("#ff7a2a") * 0.25
+    sc.rgb[nut] = base[nut]
+    o, _, _ = edges(nut)
+    sc.rgb[o] = OUTL
+    well = d <= r + 2
+    sc.rgb[well] = hexc("#0a090c")
+    dy = 1 if pressed else -1
+    dc = np.hypot(X, Y - dy)
+    cap = dc <= r
+    lt = np.clip(0.55 - (X * 0.6 + (Y - dy) * 0.8) / (2.2 * r) - (dc / r) ** 4 * 0.35, 0, 1)
+    _ramp_fill(sc, cap, CAP[kind], lt)
+    rim = cap & (dc > r - 1.6)
+    sc.rgb[rim] = sc.rgb[rim] * 0.6
+    hl = np.hypot(X + r * 0.38, Y - dy + r * 0.42) <= max(1.2, r * 0.2)
+    sc.rgb[hl & cap] = hexc(CAP[kind][4]) * 0.5 + hexc("#ffffff") * 0.5
+    co, _, _ = edges(cap)
+    sc.rgb[co & (Y - dy > 0)] = OUTL
+    sc.occ[nut] = True
+    sc.light[nut] = 0
+    if kind == "hot":                                          # hot metal lights the iron round it
+        halo = (d > hexr) & (d <= hexr + 3)
+        th = BAYER[sc.yy % 4, sc.xx % 4]
+        sc.rgb[halo & (th < 0.45)] = sc.rgb[halo & (th < 0.45)] * 0.5 + hexc("#ff8a2a") * 0.5
+
+
+TAG = {   # the tag's ink, its metal, its lit edge
+    "steel": ("#14161c", "#9aa0ac", "#d4d8e0"), "brass": ("#2a1806", "#c09a50", "#f0d490"),
+    "rust": ("#1e0a06", "#a8705a", "#d8a088"), "hot": ("#2a1806", "#c09a50", "#f0d490"),
+    "dull": ("#1a1a1c", "#56565c", "#6e6e74")}
+
+
+def tag(sc, x0, y0, x1, y1, text, kind="steel", wire_to=None):
+    """A stamped tag on the console beside its control: pointed at the control, a hole at the point with a wire to
+    it, the letters struck into the metal (dark, with the light catching the lower edge of each stroke)."""
+    X, Y = sc.xx, sc.yy
+    yc = (y0 + y1) / 2
+    p = (y1 - y0) / 2
+    m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
+    m &= (X - x0) >= np.abs(Y - yc) * 0.9                       # the point toward the control
+    m &= (x1 - 1 - X) + (Y - y0) >= 3
+    m &= (x1 - 1 - X) + (y1 - 1 - Y) >= 3
+    dark, mid, light = (hexc(c) for c in TAG[kind])
+    t = np.clip((Y - y0) / max(1, y1 - y0), 0, 1)
+    th = BAYER[sc.yy % 4, sc.xx % 4]
+    fill = np.where(((t + (th - 0.5) * 0.25) < 0.45)[..., None], mid[None, None, :] * 1.06, mid[None, None, :] * 0.86)
+    sc.rgb[m] = fill[m]
+    hammered(sc, m, x0 + y0, k=0.10)
+    o, top, _ = edges(m)
+    sc.rgb[top] = light
+    sc.rgb[o & ~top] = OUTL
+    bot = o & (Y > yc)
+    sc.rgb[bot] = OUTL
+    hx, hy = int(x0 + p * 0.95), int(yc)                         # the hole and its wire
+    sc.rgb[hy - 2:hy + 3, hx - 2:hx + 3] = OUTL
+    sc.rgb[hy - 1:hy + 2, hx - 1:hx + 2] = hexc("#0a090c")
+    if wire_to is not None:
+        wx = int(wire_to)
+        for x in range(min(wx, hx), max(wx, hx)):
+            sc.rgb[hy + (1 if (x // 3) % 2 else 0), x] = hexc("#8a8890")
+    tx = x0 + p * 1.6 + 6
+    tw = SU.text_width(text, "text", 16)
+    ink = tuple(int(v) for v in dark)
+    letters(sc, text, tx + 1, yc - 8 + 1, "text", 16, col=tuple(int(v) for v in light), outline=False, shadow=False)
+    letters(sc, text, tx, yc - 8, "text", 16, col=ink, outline=False, shadow=False)
+    sc.occ[m] = True
+    sc.light[m] = 0
+    return tw
+
+
+def nameplate(sc, x0, y0, x1, y1, text, hot=True, heated=False):
+    """A cast plate like a locomotive's: an arched top, a raised brass rim, raised brass letters on enamel — black
+    enamel, or glowing ember-red when it is the step that moves the run on."""
+    X, Y = sc.xx, sc.yy
+    w = x1 - x0
+    xc = (x0 + x1) / 2
+    u = (X - xc) / (w / 2)
+    top = y0 + 7 * u ** 2                                          # the arched top
+    m = (X >= x0) & (X < x1) & (Y >= top) & (Y < y1)
+    cr = 6                                                         # cast corners, cut in as quarter circles
+    for cx_, cy_ in ((x0, y0 + 7), (x1 - 1, y0 + 7), (x0, y1 - 1), (x1 - 1, y1 - 1)):
+        m &= np.hypot(X - cx_, Y - cy_) > cr
+    inner = shrink(shrink(shrink(m)))
+    rim = m & ~inner
+    lt = np.clip(0.6 - (X - xc) / w * 0.5 - (Y - (y0 + y1) / 2) / (y1 - y0) * 0.9, 0, 1)
+    _ramp_fill(sc, rim, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), lt)
+    o, _, _ = edges(m)
+    sc.rgb[o] = OUTL
+    io, itop, _ = edges(inner)
+    t = np.clip((Y - y0) / max(1, y1 - y0), 0, 1)
+    if hot:
+        enamel = ("#2a0604", "#4a0e08", "#7a1c0c", "#b0361a", "#e86a2a")
+        tt = 0.72 - t * 0.55 + (0.12 if heated else 0.0)
+    else:
+        enamel = ("#0a090c", "#121016", "#1a1820", "#24222a", "#302e38")
+        tt = 0.6 - t * 0.4
+    _ramp_fill(sc, inner, enamel, np.clip(tt, 0, 1))
+    sc.rgb[itop] = sc.rgb[itop] * 0.4                              # the enamel sits below the rim
+    for bx in (x0 + 9, x1 - 10):                                   # bolts through the rim's ends
+        by = (y0 + y1) // 2 + 2
+        sc.rgb[by - 2:by + 3, bx - 2:bx + 3] = OUTL
+        sc.rgb[by - 1:by + 2, bx - 1:bx + 2] = hexc("#d0a848")
+        sc.rgb[by - 1, bx - 1] = hexc("#f4dc96")
+    letters(sc, text, xc, (y0 + y1) / 2 - 7, "title", 16, col=(255, 222, 150), col2=(150, 100, 40), align="center")
+    if heated:
+        sparks(sc, x1 - 14, y0 + 6, 9, seed=x0)
+        sparks(sc, x0 + 18, y1 - 4, 6, seed=x1)
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
+def lever(sc, x, y0, y1, pulled=False, hot=True):
+    """A throttle lever (рубильник): a toothed iron quadrant on a base block, a thick arm from a pivot at its foot,
+    a red ball for a handle; pulled (the mouse on it) — thrown forward, sparks at the pivot."""
+    X, Y = sc.xx, sc.yy
+    px, py = x, y1 - 9
+    R = (y1 - y0) * 0.42
+    dd = np.hypot(X - px, Y - py)
+    quad = (dd <= R) & (Y <= py)
+    teeth = (dd > R) & (dd <= R + 2) & (Y <= py - 1) & (np.mod(np.arctan2(X - px, py - Y) * 9 / np.pi, 2) < 1)
+    q = quad | teeth
+    _ramp_fill(sc, q, ("#141316", "#1e1c22", "#2a2830", "#3c3a44", "#5a5862"),
+               np.clip(0.62 - (X - px) / (3 * R) + (Y - py) / (2.5 * R), 0, 1))
+    o, _, _ = edges(q)
+    sc.rgb[o] = OUTL
+    slot = (dd >= R * 0.55) & (dd <= R * 0.72) & (Y <= py - 2) & (np.abs(X - px) <= (py - Y) * 1.6)
+    sc.rgb[slot] = hexc("#060508")
+    base = (np.abs(X - px) <= R + 3) & (Y > py) & (Y <= y1)
+    _ramp_fill(sc, base, ("#141316", "#1e1c22", "#2a2830", "#3c3a44", "#5a5862"), np.clip(0.7 - (Y - py) / 10.0, 0, 1))
+    bo, btop, _ = edges(base)
+    sc.rgb[bo] = OUTL
+    sc.rgb[btop & ~bo] = hexc("#6a6870")
+    for bx in (px - R + 1, px + R - 1):
+        rivet(sc, int(bx), int(py + 4))
+    a = 0.62 if pulled else -0.5
+    L = (y1 - y0) - 14
+    ex, ey = px + np.sin(a) * L, py - np.cos(a) * L
+    ux, uy = np.sin(a), -np.cos(a)
+    along = (X - px) * ux + (Y - py) * uy
+    across = np.abs(-(X - px) * uy + (Y - py) * ux)
+    arm = (along >= -2) & (along <= L) & (across <= 2.2)
+    _ramp_fill(sc, arm, ("#2a2c34", "#50545e", "#868a94", "#bcc0c8", "#eef0f4"),
+               np.clip(0.75 - ((X - px) * uy - (Y - py) * ux) / 5.0 * 0.0 - across / 4.0, 0, 1))
+    ao, _, _ = edges(arm)
+    sc.rgb[ao] = OUTL
+    d = np.hypot(X - ex, Y - ey)                                   # the handle
+    ball = d <= 5.5
+    _ramp_fill(sc, ball, CAP["rust"], np.clip(0.62 - ((X - ex) + (Y - ey)) / 10.0, 0, 1))
+    bo2, _, _ = edges(ball)
+    sc.rgb[bo2] = OUTL
+    sc.rgb[int(ey) - 2:int(ey), int(ex) - 2:int(ex)] = hexc("#ffd0b0")
+    pv = np.hypot(X - px, Y - py) <= 3.2                           # the pivot
+    _ramp_fill(sc, pv, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), np.clip(0.6 - ((X - px) + (Y - py)) / 6, 0, 1))
+    sc.rgb[int(py), int(px)] = OUTL
+    if pulled:
+        sparks(sc, px + 5, py - 3, 8, seed=int(px))
+    sc.occ[q | ball | base | arm] = True
+    sc.light[q | base] = 0
+
+
+def step_plate(sc, x0, y0, x1, y1, text, kind="dull", first=False):
+    """A step of a sequence: a cast plate shaped as an arrow — its tail notched to take the previous one's point — so
+    the steps read as one chain. Done — brass; the current one — hot enamel in a brass rim; the next ones — dull iron."""
+    X, Y = sc.xx, sc.yy
+    yc = (y0 + y1) / 2
+    h2 = (y1 - y0) / 2
+    pt = h2 * 0.8
+    m = (Y >= y0) & (Y < y1) & (X >= x0) & (X < x1)
+    m &= (x1 - 1 - X) >= np.abs(Y - yc) * (pt / h2)                     # the point
+    if not first:
+        m &= (X - x0) >= pt - np.abs(Y - yc) * (pt / h2)                # the notch
+    inner = shrink(shrink(m))
+    rim = m & ~inner
+    t = np.clip((Y - y0) / max(1, y1 - y0), 0, 1)
+    if kind == "hot":
+        _ramp_fill(sc, rim, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), np.clip(0.75 - t * 0.6, 0, 1))
+        _ramp_fill(sc, inner, ("#2a0604", "#4a0e08", "#7a1c0c", "#b0361a", "#e86a2a"), np.clip(0.75 - t * 0.6, 0, 1))
+        col = (255, 222, 150)
+    elif kind == "brass":
+        _ramp_fill(sc, m, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), np.clip(0.85 - t * 0.6, 0, 1))
+        col = (52, 32, 10)
+    else:
+        _ramp_fill(sc, m, ("#141316", "#1c1a20", "#26242a", "#323038", "#46444c"), np.clip(0.8 - t * 0.6, 0, 1))
+        col = (120, 114, 112)
+    o, top, _ = edges(m)
+    sc.rgb[o] = OUTL
+    sc.rgb[top & ~o] = sc.rgb[top & ~o] * 0.6 + hexc("#ffffff") * 0.15
+    tx = (x0 + x1) / 2 + pt * 0.3
+    if kind == "brass":                                                 # struck into the brass: dark letters
+        col = (30, 18, 4)
+    letters(sc, text, tx, yc - 8, "text", 16, col=col, outline=kind == "hot", shadow=kind == "hot", align="center")
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
+def cap_button(sc, cx, cy, r, text, kind="steel", pressed=False):
+    """A small round push-button with its sign stamped on the cap (the battle's speed: pause, ×2, to the end)."""
+    pushbutton(sc, cx, cy, r, kind=kind, pressed=pressed)
+    dark = kind in ("brass", "hot")
+    letters(sc, text, cx, cy - 8 + (1 if pressed else -1), "text", 16, col=(40, 26, 10) if dark else (226, 220, 210),
+            outline=not dark, shadow=False, align="center")
+
+
+def valve(sc, cx, cy, r=16, turning=False):
+    """A valve's handwheel, red-painted iron: a flange behind it with bolts, a rim, four spokes, a brass nut on the
+    hub; turning (the mouse on it) — the spokes a little round, a puff of steam."""
+    X, Y = sc.xx - cx, sc.yy - cy
+    d = np.hypot(X, Y)
+    fl = d <= r + 4
+    sc.rgb[fl] = hexc("#1a181c")
+    fo, _, _ = edges(fl)
+    sc.rgb[fo] = OUTL
+    for a in np.linspace(0, 2 * np.pi, 7)[:-1] + 0.3:
+        bx, by = int(round(cx + np.cos(a) * (r + 2))), int(round(cy + np.sin(a) * (r + 2)))
+        sc.rgb[by, bx] = hexc("#8a8890")
+    rim = (d <= r) & (d >= r - 3.5)
+    lt = np.clip(0.55 - (X * 0.6 + Y * 0.8) / (2.0 * r), 0, 1)
+    _ramp_fill(sc, rim, CAP["rust"], lt)
+    a0 = 0.35 if turning else 0.0
+    for k in range(4):
+        a = a0 + k * np.pi / 2 + np.pi / 4
+        dx, dy = np.cos(a), np.sin(a)
+        along = X * dx + Y * dy
+        across = np.abs(-X * dy + Y * dx)
+        sp = (along > 2) & (along < r - 2) & (across <= 1.3)
+        _ramp_fill(sc, sp, CAP["rust"], np.clip(lt - 0.1, 0, 1))
+    hub = d <= 4
+    _ramp_fill(sc, hub, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), np.clip(0.6 - (X + Y) / 8.0, 0, 1))
+    ro, _, _ = edges((d <= r) & ~((d < r - 3.5) & ~hub & ~np.zeros_like(hub)))
+    sc.rgb[edges(d <= r)[0]] = OUTL
+    sc.rgb[edges((d < r - 3.5))[0] & ~(d <= 4)] = sc.rgb[edges((d < r - 3.5))[0] & ~(d <= 4)] * 0.6
+    sc.rgb[cy, cx] = OUTL
+    if turning:
+        steam(sc, cx + r - 2, cy - r, 8, seed=cx)
+    sc.occ[fl] = True
+
+
 def wing(sc, x0, y0, x1, y1):
     """The title bar: an iron beam, hammered, a row of rivets along its foot and a brass strip under it."""
     m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
@@ -317,15 +605,24 @@ def kit_sheet():
     for kind in ("hot", "steel", "rust", "brass", "dull"):
         button(sc, x, 70, x + 170, 108, kind)
         x += 182
-    button(sc, 26, 120, 196, 158, "hot", heated=True)
+    sill(sc, 112, 170)
+    lever(sc, 40, 116, 166)
+    nameplate(sc, 60, 120, 230, 162, "В БОЙ")
+    lever(sc, 252, 116, 166, pulled=True)
+    nameplate(sc, 272, 120, 442, 162, "В БОЙ", heated=True)
+    pushbutton(sc, 476, 141, 13, "steel")
+    tag(sc, 496, 128, 610, 154, "Автосборка", "steel", wire_to=490)
+    pushbutton(sc, 640, 141, 13, "steel", pressed=True)
+    tag(sc, 660, 128, 760, 154, "Назад", "steel", wire_to=654)
+    valve(sc, 790, 141, 15)
+    tag(sc, 812, 128, 940, 154, "Починить · 2", "brass", wire_to=806)
     x = 26
     for st in ("normal", "hi", "hover", "new", "broken", "rare", "trophy"):
         cell(sc, x, 180, x + 120, 240, st)
         x += 130
-    levels(sc, 230, 136, 2)
-    socket(sc, 300, 126, 332, 150)
-    chain(sc, 360, 116, 170)
-    sparks(sc, 420, 140, 12)
+    levels(sc, 830, 250, 2)
+    socket(sc, 860, 246, 884, 270)
+    chain(sc, 900, 246, 284)
     img = sc.image(2)
     img.save(out("foundry_ui_kit.png"))
     print("foundry_ui_kit.png", img.size)
