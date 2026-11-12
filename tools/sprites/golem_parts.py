@@ -183,7 +183,14 @@ STOCK = {
     "Механик": dict(legs="walk", arm_n="wrench", arm_f="can", head="lamp"),
 }
 NEEDS = {"chain": "staff", "fireball": "staff", "ground": "staff", "long": "cannon", "canister": "cannon",
-         "hotshot": "cannon", "tower": "shield", "counter": "shield"}
+         "hotshot": "cannon", "buffer": "cannon", "bounce": "cannon", "tower": "shield", "counter": "shield"}
+POOL = {   # the hulls' role modules (the Gun's spider legs became legs; the Buffer took their place)
+    "Страж": ["tower", "intercept", "anchor", "plates", "counter", "hot"],
+    "Мудрец": ["chain", "ground", "overload", "fireball", "firewall", "blades"],
+    "Горн": ["magnet", "rod", "smoke", "whistle", "maw", "greedy"],
+    "Орудие": ["mortar", "long", "buffer", "canister", "hotshot", "bomb"],
+    "Механик": ["repair", "crane", "spares", "oiler", "welding", "oiltank"],
+}
 
 
 def spec(hull, legs=None, arm_n=None, arm_f=None, head=None):
@@ -249,7 +256,10 @@ def assemble(hull, legs=None, arm_n=None, arm_f=None, head=None, core=None, mods
         need = NEEDS.get(key)
         if need and need not in (pr["arm_n"], pr["arm_f"]):
             continue                                   # nothing for it to ride on
-        if hull == "Страж":
+        rare = next((r for r in FM.RARE if r[0] == key), None)
+        if rare:                                       # a rare module, any hull
+            rare[4](G, info, lv)
+        elif hull == "Страж":
             GM.MODULES[key][2](G, dict(info, R=info.get("R")), lv)
         else:
             FM.module(hull, key)[3](G, info, lv)
