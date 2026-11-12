@@ -193,7 +193,7 @@ def keycap(sc, x, y, t, lit=False):
 # ---------------------------------------------------------------- the brood: everything hatched, eat the extra
 SPEND = [   # what biomass buys in the brood: (icon, the button, what it does, cost)
     ("feed", "Кормить Матку", "{выводок} → {потомок:+1}", 10),
-    ("evolve", "Эволюция формы", "→ {порода} {потомок}", 15),
+    ("evolve", "Эволюция формы", "вся {порода} · {потомок} тоже", 15),
     ("clutch", "Ещё кладка", "{пара:+1} → {потомок}", 10),
     ("reroll", "Перебросить кладки", "{потомок} → заново", 5),
 ]
@@ -1492,7 +1492,7 @@ def big_card(spec, name, save=True):
     key_on(sc, 296, HH - 52, "Esc")
     # middle: the numbers, then the attacks — each its own row
     x0, x1 = 316, 616
-    heading(sc, "СУДЬБА", x0, 62, seed=3)
+    heading(sc, "ТЕЛО", x0, 62, seed=3)
     y = 86
     import fxg
     STAT = {"здоровье": "здоровье", "броня": "броня", "скорость": "скорость", "боевой дух": "дух", "размер": "размер",
