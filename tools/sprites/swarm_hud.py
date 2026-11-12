@@ -97,6 +97,7 @@ def frame_screen(seed):
     return sc
 
 
+KIT = {"cell": UI.cell}   # the class's cell for tooltips — the Foundry swaps in its own (foundry_hud)
 HOVER = []        # every glyph and icon on the screen the mouse can point at: (key, x, y, w, h); «@key» — a trait's icon
 ALT = [False]     # Alt held: each line of terms is read out in small words under itself
 
@@ -149,7 +150,7 @@ def act_button(sc, x0, y0, x1, y1, text, key="Enter", dim=False):
 def tip_box(sc, x, y, w, rows, head=None):
     """A tooltip of a few lines of glyphs, a name over them if given. Returns its height."""
     h = fx_rows(sc, 0, 0, w - 24, rows, draw=False) + (34 if head else 14)
-    UI.cell(sc, x, y, x + w, y + h, "normal")
+    KIT["cell"](sc, x, y, x + w, y + h, "normal")
     yy = y + 8
     if head:
         letters(sc, head, x + 12, yy, "text", 16, col=GOLD)
@@ -1252,7 +1253,7 @@ def gloss_tip(sc, key, x, y, w=250, draw=True):
         nm, kind, rows = TRAIT_TIP[key[1:]]
         h = fx_rows(sc, 0, 0, w - 24, rows, draw=False) + 52
         if draw:
-            UI.cell(sc, x, y, x + w, y + h, "normal")
+            KIT["cell"](sc, x, y, x + w, y + h, "normal")
             icon(sc, key[1:], x + 10, y + 8, 2)
             letters(sc, nm, x + 48, y + 8, "text", 16, col=GOLD)
             letters(sc, kind, x + 48, y + 26, "text", 16, col=MUTED)
@@ -1262,7 +1263,7 @@ def gloss_tip(sc, key, x, y, w=250, draw=True):
     lines = wrap(what, w - 24)
     h = 46 + len(lines) * 16
     if draw:
-        UI.cell(sc, x, y, x + w, y + h, "normal")
+        KIT["cell"](sc, x, y, x + w, y + h, "normal")
         fxg.draw(sc, key, x + 12, y + 10, 2)
         letters(sc, nm, x + 44, y + 12, "text", 16, col=GOLD)
         for j, ln in enumerate(lines):
@@ -2014,13 +2015,13 @@ def glossary_screen(chapter="Когда", term="гибель_своя"):
     # chapters
     UI.plate(sc, 12, 52, 196, 446, antennae=True)
     for i, (ch, keys) in enumerate(fxg.GROUPS):
-        y0 = 60 + i * 47
+        y0 = 58 + i * 42
         on = ch == chapter
-        UI.cell(sc, 20, y0, 188, y0 + 41, "hi" if on else "normal")
+        UI.cell(sc, 20, y0, 188, y0 + 37, "hi" if on else "normal")
         a_ = fxg.rgba(keys[0])
-        fxg.draw(sc, keys[0], 30 + (22 - a_.shape[1] * 2) // 2, y0 + 20 - a_.shape[0], 2)
-        cw_ = letters(sc, ch, 62, y0 + 12, "text", 16, col=GOLD if on else INK, jitter=1, seed=i)
-        letters(sc, str(len(keys)), 70 + cw_, y0 + 12, "text", 16, col=MUTED)
+        fxg.draw(sc, keys[0], 30 + (22 - a_.shape[1] * 2) // 2, y0 + 18 - a_.shape[0], 2)
+        cw_ = letters(sc, ch, 62, y0 + 10, "text", 16, col=GOLD if on else INK, jitter=1, seed=i)
+        letters(sc, str(len(keys)), 70 + cw_, y0 + 10, "text", 16, col=MUTED)
     # the chapter's glyphs, two columns
     keys = dict(fxg.GROUPS)[chapter]
     UI.plate(sc, 206, 52, 630, 446, antennae=True)
