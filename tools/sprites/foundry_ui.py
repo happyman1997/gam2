@@ -553,6 +553,133 @@ def valve(sc, cx, cy, r=16, turning=False):
     sc.occ[fl] = True
 
 
+DIGITS = {"1": ["010", "110", "010", "010", "111"], "2": ["111", "001", "111", "100", "111"],
+          "4": ["101", "101", "111", "001", "001"], "9": ["111", "101", "111", "001", "111"],
+          "3": ["111", "001", "011", "001", "111"], "0": ["111", "101", "101", "101", "111"]}
+
+
+def wrench(sc, x0, x1, yc, flip=False, size="24", seed=0):
+    """A big combination spanner lying on the beam: a twelve-point ring at one end, an open jaw set at 15° at the
+    other, a shaft that narrows between two necks with a sunk panel and its size struck into it. Forged chrome
+    steel lit from the top left: a bright bevel along the top edges, shade along the bottom, the hollows dark,
+    worn bright spots, a fleck or two of rust; its shadow on the beam. flip — the jaw to the left."""
+    Xs, Y = sc.xx.astype(float), sc.yy.astype(float)
+    X = (x0 + x1 - 1) - Xs if flip else Xs                             # mirror: the jaw always faces inward
+    Rr, Rj = 15.0, 19.0
+    cr = np.array((x0 + Rr + 1, yc))                                   # the ring's centre
+    cj = np.array((x1 - Rj - 1, yc))                                   # the jaw's centre
+    uj = cj[0] - cr[0]
+    u, v = X - cr[0], Y - yc
+    t = np.clip(u / uj, 0, 1)
+    hw = 6.0 + 4.6 * (1 - np.sin(np.pi * t)) ** 2                      # the shaft: narrow in the middle, necks at the heads
+    shaft = (u >= 0) & (u <= uj) & (np.abs(v) <= hw)
+    rr = np.hypot(u, v)
+    th_ = np.arctan2(v, u)
+    ring = rr <= Rr
+    hole = rr <= 7.8 + 1.0 * np.cos(12 * th_)                         # twelve points
+    du, dv = X - cj[0], Y - yc
+    rj = np.hypot(du, dv)
+    jaw = rj <= Rj
+    a = np.radians(15)
+    d_ = np.array((np.cos(a), -np.sin(a)))                             # the opening, outward and a little up
+    n_ = np.array((np.sin(a), np.cos(a)))
+    along = du * d_[0] + dv * d_[1]
+    across = np.abs(du * n_[0] + dv * n_[1])
+    slot = ((across <= 7.0) & (along >= 0)) | (rj <= 7.0)
+    m = (ring & ~hole) | (jaw & ~slot) | (shaft & ~hole & ~(slot & jaw))
+    # its shadow on the beam
+    sh = np.roll(np.roll(m, 3, 0), 2, 1) & ~m
+    sc.rgb[sh] *= 0.45
+    # the bevel: how deep inside the shape each pixel is
+    d1 = shrink(m)
+    d2 = shrink(d1)
+    d3 = shrink(d2)
+    ny = np.zeros_like(Y)
+    upm = np.zeros_like(m); upm[1:] = m[:-1]
+    dnm = np.zeros_like(m); dnm[:-1] = m[1:]
+    lfm = np.zeros_like(m); lfm[:, 1:] = m[:, :-1]
+    rtm = np.zeros_like(m); rtm[:, :-1] = m[:, 1:]
+    lit_edge = m & (~upm | (~lfm if not flip else ~rtm))               # faces turned to the light
+    dark_edge = m & (~dnm | (~rtm if not flip else ~lfm))
+    # the base sheen: across the shaft and the heads, light above, dark below
+    hv = np.where(shaft & ~ring & ~jaw, v / np.maximum(hw, 1), np.where(ring, v / Rr, dv / Rj))
+    tt = 0.62 - 0.42 * hv
+    panel = shaft & (u > Rr + 7) & (u < uj - Rj - 6) & (np.abs(v) <= hw - 2.6)
+    tt = np.where(panel, tt - 0.32, tt)
+    ramp_ = ("#15171c", "#343944", "#646c7a", "#a4acb8", "#e6eaf0")
+    pal = np.array([hexc(c) for c in ramp_])
+    idx = np.clip(np.floor(np.clip(tt, 0, 1) * 4.0 + 0.5), 0, 4).astype(int)   # clean bands: polished steel
+    sc.rgb[m] = pal[idx][m]
+    sc.rgb[m & ~d1 & lit_edge] = pal[4]                                 # the bright bevel
+    sc.rgb[m & ~d1 & dark_edge & ~lit_edge] = pal[1]
+    sc.rgb[d1 & ~d2 & dark_edge] = pal[2]
+    # the sunk panel's own edges: dark under its top lip, light along its bottom
+    po, ptop, _ = edges(panel)
+    sc.rgb[ptop] = pal[0]
+    pb = po & ~ptop & (v > 0)
+    sc.rgb[pb] = pal[3]
+    # inner walls of the ring and the jaw: the light catches the lower wall
+    inner = (hole & (rr <= 8.5)) | (slot & jaw)
+    io = m & (np.roll(inner, 1, 0) | np.roll(inner, -1, 0) | np.roll(inner, 1, 1) | np.roll(inner, -1, 1))
+    sc.rgb[io & (v < 0) & ring] = pal[1]
+    sc.rgb[io & (v > 0) & ring] = pal[3]
+    hole_in = hole & (rr <= 9.5)                                        # the beam seen through the ring, in shade
+    sc.rgb[hole_in] = sc.rgb[hole_in] * 0.7
+    sc.rgb[io & jaw & (dv < 0)] = pal[1]
+    sc.rgb[io & jaw & (dv >= 0)] = pal[3]
+    # the outline
+    o, _, _ = edges(m)
+    sc.rgb[o] = OUTL
+    so = io & (np.roll(inner, -1, 0) & ~np.roll(m, -1, 0))
+    # worn bright spots and rust
+    rnd = np.random.RandomState(seed + 11)
+    for _ in range(6):
+        k_ = rnd.uniform(0.15, 0.85)
+        sx_ = cr[0] + k_ * uj
+        sxx = int((x0 + x1 - 1) - sx_) if flip else int(sx_)
+        sy_ = int(yc - 2)
+        if m[sy_, sxx]:
+            sc.rgb[sy_, sxx] = hexc("#ffffff")
+    for _ in range(2):
+        rx = cj[0] - rnd.uniform(4, 12)
+        rxx = int((x0 + x1 - 1) - rx) if flip else int(rx)
+        ry = int(yc + rnd.uniform(3, 9))
+        for dx_, dy_ in ((0, 0), (1, 0), (0, 1), (-1, 1)):
+            if m[ry + dy_, rxx + dx_] and d1[ry + dy_, rxx + dx_]:
+                sc.rgb[ry + dy_, rxx + dx_] = hexc("#8a4a2a") if (dx_ + dy_) % 2 else hexc("#5a2a16")
+    # the size, struck into the panel near the jaw (read left to right whichever way the spanner lies)
+    w_txt = len(size) * 4 - 1
+    sx0 = cj[0] - Rj - 10 - w_txt
+    if flip:
+        sx0 = (x0 + x1 - 1) - (cj[0] - Rj - 10)
+    for i, ch in enumerate(size):
+        for r_, row in enumerate(DIGITS[ch]):
+            for c_, bit in enumerate(row):
+                if bit == "1":
+                    xx, yy = int(sx0 + i * 4 + c_), int(yc - 2 + r_)
+                    sc.rgb[yy, xx] = pal[0]
+                    if not m[yy + 1, xx] or True:
+                        sc.rgb[yy + 1, xx] = np.maximum(sc.rgb[yy + 1, xx], pal[2])
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
+def core_port(sc, cx, cy, kind, r=6):
+    """The golem's core as a small porthole: an iron ring, the core's own colour inside — cast iron grey, fire
+    orange, the storm's blue — glowing a little."""
+    col = {"cast": "#c8c8d0", "fire": "#ff8a2a", "volt": "#8ad8ff"}[kind]
+    d = np.hypot(sc.xx - cx, sc.yy - cy)
+    sc.rgb[d <= r + 1] = OUTL
+    sc.rgb[(d <= r) & (d > r - 2)] = hexc("#6a6870")
+    sc.rgb[d <= r - 2] = hexc(col) * 0.55
+    sc.rgb[d <= r - 3.5] = hexc(col)
+    sc.rgb[int(cy) - 2, int(cx) - 2] = hexc("#ffffff") * 0.7 + hexc(col) * 0.3
+    if kind != "cast":
+        th = BAYER[sc.yy % 4, sc.xx % 4]
+        halo = (d > r + 1) & (d <= r + 4) & (th < 0.4)
+        sc.rgb[halo] = sc.rgb[halo] * 0.5 + hexc(col) * 0.5
+
+
 def wing(sc, x0, y0, x1, y1):
     """The title bar: an iron beam, hammered, a row of rivets along its foot and a brass strip under it."""
     m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
@@ -649,6 +776,9 @@ def kit_sheet():
     for st in ("normal", "hi", "hover", "new", "broken", "rare", "trophy"):
         cell(sc, x, 180, x + 120, 240, st)
         x += 130
+    wrench(sc, 560, 716, 262, size="24", seed=1)
+    for j, k_ in enumerate(("cast", "fire", "volt")):
+        core_port(sc, 736 + j * 22, 262, k_)
     levels(sc, 830, 250, 2)
     socket(sc, 860, 246, 884, 270)
     chain(sc, 900, 246, 284)

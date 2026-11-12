@@ -117,14 +117,25 @@ def title(sc, text, sub=None, epi=None, x=16):
     return w
 
 
+def title_center(sc, text):
+    """The workshop's name in the middle of the beam, a big spanner either side of it, their jaws turned to it."""
+    tw = SU.text_width(text, "title", 24)
+    x = WW // 2 - tw // 2
+    letters(sc, text, x, 6, "title", 24, col=(232, 222, 206), col2=(120, 96, 70), jitter=0)
+    for k in range(0, tw, 3):
+        sc.rgb[31, x + k] = sc.rgb[31, x + k] * 0.4 + hexc("#ff8a3a") * 0.6
+    L = 156
+    FU.wrench(sc, x - 14 - L, x - 14, 21, flip=False, size="24", seed=1)
+    FU.wrench(sc, x + tw + 14, x + tw + 14 + L, 21, flip=True, size="19", seed=2)
+
+
 def toolbar(sc, alt=False, on=False):
     """The right end of the beam, the same on every screen: Alt, two sockets kept for buttons to come, «?» (F1)."""
     H.keycap(sc, 790, 14, "Alt", lit=alt)
     for sx in (832, 872):
         FU.socket(sc, sx, 10, sx + 32, 34)
-    FU.button(sc, 912, 8, 950, 36, "brass" if on else "steel")
-    letters(sc, "?", 931, 14, "title", 16, col=DARK if on else INK, outline=not on, align="center")
-    H.keycap(sc, 900, 28, "F1")
+    FU.cap_button(sc, 930, 19, 11, "?", "brass" if on else "steel")
+    H.keycap(sc, 912, 30, "F1")
 
 
 def metal(sc, n, x=700):
@@ -471,8 +482,8 @@ def rack(sc, x0, y0, x1, sel="Орудие"):
         if state == "broken":
             H.fx_line(sc, x0 + 66, y + 52, "{поломка}")
         else:
-            H.glyph(sc, "ядро", x0 + 66, y + 54, 1)
-            letters(sc, MOD_NAME[core].split()[0].lower(), x0 + 84, y + 52, "text", 16, col=MUTED)
+            FU.core_port(sc, x0 + 74, y + 62, core)                     # its core, by colour, no word
+            H.HOVER.append(("ядро", x0 + 66, y + 54, 16, 16))
         y += 92
     FU.cell(sc, x0, y, x1, y + 44, "locked")
     letters(sc, "+ новый голем", (x0 + x1) / 2, y + 14, "text", 16, col=PALE, align="center")
@@ -574,8 +585,9 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
         if st == "core":
             FU.cell(sc, bx, by, bx + bw, by + BH, "normal")
             letters(sc, "ГРУДЬ · ЯДРО", bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
-            H.glyph(sc, "ядро", bx + 8, by + 18, 2)
-            letters(sc, MOD_NAME[key].split()[0].lower(), bx + 32, by + 17, "text", 16, col=INK)
+            FU.core_port(sc, bx + 16, by + 26, key)
+            H.HOVER.append(("ядро", bx + 8, by + 18, 16, 16))
+            letters(sc, MOD_NAME[key], bx + 30, by + 17, "text", 16, col=INK)
             callout(sc, pt, (ex, by + BH // 2), lane=lane)
         elif st == "incoming":
             FU.cell(sc, bx, by, bx + bw, by + BH, "hover" if variant is None else "new")
@@ -707,8 +719,8 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
     import frames as F
     sc = screen(11)
     FU.wing(sc, 0, 0, WW, 44)
-    title(sc, "МАСТЕРСКАЯ")
-    metal(sc, 14)
+    title_center(sc, "МАСТЕРСКАЯ")
+    metal(sc, 14, x=18)
     toolbar(sc)
     rack(sc, 10, 52, 168, sel=frame)
     _, ncell, mods, core, state = next(g for g in ARMY if g[0] == frame)
