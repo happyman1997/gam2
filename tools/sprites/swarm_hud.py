@@ -111,19 +111,66 @@ def glyph(sc, key, x, y, z=2):
 
 
 def help_button(sc, on=False, alt=False):
-    """«?» at the right of the wing: the glossary of glyphs, on every screen; beside it the Alt key while held."""
+    """The wing's right end, the same on every screen: the Alt key (lit while held — every line of glyphs read
+    out in words), two empty sockets kept for buttons to come, and «?» — the glossary (F1)."""
+    keycap(sc, 790, 14, "Alt", lit=alt)
+    for sx in (832, 872):                                   # kept for buttons to come
+        cond_plate(sc, sx, 10, sx + 32, 34)
     UI.button(sc, 912, 8, 950, 36, "amber" if on else "chitin")
     letters(sc, "?", 931, 14, "title", 16, col=DARK if on else INK, outline=not on, align="center")
-    if alt:
-        keycap(sc, 860, 12, "Alt", lit=True)
+    keycap(sc, 900, 28, "F1")
 
 
-def act_button(sc, x0, y0, x1, y1, text):
+def key_on(sc, x1, y0, t):
+    """A button's key, on its top edge near the right end."""
+    w = UI.text_width(t, "title", 8) + 14
+    keycap(sc, int(x1 - w - 26), int(y0 - 10), t)
+
+
+def act_button(sc, x0, y0, x1, y1, text, key="Enter", dim=False):
     """The swarm's own action — what moves the run on: acid. Leaving and going back are chitin, what destroys is
-    blood, what is on or chosen is amber, what can't be pressed is dim; under the mouse any button is eaten through."""
-    UI.button(sc, x0, y0, x1, y1, "acid")
-    letters(sc, text, (x0 + x1) / 2, (y0 + y1) / 2 - 9, "title", 16, col=ACID2, col2=(110, 170, 40), align="center",
-            jitter=1, hairs=4)
+    blood, what is on or chosen is amber, what can't be pressed is dim; under the mouse any button is eaten through.
+    Each carries its key."""
+    UI.button(sc, x0, y0, x1, y1, "dim" if dim else "acid")
+    if dim:
+        letters(sc, text, (x0 + x1) / 2, (y0 + y1) / 2 - 9, "title", 16, col=PALE, outline=False, align="center")
+    else:
+        letters(sc, text, (x0 + x1) / 2, (y0 + y1) / 2 - 9, "title", 16, col=ACID2, col2=(110, 170, 40), align="center",
+                jitter=1, hairs=4)
+    if key:
+        key_on(sc, x1, y0, key)
+
+
+def tip_box(sc, x, y, w, rows, head=None):
+    """A tooltip of a few lines of glyphs, a name over them if given. Returns its height."""
+    h = fx_rows(sc, 0, 0, w - 24, rows, draw=False) + (34 if head else 14)
+    UI.cell(sc, x, y, x + w, y + h, "normal")
+    yy = y + 8
+    if head:
+        letters(sc, head, x + 12, yy, "text", 16, col=GOLD)
+        yy += 24
+    fx_rows(sc, x + 12, yy + 2, w - 24, rows)
+    return h
+
+
+def confirm(sc, title_, rows, yes, yes_kind="blood"):
+    """Asking first, only where something is lost for good: the screen dims, a cell says what goes, two buttons."""
+    sc.rgb[:] = sc.rgb * 0.42
+    w, x0 = 380, WW // 2 - 190
+    hh = fx_rows(sc, 0, 0, w - 40, rows, draw=False)
+    y0 = HH // 2 - 70 - hh // 2
+    y1 = y0 + 60 + hh + 70
+    UI.cell(sc, x0, y0, x0 + w, y1, "hi")
+    heading(sc, title_, x0 + 20, y0 + 16, seed=9)
+    fx_rows(sc, x0 + 20, y0 + 52, w - 40, rows)
+    by = y1 - 56
+    UI.button(sc, x0 + 16, by, x0 + 180, by + 40, yes_kind)
+    letters(sc, yes, x0 + 98, by + 12, "text", 16, col=INK, align="center")
+    key_on(sc, x0 + 180, by, "Enter")
+    UI.button(sc, x0 + w - 180, by, x0 + w - 16, by + 40, "chitin")
+    letters(sc, "Назад", x0 + w - 98, by + 12, "text", 16, col=INK, align="center")
+    key_on(sc, x0 + w - 16, by, "Esc")
+    key_on(sc, x0 + w - 16, by, "Esc")
 
 
 def keycap(sc, x, y, t, lit=False):
@@ -158,8 +205,8 @@ def brood(variant=None):
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
     title(sc, "ВЫВОДОК", seed=5)
-    icon(sc, "biomass", 812, 6, 2)
-    letters(sc, "34", 852, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    icon(sc, "biomass", 700, 6, 2)
+    letters(sc, "34", 740, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     help_button(sc)
     # the auto-selection, already done: plain ants go first, their traits killed least
     groups = [list(g) for g in B.GROUPS]
@@ -179,7 +226,10 @@ def brood(variant=None):
     GX0, GY0, GCW, GCH = 12, 100, 224, 78
     for k_, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(groups):
         x0, y0 = GX0 + (k_ % 3) * (GCW + 8), GY0 + (k_ // 3) * (GCH + 6)
-        UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "eat" if eat else ("new" if new else "normal"))
+        hov = variant is None and k_ == 2                 # the mouse over the wasps
+        UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "hover" if hov else ("eat" if eat else ("new" if new else "normal")))
+        if hov:
+            hover_at = (x0, y0)
         mut = B.MUTS.get(k_, (None,))[0]
         spr = W.build(traits, hue, "idle", soldier, k=1.05 if soldier else 1.35, chimera=chim, genes=W.genes_for(k_ * 7 + 3), rare=mut)
         if count > 1:
@@ -228,6 +278,11 @@ def brood(variant=None):
         wc, _ = fx_line(sc, 0, 0, f"{{биомасса:{cost}}}", draw=False)
         fx_line(sc, 930 - wc, y0 + 42, f"{{биомасса:{cost}}}")
     act_button(sc, 710, 482, 948, 534, "В БОЙ")
+    key_on(sc, 236, 486, "R")
+    if variant is None:                                  # over a group: what the mouse's buttons do
+        hx, hy = hover_at
+        tip_box(sc, hx + 30, hy + 74, 236, ["{лкм} → {съедена:+1}", "{пкм} → {съедена:−1}", "Shift {лкм} → вся группа"])
+        cursor(sc, hx + 150, hy + 40)
     # the living: an ant walking the limit plate, one let down on silk, eggs in a corner
     UI.creature(sc, bug((), "idle", 1.0, 41), 272, 52)
     UI.silk(sc, (560, 44), (560, 50), sag=0)
@@ -262,7 +317,7 @@ def heading(sc, text, x, y, col=(240, 196, 110), seed=0):
 
 
 # ---------------------------------------------------------------- the camp: the swarm picks a mutation itself
-def camp():
+def camp(variant=None):
     import swarm_screens as SS
     sc = frame_screen(73)
     UI.wing(sc, 0, 0, WW, 44)
@@ -319,9 +374,11 @@ def camp():
     # leave / mutate
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Отказаться", 156, 486, "title", 16, col=INK, align="center")
+    key_on(sc, 300, 470, "Esc")
     act_button(sc, 690, 466, 948, 524, "МУТИРОВАТЬ")
 
-    cursor(sc, 560, 240)                         # the mouse over the second offer: its rim goes acid
+    if variant != "confirm":
+        cursor(sc, 560, 240)                     # the mouse over the second offer: its rim goes acid
     # the living
     UI.creature(sc, bug(("stinger",), "idle", 1.0, 71), 230, 54)
     UI.silk(sc, (600, 44), (600, 62), sag=0)
@@ -329,10 +386,14 @@ def camp():
     UI.creature(sc, bug(("wings",), "idle", 1.0, 72), 930, 470)
     UI.creature(sc, clutch(0.9), 640, 448)
     UI.cobweb(sc, 2, 448, 28, quad=(1, 1))
+    name = "swarm_camp.png"
+    if variant == "confirm":                     # «Отказаться» loses all three: asked first
+        confirm(sc, "ОТКАЗАТЬСЯ?", ["{@horn} {@m_spinner} {@m_nest} → ✕"], "Отказаться")
+        name = "swarm_confirm.png"
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_camp.png"))
-    print("swarm_camp.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
 # ---------------------------------------------------------------- the evolution of a form
@@ -341,12 +402,13 @@ def evolution(variant=None):
     import swarm_evo as EV
     sc = frame_screen(71)
     ALT[0] = variant == "alt"
+    bio = 20 if variant == "poor" else 39
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=8)
     title(sc, "ЭВОЛЮЦИЯ", seed=23)
     help_button(sc, alt=ALT[0])
-    icon(sc, "biomass", 776 if ALT[0] else 830, 8, 2)
-    letters(sc, "39", 816 if ALT[0] else 870, 10, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    icon(sc, "biomass", 700, 8, 2)
+    letters(sc, str(bio), 740, 10, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "ФОРМЫ В РОЕ", 26, 64, seed=4)
     for i, (form, name, n, taken) in enumerate(SS.FORMS_IN_SWARM):
@@ -363,8 +425,21 @@ def evolution(variant=None):
     form, name, n, taken = SS.FORMS_IN_SWARM[SS.CHOSEN]
     UI.plate(sc, 310, 52, 948, 446, antennae=True)
     UI.engrave(sc, bug((form,), "idle", 5.0, 3), 640, 470, col="#2a2234", k=0.9)
-    heading(sc, f"{name.upper()} · {n} ТЕЛ", 326, 64, seed=5)
-    fx_line(sc, 326, 84, "{биомасса} 15 · 25 · 40", dim=True)
+    heading(sc, f"{name.upper()} ×{n}", 326, 64, seed=5)
+    # the price of each next evolution: the paid one struck out, the one now marked, the next one dim
+    cx_ = 326 + glyph(sc, "биомасса", 326, 82, 2) + 8
+    for j, c_ in enumerate(SS.COSTS):
+        t_ = str(c_)
+        tw = UI.text_width(t_)
+        if j < len(taken):
+            letters(sc, t_, cx_, 86, "text", 16, col=PALE)
+            sc.rgb[94, cx_ - 1:cx_ + tw + 1] = hexc("#c04a3a")
+        elif j == len(taken):
+            letters(sc, t_, cx_, 86, "text", 16, col=GOLD)
+            sc.rgb[104:106, cx_:cx_ + tw] = hexc("#b8f030")
+        else:
+            letters(sc, t_, cx_, 86, "text", 16, col=MUTED)
+        cx_ += tw + 22
     nxt = SS.COSTS[len(taken)]
     for j, (key, ename, what, look) in enumerate(EV.EVO[form]):
         x0 = 322 + j * 208
@@ -380,13 +455,17 @@ def evolution(variant=None):
         put(sc, W.build((form,), -0.08, "idle", False, k=3.2, genes=W.genes_for(3), evo=(key,)), x0 + 104, 380, 34)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
-    act_button(sc, 660, 466, 948, 524, f"ВЗЯТЬ · {nxt}")
+    key_on(sc, 300, 470, "Esc")
+    act_button(sc, 660, 466, 948, 524, f"ВЗЯТЬ · {nxt}", dim=bio < nxt)
+    if bio < nxt:                                        # pressed or pointed at: why not
+        tip_box(sc, 700, 396, 220, [f"не хватает {{биомасса:{nxt - bio}}}"])
+        cursor(sc, 820, 492)
     UI.creature(sc, bug((), "idle", 1.0, 73), 200, 54)
     UI.creature(sc, bug(("horn",), "idle", 0.9, 74), 600, 448)
     UI.silk(sc, (700, 44), (700, 62), sag=0)
     UI.creature(sc, bug(("ant",), "attack", 0.85, 75, rare="spinner"), 706, 76, shadow=False)
     UI.cobweb(sc, 958, 448, 30, quad=(-1, 1))
-    name = "swarm_alt_words.png" if ALT[0] else "swarm_evolution_screen.png"
+    name = "swarm_alt_words.png" if ALT[0] else ("swarm_tip_disabled.png" if variant == "poor" else "swarm_evolution_screen.png")
     ALT[0] = False
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
@@ -675,9 +754,12 @@ def battle_hud():
         tug(sc, 144, 10, 520, 25, 0.6)
         letters(sc, f"Литейщик: {ng - 1} из {ng}", 530, 9, "text", 16, col=(214, 196, 150))
         letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
-        for x0, x1, t, on in ((736, 784, "II", paused), (790, 838, "×2", not paused), (844, 952, "в конец »", False)):
+        for x0, x1, t, on, key in ((736, 784, "II", paused, "Пробел"), (790, 838, "×2", not paused, "Tab"),
+                                   (844, 952, "в конец »", False, "End")):
             UI.button(sc, x0, 6, x1, 28, "amber" if on else "chitin")
             letters(sc, t, (x0 + x1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
+            kw = UI.text_width(key, "title", 8) + 14
+            keycap(sc, int((x0 + x1) / 2 - kw / 2), 31, key)
         name = "swarm_battle_hud.png"
         if mode == "enemy":                         # the enemy has a card too: the Guard
             cx0, cy0, cx1 = int(gx - 330), int(gy - 40), int(gx - 50)
@@ -979,6 +1061,7 @@ def leaders_pick():
         bug_card(sc, 132 + i * 232, 60, name, i == 0, seed=40 + i)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
+    key_on(sc, 300, 470, "Esc")
     UI.button(sc, 326, 470, 634, 520, "chitin")
     letters(sc, "ПОЛНОЕ ОПИСАНИЕ", 480, 486, "title", 16, col=ACID2, align="center")
     UI.button(sc, 660, 466, 948, 524, "acid")
@@ -1016,6 +1099,7 @@ def development():
             icon(sc, "m_" + mk, x0 + 14 + k_ * 40, 396, 2)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Позже", 156, 486, "title", 16, col=INK, align="center")
+    key_on(sc, 300, 470, "Esc")
     act_button(sc, 690, 466, 948, 524, "ПРОРАСТИ")
     UI.creature(sc, bug((), "idle", 1.0, 190), 540, 54)
     UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
@@ -1400,6 +1484,7 @@ def big_card(spec, name, save=True):
             y += 38 + 16 * (0 if isinstance(vals, str) else len(vals) - 1)
     UI.button(sc, 22, HH - 52, 296, HH - 16, "chitin")
     letters(sc, "Закрыть", 159, HH - 42, "title", 16, col=INK, align="center")
+    key_on(sc, 296, HH - 52, "Esc")
     # middle: the numbers, then the attacks — each its own row
     x0, x1 = 316, 616
     heading(sc, "СУДЬБА", x0, 62, seed=3)
@@ -1654,6 +1739,7 @@ def mutation_card(key="nest"):
 
     UI.button(sc, x1 - 220, y1 - 54, x1 - 20, y1 - 16, "chitin")
     letters(sc, "Закрыть", x1 - 120, y1 - 44, "title", 16, col=INK, align="center")
+    key_on(sc, x1 - 20, y1 - 54, "Esc")
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out("swarm_mutation_card.png"))
@@ -1962,6 +2048,7 @@ def glossary_screen(chapter="Когда", term="гибель_своя"):
     # leave; Alt
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Закрыть", 156, 486, "title", 16, col=INK, align="center")
+    key_on(sc, 300, 470, "Esc")
     kw = keycap(sc, 400, 484, "Alt")
     letters(sc, "— подписи под значками", 408 + kw, 485, "text", 16, col=MUTED)
     UI.creature(sc, bug(("wings",), "idle", 0.9, 93), 900, 52)
@@ -2013,6 +2100,8 @@ def hints():
     brood("tip")
     aftermath("tip")
     evolution("alt")
+    evolution("poor")
+    camp("confirm")
 
 
 SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "finds": finds, "pools": pools,

@@ -56,7 +56,7 @@ OWN = {
     "деление": ["VV...VV", "V.V.V.V", "...V...", "...V...", "...V..."],
     "гигант": ["...A...", "..AAA..", ".AAAAA.", "...A...", "...A...", "..AAA.."],
     "бесплоден": ["..EEE.R", ".EEEER.", "EEEERE.", "EEERE..", "EERE...", ".REeE..", "R.EE..."],
-    "выбор": ["W......", "WW.....", "WWW....", "WWWW...", "WWWWW..", "WWW....", "W.WW...", "...WW.."],
+    "выбор": ["A.....A", "AA...AA", ".A...A.", "..A.A..", "...a...", "...a...", "..aaa.."],
     "рост": ["...R...", "..RRR..", ".RRRRR.", "RRRRRRR", "..RRR..", "..RRR..", "..RRR.."],
     "тело": ["S.....S", "SS...SS", ".SSSSS.", "SS...SS", "S.....S"],
     "кокон": ["..SS...", ".SsSS..", ".SSsS..", ".SsSS..", ".SSsS..", "..SS...", "...S..."],
@@ -108,6 +108,8 @@ OWN = {
     "черта_боя": ["A.....A", ".A...A.", "..A.A..", "...A...", "..A.A..", ".A...A.", "A.....A"],
     "кормление": ["...R...", "..RRR..", "...R...", "AAAAAAA", "AaAaAaA", "AAAAAAA"],
     "цель": ["...R...", ".RRRRR.", ".R...R.", "RR.R.RR", ".R...R.", ".RRRRR.", "...R..."],
+    "лкм": ["...I...", "...I...", ".AAkii.", "AAAkiii", "AAAkiii", "iiiiiii", "iiiiiii", "iiiiiii", ".iiiii.", "..iii.."],
+    "пкм": ["...I...", "...I...", ".iikAA.", "iiikAAA", "iiikAAA", "iiiiiii", "iiiiiii", "iiiiiii", ".iiiii.", "..iii.."],
     "порода": ["k.......k...", ".k.......k..", "VVV.....VVV.", "VgVV.ii.VgVV", "VVVV....VVVV", "V.V..ii.V.V."],
     "солдат": ["..k.k.....", "WW.k......", ".WIII.III.", "WIIiIIIIII", ".IIIIIIII.", "..I.I.I.I.", ".I..I..I..", "I...I...I."],
     "новая_форма": ["......y..", ".....yWy.", "...k..y..", "..k......", ".AA.AAA..", "AAAAAAAA.", ".A.A.A...",
@@ -202,6 +204,8 @@ TERMS = {
     "черта_боя": ("Черта боя", "черта, что в этом бою убила больше всех", "own"),
     "кормление": ("Кормление лидера", "цена в биомассе", "own"),
     "цель": ("Цель", "кого бьют; N — очередь", "own"),
+    "лкм": ("Левая кнопка", "щелчок левой кнопкой мыши", "own"),
+    "пкм": ("Правая кнопка", "щелчок правой кнопкой мыши", "own"),
     "порода": ("Одна форма", "особи одной формы", "own"),
     "солдат": ("Солдат", "крупная особь формы; 3 очка предела", "own"),
     "новая_форма": ("Новая форма", "формы, которой в рое ещё нет", "own"),
@@ -255,8 +259,9 @@ GROUPS = [
     ("Враги", ["машина", "живой", "дикие", "босс", "стена", "тыл", "цель", "убийца"]),
     ("Урон", list(dmg.GLYPHS)),
 ]
+UI_KEYS = {"лкм", "пкм"}          # the mouse in hints: not words of the game, left out of the glossary
 _named = {k for _, ks in GROUPS for k in ks}
-GROUPS[2][1].extend(k for k in TERMS if k not in _named)
+GROUPS[2][1].extend(k for k in TERMS if k not in _named and k not in UI_KEYS)
 
 
 def _hod(n):
@@ -366,7 +371,7 @@ def sheet():
     """The glossary: every term's glyph, its name and what it means."""
     from PIL import ImageDraw, ImageFont
     from paths import font, out
-    keys = list(TERMS)
+    keys = [k for k in TERMS if k not in UI_KEYS]
     cols, cw, rh = 3, 660, 52
     rows_n = (len(keys) + cols - 1) // cols
     img = Image.new("RGB", (cols * cw + 20, rows_n * rh + 80), (24, 18, 30))
