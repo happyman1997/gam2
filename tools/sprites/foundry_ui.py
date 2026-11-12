@@ -482,6 +482,35 @@ def step_plate(sc, x0, y0, x1, y1, text, kind="dull", first=False):
     sc.light[m] = 0
 
 
+def tab(sc, x0, y0, x1, y1, text, active=False, badge=None):
+    """A tab on top of a panel: a cast plate with its top corners cut away; the active one brass and open into the
+    panel below, the rest dull iron. badge — a red number riveted to its corner (what needs doing there)."""
+    X, Y = sc.xx, sc.yy
+    m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
+    m &= (X - x0) + (Y - y0) * 0.0 >= np.maximum(0, 5 - (Y - y0))       # the cut top corners
+    m &= (x1 - 1 - X) >= np.maximum(0, 5 - (Y - y0))
+    t = np.clip((Y - y0) / max(1, y1 - y0), 0, 1)
+    if active:
+        _ramp_fill(sc, m, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), np.clip(0.85 - t * 0.5, 0, 1))
+        col = (30, 18, 4)
+    else:
+        _ramp_fill(sc, m, ("#141316", "#1c1a20", "#26242a", "#323038", "#46444c"), np.clip(0.7 - t * 0.5, 0, 1))
+        col = (150, 142, 136)
+    o, top, _ = edges(m)
+    sc.rgb[o & ~((Y == y1 - 1) & active)] = OUTL
+    letters(sc, text, (x0 + x1) / 2, (y0 + y1) / 2 - 8, "text", 16, col=col, outline=False, shadow=not active,
+            align="center")
+    if badge:
+        bx, by = x1 - 6, y0 + 3
+        d = np.hypot(X - bx, Y - by)
+        sc.rgb[d <= 6] = OUTL
+        sc.rgb[d <= 5] = hexc("#c8402a")
+        sc.rgb[d <= 2] = hexc("#e8603a")
+        letters(sc, str(badge), bx, by - 8, "text", 16, col=(255, 236, 220), outline=False, shadow=False, align="center")
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
 def cap_button(sc, cx, cy, r, text, kind="steel", pressed=False):
     """A small round push-button with its sign stamped on the cap (the battle's speed: pause, ×2, to the end)."""
     pushbutton(sc, cx, cy, r, kind=kind, pressed=pressed)

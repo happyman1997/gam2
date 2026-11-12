@@ -153,7 +153,7 @@ def action(sc, x0, y0, x1, y1, text, kind="hot", heated=False, big=False):
         tk = {"rust": "rust", "dull": "dull", "brass": "brass"}.get(kind, "steel")
     tx0 = bx + r + 12
     tw = SU.text_width(text, "text", 16)
-    FU.tag(sc, tx0, yc - 13, min(x1, int(tx0 + 13 * 1.6 + 6 + tw + 14)), yc + 13, text, tk, wire_to=bx + r + 6)
+    FU.tag(sc, tx0, yc - 13, min(x1, int(tx0 + 13 * 1.6 + 6 + tw + 9)), yc + 13, text, tk, wire_to=bx + r + 6)
 
 
 def heading(sc, text, x, y):
@@ -176,8 +176,8 @@ PART_FX = {
     "tracks": ["{размер:−2} → сквозь · {урон} {дроб}"],
     "mill": ["{начало} → катится · {урон} {дроб}"],
     # arms
-    "fist": ["{атака} {дроб} вплотную · слабый"],
-    "maul": ["{атака} {дроб} вплотную · тяжёлый"],
+    "fist": ["{атака} {дроб} · слабый"],
+    "maul": ["{атака} {дроб} · тяжёлый"],
     "shield": ["{атака} спереди → {урон:½}"],
     "cannon": ["{атака} {дроб} {дальность:3}"],
     "staff": ["{атака} {молния} {дальность:4}"],
@@ -607,38 +607,23 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
     return hot
 
 
-def workshop(variant=None, frame="Орудие", new_key="long", name=None):
-    """The slipway: the golem on the workbench before its drawing, a callout from every mount to its part — measured
-    on the sprite, named by where it sits (back, shoulder, arm, chest, legs); empty cells dashed; the chest with its
-    core. The chosen part hangs from the crane over the mount it takes. On the left the army on its rack; on the right
-    the crate with what the battle brought, one of three."""
-    import frames as F
-    sc = screen(11)
-    FU.wing(sc, 0, 0, WW, 44)
-    title(sc, "МАСТЕРСКАЯ")
-    metal(sc, 14)
-    toolbar(sc)
-    rack(sc, 10, 52, 168, sel=frame)
-    _, ncell, mods, core, state = next(g for g in ARMY if g[0] == frame)
-    role = ROLE[frame]
-    FU.plate(sc, 176, 52, 700, 462, seed=3)
-    hot = slipway(sc, frame, mods, core, ncell, (186, 62, 690, 408), new_key=new_key, variant=variant,
-                  role=role, broken=state == "broken", body=BODY.get(frame))
-    # under the drawing: the frame's own and its cells
-    passive = {"Страж": "Заслон: {радиус:1} → {цель:1}", "Мудрец": "Питание: {свой} {радиус:1} → {через:−1}",
-               "Горн": "Жар горна: {каждые:1} → {огонь} {радиус:1}", "Орудие": "Наводка: {дальность} → {урон} без потерь",
-               "Механик": "Наладка: {каждые:1} → {свой} {радиус:1} {ремонт:1}"}[frame]
-    H.fx_line(sc, 190, 418, passive)
-    for j in range(ncell):
-        cx_ = 690 - (ncell - j) * 30
-        FU.cell(sc, cx_, 412, cx_ + 24, 436, "hi" if j < len(mods) else ("new" if (j == len(mods) and new_key) else "locked"))
-    letters(sc, "ячейки", 690 - ncell * 30, 440, "text", 16, col=MUTED)
-    # the crate: what the battle brought
-    FU.plate(sc, 708, 52, 948, 462, seed=4)
-    heading(sc, "ДЕТАЛИ", 720, 64)
-    H.fx_line(sc, 720, 86, "{выбор:1 из 3}", dim=True)
+RACK = {   # the parts rack: spare parts lying on it, by slot kind
+    "arm": [("shield", 1), ("tongs", 1)], "legs": [("spider", 1)], "head": [("lamp", 1)],
+}
+
+
+def panel_tabs(sc, cur, broken=1):
+    """The right panel's tabs: what the battle brought, the parts rack, the repairs."""
+    for j, (key, text) in enumerate((("loot", "ДОБЫЧА"), ("rack", "СТОЙКА"), ("repair", "РЕМОНТ"))):
+        x0 = 714 + j * 78
+        FU.tab(sc, x0, 58, x0 + 74, 84, text, active=key == cur, badge=broken if key == "repair" and broken else None)
+    sc.rgb[84, 710:946] = hexc("#8a6a34")
+
+
+def loot_panel(sc, new_key):
+    H.fx_line(sc, 720, 90, "{выбор:1 из 3}", dim=True)
     for j, (key, kind, st, nm, who, lines) in enumerate(OFFERS):
-        y0 = 112 + j * 114
+        y0 = 114 + j * 114
         on_hook = key == new_key
         FU.cell(sc, 716, y0, 940, y0 + 106, "hi" if on_hook else st)
         if on_hook:
@@ -660,18 +645,135 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None):
         letters(sc, nm, 786, y0 + 36, "text", 16, col=GOLD if on_hook else INK)
         letters(sc, who, 786, y0 + 54, "text", 16, col=PALE)
         H.fx_rows(sc, 724, y0 + 76, 210, lines)
+
+
+def rack_panel(sc, frame, slot, chosen, cur):
+    """What can go into the chosen body slot: spare parts on the rack, a part off another golem (swapped), the spare
+    one; the part now in it goes to the rack."""
+    kind = "legs" if slot == "legs" else ("head" if slot == "head" else "arm")
+    lab = dict(SLOTS)[slot]
+    letters(sc, f"{frame.lower()} · {lab}", 720, 90, "text", 16, col=GOLD)
+    rows = [(k_, f"на стойке ×{n}", "rack") for k_, n in RACK[kind]]
+    rows += [("wrench", "с Механика", "swap")] if kind == "arm" else []
+    rows += [({"arm": "fist", "legs": "walk", "head": "helm"}[kind], "запасная", "spare")]
+    rows = rows[:4]
+    for j, (k_, tag, src) in enumerate(rows):
+        y0 = 110 + j * 74
+        st = "hi" if k_ == chosen else "normal"
+        FU.cell(sc, 716, y0, 940, y0 + 70, st)
+        FU.cell(sc, 722, y0 + 9, 774, y0 + 61, "locked")
+        if k_ == chosen:
+            letters(sc, "на", 748, y0 + 17, "text", 16, col=BRASS, align="center")
+            letters(sc, "крюке", 748, y0 + 35, "text", 16, col=BRASS, align="center")
+        else:
+            part_icon(sc, slot, k_, 732, y0 + 19, 32, hull=frame)
+        letters(sc, part_name(slot, k_), 784, y0 + 4, "text", 16, col=GOLD if st == "hi" else INK)
+        letters(sc, tag, 784, y0 + 22, "text", 16, col=BRASS if src == "rack" else (PALE if src == "spare" else MUTED))
+        H.fx_rows(sc, 784, y0 + 44, 150, PART_FX[k_])
+    y = 110 + len(rows) * 74 + 2
+    part_icon(sc, slot, cur, 720, y + 2)
+    H.fx_line(sc, 740, y, f"{part_name(slot, cur)} → на стойку", dim=True)
+    letters(sc, "переставлять — бесплатно", 720, y + 22, "text", 16, col=PALE)
+
+
+def repair_panel(sc):
+    """What broke on the chosen golem, what it costs to mend, what happens if it is not mended; the whole army."""
+    H.glyph(sc, "поломка", 720, 92, 2)
+    letters(sc, "Мудрец сломан", 748, 92, "text", 16, col=RED)
+    FU.cell(sc, 716, 118, 940, 176, "broken")
+    mod_icon(sc, "overload", 726, 132, 2)
+    letters(sc, "Перегрузка", 766, 124, "text", 16, col=INK)
+    H.fx_line(sc, 766, 146, "{модуль:II} ⇒ {модуль:I}")
+    letters(sc, "уровень потерян насовсем", 720, 182, "text", 16, col=MUTED)
+    H.fx_line(sc, 720, 206, "{ремонт} → в строй · {металл:2}")
+    H.fx_line(sc, 720, 232, "не чинить → пропускает бой", dim=True)
+    H.fx_line(sc, 720, 258, "Запасные части → {модуль} цел", dim=True)
+    sc.rgb[288, 716:940] = hexc("#5a5860")
+    letters(sc, "армия", 720, 294, "text", 16, col=MUTED)
+    for j, (fr, ok) in enumerate((("Страж", True), ("Мудрец", False), ("Орудие", True), ("Механик", True))):
+        y = 318 + j * 25
+        H.glyph(sc, "ремонт" if ok else "поломка", 720, y, 1)
+        letters(sc, fr, 744, y - 2, "text", 16, col=INK if ok else RED)
+        letters(sc, "в строю" if ok else "{металл:2}".replace("{металл:2}", "2"), 932, y - 2, "text", 16,
+                col=PALE if ok else BRASS, align="right")
+    H.fx_line(sc, 720, 428, "{металл:14} → {металл:12}")
+
+
+def workshop(variant=None, frame="Орудие", new_key="long", name=None, panel="loot", body_new=None):
+    """The slipway: the golem on the workbench before its drawing, its body on the left, what is inside on the right;
+    the chosen part hangs from the crane over the mount it takes. On the left the army on its rack; on the right the
+    panel with its tabs: what the battle brought (one of three), the parts rack (a body slot chosen — what can go in
+    it), the repairs (a broken golem chosen — what broke and what it costs)."""
+    import frames as F
+    sc = screen(11)
+    FU.wing(sc, 0, 0, WW, 44)
+    title(sc, "МАСТЕРСКАЯ")
+    metal(sc, 14)
+    toolbar(sc)
+    rack(sc, 10, 52, 168, sel=frame)
+    _, ncell, mods, core, state = next(g for g in ARMY if g[0] == frame)
+    role = ROLE[frame]
+    FU.plate(sc, 176, 52, 700, 462, seed=3)
+    body = BODY.get(frame)
+    if panel == "rack":
+        hot = slipway(sc, frame, mods, core, ncell, (186, 62, 690, 408), new_key=None, variant=variant, role=role,
+                      body=body, body_new=body_new, body_hot=body_new[0] if body_new else None)
+    elif panel == "repair":
+        hot = slipway(sc, frame, mods, core, ncell, (186, 62, 690, 408), new_key=None, variant="plain", role=role,
+                      broken=True, damaged=("overload",), body=body, crane=False)
+        FU.steam(sc, 430, 150, 14, seed=4)
+    else:
+        hot = slipway(sc, frame, mods, core, ncell, (186, 62, 690, 408), new_key=new_key, variant=variant,
+                      role=role, broken=state == "broken", body=body)
+    # under the drawing: the frame's own and its cells
+    passive = {"Страж": "Заслон: {радиус:1} → {цель:1}", "Мудрец": "Питание: {свой} {радиус:1} → {через:−1}",
+               "Горн": "Жар горна: {каждые:1} → {огонь} {радиус:1}", "Орудие": "Наводка: {дальность} → {урон} без потерь",
+               "Механик": "Наладка: {каждые:1} → {свой} {радиус:1} {ремонт:1}"}[frame]
+    H.fx_line(sc, 190, 418, passive)
+    for j in range(ncell):
+        cx_ = 690 - (ncell - j) * 30
+        FU.cell(sc, cx_, 412, cx_ + 24, 436, "hi" if j < len(mods) else
+                ("new" if (j == len(mods) and new_key and panel == "loot") else "locked"))
+    letters(sc, "ячейки", 690 - ncell * 30, 440, "text", 16, col=MUTED)
+    # the panel on the right, with its tabs
+    FU.plate(sc, 708, 52, 948, 462, seed=4)
+    panel_tabs(sc, panel)
+    if panel == "rack":
+        rack_panel(sc, frame, body_new[0], body_new[1], GP_part(frame, body_new[0]))
+    elif panel == "repair":
+        repair_panel(sc)
+    else:
+        loot_panel(sc, new_key)
     FU.sill(sc, 468)
-    action(sc, 12, 478, 210, 526, "Автосборка", "steel")
-    action(sc, 220, 478, 450, 526, "Починить всё · 2", "hot")
-    action(sc, 460, 478, 690, 526, "Пропустить · +4", "steel")
-    action(sc, 700, 472, 948, 532, "В БОЙ", "hot", big=True)
+    action(sc, 12, 478, 174, 526, "Автосборка", "steel")
+    action(sc, 178, 478, 356, 526, "Починить · 2", "hot", heated=panel == "repair")
+    action(sc, 360, 478, 522, 526, "Переплавка", "rust")
+    action(sc, 526, 478, 704, 526, "Пропуск · +4", "steel")
+    action(sc, 710, 472, 948, 532, "В БОЙ", "hot", big=True)
     FU.sparks(sc, 186, 400, 10, seed=5)
-    if variant is None and hot:
+    if panel == "repair":
+        H.cursor(sc, 201, 506)
+    elif variant is None and hot:
         H.cursor(sc, hot[1], hot[2])
-    name = name or "foundry_workshop.png"
+    name = name or {"loot": "foundry_workshop.png", "rack": "foundry_workshop_rack.png",
+                    "repair": "foundry_workshop_repair.png"}[panel]
     img = sc.image(S)
     img.save(out(name))
     print(name, img.size)
+
+
+def GP_part(frame, slot):
+    """The part in this slot of this golem now."""
+    import golem_parts as GP
+    return dict(GP.STOCK[frame], **BODY.get(frame, {}))[slot]
+
+
+def workshop_rack():
+    workshop(frame="Орудие", panel="rack", body_new=("arm_f", "shield"))
+
+
+def workshop_repair():
+    workshop(frame="Мудрец", panel="repair")
 
 
 def slipways():
@@ -856,6 +958,174 @@ def assembly(step=0):
 def new_golem():
     for st in (0, 1, 2, 4):
         assembly(st)
+
+
+# ---------------------------------------------------------------- melting down
+def molten(spr, k=1.0):
+    """A sprite gone red-hot: its shading mapped onto the melt's ramp."""
+    out = spr.__class__(spr.w, spr.h)
+    out.a = spr.a.copy()
+    lum = spr.rgb.mean(axis=2) / 255.0
+    pal = np.array([hexc(c) for c in ("#5a1408", "#a8320e", "#e86a1a", "#ffb43a", "#fff3c0")])
+    idx = np.clip((lum * 4.6 * k + 0.6).astype(int), 0, 4)
+    out.rgb = pal[idx].astype(np.float32)
+    out.ox, out.oy = getattr(spr, "ox", 0), getattr(spr, "oy", 0)
+    return out
+
+
+def crucible_scene(sc, x0, y0, x1, y1, melt_key, cast_key):
+    from swarm_ui import edges
+    """The hearth with its coals, the crucible over it with the melt and the module going down into it, the spout
+    pouring a thread of metal into the mould where the other module is being cast."""
+    X, Y = sc.xx, sc.yy
+    th = BAYER[sc.yy % 4, sc.xx % 4]
+    cx = (x0 + x1) // 2 - 30
+    # the hearth: a brick firebox, its mouth full of coals
+    hx0, hx1, hy0, hy1 = cx - 90, cx + 90, y1 - 150, y1 - 60
+    box = (X >= hx0) & (X < hx1) & (Y >= hy0) & (Y < hy1)
+    sc.rgb[box] = hexc("#3a1a14")
+    for yy in range(hy0, hy1, 8):                                       # brick courses
+        sc.rgb[yy, hx0:hx1] = hexc("#1e0e0a")
+        off = 0 if ((yy - hy0) // 8) % 2 else 10
+        for xx in range(hx0 + off, hx1, 20):
+            sc.rgb[yy:yy + 8, xx] = hexc("#1e0e0a")
+    mouth = (X >= hx0 + 20) & (X < hx1 - 20) & (Y >= hy0 + 30) & (Y < hy1 - 8)
+    t = np.clip((Y - (hy0 + 30)) / 40.0, 0, 1)
+    coal = np.where((th + t * 0.8 + value_noise_cached(sc) * 0.6) > 1.0, 1, 0)
+    pal = np.array([hexc(c) for c in ("#2a0a06", "#7a1c0c", "#e86a1a", "#ffd070")])
+    lvl = np.clip((t * 2.2 + th * 0.9 + value_noise_cached(sc) * 1.4).astype(int), 0, 3)
+    sc.rgb[mouth] = pal[lvl][mouth]
+    o, _, _ = edges(box)
+    sc.rgb[o] = SU.OUTL
+    mo, _, _ = edges(mouth)
+    sc.rgb[mo] = SU.OUTL
+    # flames licking up round the crucible's foot
+    rnd = np.random.RandomState(5)
+    for k_ in range(14):                                                 # tongues of flame, uneven, dithered
+        fx_ = cx - 62 + k_ * 9 + rnd.randint(-2, 3)
+        hgt = rnd.randint(8, 20)
+        sway = rnd.uniform(-2.5, 2.5)
+        for j in range(hgt):
+            f = j / hgt
+            w_ = max(0, int(round(3.4 * (1 - f) ** 0.7)))
+            xx = int(fx_ + sway * f * f)
+            yy = hy0 - j + 2
+            col = "#fff0a0" if f < 0.25 else ("#ffb43a" if f < 0.55 else ("#e86a1a" if f < 0.8 else "#a8320e"))
+            for x_ in range(xx - w_, xx + w_ + 1):
+                if f > 0.6 and (x_ + yy) % 2:
+                    continue
+                sc.rgb[yy, x_] = hexc(col)
+    # the crucible: an iron bowl, its rim, a spout to the right; the melt inside
+    top, bot = hy0 - 86, hy0 - 6
+    half = lambda yy: 52 - (yy - top) * 0.22
+    bowl = (Y >= top) & (Y < bot) & (np.abs(X - cx) <= half(Y))
+    lt = np.clip(0.62 - (X - cx) / 110.0 - (Y - top) / 200.0, 0, 1)
+    FU._ramp_fill(sc, bowl, ("#121114", "#1e1c22", "#2e2c34", "#45434c", "#66646e"), lt)
+    rim = (Y >= top - 4) & (Y < top + 3) & (np.abs(X - cx) <= 56)
+    FU._ramp_fill(sc, rim, ("#1e1c22", "#2e2c34", "#45434c", "#66646e", "#9a98a2"), np.clip(0.7 - (X - cx) / 120.0, 0, 1))
+    spout = (Y >= top - 6) & (Y < top + 6) & (X >= cx + 50) & (X < cx + 66) & ((X - cx - 50) * 0.5 >= (Y - top + 6) * 0.4 - 2)
+    FU._ramp_fill(sc, spout, ("#1e1c22", "#2e2c34", "#45434c", "#66646e", "#9a98a2"), np.clip(0.6 - (Y - top) / 20.0, 0, 1))
+    for m_ in (bowl | rim | spout,):
+        o, _, _ = edges(m_)
+        sc.rgb[o] = SU.OUTL
+    melt = (np.abs(X - cx) <= 50) & (((X - cx) / 50.0) ** 2 + ((Y - (top + 2)) / 6.0) ** 2 <= 1)
+    mpal = np.array([hexc(c) for c in ("#e86a1a", "#ffb43a", "#ffe08a", "#fff6d0")])
+    ml = np.clip((th * 1.6 + value_noise_cached(sc) * 2.4 + 0.3).astype(int), 0, 3)
+    sc.rgb[melt] = mpal[ml][melt]
+    sc.glow(cx, top, 70, hexc("#ff8a2a"), 0.45)
+    # the module going down into the melt, red-hot, its lower half already under
+    spr = molten(IC.icon(melt_key, 3, "module"))
+    sx, sy = cx - 34, top - 32
+    sc.blit(spr, sx, sy)
+    under = (X >= sx) & (X < sx + spr.w) & (Y >= top - 2) & (Y < top + 9) & melt
+    sc.rgb[under] = mpal[ml][under]
+    FU.sparks(sc, cx - 10, top - 4, 12, seed=7)
+    FU.steam(sc, cx - 24, top - 46, 12, seed=3)
+    # the mould on a block to the right, the other module being cast in it; the thread of metal into it
+    mx, my = x1 - 62, y1 - 64
+    block = (X >= mx - 40) & (X < mx + 40) & (Y >= my) & (Y < my + 34)
+    FU._ramp_fill(sc, block, ("#121114", "#1e1c22", "#2e2c34", "#45434c", "#66646e"), np.clip(0.7 - (Y - my) / 40.0, 0, 1))
+    o, _, _ = edges(block)
+    sc.rgb[o] = SU.OUTL
+    cast = molten(IC.icon(cast_key, 3, "module"), 1.2)
+    sc.blit(cast, mx - cast.w // 2, my - cast.h + 18)
+    sc.glow(mx, my, 34, hexc("#ff8a2a"), 0.4)
+    ax, ay = cx + 66, top - 2
+    for i in range(60):                                                  # the pour
+        tt = i / 59
+        px_ = ax + (mx - 6 - ax) * tt
+        py_ = ay + (my - 30 - ay) * tt ** 2 - 14 * np.sin(np.pi * tt)
+        sc.rgb[int(py_) - 1:int(py_) + 2, int(px_):int(px_) + 2] = hexc("#ffe08a") if i % 3 else hexc("#ffb43a")
+    FU.sparks(sc, mx - 6, my - 26, 8, seed=9)
+
+
+_VN = {}
+
+
+def value_noise_cached(sc):
+    from noise import value_noise
+    key = (sc.w, sc.h)
+    if key not in _VN:
+        _VN[key] = value_noise(sc.w, sc.h, 3, 77)
+    return _VN[key]
+
+
+def smelt():
+    """Переплавка: a module goes into the crucible and its melt gives a level to another module of the same hull; a
+    spare part melts down to metal. Left — what goes in; in the middle the crucible over the hearth pouring into the
+    mould; right — what takes the level."""
+    sc = screen(29)
+    FU.wing(sc, 0, 0, WW, 44)
+    title(sc, "ПЕРЕПЛАВКА")
+    metal(sc, 14)
+    toolbar(sc)
+    FU.plate(sc, 12, 52, 300, 462, seed=41)
+    heading(sc, "В ТИГЕЛЬ", 26, 64)
+    rows = [("mod", "canister", "Картечь", "Орудие · I", "hi"), ("mod", "chain", "Цепная молния", "Мудрец · I", "normal"),
+            ("mod", "repair", "Ремонт", "Механик · I", "normal"), ("part", "tongs", "Клещи", "стойка → {металл:+2}", "normal")]
+    for j, (kind, k_, nm, sub, st) in enumerate(rows):
+        y0 = 94 + j * 70
+        FU.cell(sc, 20, y0, 292, y0 + 62, st)
+        FU.cell(sc, 26, y0 + 6, 76, y0 + 56, "locked")
+        if kind == "mod":
+            mod_icon(sc, k_, 35, y0 + 15, 2)
+        else:
+            part_icon(sc, "arm_f", k_, 35, y0 + 15, 32)
+        letters(sc, nm, 86, y0 + 8, "text", 16, col=GOLD if st == "hi" else INK)
+        H.fx_line(sc, 86, y0 + 32, sub, dim=st != "hi")
+    H.fx_line(sc, 24, 380, "{модуль} → {модуль:+1}", dim=True)
+    letters(sc, "тот же корпус", 24, 404, "text", 16, col=PALE)
+    H.fx_line(sc, 24, 428, "деталь → {металл:+2}", dim=True)
+    # the crucible
+    FU.plate(sc, 308, 52, 652, 462, seed=43)
+    sc.rgb[60:454, 316:644] = sc.rgb[60:454, 316:644] * 0.55
+    crucible_scene(sc, 316, 60, 644, 454, "canister", "long")
+    letters(sc, "Картечь I — в тигель", 450, 118, "text", 16, col=(255, 200, 140), align="center")
+    letters(sc, "Длинный ствол", 582, 428, "text", 16, col=(255, 222, 150), align="center")
+    H.fx_line(sc, 548, 404, "{модуль:I} ⇒ {модуль:II}")
+    # into the mould
+    FU.plate(sc, 660, 52, 948, 462, seed=42)
+    heading(sc, "В ЛИТЬЁ", 674, 64)
+    rows = [("long", "Длинный ствол", "Орудие", 1, "hi"), ("mortar", "Мортира", "Орудие", 1, "normal"),
+            ("intercept", "Перехват", "Страж · другой корпус", 1, "locked")]
+    for j, (k_, nm, who, lv, st) in enumerate(rows):
+        y0 = 94 + j * 70
+        FU.cell(sc, 668, y0, 940, y0 + 62, st)
+        FU.cell(sc, 674, y0 + 6, 724, y0 + 56, "locked")
+        mod_icon(sc, k_, 683, y0 + 15, 2)
+        letters(sc, nm, 734, y0 + 8, "text", 16, col=GOLD if st == "hi" else (INK if st == "normal" else PALE))
+        letters(sc, who, 734, y0 + 32, "text", 16, col=MUTED if st != "locked" else PALE)
+        if st != "locked":
+            H.fx_line(sc, 820, y0 + 30, "{модуль:I} ⇒ {модуль:II}" if st == "hi" else "{модуль:I}", dim=st != "hi")
+    H.fx_line(sc, 674, 316, "{металл:3} · за раз", dim=True)
+    H.fx_line(sc, 674, 344, "{металл:14} → {металл:11}")
+    FU.sill(sc, 468)
+    action(sc, 12, 478, 300, 526, "Назад", "steel")
+    action(sc, 620, 472, 948, 532, "ПЕРЕПЛАВИТЬ · 3", "hot", big=True)
+    H.cursor(sc, 200, 120)
+    img = sc.image(S)
+    img.save(out("foundry_smelt.png"))
+    print("foundry_smelt.png", img.size)
 
 
 # ---------------------------------------------------------------- the golem's card, as big as the screen
@@ -1167,7 +1437,7 @@ def battle():
     print("foundry_battle.png", img.size)
 
 
-SCREENS = {"workshop": workshop, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
+SCREENS = {"workshop": workshop, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
