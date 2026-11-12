@@ -16,7 +16,7 @@ from kit import *
 import swarm1 as W
 import swarm_ui as UI
 from swarm_ui import letters, scribble, INK, MUTED, GOLD, BIO, RED, GREEN, DARK, VIOLET
-from swarm_mut import GRUNT
+from swarm_mut import FX
 import icons as IC
 from paths import out
 
@@ -229,9 +229,9 @@ def camp():
     UI.plate(sc, 296, 52, 652, 446, antennae=True)
     heading(sc, "ЧТО ВЫПАЛО", 310, 64, seed=2)
     letters(sc, "три случайных: бери одно или ничего", 310, 86, "text", 16, col=MUTED)
-    offers = [("horn", "Рог", "деталь", "первый удар боя сильнее и {дроб}", (236, 224, 196)),
-              ("m_spinner", "Прядильные железы", "общая мутация", GRUNT["spinner"], (206, 206, 222)),
-              ("m_nest", "Малое гнездо", "мутация Матки", GRUNT["nest"], (240, 200, 90))]
+    offers = [("horn", "Рог", "деталь", [("первый удар боя", "сильнее, {дроб}")], (236, 224, 196)),
+              ("m_spinner", "Прядильные железы", "общая мутация", FX["spinner"][:2], (206, 206, 222)),
+              ("m_nest", "Малое гнездо", "мутация Матки", FX["nest"], (240, 200, 90))]
     X, Y = sc.xx, sc.yy
     for k_, (key, name, kind, what, kcol) in enumerate(offers):
         y0 = 110 + k_ * 108
@@ -251,8 +251,7 @@ def camp():
         icon(sc, key, ex - 16, ey - 12, 2)
         letters(sc, name, 386, y0 + 10, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
         letters(sc, kind, 386, y0 + 28, "title", 8, col=kcol, outline=False)
-        for n_, ln in enumerate(wrap(what, 244)):
-            UI.rich(sc, ln, 386, y0 + 46 + n_ * 17, "text", 16, col=MUTED if k_ else INK)
+        fx_rows(sc, 386, y0 + 46, 244, what[:1], dim=bool(k_))
     scribble(sc, 316, 434, 200, seed=36)
     # what it becomes
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
@@ -496,7 +495,7 @@ def pools():
     xs = [12 + i * (PW_ + 2) for i in range(4)]
     for x0 in xs:
         UI.cell(sc, x0, 52, x0 + PW_, 352, "find")
-    heads = [("Брачный полёт", "пару выбирать ты", "m_flight"), ("Гибрид", "дети пустые", "m_hybrid"),
+    heads = [("Брачный полёт", "пара на выбор", "m_flight"), ("Гибрид", "бесплоден", "m_hybrid"),
              ("Откормленная", "у Пожирателя", "m_fattened"), ("Чья мутация", "тот и цвет", "m_nest")]
     for x0, (h, sub, key) in zip(xs, heads):
         icon(sc, key, x0 + 12, 60, 2)
@@ -707,15 +706,15 @@ def battle_hud():
         name = "swarm_battle_hud.png"
         if paused:                                  # on pause: point at a spitter and read its card
             sx_, sy_ = 566, 452
-            cx0, cy0, cx1, cy1 = 586, 302, 800, 452
+            cx0, cy0, cx1 = 572, 296, 826
+            rows_ = [("каждые 2 хода", "Плевок {яд}, дальность 3"), ("попал", "Клей: 1 раунд не ходит, бьёт"),
+                     ("следующий", "через 1 ход"), ("минус", "укус вплотную слабый")]
+            cy1 = fx_rows(sc, cx0 + 10, cy0 + 44, cx1 - cx0 - 20, rows_, draw=False) + 10
             UI.cell(sc, cx0, cy0, cx1, cy1, "hi")
             icon(sc, "spitter", cx0 + 8, cy0 + 6, 2)
             letters(sc, "Паук-плевун", cx0 + 44, cy0 + 10, "text", 16, col=GOLD, jitter=1, seed=7)
             letters(sc, "рабочая", cx0 + 44, cy0 + 26, "title", 8, col=PALE, outline=False)
-            for j, (ln, col) in enumerate((("Плюёт раз в 2 хода", INK), ("на 3 клетки, урон {яд}.", INK),
-                                           ("Цель прилипает к клетке", INK), ("на раунд, но бьёт.", INK),
-                                           ("Плюнет снова через ход", GREEN), ("Вблизи кусается слабо", RED))):
-                UI.rich(sc, ln, cx0 + 10, cy0 + 44 + j * 16, "text", 16, col=col)
+            fx_rows(sc, cx0 + 10, cy0 + 44, cx1 - cx0 - 20, rows_)
             cursor(sc, sx_ - 2, sy_ - 14)
             name = "swarm_battle_pause.png"
         img = sc.image(S)
@@ -1034,6 +1033,71 @@ def development():
 SILVER = (200, 206, 220)
 
 
+def fx_rows(sc, x, y, w, rows, lh=17, dim=False, draw=True):
+    """Standard effect lines, as in Conquest of Elysium: «when:» dim, the effect bright after it, wrapped lines
+    indented; a drawback («минус») in red. Returns the y under the last line."""
+    for trig, eff in rows:
+        neg = trig == "минус"
+        tcol = RED if neg else (PALE if dim else (150, 140, 168))
+        ecol = (236, 160, 140) if neg else (MUTED if dim else INK)
+        head = trig + ":"
+        tw = UI.text_width(head + " ")
+        lines, line, avail = [], "", w - tw
+        for wd in eff.split(" "):
+            test = (line + " " + wd).strip()
+            if UI.rich_width(test) > avail and line:
+                lines.append(line)
+                line, avail = wd, w - 16
+            else:
+                line = test
+        lines.append(line)
+        if draw:
+            letters(sc, head, x, y, "text", 16, col=tcol)
+        for j, ln in enumerate(lines):
+            if draw:
+                UI.rich(sc, ln, x + tw if j == 0 else x + 16, y, "text", 16, col=ecol)
+            y += lh
+    return y
+
+
+ABIL_FX = {   # the abilities on the cards, in standard lines
+    "Кладка": [("каждые 3 хода", "Призыв: 2 личинки рядом, бьются со следующего раунда"),
+               ("конец боя", "живые личинки — в выводок с лучшей чертой боя")],
+    "Сердце роя": [("погибла своя в 2 клетках", "Яйцо на её клетке"), ("через 2 хода", "из яйца личинка")],
+    "Плодовитость": [("в выводке", "+1 потомок"), ("кормление лидера", "цена ×½")],
+    "Тесные стаи": [("в клетке", "до 6 мелких вместо 4"), ("минус", "удары по площади и растаптывание задевают всех")],
+    "Медлительная": [("постоянно", "скорость 1"), ("погибла", "Обезглавленный рой: страх 1–9 у всех")],
+    "Помутнение": [("каждые 3 хода", "Помутнение врагов в 2 клетках от их плотной группы: 1 раунд бьют своих"),
+                   ("машины", "Сбой: шаг пропущен, способности молчат")],
+    "Предсмертный крик": [("погибла своя", "убийце 1 {пси}, мимо брони"), ("убийца — машина", "1 {пси} за 2 смерти")],
+    "Захват разума": [("раз в 6 ходов", "Захват врага ниже половины здоровья"), ("размер 1–3", "на 5 ходов"),
+                      ("размер 4–5", "на 2 хода"), ("размер 6–7", "Оглушение на 1 раунд")],
+    "Мыслящая порода": [("в выводке", "пси-мутации, чаще у стоявших рядом с ним")],
+    "Одна мысль на стаю": [("стая", "бьёт цель, на которую напала первая особь")],
+    "Хрупкий мозг": [("постоянно", "мягкое тело"), ("погиб", "Обезглавленный рой: страх 1–9 у всех")],
+    "Рост": [("каждые 2 тела", "здоровье ×1,4, удар +2; до 2 раз за бой, до размера 7")],
+    "Каннибал": [("постоянно", "ест своих павших рядом: лечится и растёт")],
+    "Всё в пасть": [("после боя", "+1 биомасса за тело"), ("между боями", "биомасса — в его рост"), ("минус", "рой меньше")],
+    "Свора": [("стаи", "идут за ним; тела — ему"), ("минус", "особи не лечатся пожиранием")],
+    "Ненасытный": [("3 раунда без еды", "съедает свою мелкую рядом"), ("рядом никого", "−1/10 здоровья за раунд")],
+    "Заражение": [("пробил броню", "Заражение"), ("заражённый погиб", "2 личинки"),
+                  ("заражена машина", "личинка каждые 3 хода; сломана — ещё 2")],
+    "Длинный яйцеклад": [("постоянно", "дальность 2, инициатива +3")],
+    "Подкидыш": [("в начале боя", "1 рабочая в тылу врага")],
+    "Дети хозяина": [("личинка из заражённого", "берёт его черту"), ("конец боя", "живые — в выводок химерами")],
+    "Чужие черты": [("в выводке", "чужие черты чаще; до 2 на особи")],
+    "Пёстрые стаи": [("стая", "разные виды вместе"), ("в выводке", "пары и внутри стаи")],
+    "Хрупкая кладка": [("{огонь} по заражённому", "кладка выжжена, даже свой огонь")],
+    "Жало": [("пробил броню", "{яд} 1–4, копится; броня −1, предел −2"), ("машины", "без {яд}")],
+    "Крылья": [("постоянно", "проходит сквозь своих")],
+    "Клешни-тиски": [("атака", "{дроб}"), ("попал", "цель не уходит со своей клетки")],
+    "Хитин": [("постоянно", "{руб} ×½, {дроб} ×2")],
+    "Стая": [("постоянно", "боевой дух +1 за свою рядом, до +4")],
+    "Пожирание": [("убила", "ест труп: здоровье +¼"), ("после боя", "съеденное — в биомассу")],
+    "Медленнее других": [("постоянно", "скорость 2; у рабочих 3")],
+}
+
+
 def section(sc, x, y, w, key, label, title, text, col=GOLD, seed=0):
     """One block of a card: an icon, a small label, the name, and what it does, wrapped."""
     if key:
@@ -1124,7 +1188,7 @@ def pict_flight(sc, x0, y, x1):
     cursor(sc, int(xs[1]) + 2, int(y) + 22)
 
 
-PICT = {"Брачный полёт": (pict_flight, "пара для неё — ты выбирать")}
+PICT = {"Брачный полёт": (pict_flight, FX["flight"])}
 
 
 def leader_comb(sc, x0, y, rows, key, hover):
@@ -1224,10 +1288,11 @@ def big_card(spec, name, save=True):
         cx, cy, nm, desc, _ = pos[hover]
         draw_pict, line = PICT[nm]
         ty0 = int(yb + 4)
-        UI.cell(sc, x0, ty0, x1, ty0 + 104, "normal")
+        h_ = fx_rows(sc, x0 + 12, 0, x1 - x0 - 24, line, draw=False)
+        UI.cell(sc, x0, ty0, x1, ty0 + 90 + h_, "normal")
         letters(sc, nm, x0 + 12, ty0 + 8, "text", 16, col=GOLD)
         draw_pict(sc, x0 + 12, ty0 + 36, x1 - 12)
-        UI.rich(sc, line, x0 + 12, ty0 + 82, "text", 16, col=INK)
+        fx_rows(sc, x0 + 12, ty0 + 82, x1 - x0 - 24, line)
         cursor(sc, int(cx) + 4, int(cy) + 2)
     # under the attacks: what it hands down — icons in a column
     if spec.get("below"):
@@ -1258,12 +1323,12 @@ def big_card(spec, name, save=True):
     # the hovered one: its text in a tooltip under the cursor
     if hov is not None:
         key, lab, nm, desc, col = spec["abilities"][hov]
-        lines = wrap(desc, x1 - x0 - 40)
+        rows = ABIL_FX.get(nm, desc)
         tx0, ty0 = x0 + 10, hy + 46
-        UI.cell(sc, tx0, ty0, x1, ty0 + 30 + len(lines) * 16, "normal")
+        h_ = fx_rows(sc, tx0 + 12, 0, x1 - tx0 - 24, rows, draw=False)
+        UI.cell(sc, tx0, ty0, x1, ty0 + 34 + h_, "normal")
         letters(sc, nm, tx0 + 12, ty0 + 8, "text", 16, col=col)
-        for j, ln in enumerate(lines):
-            UI.rich(sc, ln, tx0 + 12, ty0 + 26 + j * 16, "text", 16, col=INK)
+        fx_rows(sc, tx0 + 12, ty0 + 28, x1 - tx0 - 24, rows)
         cursor(sc, int(hx) - 30, int(hy) + 10)
     if not save:
         return sc
@@ -1306,13 +1371,13 @@ def cards():
                ("val", "таких в рое", "7", INK)],
         stats=[("здоровье", "8"), ("броня", "0 · хитин"), ("скорость", "2"), ("боевой дух", "6"),
                ("размер", "1"), ("предел роя", "1 очко")],
-        attacks=[("stinger", "Жало", "1–4 +1", "{кол}", "1", "если пробивает броню: {яд} 1–4 и −1 к броне"),
+        attacks=[("stinger", "Жало", "1–4 +1", "{кол}", "1", "пробил броню: {яд} 1–4, броня −1"),
                  ("evo_vise", "Клешни", "—", "{дроб}", "1", "цель не может уйти со своей клетки")],
         below=("ПОТОМКАМ", [("stinger", "Жало", "черта", GOLD), ("wings", "Крылья", "черта", GOLD),
                             ("m_blister", "Нарывник", "мутация", SILVER)]),
         abilities=[("stinger", "форма", "Жало", "Если удар жалом пробивает броню, цель получает 1–4 {яд} и теряет 1 броню до конца боя. {яд} накапливается. С одной цели снимается не больше 2 брони. Машинам {яд} не страшен, но броню жало снимает и с них.", GOLD),
                    ("wings", "деталь", "Крылья", "Может проходить через клетки, занятые своими.", GOLD),
-                   ("m_blister", "мутация · общая", "Нарывник", GRUNT["blister"], SILVER),
+                   ("m_blister", "мутация · общая", "Нарывник", FX["blister"], SILVER),
                    ("evo_vise", "эволюция формы", "Клешни-тиски", "Клешни бьют {дроб}. Враг, в которого они попали, не может уйти со своей клетки.", (150, 220, 120)),
                    ("fear", "слабость", "Медленнее других", "Скорость 2, у других рабочих 3.", RED),
                    ("ant", "класс", "Стая", "Боевой дух +1 за каждую свою особь в соседних клетках, но не больше +4.", INK),
@@ -1327,7 +1392,7 @@ def cards():
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
                ("val", "на выбор", ["пси-удар на 4 клетки", "Захват раз в 4 хода", "или Помутнение на 3 клетки"], INK)],
         stats=[("здоровье", "22"), ("броня", "0 · мягкое тело"), ("скорость", "1"), ("размер", "4")],
-        attacks=[("razum", "Пси-удар", "1–6", "{пси}", "3", "мимо брони, копит надлом")],
+        attacks=[("razum", "Пси-удар", "1–6", "{пси}", "3", "мимо брони; копит надлом")],
         hover=None,
         comb=([("Основа", [("m_psi_gland", "lived", "Пси-железа", "")]),
                ("Безумие", [("m_psi_reson", "open", "Резонатор", ""), ("m_psi_dread", "sealed", "Чутьё на страх", "")]),
@@ -1367,7 +1432,7 @@ def cards():
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
                ("val", "на выбор", ["личинок 3", "заражает и яд скорпионов", "или подкидышей двое"], INK)],
         stats=[("здоровье", "12"), ("броня", "1 · хитин"), ("скорость", "2"), ("размер", "3")],
-        attacks=[("kuk", "Яйцеклад", "1–6", "{кол}", "2", "раньше всех; пробил броню — заражает")],
+        attacks=[("kuk", "Яйцеклад", "1–6", "{кол}", "2", "инициатива +3; пробил броню: Заражение")],
         hover=None,
         comb=([("Заражение", [("m_parasitoid", "lived", "Паразитоид", ""), ("m_bloodeggs", "sealed", "Яйца в крови", ""),
                               ("m_spores", "open", "Споры", "")]),
@@ -1396,7 +1461,7 @@ def mutation_card(key="nest"):
     moment it works in battle as a picture, one line of what it does, what it hands down."""
     import swarm_mut as M
     name, whose, state, n, line, tr = MUT_CARD[key]
-    line = line or M.GRUNT[key]
+    rows = FX[key]
     sc = big_card(matka_spec(hover=None), None, save=False)
     sc.rgb *= 0.38                                              # the card underneath, dimmed
     x0, y0, x1, y1 = 176, 64, 784, 476
@@ -1422,9 +1487,8 @@ def mutation_card(key="nest"):
     floor = (sc.yy > y0 + 250) & (sc.yy < y0 + 292) & (sc.xx > gx0) & (sc.xx < gx1)
     sc.rgb[floor] = sc.rgb[floor] * 0.75 + hexc("#2a2018") * 0.25
     M.scene(sc, key, (gx0 + gx1) / 2 - 10, y0 + 266)
-    # one line, and what it hands down
-    for j, ln in enumerate(wrap(line, x1 - x0 - 44)):
-        UI.rich(sc, ln, x0 + 22, y0 + 316 + j * 20, "text", 16, col=INK)
+    # its effects, as standard lines, and what it hands down
+    fx_rows(sc, x0 + 22, y0 + 314, x1 - x0 - 44, rows, lh=18)
     icon(sc, "ant", x0 + 22, y0 + 368, 1)
     letters(sc, "передаётся потомкам", x0 + 42, y0 + 369, "text", 16, col=MUTED)
     UI.button(sc, x1 - 220, y1 - 54, x1 - 20, y1 - 16, "chitin")
