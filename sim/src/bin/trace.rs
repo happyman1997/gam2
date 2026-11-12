@@ -14,8 +14,7 @@ fn main() {
         _ => (vec![strazh(), mudrets()], many(rabochaya(), 25)),
     };
     let mut bt = Battle::new(seed).with_log();
-    bt.add_army(0, &a);
-    bt.add_army(1, &b);
+    bt.add_armies(&a, &b);
     let o = bt.run();
     let name = |i: usize| format!("{}#{}", bt.units[i].t.name, i);
     let (mut kills, mut flees, mut left, mut hits0, mut dmg0, mut hits1, mut dmg1) = (0, 0, 0, 0, 0, 0, 0);

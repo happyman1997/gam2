@@ -3,10 +3,10 @@ letters, the headings dripping and bristling, the swarm's own script under them)
 interface, silk and cobwebs, resin running off the plates, old engravings showing through.
 
     python3 tools/sprites/swarm_hud.py            -> out/brood.png, out/swarm_camp.png, out/swarm_evolution_screen.png,
-                                                     out/swarm_deploy.png, out/brood_finds.png, out/brood_pools.png,
+                                                     out/brood_finds.png, out/brood_pools.png,
                                                      out/swarm_flocks.png, out/swarm_battle_hud.png, out/swarm_aftermath.png,
                                                      out/swarm_leader_pick.png, out/swarm_development_screen.png
-    python3 tools/sprites/swarm_hud.py brood      -> one screen (a key of SCREENS: brood, camp, evolution, deploy, finds,
+    python3 tools/sprites/swarm_hud.py brood      -> one screen (a key of SCREENS: brood, camp, evolution, finds,
                                                      pools, flocks, battle, aftermath, leader, development)
 """
 import sys
@@ -380,95 +380,6 @@ def evolution(variant=None):
     UI.WOBBLE[0] = 0.0
     img.save(out(name))
     print(name, img.size)
-
-
-# ---------------------------------------------------------------- deployment by flocks
-def deploy():
-    import swarm_screens as SS
-    import frames as F
-    sc = frame_screen(75)
-    UI.wing(sc, 0, 0, WW, 44)
-    UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=9)
-    title(sc, "РАССТАНОВКА", seed=25)
-    letters(sc, "Литейщик: 4 голема", 884, 12, "text", 16, col=(214, 196, 150), align="right")
-    help_button(sc)
-    UI.plate(sc, 660, 50, 948, 122)
-    icon(sc, "matka", 670, 58, 2)
-    letters(sc, "ТЕСНЫЕ СТАИ", 708, 57, "title", 8, col=GOLD, outline=False)
-    fx_rows(sc, 708, 70, 230, ABIL_FX["Тесные стаи"], lh=24)
-    CW_, CH_, GX0, GY0 = SS.CW_, SS.CH_, SS.GX0, SS.GY0 + 4
-    cols, rows = 21, 12
-    for c in range(cols):
-        for r in range(rows):
-            x, y = GX0 + c * CW_, GY0 + r * CH_
-            if 9 <= c < 13:
-                continue
-            col = hexc("#9a8ab8") if c < 9 else hexc("#c9b27a")
-            for dx, dy in ((0, 0), (1, 0), (0, 1), (-1, 0), (0, -1)):
-                sc.rgb[y + dy, x + dx] = sc.rgb[y + dy, x + dx] * 0.55 + col * 0.45
-    rnd = np.random.default_rng(3)
-    items = []
-    for k_, (traits, soldier, name, n, cells, col, placed) in enumerate(SS.FLOCKS):
-        if not placed:
-            continue
-        m = np.zeros((HH, WW), bool)
-        for (c, r) in cells:
-            m[GY0 + r * CH_ + 2:GY0 + (r + 1) * CH_ - 2, GX0 + c * CW_ + 2:GX0 + (c + 1) * CW_ - 2] = True
-        edge = m & ~(np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1))
-        sc.rgb[m] = sc.rgb[m] * 0.8 + hexc(col) * 0.2
-        sc.rgb[edge & ((sc.xx + sc.yy) % 3 != 0)] = hexc(col)
-        per = max(1, int(np.ceil(n / max(1, len(cells)))))
-        placed_n = 0
-        for (c, r) in cells:
-            for j in range(per):
-                if placed_n >= n:
-                    break
-                if per > 4:                                         # a tight cell: three abreast
-                    x = GX0 + c * CW_ + 8 + (j % 3) * 12 + (j // 3) * 5 + rnd.uniform(-2, 2)
-                    y = GY0 + r * CH_ + 13 + (j // 3) * 11 + rnd.uniform(-1, 1)
-                else:
-                    x = GX0 + c * CW_ + 10 + (j % 2) * 18 + rnd.uniform(-3, 3)
-                    y = GY0 + r * CH_ + 14 + (j // 2) * 10 + rnd.uniform(-2, 2)
-                items.append((y, W.build(traits, rnd.uniform(-0.1, 0.1), "idle", soldier, k=SS.ZD, genes=W.genes_for(k_ * 50 + placed_n)), x))
-                placed_n += 1
-    for (y, spr, x) in sorted(items, key=lambda t: t[0]):
-        sc.blit(spr, int(x - spr.ox), int(y - spr.oy))
-    q = W.queen(0.0, "idle", k=SS.ZD)
-    sc.blit(q, int(GX0 + 1.6 * CW_ - q.ox), int(GY0 + 6.6 * CH_ - q.oy))
-    for name_, c, r in (("Страж", 14.5, 6.2), ("Орудие", 15.0, 2.6), ("Горн", 15.2, 9.8), ("Механик", 17.4, 6.0)):
-        g = F.build(name_, "idle", k=F.FRAMES[name_][0] * SS.ZD)
-        f_ = g.flipped()
-        f_.ox, f_.oy = g.w - 1 - g.ox, g.oy
-        sc.blit(f_, int(GX0 + c * CW_ - f_.ox), int(GY0 + r * CH_ - f_.oy))
-    UI.silk(sc, (GX0 + 4 * CW_ + 30, GY0 + 4 * CH_ + 15), (GX0 + 5 * CW_ + 8, GY0 + 4 * CH_ + 15), sag=4, col="#7ae040")
-    for k_, (traits, soldier, name, n, cells, col, placed) in enumerate(SS.FLOCKS):
-        if not placed:
-            continue
-        c = min(cells, key=lambda t: (t[1], t[0]))
-        letters(sc, f"{name} ×{n}", GX0 + c[0] * CW_, GY0 + c[1] * CH_ - 18, "text", 16, col=tuple(int(v) for v in hexc(col)),
-                jitter=1, seed=k_)
-    fx_line(sc, GX0 + 6 * CW_ + 10, GY0 + 4 * CH_ + 10, "← {пара} → {потомок}")
-    UI.plate(sc, 4, HH - 92, WW - 4, HH - 2)
-    for k_, (traits, soldier, name, n, cells, col, placed) in enumerate([fl for fl in SS.FLOCKS if not fl[6]]):
-        x0 = 12 + k_ * 150
-        UI.cell(sc, x0, HH - 84, x0 + 142, HH - 10, "normal", col=col)
-        put(sc, W.build(traits, 0.0, "idle", soldier, k=1.1, genes=W.genes_for(90 + k_)), x0 + 34, HH - 22, 10)
-        for j, ln in enumerate(wrap(name.replace("-", "- "), 76)):
-            letters(sc, ln.replace("- ", "-"), x0 + 62, HH - 80 + j * 16, "text", 16, col=INK, jitter=1, seed=k_ + j)
-        letters(sc, f"×{n}", x0 + 62, HH - 42, "title", 8, col=GOLD, outline=False)
-        letters(sc, "в запасе", x0 + 62, HH - 28, "title", 8, col=PALE, outline=False)
-    for k_, t in enumerate(("в линию", "в кулак", "разделить", "как в прошлый")):
-        x0, y0 = 318 + (k_ % 2) * 172, HH - 86 + (k_ // 2) * 40
-        UI.button(sc, x0, y0, x0 + 164, y0 + 34, "chitin")
-        letters(sc, t, x0 + 82, y0 + 9, "text", 16, col=INK, align="center")
-    act_button(sc, 690, HH - 80, 948, HH - 20, "В БОЙ")
-    UI.creature(sc, bug((), "idle", 0.9, 76), 420, HH - 92)
-    UI.creature(sc, bug(("wings",), "idle", 0.9, 77), 930, HH - 94)
-    UI.cobweb(sc, 958, 46, 40, quad=(-1, 1))
-    img = sc.image(S)
-    UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_deploy.png"))
-    print("swarm_deploy.png", img.size)
 
 
 # ---------------------------------------------------------------- the brood's finds, and what the leaders' pools add
@@ -2015,7 +1926,7 @@ def hints():
     evolution("alt")
 
 
-SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "deploy": deploy, "finds": finds, "pools": pools,
+SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "finds": finds, "pools": pools,
            "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development,
            "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif,
            "glossary": glossary_screen, "hints": hints, "roles": roles}

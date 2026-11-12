@@ -42,6 +42,47 @@ fn center_d2(ax: i32, ay: i32, af: i32, bx: i32, by: i32, bf: i32) -> i32 {
     (acx - bcx).pow(2) + (acy - bcy).pow(2)
 }
 
+/// What a unit is for, read from its numbers and traits — where the automatic formation stands it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Role {
+    /// A big leader who fights in melee and keeps up (Пожиратель): first, in the middle of the front.
+    LeaderFront,
+    /// Any other leader — shoots, lays, is slow or small (Матка, Разум улья, Чума): the middle of the back
+    /// rank, taken before the shooters fill it.
+    LeaderBack,
+    /// Holds the line: a shield, thorns, curling up, heavy armour.
+    Front,
+    /// Melee that deals the damage: the front, beside the shields.
+    Strike,
+    /// Flies, leaps or runs fast: the ends of the front.
+    Flank,
+    /// Does not attack, mends or feeds the others: just behind the front.
+    Support,
+    /// Shoots or casts: the back ranks.
+    Ranged,
+}
+
+pub fn role(t: &Template) -> Role {
+    if t.has(Trait::Leader) {
+        return if t.range <= 1 && t.speed >= 2 && t.size >= 5 && !t.has(Trait::NoAttack) { Role::LeaderFront } else { Role::LeaderBack };
+    }
+    if t.range > 1 || t.has(Trait::Caster) {
+        Role::Ranged
+    } else if t.has(Trait::NoAttack) {
+        Role::Support
+    } else if t.has(Trait::Flyer) || t.has(Trait::Leap) || t.speed >= 4 {
+        Role::Flank
+    } else if t.has(Trait::Zaslon)
+        || t.has(Trait::CurlUp)
+        || t.traits.iter().any(|x| matches!(x, Trait::Thorns { .. }))
+        || t.armor >= 4
+    {
+        Role::Front
+    } else {
+        Role::Strike
+    }
+}
+
 const DIRS: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
 
 #[derive(Clone, Debug)]
@@ -128,6 +169,10 @@ impl Grid {
         (y * W + x) as usize
     }
     fn can_place(&self, side: u8, size: u32, x: i32, y: i32) -> bool {
+        self.can_place_cap(side, size, x, y, 4)
+    }
+    /// As can_place, with at most `cap` of a cell taken (two small ones to a cell against area blows).
+    fn can_place_cap(&self, side: u8, size: u32, x: i32, y: i32, cap: u8) -> bool {
         let f = footprint(size);
         let c = cell_cost(size);
         if x < 0 || y < 0 || x + f > W || y + f > H {
@@ -139,7 +184,7 @@ impl Grid {
                 if self.side[i] != -1 && self.side[i] != side as i8 {
                     return false;
                 }
-                if self.used[i] + c > 4 {
+                if self.used[i] + c > cap.max(c) {
                     return false;
                 }
             }
@@ -210,18 +255,38 @@ impl Battle {
         }
     }
 
-    /// Default formation: melee at the front of the zone, ranged and support at the back,
-    /// rows filled from the middle outwards. Side 0 stands on the left, side 1 on the right.
+    /// Places one army with nothing to read about the enemy (tests, traces).
     pub fn add_army(&mut self, side: u8, army: &[Template]) {
-        for t in army {
+        self.deploy(side, army, &[]);
+    }
+
+    /// Both armies, each reading the other: there is no deployment screen, the game stands the armies itself.
+    pub fn add_armies(&mut self, a: &[Template], b: &[Template]) {
+        self.deploy(0, a, b);
+        self.deploy(1, b, a);
+    }
+
+    /// The automatic formation («Авторасстановка» in CONCEPT.md). Every unit gets a role from its numbers and
+    /// traits; the roles stand in ranks from the front of the zone, rows filled from the middle outwards,
+    /// flankers from the edges inwards; against area blows the small ones stand two to a cell instead of four.
+    /// A kind of unit (a flock) is placed in one run, so it stands together.
+    pub fn deploy(&mut self, side: u8, army: &[Template], enemy: &[Template]) {
+        let area = enemy.iter().any(|t| t.has_ability(|a| matches!(a, Ability::Volley { .. })));
+        let mut order: Vec<(Role, usize)> = army.iter().enumerate().map(|(i, t)| (role(t), i)).collect();
+        // leaders first (theirs are the middles), then the front and the strikers, the flanks, support, shooters; within a role the
+        // toughest first; a kind together
+        order.sort_by_key(|&(r, i)| (r, Reverse(army[i].armor * 4 + army[i].hp), army[i].name.clone()));
+        for (r, i) in order {
+            let t = &army[i];
             let f = footprint(t.size);
-            let back = t.range > 1 || t.has(Trait::NoAttack);
-            let mut cols: Vec<i32> = if side == 0 { (0..=ZONE - f).collect() } else { (W - ZONE..=W - f).collect() };
-            // front first for melee; for side 0 the front is the right edge of the zone
-            let front_first = !back;
-            if (side == 0) == front_first {
-                cols.reverse();
-            }
+            let cap = if area && t.size == 1 { 2 } else { 4 };
+            // ranks from the front of the zone (side 0's front is its right edge)
+            let ranks: Vec<i32> = match r {
+                Role::LeaderFront | Role::Front | Role::Strike | Role::Flank => (0..ZONE - f + 1).collect(),
+                Role::Support => (1..ZONE - f + 1).chain(0..1).collect(),
+                Role::Ranged | Role::LeaderBack => (0..ZONE - f + 1).rev().collect(),
+            };
+            let cols: Vec<i32> = ranks.iter().map(|&k| if side == 0 { ZONE - f - k } else { W - ZONE + k }).collect();
             let mid = (H - f) / 2;
             let mut rows = vec![mid];
             for k in 1..H {
@@ -231,13 +296,27 @@ impl Battle {
                     }
                 }
             }
+            if r == Role::Flank {                       // from the edges inwards, top and bottom in turn
+                rows.sort_by_key(|&y| (y.min(H - f - y), y > H - f - y));
+            }
             let mut placed = false;
             'outer: for &x in &cols {
                 for &y in &rows {
-                    if self.grid.can_place(side, t.size, x, y) {
+                    if self.grid.can_place_cap(side, t.size, x, y, cap) {
                         self.place(side, t.clone(), x, y);
                         placed = true;
                         break 'outer;
+                    }
+                }
+            }
+            if !placed {
+                'any: for &x in &cols {
+                    for &y in &rows {
+                        if self.grid.can_place(side, t.size, x, y) {
+                            self.place(side, t.clone(), x, y);
+                            placed = true;
+                            break 'any;
+                        }
                     }
                 }
             }
@@ -1109,7 +1188,6 @@ impl Battle {
 /// One battle: side 0 against side 1 with a seed.
 pub fn fight(a: &[Template], b: &[Template], seed: u64) -> Outcome {
     let mut bt = Battle::new(seed);
-    bt.add_army(0, a);
-    bt.add_army(1, b);
+    bt.add_armies(a, b);
     bt.run()
 }

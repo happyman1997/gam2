@@ -17,8 +17,7 @@ fn main() {
         _ => ("Старт Зодчего против роя", start_zodchiy(), swarm_start()),
     };
     let mut bt = Battle::new(seed).with_log();
-    bt.add_army(0, &a);
-    bt.add_army(1, &b);
+    bt.add_armies(&a, &b);
     let mut over = false;
     while bt.round < upto {
         if bt.step().is_some() {

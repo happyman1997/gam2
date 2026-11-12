@@ -1,10 +1,8 @@
 """Mock-ups of the swarm's other screens, in the brood screen's style:
   evolution  — «Эволюция формы»: the forms in the swarm, the chosen form's three evolutions as cards
   camp       — the camp: the swarm chooses a mutation itself — who gets it, which trait, what it will look like
-  deploy     — deployment by flocks: the swarm stands in flocks of one kind, the player puts a flock on the cells
-               and shapes it; the creatures settle inside by themselves
 
-    python3 tools/sprites/swarm_screens.py      -> out/swarm_evolution_screen.png, out/swarm_camp.png, out/swarm_deploy.png
+    python3 tools/sprites/swarm_screens.py      -> out/swarm_evolution_screen.png, out/swarm_camp.png
 """
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -173,103 +171,8 @@ def camp_screen():
     print("swarm_camp.png", img.size)
 
 
-# ---------------------------------------------------------------- deployment by flocks
-CW_, CH_, GX0, GY0 = 40, 30, 20, 70           # deployment grid: the swarm's zone on the left, the enemy on the right
-ZD = 0.62                                     # everyone at the same zoom: the true relative sizes
-FLOCKS = [  # (traits, soldier, name, count, cells (col, row) it covers, colour, placed)
-    ((), False, "муравьи", 19, [(5, 4), (5, 5), (5, 6), (5, 7)], "#c9b27a", True),      # Матка: tight flocks, 5 to a cell
-    (("stinger",), False, "скорпионы", 7, [(4, 3), (4, 4), (4, 5), (4, 6)], "#d0603e", True),
-    (("horn",), True, "жуки-солдаты", 2, [(6, 6), (6, 7)], "#c07040", True),
-    (("acid",), False, "бочонки", 2, [(3, 2), (3, 3)], "#8ae04a", True),
-    (("wings",), False, "осы", 4, [(5, 0), (6, 0), (6, 1)], "#e0b040", True),
-    (("scythes",), False, "богомол", 1, [], "#9ab098", False),
-    ((), True, "муравьи-солдаты", 2, [], "#c9b27a", False),
-]
-
-
-def deploy_screen():
-    sc = ground(75)
-    cols, rows = 21, 12
-    for c in range(cols):                                       # the grid; the swarm's zone is the left 9 columns
-        for r in range(rows):
-            x, y = GX0 + c * CW_, GY0 + r * CH_
-            col = hexc("#9a8ab8") if c < 9 else hexc("#c9b27a")
-            if 9 <= c < 13:
-                continue
-            for dx, dy in ((0, 0), (1, 0), (0, 1)):
-                sc.rgb[y + dy, x + dx] = sc.rgb[y + dy, x + dx] * 0.6 + col * 0.4
-    zone = np.zeros((HH, WW), bool)
-    zone[GY0:GY0 + rows * CH_, GX0:GX0 + 9 * CW_] = True
-    sc.rgb[zone] = sc.rgb[zone] * 0.9 + hexc("#4a3a6a") * 0.1
-    rnd = np.random.default_rng(3)
-    items = []
-    for k, (traits, soldier, name, n, cells, col, placed) in enumerate(FLOCKS):
-        if not placed:
-            continue
-        m = np.zeros((HH, WW), bool)
-        for (c, r) in cells:
-            m[GY0 + r * CH_ + 2:GY0 + (r + 1) * CH_ - 2, GX0 + c * CW_ + 2:GX0 + (c + 1) * CW_ - 2] = True
-        edge = m & ~(np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1))
-        sc.rgb[m] = sc.rgb[m] * 0.82 + hexc(col) * 0.18
-        sc.rgb[edge & ((sc.xx + sc.yy) % 3 != 0)] = hexc(col)
-        per = max(1, int(np.ceil(n / max(1, len(cells)))))
-        placed_n = 0
-        for (c, r) in cells:                                   # the creatures settle inside by themselves
-            for j in range(per):
-                if placed_n >= n:
-                    break
-                x = GX0 + c * CW_ + 10 + (j % 2) * 18 + rnd.uniform(-3, 3)
-                y = GY0 + r * CH_ + 14 + (j // 2) * 10 + rnd.uniform(-2, 2)
-                items.append((y, W.build(traits, rnd.uniform(-0.1, 0.1), "idle", soldier, k=ZD, genes=W.genes_for(k * 50 + placed_n)), x))
-                placed_n += 1
-    for (y, spr, x) in sorted(items, key=lambda t: t[0]):
-        sc.blit(spr, int(x - spr.ox), int(y - spr.oy))
-    q = W.queen(0.0, "idle", k=ZD)
-    sc.blit(q, int(GX0 + 1.6 * CW_ - q.ox), int(GY0 + 6.6 * CH_ - q.oy))
-    for name_, c, r, size in (("Страж", 14.5, 6.2, 6), ("Орудие", 15.0, 2.6, 5), ("Горн", 15.2, 9.8, 5), ("Механик", 17.4, 6.0, 4)):
-        g = F.build(name_, "idle", k=F.FRAMES[name_][0] * ZD)
-        g = g.flipped() if False else g
-        f_ = g.flipped()
-        f_.ox, f_.oy = g.w - 1 - g.ox, g.oy
-        sc.blit(f_, int(GX0 + c * CW_ - f_.ox), int(GY0 + r * CH_ - f_.oy))
-    # a pairing hint: two neighbouring flocks of different kinds — the brood's pairs
-    for x in range(GX0 + 4 * CW_ + 30, GX0 + 5 * CW_ + 8, 3):
-        sc.rgb[GY0 + 4 * CH_ + 15, x] = hexc("#7ae040")
-    UI.plate(sc, 4, HH - 86, WW - 4, HH - 2)
-    for k, (traits, soldier, name, n, cells, col, placed) in enumerate([fl for fl in FLOCKS if not fl[6]]):
-        x0 = 12 + k * 150
-        UI.cell(sc, x0, HH - 78, x0 + 142, HH - 10, "normal", col=col)
-        put(sc, W.build(traits, 0.0, "idle", soldier, k=1.1, genes=W.genes_for(90 + k)), x0 + 34, HH - 24, 10)
-    for k, t in enumerate(("Вытянуть в линию", "Собрать в кулак", "Разделить стаю", "Как в прошлом бою")):
-        x0 = 316 + k * 158
-        UI.button(sc, x0, HH - 62, x0 + 150, HH - 28, "chitin")
-    img = sc.image(S)
-    d = ImageDraw.Draw(img)
-    d.text((20, 18), "Расстановка · рой ставится стаями · на поле выходит вся армия", font=f(1, 24), fill=INK)
-    t = "Литейщик: 4 голема"
-    d.text((WW * S - 24 - d.textlength(t, font=f(0, 16)), 22), t, font=f(0, 16), fill=(214, 196, 150))
-    for k, (traits, soldier, name, n, cells, col, placed) in enumerate(FLOCKS):
-        if not placed:
-            continue
-        c = min(cells, key=lambda t: (t[1], t[0]))
-        x, y = (GX0 + c[0] * CW_) * S, (GY0 + c[1] * CH_) * S - 26
-        lab = f"{name} ×{n}"
-        d.rectangle((x - 2, y - 2, x + d.textlength(lab, font=f(1, 15)) + 6, y + 22), fill=(20, 14, 26))
-        d.text((x + 2, y), lab, font=f(1, 15), fill=tuple(int(v) for v in hexc(col)))
-    d.text(((GX0 + 4 * CW_ + 30) * S, (GY0 + 4 * CH_ + 15) * S + 6), "пара: кладка", font=f(0, 13), fill=GREEN)
-    for k, (traits, soldier, name, n, cells, col, placed) in enumerate([fl for fl in FLOCKS if not fl[6]]):
-        x0 = (12 + k * 150) * S
-        d.text((x0 + 120, (HH - 70) * S), name, font=f(1, 15), fill=INK)
-        d.text((x0 + 120, (HH - 70) * S + 24), f"×{n} · не поставлена", font=f(0, 13), fill=MUTED)
-    for k, t in enumerate(("Вытянуть в линию", "Собрать в кулак", "Разделить стаю", "Как в прошлом бою")):
-        x0 = 316 + k * 158
-        d.text(((x0 + 75) * S - d.textlength(t, font=f(0, 15)) / 2, (HH - 50) * S), t, font=f(0, 15), fill=INK)
-    img.save(out("swarm_deploy.png"))
-    print("swarm_deploy.png", img.size)
-
-
 if __name__ == "__main__":
     # the screens themselves are drawn by swarm_hud (hand-made, text in the picture); this module keeps their data
     import swarm_hud
-    for k in ("evolution", "camp", "deploy"):
+    for k in ("evolution", "camp"):
         swarm_hud.SCREENS[k]()
