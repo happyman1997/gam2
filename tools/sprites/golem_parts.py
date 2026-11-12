@@ -80,7 +80,7 @@ ARMS = {   # key: name, item, the pose its donor holds it in (near side), extra 
     "fist": ("Кулак-поршень", _fist, dict(hand=(4.0, -11.6, 1.6), pole=(-0.5, -0.2, 1.0))),
     "maul": ("Паровой молот", _maul, dict(hand=(HM.WX, HM.WY, HM.WZ), pole=(1.4, -7.6, 2.0))),
     "shield": ("Щит", _shield, dict(hand=(5.8, -10.0, 2.0), pole=(0.8, -8.0, 1.6))),
-    "cannon": ("Пушка", GH.cannon, dict(hand=(6.0, -10.5, 1.0), pole=(-0.6, -0.2, 0.8))),
+    "cannon": ("Пушка", GH.cannon, dict(hand=(7.6, -9.2, 2.8), pole=(-0.6, -0.2, 0.8))),
     "staff": ("Посох-электрод", GH.sage_staff, dict(hand=(5.0, -8.0, 4.0), pole=(-0.6, -0.6, 1.0),
                                                     staff_dir=(0.05, 1.0, 0.05), hold=0.46)),
     "focus": ("Ладонь-разрядник", GH.sage_focus, dict(hand=(5.0, -12.0, 1.2), pole=(-0.4, -0.2, 1.0))),

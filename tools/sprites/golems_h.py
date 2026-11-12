@@ -603,7 +603,7 @@ GORN = dict(
 )
 
 
-# ---------------------------------------------------------------- Орудие: a gunner, cannons for forearms
+# ---------------------------------------------------------------- Орудие: a gunner with a heavy gun in each hand
 ORUDIE_CORE = Core(20.5, ((6.0, 8.6), (6.6, 9.4)), (0.0, 30.6, (7.6, 8.0), (10.0, 16.0), 8.8), ring_r=2.9)
 
 
@@ -640,26 +640,58 @@ def orudie_torso(G, P, S):
 
 
 def cannon(G, side, sh, el, w, s, P, A, S):
-    """The forearm ends in a breech and a long barrel with bands, a sight and a muzzle brake."""
-    g = G["item_" + side]
+    """A heavy gun held in the fist by its pistol grip and braced along the forearm: a riveted receiver above the
+    fist, a skeleton stock back over the forearm, a drum magazine under the receiver, a long thick barrel in a
+    perforated cooling jacket, a heavy muzzle brake, a sight and a carry handle."""
     d = unit(w - el)
     up = arr((0, 1.0, 0)) - d * d[1]
     up = unit(up) if np.linalg.norm(up) > 1e-6 else arr((1.0, 0, 0))
-    R = np.column_stack([d, up, np.cross(d, up)])
-    g.box(w + d * 1.4, (3.4, 4.6, 4.6), M_DIRON, R)                                        # breech
-    g.box(w + d * 1.4 + up * 2.6, (2.0, 0.8, 2.0), P, R)
-    m0, m1 = w + d * 2.8, w + d * 15.0
-    g.cyl(m0, m1, 2.0, M_IRON, seg=12)
-    for f in (0.12, 0.4, 0.68):
-        p = lerp(m0, m1, f)
-        g.cyl(p, p + d * 0.7, 2.4, M_STEEL if f != 0.4 else P, seg=12)
-    g.cyl(m0, lerp(m0, m1, 0.3), 2.25, P, seg=12)                                        # painted jacket
-    g.box(lerp(m0, m1, 0.35) + up * 2.4, (2.4, 1.0, 0.7), M_DIRON, R)                      # sight
-    g.box(m1 + d * 1.1, (2.4, 4.6, 4.6), M_DIRON, R)                                       # muzzle brake
-    for v in (up, -up):
-        g.box(m1 + d * 1.1 + v * 2.35, (1.3, 0.2, 3.2), M_HOLE, R)
-    g.ell(m1 + d * 2.35, (0.2, 1.3, 1.3), M_HOLE, R)
-    return dict(muzzle=m1 + d * 2.5, breech=w + d * 1.4 + up * 2.0, d=d, up=up)
+    hand, h, u = fist(G, "hand_" + side, w, w - el, up, s, P, th=1.1)
+    g = G["item_" + side]
+    e = unit(np.cross(d, u))
+    R = np.column_stack([d, u, e])
+    c = hand + u * 4.0 + d * 1.2                                                           # the gun's axis over the fist
+    g.cyl(hand - u * 2.2, c - u * 1.4, 0.95, M_IRON, seg=8)                                # pistol grip
+    g.box(c - u * 2.3 + d * 2.2, (2.8, 0.5, 0.6), M_STEEL, R)                              # trigger guard
+    g.box(c - u * 1.9 + d * 3.4, (0.5, 1.2, 0.6), M_STEEL, R)
+    g.box(c, (9.6, 3.6, 3.0), M_DIRON, R)                                                  # receiver
+    g.box(c + u * 0.3 + d * 0.6, (7.2, 2.4, 3.3), P, R)                                    # painted side plates
+    rivets(g, [c + d * t + u * 0.3 + e * 1.7 * sg for t in (-2.6, 0.6, 3.6) for sg in (1, -1)], r=0.3)
+    g.box(c + u * 1.95 - d * 0.6, (5.0, 0.4, 2.2), M_IRON, R)                              # ejection port cover
+    # the stock: two steel struts back over the forearm to a rubber-padded butt plate
+    for a_, b_ in ((c - d * 4.6 + u * 0.8, c - d * 9.4 + u * 0.2), (c - d * 4.6 - u * 1.2, c - d * 9.0 - u * 1.4)):
+        g.cyl(a_, b_, 0.55, M_IRON, seg=6)
+    g.box(c - d * 9.8 - u * 0.6, (1.2, 3.6, 2.4), M_DIRON, R)
+    # a drum magazine under the receiver, ahead of the grip
+    dm = c + d * 2.6 - u * 3.8
+    g.cyl(dm - e * 1.5, dm + e * 1.5, 2.7, M_IRON, seg=16)
+    for sg in (1, -1):
+        g.cyl(dm + e * 1.45 * sg, dm + e * 1.7 * sg, 2.2, P, seg=16)
+        g.cyl(dm + e * 1.7 * sg, dm + e * 1.9 * sg, 0.7, M_STEEL, seg=8)
+    g.box(lerp(dm, c, 0.55) + d * 0.2, (1.6, 1.6, 2.2), M_DIRON, R)                        # its neck into the receiver
+    # the barrel: a thick bore, a perforated cooling jacket, a heavy slotted muzzle brake
+    b0, b1 = c + d * 4.8, c + d * 19.0
+    g.cyl(b0, b1, 0.95, M_IRON, seg=10)
+    j1 = lerp(b0, b1, 0.62)
+    g.cyl(b0, j1, 1.65, M_DIRON, seg=12)
+    for t in np.linspace(0.1, 0.9, 6):
+        p = lerp(b0, j1, t)
+        g.cyl(p, p + d * 0.45, 1.72, M_HOLE, seg=12)
+    g.cyl(b0 - d * 0.3, b0 + d * 0.6, 1.9, P, seg=12)                                      # painted collar
+    g.cyl(j1, j1 + d * 0.5, 1.85, M_STEEL, seg=12)
+    g.box(b1 + d * 1.2, (2.6, 2.6, 2.6), M_DIRON, R)                                       # muzzle brake
+    for v in (u, -u):
+        g.box(b1 + d * 1.2 + v * 1.35, (1.4, 0.2, 2.0), M_HOLE, R)
+    for v in (e, -e):
+        g.box(b1 + d * 1.2 + v * 1.35, (1.4, 2.0, 0.2), M_HOLE, R)
+    g.ell(b1 + d * 2.55, (0.2, 0.75, 0.75), M_HOLE, R)
+    # sights and a carry handle
+    g.box(c + u * 2.3 + d * 3.4, (1.4, 1.0, 0.7), M_DIRON, R)                              # rear sight
+    g.box(b0 + u * 2.0 + d * 0.2, (0.5, 1.2, 0.4), M_DIRON, R)                             # front sight
+    g.cyl(c + u * 3.3 - d * 3.0, c + u * 3.3 + d * 1.2, 0.4, M_IRON, seg=6)
+    for t in (-3.0, 1.2):
+        g.cyl(c + u * 1.8 + d * t, c + u * 3.3 + d * t, 0.35, M_IRON, seg=6)
+    return dict(muzzle=b1 + d * 2.6, breech=c + u * 1.8, d=d, up=u, c=c)
 
 
 def orudie_fx(fx, A, info, S, ft):
@@ -686,10 +718,11 @@ ORUDIE = dict(
     hip=20.5, hz=4.6, hipx=(0.4, -0.8), LT=9.75, LS=7.25, LU=8.0, LF=8.0, th_leg=1.0, th_arm=1.05,
     sh=arr((-0.6, 34.0, 9.2)), torso=orudie_torso, item_n=cannon, item_f=cannon, fx=orudie_fx,
     hit=lambda info: (info["n"]["muzzle"] + info["n"]["d"] * (info["n"]["muzzle"][1] / max(0.05, -info["n"]["d"][1]))) * arr((1, 0, 1)),
-    allow=[("arm_n", "item_n"), ("arm_f", "item_f")],
+    allow=[("arm_n", "item_n"), ("arm_f", "item_f"), ("hand_n", "item_n"), ("hand_f", "item_f"),
+           ("arm_n.ram", "item_n"), ("arm_f.ram", "item_f")],
     poses=dict(
         idle=dict(lean=0.0, t=(0.0, 0.0, 0.0), ank=((2.8, 3.6, 5.3), (-4.6, 3.6, -5.4)),
-                  hand_n=(6.0, -10.5, 1.0), pole_n=(-0.6, -0.2, 0.8), hand_f=(5.5, -10.5, -1.0), pole_f=(-0.6, -0.2, -0.8)),
+                  hand_n=(7.6, -9.2, 2.8), pole_n=(-0.6, -0.2, 0.8), hand_f=(6.8, -9.6, -2.8), pole_f=(-0.6, -0.2, -0.8)),
         # aimed at an enemy two or three rows off (about 100 units): at a bug, at a body of its own height, at a giant
         attack=dict(lean=0.12, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(12.74, -7.2, -0.14), pole_n=(-1.29, -0.42, 0.88), hand_f=(12.9, -7.41, -0.18), pole_f=(-0.65, -0.42, -0.48), ram_n="front", ram_f="back", fx=True),
         attack_level=dict(lean=0.09, t=(-0.8, -0.4, 0.0), ank=((3.8, 3.6, 5.8), (-5.6, 3.6, -5.8)), hand_n=(8.46, -8.19, -0.1), pole_n=(-1.26, -0.63, 0.54), hand_f=(9.67, -7.73, -0.8), pole_f=(-0.87, -0.76, -0.59), ram_n="front", ram_f="back", fx=True),
