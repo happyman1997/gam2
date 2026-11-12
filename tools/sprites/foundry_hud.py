@@ -117,16 +117,29 @@ def title(sc, text, sub=None, epi=None, x=16):
     return w
 
 
-def title_center(sc, text):
-    """The workshop's name in the middle of the beam, a big spanner either side of it, their jaws turned to it."""
+def title_center(sc, text, tool="wrench"):
+    """A screen's name in the middle of the beam, a big tool either side of it turned to it: spanners for the
+    workshop, smith's hammers for a new golem, tongs with a hot bar for smelting, brass cogs for a victory."""
     tw = SU.text_width(text, "title", 24)
     x = WW // 2 - tw // 2
     letters(sc, text, x, 6, "title", 24, col=(232, 222, 206), col2=(120, 96, 70), jitter=0)
     for k in range(0, tw, 3):
         sc.rgb[31, x + k] = sc.rgb[31, x + k] * 0.4 + hexc("#ff8a3a") * 0.6
-    L = 156
-    FU.wrench(sc, x - 14 - L, x - 14, 21, flip=False, size="24", seed=1)
-    FU.wrench(sc, x + tw + 14, x + tw + 14 + L, 21, flip=True, size="19", seed=2)
+    L = int(min(156, 286 - tw // 2, WW // 2 - tw // 2 - 14 - 128))
+    if tool == "wrench":
+        FU.wrench(sc, x - 14 - L, x - 14, 21, flip=False, size="24", seed=1)
+        FU.wrench(sc, x + tw + 14, x + tw + 14 + L, 21, flip=True, size="19", seed=2)
+    elif tool == "hammer":
+        L = min(L, 112)
+        FU.hammer(sc, x - 12 - L, x - 12, 21, flip=False, seed=1)
+        FU.hammer(sc, x + tw + 12, x + tw + 12 + L, 21, flip=True, seed=2)
+    elif tool == "tongs":
+        L = min(L, 132)
+        FU.tongs(sc, x - 24 - L, x - 24, 21, flip=False, seed=1)
+        FU.tongs(sc, x + tw + 24, x + tw + 24 + L, 21, flip=True, seed=2)
+    else:
+        FU.gears(sc, x - 12 - 80, x - 12, 21, flip=False, seed=0.0)
+        FU.gears(sc, x + tw + 12, x + tw + 12 + 80, 21, flip=True, seed=0.3)
 
 
 def toolbar(sc, alt=False, on=False):
@@ -828,8 +841,8 @@ def assembly(step=0):
     import golems_h as GH
     sc = screen(23 + step)
     FU.wing(sc, 0, 0, WW, 44)
-    title(sc, "НОВЫЙ ГОЛЕМ")
-    metal(sc, 22)
+    title_center(sc, "НОВЫЙ ГОЛЕМ", "hammer")
+    metal(sc, 22, x=18)
     toolbar(sc)
     steps_bar(sc, step)
     if step == 0:
@@ -1088,8 +1101,8 @@ def smelt():
     mould; right — what takes the level."""
     sc = screen(29)
     FU.wing(sc, 0, 0, WW, 44)
-    title(sc, "ПЕРЕПЛАВКА")
-    metal(sc, 14)
+    title_center(sc, "ПЕРЕПЛАВКА", "tongs")
+    metal(sc, 14, x=18)
     toolbar(sc)
     FU.plate(sc, 12, 52, 300, 462, seed=41)
     heading(sc, "В ТИГЕЛЬ", 26, 64)
@@ -1346,8 +1359,8 @@ def aftermath():
     from swarm_effects import lit
     sc = screen(19)
     FU.wing(sc, 0, 0, WW, 44)
-    title(sc, "ПОБЕДА")
-    metal(sc, 20)
+    title_center(sc, "ПОБЕДА", "gears")
+    metal(sc, 20, x=18)
     toolbar(sc)
     # broken: the damage report — the golem as a drawing, the part that broke in red, a red callout to it
     FU.plate(sc, 12, 52, 330, 462, seed=31)

@@ -664,6 +664,153 @@ def wrench(sc, x0, x1, yc, flip=False, size="24", seed=0):
     sc.light[m] = 0
 
 
+def _seg(X, Y, p0, p1, r):
+    """Pixels within r of the segment p0–p1."""
+    (ax, ay), (bx, by) = p0, p1
+    dx, dy = bx - ax, by - ay
+    L2 = max(1e-6, dx * dx + dy * dy)
+    t = np.clip(((X - ax) * dx + (Y - ay) * dy) / L2, 0, 1)
+    return np.hypot(X - (ax + t * dx), Y - (ay + t * dy)) <= r
+
+
+STEEL = ("#15171c", "#343944", "#646c7a", "#a4acb8", "#e6eaf0")
+IRON = ("#121114", "#24222a", "#3a3842", "#5e5c66", "#8e8c96")
+WOOD = ("#1e1208", "#3e2812", "#62401e", "#8a5e2e", "#b4844a")
+BRASSR = ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96")
+
+
+def _bands(sc, m, ramp_, t):
+    """Fill m from a ramp in clean bands (no dither): polished or worked metal."""
+    pal = np.array([hexc(c) for c in ramp_])
+    idx = np.clip(np.floor(np.clip(t, 0, 1) * 4.0 + 0.5), 0, 4).astype(int)
+    sc.rgb[m] = pal[idx][m]
+    return pal
+
+
+def _finish(sc, m, pal, flip=False):
+    """Outline, a bright bevel on the faces turned to the light (top, and the left — or the right when mirrored),
+    a shaded one below; the shadow on the beam is drawn before."""
+    upm = np.zeros_like(m); upm[1:] = m[:-1]
+    dnm = np.zeros_like(m); dnm[:-1] = m[1:]
+    lfm = np.zeros_like(m); lfm[:, 1:] = m[:, :-1]
+    rtm = np.zeros_like(m); rtm[:, :-1] = m[:, 1:]
+    d1 = shrink(m)
+    lit = m & ~d1 & (~upm | (~rtm if flip else ~lfm))
+    dark = m & ~d1 & ~dnm & ~lit
+    sc.rgb[lit] = pal[4]
+    sc.rgb[dark] = pal[1]
+    o, _, _ = edges(m)
+    sc.rgb[o] = OUTL
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
+def _shadow(sc, m):
+    sh = np.roll(np.roll(m, 3, 0), 2, 1) & ~m
+    sc.rgb[sh] *= 0.45
+
+
+def hammer(sc, x0, x1, yc, flip=False, seed=0):
+    """A smith's hammer lying on the beam, its head at the inner end: a forged block with a flared striking face
+    below and a cross-peen tapering to an edge above, an iron collar on the ash handle, the handle swelling to its
+    butt, its grain in darker streaks. flip — the head to the left."""
+    Xs, Y = sc.xx.astype(float), sc.yy.astype(float)
+    X = (x0 + x1 - 1) - Xs if flip else Xs
+    hx0, hx1 = x1 - 26, x1 - 3
+    hc = (hx0 + hx1) / 2
+    body = (X >= hx0) & (X < hx1) & (Y >= yc - 10) & (Y < yc + 10)
+    face = (X >= hx0 - 3) & (X < hx1 + 3) & (Y >= yc + 10) & (Y < yc + 19)
+    face &= ~(((X < hx0 - 1) | (X >= hx1 + 1)) & (Y >= yc + 17))         # the face's chamfered corners
+    peen = (Y >= yc - 20) & (Y < yc - 10) & (np.abs(X - hc) <= 2.5 + (Y - (yc - 20)) * 0.95)
+    head = body | face | peen
+    hl = x1 - 26 - x0
+    t = np.clip((X - x0) / max(1, hl), 0, 1)
+    hw = 3.8 + 2.4 * (1 - t) ** 2.0                                      # the handle, swelling to the butt
+    handle = (X >= x0 + 3) & (X < hx0 + 2) & (np.abs(Y - yc) <= hw)
+    butt = np.hypot(X - (x0 + 6), Y - yc) <= 6.4
+    handle |= butt
+    collar = (X >= hx0 - 7) & (X < hx0) & (np.abs(Y - yc) <= 5.6)
+    m = head | handle | collar
+    _shadow(sc, m)
+    v = (Y - yc) / np.maximum(hw, 1)
+    pal_w = _bands(sc, handle & ~collar, WOOD, 0.62 - 0.42 * v)
+    rnd = np.random.RandomState(seed + 3)
+    for _ in range(4):                                                    # the grain
+        gy = int(round(yc + rnd.uniform(-2.2, 2.2)))
+        gx0 = int(x0 + rnd.uniform(6, hl * 0.4))
+        gx1 = int(gx0 + rnd.uniform(14, 40))
+        for gx in range(gx0, min(gx1, hx0 - 7)):
+            xx = int((x0 + x1 - 1) - gx) if flip else gx
+            if handle[gy, xx]:
+                sc.rgb[gy, xx] = pal_w[1]
+    _bands(sc, collar, IRON, 0.6 - (Y - yc) / 10.0)
+    lt = 0.72 - (X - hx0) / (hx1 - hx0) * 0.35 - (Y - yc) / 44.0
+    pal = _bands(sc, head, STEEL, np.where(face, lt + 0.12, np.where(peen, lt - 0.1, lt)))
+    for yy in (int(yc - 2), int(yc + 2)):                                 # the wedges through the eye
+        xx = int((x0 + x1 - 1) - hc) if flip else int(hc)
+        sc.rgb[yy, xx] = pal[0]
+    _finish(sc, m, pal, flip)
+
+
+def tongs(sc, x0, x1, yc, flip=False, seed=0):
+    """Smith's tongs lying on the beam, their jaws at the inner end holding a red-hot bar: two long reins with
+    curled ends, a riveted pivot, two short curved jaws. flip — the jaws to the left."""
+    Xs, Y = sc.xx.astype(float), sc.yy.astype(float)
+    X = (x0 + x1 - 1) - Xs if flip else Xs
+    px_ = x1 - 40
+    reins = _seg(X, Y, (x0 + 7, yc - 9), (px_, yc - 2.5), 2.7) | _seg(X, Y, (x0 + 7, yc + 9), (px_, yc + 2.5), 2.7)
+    curls = (np.abs(np.hypot(X - (x0 + 7), Y - (yc - 13)) - 4) <= 1.8) & (X <= x0 + 7)
+    curls |= (np.abs(np.hypot(X - (x0 + 7), Y - (yc + 13)) - 4) <= 1.8) & (X <= x0 + 7)
+    jaw_u = _seg(X, Y, (px_, yc - 2.5), (px_ + 18, yc - 13), 3.4) | _seg(X, Y, (px_ + 18, yc - 13), (x1 - 4, yc - 6), 3.2)
+    jaw_d = _seg(X, Y, (px_, yc + 2.5), (px_ + 18, yc + 13), 3.4) | _seg(X, Y, (px_ + 18, yc + 13), (x1 - 4, yc + 6), 3.2)
+    pivot = np.hypot(X - px_, Y - yc) <= 7.0
+    m = reins | curls | jaw_u | jaw_d | pivot
+    bar = (X >= x1 - 22) & (X < x1 + 8) & (np.abs(Y - yc) <= 3.6)          # the hot bar in its jaws
+    bar &= ~(jaw_u | jaw_d)
+    _shadow(sc, m | bar)
+    pal = _bands(sc, m, IRON, 0.62 - (Y - yc) / 22.0)
+    rv = np.hypot(X - px_, Y - yc) <= 3.0
+    _bands(sc, rv, STEEL, 0.8 - (Y - yc) / 6.0)
+    _finish(sc, m, pal, flip)
+    hot = ("#5a1408", "#a8320e", "#e86a1a", "#ffb43a", "#fff3c0")
+    _bands(sc, bar, hot, 0.9 - np.abs(Y - yc) / 9.0 - np.clip((X - (x1 - 4)) / 20.0, 0, 1))
+    bo, _, _ = edges(bar)
+    sc.rgb[bo] = OUTL
+    cx_ = int((x0 + x1 - 1) - (x1 - 6)) if flip else int(x1 - 6)
+    sc.glow(cx_, yc, 16, hexc("#ff8a2a"), 0.35)
+
+
+def gear(sc, cx, cy, r, teeth=10, phase=0.0, ramp_=BRASSR):
+    """A cog: teeth round its rim, a ring of round holes, a hub with a key; lit from the top left."""
+    X, Y = sc.xx.astype(float) - cx, sc.yy.astype(float) - cy
+    d = np.hypot(X, Y)
+    a = np.arctan2(Y, X)
+    tooth = np.cos(teeth * (a - phase)) > 0.05
+    m = (d <= r) | ((d <= r + 3.6) & tooth)
+    win = (d > r * 0.34) & (d < r * 0.72) & (np.abs(np.sin(2 * (a - phase - 0.4))) > 0.42)   # four windows, four spokes
+    m &= ~win
+    m &= d > 2.4                                                          # the axle hole
+    lt = 0.6 - (X * 0.6 + Y * 0.8) / (2.4 * r)
+    rim = (d > r - 2.5) & (d <= r)
+    pal = _bands(sc, m, ramp_, np.where(rim, lt + 0.15, lt))
+    hub = (d <= 5) & m
+    _bands(sc, hub, ramp_, lt + 0.25)
+    _finish(sc, m, pal)
+    return m
+
+
+def gears(sc, x0, x1, yc, flip=False, seed=0):
+    """A pair of brass cogs meshing, the big one by the title; flip — mirrored."""
+    xs = [x1 - 20, x1 - 20 - 33]
+    if flip:
+        xs = [x0 + 20, x0 + 20 + 33]
+    m = np.zeros((sc.h, sc.w), bool)
+    _shadow_m = []
+    xs = [x1 - 20, x1 - 20 - 37] if not flip else [x0 + 20, x0 + 20 + 37]
+    gear(sc, xs[1], yc + 2, 12, teeth=9, phase=0.4 + seed, ramp_=STEEL)
+    gear(sc, xs[0], yc, 16, teeth=12, phase=0.1 + seed)
+
+
 def core_port(sc, cx, cy, kind, r=6):
     """The golem's core as a small porthole: an iron ring, the core's own colour inside — cast iron grey, fire
     orange, the storm's blue — glowing a little."""
