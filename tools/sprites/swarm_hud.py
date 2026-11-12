@@ -80,15 +80,13 @@ def epithet(sc, text, x, y, col, seed=0, px=16, curls=True):
     return w
 
 
-def title(sc, text, sub, x=16, seed=0, epi=None):
-    """The screen's name in dripping, bristling letters, a line under it in the swarm's script — or, for a leader,
-    its by-name written in its colour."""
+def title(sc, text, sub=None, x=16, seed=0, epi=None):
+    """The screen's name in dripping, bristling letters; for a leader, its by-name written in its colour beside it."""
     w = letters(sc, text, x, 6, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=6, hairs=9, seed=seed)
     if epi:
         epithet(sc, sub, x + w + 44, 10, epi, seed=seed + 1)
-        return w
-    letters(sc, sub, x + w + 16, 6, "text", 16, col=(196, 182, 206), jitter=1, seed=seed + 1)
-    scribble(sc, x + w + 16, 27, UI.text_width(sub) + 4, seed=seed + 2)
+    elif sub:
+        letters(sc, sub, x + w + 16, 10, "text", 16, col=(196, 182, 206), jitter=1, seed=seed + 1)
     return w
 
 
@@ -105,18 +103,17 @@ def brood():
     UI.engrave(sc, leader("Матка", "idle", 2.2), 640, 560, k=0.8)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
-    title(sc, "ВЫВОДОК", "вылупились все. лишних — в пасть.", seed=5)
+    title(sc, "ВЫВОДОК", seed=5)
     # biomass, top right
-    icon(sc, "biomass", 742, 8, 2)
-    letters(sc, "34", 782, 8, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
-    letters(sc, "биомасса", 822, 6, "text", 16, col=BIO)
-    letters(sc, "+5 за съеденных", 822, 22, "text", 16, col=(120, 180, 96))
+    icon(sc, "biomass", 770, 6, 2)
+    letters(sc, "34", 810, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    fx_line(sc, 856, 12, "{съедена:5} → +5")
     # the limit: an abdomen of segments
     total, eaten = B.totals()
     UI.plate(sc, 12, 50, 948, 96)
-    letters(sc, "улей тесен:", 24, 58, "text", 16, col=INK)
-    letters(sc, f"{total}/{B.LIMIT}", 24, 74, "title", 16, col=(255, 140, 110), col2=(170, 50, 40), jitter=1)
-    letters(sc, f"лишних {total - B.LIMIT}, к съедению {eaten}", 132, 74, "text", 16, col=MUTED)
+    fx_line(sc, 24, 54, "{предел}")
+    letters(sc, f"{total}/{B.LIMIT}", 50, 56, "title", 16, col=(255, 140, 110), col2=(170, 50, 40), jitter=1)
+    fx_line(sc, 24, 76, f"{{съедена:{eaten}}} из {total - B.LIMIT}", dim=True)
     bx0, bx1 = 322, 938
     sb0, sw = UI.segbar(sc, bx0, 62, bx1, 16, total, B.LIMIT, eaten)
     letters(sc, "предел", sb0 + B.LIMIT * sw, 84, "title", 8, col=(240, 230, 200), align="center")
@@ -134,11 +131,13 @@ def brood():
         put(sc, spr, x0 + 50, y0 + GCH - 10, 12)
         letters(sc, name, x0 + 12, y0 + 6, "text", 16, col=INK, jitter=1, seed=k_)
         cw = letters(sc, f"×{count}", x0 + 100, y0 + 28, "title", 16, col=(236, 220, 190), col2=(160, 130, 100))
-        letters(sc, f"{B.pts(B.GROUPS[k_]) * count} оч", x0 + 104 + cw, y0 + 34, "title", 8, col=PALE, outline=False)
+        import fxg
+        fxg.draw(sc, "предел", x0 + 106 + cw, y0 + 31, 1)
+        letters(sc, str(B.pts(B.GROUPS[k_]) * count), x0 + 118 + cw, y0 + 34, "title", 8, col=PALE, outline=False)
         if eat:
-            letters(sc, f"съесть {eat}: +{eat * B.pts(B.GROUPS[k_])}", x0 + 100, y0 + 52, "text", 16, col=RED)
+            fx_line(sc, x0 + 100, y0 + 50, f"{{съедена:{eat}}} → +{eat * B.pts(B.GROUPS[k_])}")
         elif new:
-            letters(sc, f"новых {new}", x0 + 100, y0 + 52, "text", 16, col=GREEN)
+            fx_line(sc, x0 + 100, y0 + 50, f"{{потомок:+{new}}}")
         mark = None
         if k_ in B.MUTS:
             key, m = B.MUTS[k_]
@@ -155,10 +154,9 @@ def brood():
         letters(sc, "+", x0 + 216, y0 + 59, "text", 16, col=INK, align="center")
     # natural selection
     UI.plate(sc, 12, 402, 948, 440)
-    icon(sc, "selection", 22, 412)
-    letters(sc, "кто убивал — тот плодится:", 42, 413, "text", 16, col=INK)
+    fx_line(sc, 24, 412, "{убийство} → {потомок}")
     for i, (name, kills, key) in enumerate(B.SELECTION):
-        x = 268 + i * 170
+        x = 150 + i * 200
         icon(sc, key, x, 412)
         letters(sc, name, x + 20, 413, "text", 16, col=INK if i else (255, 170, 130))
         UI.meter(sc, x + 84, 418, x + 144, 7, 10, round(10 * kills / 23), "#c04a3a" if i == 0 else "#8a6aa8")
@@ -175,8 +173,8 @@ def brood():
                                  (714, 948, f"В бой · съешь ещё {total - B.LIMIT - eaten}", "dim", PALE)):
         UI.button(sc, x0, 496, x1, 532, kind)
         letters(sc, t, (x0 + x1) / 2, 505, "text", 16, col=col, align="center")
-    letters(sc, "съеденное — биомасса", 592, 498, "text", 16, col=MUTED, align="center")
-    scribble(sc, 512, 518, 160, seed=11)
+    w_, _ = fx_line(sc, 0, 0, "{съедена} → {биомасса}", draw=False)
+    fx_line(sc, 592 - w_ // 2, 505, "{съедена} → {биомасса}", dim=True)
     # the living: an ant walking the limit plate, one let down on silk, eggs in a corner, a wasp resting on «В бой»
     UI.creature(sc, bug((), "idle", 1.0, 41), 272, 52)
     UI.silk(sc, (560, 44), (560, 50), sag=0)
@@ -215,7 +213,7 @@ def camp():
     sc = frame_screen(73)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=5)
-    title(sc, "УЛЕЙ", "рой линяет. что-то в нём проросло", seed=21)
+    title(sc, "УЛЕЙ", seed=21)
     # who
     UI.plate(sc, 12, 52, 286, 446, antennae=True)
     heading(sc, "КТО", 26, 64, seed=1)
@@ -228,7 +226,7 @@ def camp():
     # what fell out: three random offers, one of them or nothing
     UI.plate(sc, 296, 52, 652, 446, antennae=True)
     heading(sc, "ЧТО ВЫПАЛО", 310, 64, seed=2)
-    letters(sc, "три случайных: бери одно или ничего", 310, 86, "text", 16, col=MUTED)
+    fx_line(sc, 310, 84, "{выбор:1 из 3}", dim=True)
     offers = [("horn", "Рог", "деталь", ["{начало} → {урон:+2} {дроб}"], (236, 224, 196)),
               ("m_spinner", "Прядильные железы", "общая мутация", FX["spinner"][:2], (206, 206, 222)),
               ("m_nest", "Малое гнездо", "мутация Матки", FX["nest"], (240, 200, 90))]
@@ -252,30 +250,22 @@ def camp():
         letters(sc, name, 386, y0 + 10, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
         letters(sc, kind, 386, y0 + 28, "title", 8, col=kcol, outline=False)
         fx_rows(sc, 386, y0 + 46, 244, what[:1], dim=bool(k_))
-    scribble(sc, 316, 434, 200, seed=36)
     # what it becomes
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
     UI.engrave(sc, bug((), "idle", 4.2, 70, soldier=True), 820, 330, col="#2a2234", k=0.9)
     heading(sc, "КАКИМ СТАНЕТ", 676, 64, seed=3)
-    put(sc, W.build((), 0.03, "idle", True, k=1.9, genes=W.genes_for(70)), 730, 214, 22)
-    put(sc, W.build(("ant", "horn"), 0.03, "idle", True, k=1.9, genes=W.genes_for(70)), 872, 214, 22)
-    letters(sc, "сейчас", 730, 222, "text", 16, col=MUTED, align="center")
-    letters(sc, "с рогом", 872, 222, "text", 16, col=GOLD, align="center")
-    UI.silk(sc, (760, 180), (836, 180), sag=-6, col="#e8c050")
-    text = ("Муравей-солдат получает Рог: первый удар боя сильнее и {дроб}, против литого металла. "
-            "Рог наследуется: в кладках этой линии появятся рога.")
-    for n_, ln in enumerate(wrap(text, 262)):
-        UI.rich(sc, ln, 676, 254 + n_ * 18, "text", 16, col=INK)
-    scribble(sc, 676, 380, 250, seed=31)
-    scribble(sc, 676, 392, 180, seed=32)
+    put(sc, W.build((), 0.03, "idle", True, k=2.3, genes=W.genes_for(70)), 728, 236, 26)
+    put(sc, W.build(("ant", "horn"), 0.03, "idle", True, k=2.3, genes=W.genes_for(70)), 876, 236, 26)
+    letters(sc, "сейчас", 728, 246, "text", 16, col=MUTED, align="center")
+    letters(sc, "с рогом", 876, 246, "text", 16, col=GOLD, align="center")
+    UI.silk(sc, (762, 190), (834, 190), sag=-6, col="#e8c050")
+    fx_rows(sc, 676, 290, 262, offers[0][3] + ["{@horn} {наследие}"], lh=30)
     # leave / mutate
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Отказаться", 156, 486, "title", 16, col=INK, align="center")
     UI.button(sc, 690, 466, 948, 524, "amber")
     letters(sc, "МУТИРОВАТЬ", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "выпадает из встреченного", 495, 470, "text", 16, col=MUTED, align="center")
-    letters(sc, "в походе; Улей — подарок", 495, 488, "text", 16, col=MUTED, align="center")
-    scribble(sc, 420, 512, 150, seed=33)
+
     # the living
     UI.creature(sc, bug(("stinger",), "idle", 1.0, 71), 230, 54)
     UI.silk(sc, (600, 44), (600, 62), sag=0)
@@ -296,7 +286,7 @@ def evolution():
     sc = frame_screen(71)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=8)
-    title(sc, "ЭВОЛЮЦИЯ", "вся форма меняется разом, и нерождённые тоже", seed=23)
+    title(sc, "ЭВОЛЮЦИЯ", seed=23)
     icon(sc, "biomass", 830, 8, 2)
     letters(sc, "39", 870, 10, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
@@ -313,7 +303,7 @@ def evolution():
     UI.plate(sc, 310, 52, 948, 446, antennae=True)
     UI.engrave(sc, bug((form,), "idle", 5.0, 3), 640, 470, col="#2a2234", k=0.9)
     heading(sc, f"{name.upper()} · {n} ТЕЛ", 326, 64, seed=5)
-    letters(sc, "каждая следующая дороже: 15, 25, 40", 326, 86, "text", 16, col=MUTED)
+    fx_line(sc, 326, 84, "{биомасса} 15 · 25 · 40", dim=True)
     nxt = SS.COSTS[len(taken)]
     for j, (key, ename, what, look) in enumerate(EV.EVO[form]):
         x0 = 322 + j * 208
@@ -321,19 +311,16 @@ def evolution():
         UI.cell(sc, x0, 108, x0 + 200, 438, "hi" if j == 1 else ("new" if is_taken else "normal"))
         icon(sc, "evo_" + key, x0 + 12, 118, 2)
         letters(sc, ename, x0 + 50, 120, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
-        letters(sc, "взята" if is_taken else f"{nxt} биомассы", x0 + 50, 138, "text", 16, col=GREEN if is_taken else BIO)
-        for k_, ln in enumerate(wrap(what, 180)):
-            UI.rich(sc, ln, x0 + 12, 166 + k_ * 17, "text", 16, col=INK)
-        put(sc, W.build((form,), -0.08, "idle", False, k=2.4, genes=W.genes_for(3), evo=(key,)), x0 + 104, 340, 22)
-        for k_, ln in enumerate(wrap("на теле: " + look, 180)):
-            letters(sc, ln, x0 + 12, 360 + k_ * 17, "text", 16, col=MUTED)
+        if is_taken:
+            letters(sc, "взята", x0 + 50, 138, "text", 16, col=GREEN)
+        else:
+            fx_line(sc, x0 + 50, 136, f"{{биомасса:{nxt}}}")
+        fx_rows(sc, x0 + 12, 170, 180, EV.EVO_FX[key], lh=28)
+        put(sc, W.build((form,), -0.08, "idle", False, k=3.2, genes=W.genes_for(3), evo=(key,)), x0 + 104, 350, 28)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
     UI.button(sc, 660, 466, 948, 524, "amber")
     letters(sc, f"ВЗЯТЬ · {nxt}", 804, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "Разум улья: эволюция", 480, 470, "text", 16, col=MUTED, align="center")
-    letters(sc, "дешевле на 1 биомассу", 480, 488, "text", 16, col=MUTED, align="center")
-    scribble(sc, 400, 512, 160, seed=34)
     UI.creature(sc, bug((), "idle", 1.0, 73), 200, 54)
     UI.creature(sc, bug(("horn",), "idle", 0.9, 74), 600, 448)
     UI.silk(sc, (700, 44), (700, 62), sag=0)
@@ -352,12 +339,12 @@ def deploy():
     sc = frame_screen(75)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=9)
-    title(sc, "РАССТАНОВКА", "стаи ложатся на поле; выходит вся армия", seed=25)
+    title(sc, "РАССТАНОВКА", seed=25)
     letters(sc, "Литейщик: 4 голема", 944, 8, "text", 16, col=(214, 196, 150), align="right")
-    UI.plate(sc, 600, 50, 948, 92)
-    icon(sc, "matka", 610, 56, 2)
-    letters(sc, "СТАИ МАТКИ: ТЕСНЫЕ", 648, 57, "title", 8, col=GOLD, outline=False)
-    letters(sc, "в клетке до 6 мелких, а не 4", 648, 70, "text", 16, col=INK)
+    UI.plate(sc, 660, 50, 948, 122)
+    icon(sc, "matka", 670, 58, 2)
+    letters(sc, "ТЕСНЫЕ СТАИ", 708, 57, "title", 8, col=GOLD, outline=False)
+    fx_rows(sc, 708, 70, 230, ABIL_FX["Тесные стаи"], lh=24)
     CW_, CH_, GX0, GY0 = SS.CW_, SS.CH_, SS.GX0, SS.GY0 + 4
     cols, rows = 21, 12
     for c in range(cols):
@@ -409,7 +396,7 @@ def deploy():
         c = min(cells, key=lambda t: (t[1], t[0]))
         letters(sc, f"{name} ×{n}", GX0 + c[0] * CW_, GY0 + c[1] * CH_ - 18, "text", 16, col=tuple(int(v) for v in hexc(col)),
                 jitter=1, seed=k_)
-    letters(sc, "← пара: кладка", GX0 + 6 * CW_ + 10, GY0 + 4 * CH_ + 10, "text", 16, col=(130, 230, 90))
+    fx_line(sc, GX0 + 6 * CW_ + 10, GY0 + 4 * CH_ + 10, "← {пара} → {потомок}")
     UI.plate(sc, 4, HH - 92, WW - 4, HH - 2)
     for k_, (traits, soldier, name, n, cells, col, placed) in enumerate([fl for fl in SS.FLOCKS if not fl[6]]):
         x0 = 12 + k_ * 150
@@ -418,7 +405,7 @@ def deploy():
         for j, ln in enumerate(wrap(name.replace("-", "- "), 76)):
             letters(sc, ln.replace("- ", "-"), x0 + 62, HH - 80 + j * 16, "text", 16, col=INK, jitter=1, seed=k_ + j)
         letters(sc, f"×{n}", x0 + 62, HH - 42, "title", 8, col=GOLD, outline=False)
-        letters(sc, "не стоит", x0 + 62, HH - 28, "title", 8, col=PALE, outline=False)
+        letters(sc, "в запасе", x0 + 62, HH - 28, "title", 8, col=PALE, outline=False)
     for k_, t in enumerate(("в линию", "в кулак", "разделить", "как в прошлый")):
         x0 = 316 + k_ * 158
         UI.button(sc, x0, HH - 66, x0 + 150, HH - 26, "chitin")
@@ -433,6 +420,15 @@ def deploy():
 
 
 # ---------------------------------------------------------------- the brood's finds, and what the leaders' pools add
+FINDS_FX = [   # when each find comes, and what it gives (fxg.py)
+    ("{конец} {порода:×2}", ["{потомок:×3} {порода}", "{мутация:✕}"]),
+    ("{рабочая} {убийство:№1}", ["{кокон} → {солдат}"]),
+    ("{дикие}", ["{новая_форма:×3}"]),
+    ("{босс}", ["{потомок} → {гигант}"]),
+    ("{добыча} {живой}", ["{потомок:1–2} → {химера}"]),
+]
+
+
 def finds():
     import brood as B
     from swarm_abilities import render_small
@@ -441,7 +437,7 @@ def finds():
     sc = UI.nest(WW_, HH_, 33)
     UI.wing(sc, 0, 0, WW_, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=12)
-    title(sc, "НАХОДКИ", "иногда вместо кладки — подарок боя", seed=27)
+    title(sc, "НАХОДКИ", seed=27)
     CW_ = 184
     xs = [12 + i * (CW_ + 4) for i in range(5)]
     for x0 in xs:
@@ -463,15 +459,14 @@ def finds():
     put(sc, W.build(("acid",), 0.0, "idle", False, k=1.9, chimera="hand", genes=W.genes_for(50)), x0 + 54, by, 16)
     put(sc, W.build(("ant",), 0.05, "idle", False, k=1.9, chimera="face", genes=W.genes_for(51)), x0 + 134, by, 14)
     icons_ = ["evolve", "larva", "ant", "clutch", "hand"]
-    for i, (x0, (name, when, what)) in enumerate(zip(xs, B.FINDS)):
+    for i, (x0, (name, _, _), (when, what)) in enumerate(zip(xs, B.FINDS, FINDS_FX)):
         cx = x0 + CW_ / 2
         icon(sc, icons_[i], x0 + 10, 60)
         for j, ln in enumerate(wrap(name, CW_ - 40)):
             letters(sc, ln, x0 + 30, 61 + j * 17, "text", 16, col=GOLD, jitter=1, seed=i + j)
-        for j, ln in enumerate(wrap(when, CW_ - 16)):
-            letters(sc, ln, cx, 96 + j * 16, "text", 16, col=MUTED, align="center")
-        for j, ln in enumerate(wrap(what, CW_ - 16)):
-            letters(sc, ln, cx, by + 12 + j * 17, "text", 16, col=INK, align="center")
+        for j, ln in enumerate([when] + what):
+            w_, _ = fx_line(sc, 0, 0, ln, draw=False)
+            fx_line(sc, int(cx - w_ / 2), (96 if j == 0 else by + 16 + (j - 1) * 28), ln, dim=(j == 0))
     UI.creature(sc, bug((), "idle", 0.9, 81), 300, 54)
     UI.cobweb(sc, 958, 46, 30, quad=(-1, 1))
     img = sc.image(S)
@@ -490,17 +485,18 @@ def pools():
     sc = UI.nest(WW_, HH_, 35)
     UI.wing(sc, 0, 0, WW_, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=14)
-    title(sc, "МУТАЦИИ ЛИДЕРОВ", "что лидеры приносят в выводок", seed=29)
+    title(sc, "МУТАЦИИ ЛИДЕРОВ", seed=29)
     PW_ = 232
     xs = [12 + i * (PW_ + 2) for i in range(4)]
     for x0 in xs:
         UI.cell(sc, x0, 52, x0 + PW_, 352, "find")
-    heads = [("Брачный полёт", "пара на выбор", "m_flight"), ("Гибрид", "бесплоден", "m_hybrid"),
-             ("Откормленная", "у Пожирателя", "m_fattened"), ("Чья мутация", "тот и цвет", "m_nest")]
+    heads = [("Брачный полёт", FX["flight"][0], "m_flight"), ("Гибрид", FX["hybrid"][0], "m_hybrid"),
+             ("Откормленная", FX["fattened"][0], "m_fattened"), ("Чья мутация", None, "m_nest")]
     for x0, (h, sub, key) in zip(xs, heads):
         icon(sc, key, x0 + 12, 60, 2)
         letters(sc, h, x0 + 50, 62, "text", 16, col=GOLD, jitter=1, seed=len(h))
-        letters(sc, sub, x0 + 50, 80, "text", 16, col=MUTED)
+        if sub:
+            fx_line(sc, x0 + 50, 80, sub.replace("{выводок} → ", ""))
     # mating flight
     x0 = xs[0]
     put(sc, W.build(("ant",), 0.05, "attack", False, k=1.9, genes=W.genes_for(61), rare="flight"), x0 + 60, 178, 14)
@@ -510,8 +506,6 @@ def pools():
         put(sc, W.build(tr, 0.0, "idle", sol, k=1.0 if sol else 1.3, genes=W.genes_for(sd)), x0 + 160, cy + 48, 8)
         letters(sc, nm, x0 + 175, cy + 3, "text", 16, col=GOLD if j == 1 else MUTED, align="center")
     UI.silk(sc, (x0 + 76, 134), (x0 + 132, 196), sag=8, col="#f0c040")
-    for j, ln in enumerate(("с кем —", "решаешь ты,", "не стык стай")):
-        letters(sc, ln, x0 + 12, 216 + j * 17, "text", 16, col=INK)
     UI.button(sc, x0 + 14, 300, x0 + PW_ - 14, 338, "amber")
     letters(sc, "СПАРИТЬ", x0 + PW_ / 2, 312, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center")
     # hybrid
@@ -526,17 +520,16 @@ def pools():
     for dd in range(-8, 9):
         E.dot(sc, ex + dd, ey + dd * 0.9, hexc("#e04a3a"))
         E.dot(sc, ex + dd, ey - dd * 0.9, hexc("#e04a3a"))
-    for j, ln in enumerate(("тело осы, жало скорпиона;", "в пары не встаёт —", "каждого выводят заново")):
-        letters(sc, ln, x0 + PW_ / 2, 270 + j * 17, "text", 16, col=INK, align="center")
+    w_, _ = fx_line(sc, 0, 0, FX["hybrid"][1], draw=False)
+    fx_line(sc, int(x0 + PW_ / 2 - w_ / 2), 290, FX["hybrid"][1])
     # fattened
     x0 = xs[2]
     put(sc, W.build((), 0.05, "idle", False, k=1.9, genes=W.genes_for(68), rare="fattened"), x0 + 56, 168, 14)
     UI.meter(sc, x0 + 20, 186, x0 + 96, 8, 5, 3, "#e8c070")
-    letters(sc, "жир: 3 боя", x0 + 20, 198, "text", 16, col=(232, 192, 112))
+    fx_line(sc, x0 + 20, 198, "{жир:3}")
     SA.arrow(sc, x0 + 104, x0 + 128, 140)
     put(sc, SL.build("Пожиратель", "idle", 0.42, stage=1), x0 + 180, 170, 18)
-    for j, ln in enumerate(("дольше держишь —", "больше он вырастет;", "пока жива — плодится")):
-        letters(sc, ln, x0 + 16, 224 + j * 17, "text", 16, col=INK)
+    fx_line(sc, x0 + 16, 240, FX["fattened"][1])
     UI.button(sc, x0 + 14, 300, x0 + PW_ - 14, 338, "blood")
     letters(sc, "СКОРМИТЬ", x0 + PW_ / 2, 312, "title", 16, col=INK, align="center")
     # whose mutation
@@ -548,7 +541,6 @@ def pools():
         y = 108 + k_ * 36
         icon(sc, key, x0 + 18, y, 2)
         letters(sc, t, x0 + 60, y + 8, "text", 16, col=col, jitter=1, seed=k_)
-    scribble(sc, x0 + 18, 334, 190, seed=41)
     UI.creature(sc, bug(("wings",), "idle", 0.9, 82), 700, 54)
     UI.cobweb(sc, 2, 46, 30, quad=(1, 1))
     img = sc.image(S)
@@ -565,17 +557,21 @@ def flocks():
     sc = UI.nest(WW_, HH_, 37)
     UI.wing(sc, 0, 0, WW_, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=5, seed=16)
-    title(sc, "СТАИ", "у каждого лидера рой стоит по-своему", seed=31)
+    title(sc, "СТАИ", seed=31)
     PW_ = 232
     xs = [12 + i * (PW_ + 4) for i in range(4)]
     for x0 in xs:
         UI.cell(sc, x0, 52, x0 + PW_, 322, "find")
-    heads = [("Матка", "Тесные стаи", "в клетке 6, а не 4"), ("Разум улья", "Одна мысль", "вся стая — в одну цель"),
-             ("Пожиратель", "Свора", "за вожаком, тела — ему"), ("Чума", "Пёстрые стаи", "разные виды вперемешку")]
-    for x0, (who, name, sub) in zip(xs, heads):
+    heads = [("Матка", "Тесные стаи", ABIL_FX["Тесные стаи"][0], ABIL_FX["Тесные стаи"][1]),
+             ("Разум улья", "Одна мысль", ABIL_FX["Одна мысль на стаю"][0], "минус: лишний {урон} → ✕"),
+             ("Пожиратель", "Свора", "{рой} {тело} → {лидер}", ABIL_FX["Свора"][2]),
+             ("Чума", "Пёстрые стаи", ABIL_FX["Пёстрые стаи"][0], "минус: {скорость} у каждой своя")]
+    for x0, (who, name, sub, minus) in zip(xs, heads):
         letters(sc, who, x0 + 12, 60, "title", 8, col=PALE, outline=False)
         letters(sc, name, x0 + 12, 72, "text", 16, col=GOLD, jitter=1, seed=len(name))
-        letters(sc, sub, x0 + 12, 90, "text", 16, col=MUTED)
+        fx_line(sc, x0 + 12, 94, sub)
+        w_, _ = fx_line(sc, 0, 0, minus, draw=False)
+        fx_line(sc, int(x0 + PW_ / 2 - w_ / 2), 290, minus)
     ZD = 0.75
 
     def cellbox(x, y, w, h, col):
@@ -596,7 +592,6 @@ def flocks():
             put(sc, bug((), "idle", ZD, 100 + j), cx - 26 + (j % 2) * 30 + (j // 2 % 2) * 6, 172 + (j // 2) * 18, 0)
         letters(sc, str(n), cx, 226, "title", 16, col=GOLD if k_ else INK, align="center")
         letters(sc, lab, cx, 248, "text", 16, col=MUTED, align="center")
-    letters(sc, "площадь бьёт больше тел", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
     # Разум: the whole flock into one target, the other enemy left alone
     x0 = xs[1]
     t1, t2 = E.golem("Механик"), E.human("Изобретатель")
@@ -606,7 +601,6 @@ def flocks():
         put(sc, bug(("scythes",), "attack", ZD, 110 + j), x0 + dx, dy, 0)
         UI.silk(sc, (x0 + dx + 10, dy - 10), (x0 + 166, 190), sag=-4, col="#c8a0ff")
     E.burst(sc, x0 + 170, 190, 9, hexc("#c8a0ff"))
-    letters(sc, "лишний урон пропадает", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
     # Пожиратель: the pack runs where he ran; the bodies are left for him
     x0 = xs[2]
     put(sc, leader("Пожиратель", "attack", 0.6), x0 + 150, 214, 16)
@@ -618,7 +612,6 @@ def flocks():
         put(sc, E.lit(bug((), "idle", ZD, 150 + dx), (40, 16, 14), 0.6), x0 + dx, dy - 1, 0)
         sc.glow(x0 + dx, dy - 6, 14, hexc("#d02a1e"), 0.4)
     letters(sc, "ему", x0 + 204, 226, "title", 8, col=(255, 140, 110), outline=False, align="center")
-    letters(sc, "сами не лечатся", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
     # Чума: one flock of all kinds, pairs inside it
     x0 = xs[3]
     cellbox(x0 + 24, 140, 184, 130, "#9ae060")
@@ -628,7 +621,6 @@ def flocks():
         put(sc, bug(tr, "idle", ZD, sd), x0 + dx, dy, 0)
     UI.silk(sc, (x0 + 66, 214), (x0 + 128, 222), sag=8, col="#f0c040")
     UI.silk(sc, (x0 + 120, 156), (x0 + 176, 166), sag=8, col="#f0c040")
-    letters(sc, "быстрые обгоняют", x0 + PW_ / 2, 292, "text", 16, col=RED, align="center")
     UI.creature(sc, bug((), "idle", 0.9, 140), 470, 54)
     UI.cobweb(sc, 958, 46, 30, quad=(-1, 1))
     img = sc.image(S)
@@ -729,37 +721,32 @@ def aftermath():
     sc = frame_screen(37)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=17)
-    title(sc, "ПОБЕДА", "бой меняет породу", seed=33)
+    title(sc, "ПОБЕДА", seed=33)
     # losses
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "ПОТЕРИ", 26, 64, seed=6)
     for j in range(9):
         put(sc, E.lit(bug(((), ("stinger",), ("wings",))[j % 3], "idle", 1.25, 160 + j), (26, 18, 16), 0.7), 56 + (j % 3) * 76 + (j // 3) * 14, 132 + (j // 3) * 34, 9)
-    letters(sc, "погибло", 26, 240, "text", 16, col=MUTED)
-    letters(sc, "23", 26, 258, "title", 24, col=(255, 140, 110), col2=(170, 50, 40), jitter=1, drips=3)
-    letters(sc, "съедено врагов", 26, 300, "text", 16, col=MUTED)
-    letters(sc, "14", 26, 318, "title", 24, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
-    icon(sc, "biomass", 90, 316, 2)
-    letters(sc, "+14 биомассы", 130, 326, "text", 16, col=BIO)
-    scribble(sc, 26, 380, 250, seed=51)
-    letters(sc, "погибшие не вернутся", 26, 400, "text", 16, col=PALE)
+    fx_line(sc, 26, 262, "{гибель_своя}")
+    letters(sc, "23", 64, 254, "title", 24, col=(255, 140, 110), col2=(170, 50, 40), jitter=1, drips=3)
+    fx_line(sc, 26, 322, "{добыча}")
+    letters(sc, "14", 64, 314, "title", 24, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    fx_line(sc, 120, 322, "→ {биомасса:+14}")
     # what the battle gave: the leader's own gift
     UI.plate(sc, 310, 52, 652, 446, antennae=True)
     UI.engrave(sc, leader("Матка", "idle", 1.6), 560, 470, col="#2a2234", k=0.9)
     heading(sc, "ДАР МАТКИ", 324, 64, seed=7)
-    letters(sc, "личинки, дожившие до конца боя,", 324, 88, "text", 16, col=MUTED)
-    letters(sc, "уходят в выводок", 324, 106, "text", 16, col=MUTED)
+    fx_line(sc, 324, 92, "{конец} {личинка:×3} → {выводок}")
     for j, dx in enumerate((380, 440, 500)):
         put(sc, larva("idle", 1.5), dx, 196, 12)
     icon(sc, "stinger", 560, 168, 2)
-    for j, ln in enumerate(("рождаются с жалом —", "оно убивало больше всех")):
-        letters(sc, ln, 324, 220 + j * 18, "text", 16, col=INK)
+    fx_line(sc, 324, 226, "{черта_боя} → {@stinger} жало")
     UI.cell(sc, 320, 268, 642, 340, "mut")
-    letters(sc, "Сердце роя: 5 яиц у Матки", 334, 278, "text", 16, col=GOLD)
-    letters(sc, "вылупились — бились — живы", 334, 296, "text", 16, col=INK)
+    letters(sc, "Сердце роя", 334, 278, "text", 16, col=GOLD, jitter=1)
+    fx_line(sc, 334, 302, "{яйцо:5} → {личинка:5} → {выводок}")
     put(sc, clutch(1.0), 580, 330, 0)
     UI.cell(sc, 320, 352, 642, 436, "normal")
-    letters(sc, "по чертам: кто убивал", 334, 362, "text", 16, col=MUTED)
+    fx_line(sc, 334, 360, "{убийство} → {потомок}", dim=True)
     for i, (name, kills, key) in enumerate(B.SELECTION):
         x, y = 334 + i * 76, 384
         icon(sc, key, x, y)
@@ -768,7 +755,7 @@ def aftermath():
     # pairs at the seams of the flocks, and the find
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
     heading(sc, "ПАРЫ", 676, 64, seed=8)
-    letters(sc, "стыки стай: 3 пары", 676, 88, "text", 16, col=MUTED)
+    fx_line(sc, 676, 92, "{пара:3} → {потомок}")
     pairs = [(((), ("stinger",)), 170), ((("horn",), ("wings",)), 230), ((("acid",), ()), 290)]
     for (a_, b_), y in pairs:
         put(sc, bug(a_, "idle", 1.2, y), 712, y, 10)
@@ -779,13 +766,10 @@ def aftermath():
     UI.cell(sc, 670, 316, 940, 436, "find")
     letters(sc, "находка", 684, 326, "title", 8, col=PALE, outline=False)
     letters(sc, "Взросление", 684, 340, "text", 16, col=GOLD, jitter=1)
-    for j, ln in enumerate(("рабочая убила больше", "всех — выйдет солдатом")):
-        letters(sc, ln, 684, 360 + j * 18, "text", 16, col=INK)
+    fx_rows(sc, 684, 366, 250, ["{рабочая} {убийство:№1}", "{кокон} → {солдат}"], lh=26)
     put(sc, bug(("ant", "stinger"), "idle", 1.1, 77, soldier=True), 900, 426, 10)
     UI.button(sc, 690, 466, 948, 524, "amber")
     letters(sc, "В ВЫВОДОК", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "выжившие отдыхают, пары кладут яйца", 480, 480, "text", 16, col=MUTED, align="center")
-    scribble(sc, 380, 500, 200, seed=52)
     UI.creature(sc, bug((), "idle", 1.0, 170), 250, 54)
     UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
     img = sc.image(S)
@@ -997,29 +981,24 @@ def development():
     sc = frame_screen(47)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=19)
-    title(sc, "РАЗВИТИЕ", "Разум улья созрел: во что ему прорасти", seed=37)
+    title(sc, "РАЗВИТИЕ", seed=37)
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "СЕЙЧАС", 26, 64, seed=9)
     icon(sc, "razum", 26, 90, 2)
     letters(sc, "Разум улья", 64, 94, "text", 16, col=INK, jitter=1, seed=4)
     put(sc, SL.build("Разум улья", "idle", 2.1), 156, 276, 34)
-    for j, ln in enumerate(("Пси-удар на 3 клетки", "Захват раз в 6 ходов", "Помутнение на 2 клетки")):
-        letters(sc, ln, 26, 300 + j * 20, "text", 16, col=INK)
-    scribble(sc, 26, 370, 240, seed=61)
-    letters(sc, "слабость: хрупкий мозг", 26, 400, "text", 16, col=(200, 120, 110))
+    fx_rows(sc, 26, 300, 260, ["{пси} {дальность:3}", "{захват} {каждые:6}", "{помутнение} {радиус:2}",
+                               "минус: {мягкое}"], lh=28)
     for j, (key, name, look) in enumerate(SL.DEV["Разум улья"]):
         x0 = 312 + j * 214
         UI.cell(sc, x0, 52, x0 + 206, 446, "hi" if j == 1 else "normal")
-        put(sc, SL.build("Разум улья", "idle", 1.9, dev=key), x0 + 103, 232, 30)
-        letters(sc, name, x0 + 14, 252, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
-        for k_, ln in enumerate(wrap(look, 180)):
-            letters(sc, ln, x0 + 14, 278 + k_ * 17, "text", 16, col=MUTED)
+        put(sc, SL.build("Разум улья", "idle", 1.9, dev=key), x0 + 103, 272, 30)
+        letters(sc, name, x0 + 14, 300, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
+        fx_line(sc, x0 + 14, 330, DEV_FX["Разум улья"][key])
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Позже", 156, 486, "title", 16, col=INK, align="center")
     UI.button(sc, 690, 466, 948, 524, "amber")
     letters(sc, "ПРОРАСТИ", 819, 486, "title", 16, col=DARK, col2=(90, 40, 10), outline=False, align="center", jitter=1)
-    letters(sc, "развитие — навсегда, на весь поход", 495, 480, "text", 16, col=MUTED, align="center")
-    scribble(sc, 400, 500, 190, seed=62)
     UI.creature(sc, bug((), "idle", 1.0, 190), 540, 54)
     UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
     img = sc.image(S)
@@ -1053,6 +1032,16 @@ def fx_line(sc, x, y, line, dim=False, draw=True, z=None):
             if draw and part[1].strip():
                 letters(sc, part[1], cx, y, "text", 16, col=tcol)
             cx += UI.text_width(part[1])
+        elif part[1].startswith("@"):                          # a trait's or ability's own icon, «{@stinger}»
+            spr = IC.icon(part[1][1:], 1, "swarm")
+            if draw:
+                icon(sc, part[1][1:], cx + 1, int(y + 9 - spr.h / 2))
+            cx += spr.w + 4
+            val = part[2]
+            if val:
+                if draw:
+                    letters(sc, val, cx - 1, y, "text", 16, col=(255, 214, 110))
+                cx += UI.text_width(val) + 2
         else:
             _, key, val = part
             a_ = fxg.rgba(key)
@@ -1125,6 +1114,23 @@ ABIL_FX = {   # the abilities on the cards, in terms (fxg.py)
     "Пожирание": ["{убийство} → {тело} {лечение:25%}", "{конец} → {биомасса}"],
     "Медленнее других": ["{всегда} → {скорость:2}"],
 }
+
+
+DEV_FX = {   # a leader's growth, as what it changes (fxg.py)
+    "Матка": {"often": "{личинка:×2} {каждые:3} → {каждые:2}", "larva": "{каждые:3} {личинка:×2} → {личинка:×3}",
+              "size": "{размер:6} → {размер:7}"},
+    "Разум улья": {"two": "{захват} {каждые:6} → {каждые:4}", "every": "{пси} {дальность:3} → {дальность:4}",
+                   "strike": "{помутнение} {радиус:2} → {радиус:3}"},
+    "Пожиратель": {"bigger": "{начало} {размер:5} → {размер:6}", "every_kill": "{рост} {тело:2} → {тело:1}",
+                   "heal": "{лечение} → {лечение:×2}"},
+    "Чума": {"three": "{заражение} {личинка:×2} → {личинка:×3}", "venom": "{яд} → {заражение}",
+             "two": "{тыл} {рабочая:×1} → {рабочая:×2}"},
+}
+
+
+def dev_choice(name):
+    import swarm_leaders as SL
+    return ("fx", "на выбор", [DEV_FX[name][k] for k, _, _ in SL.DEV[name]])
 
 
 def section(sc, x, y, w, key, label, title, text, col=GOLD, seed=0):
@@ -1270,6 +1276,10 @@ def big_card(spec, name, save=True):
                 letters(sc, nm, x + 18, y + 12, "text", 16, col=INK)
                 x += 18 + UI.text_width(nm, "text", 16) + 4
             y += 34
+        elif kind == "fx":
+            lab, rows = row
+            letters(sc, lab, 22, y, "title", 8, col=PALE, outline=False)
+            y = fx_rows(sc, 22, y + 12, 270, rows, lh=26) + 8
         else:
             lab, vals, col = row
             letters(sc, lab, 22, y, "title", 8, col=PALE, outline=False)
@@ -1379,7 +1389,7 @@ def matka_spec(hover="Брачный полёт"):
         seed=57, title="МАТКА", sub=EPITHET["Матка"][0], epi=EPITHET["Матка"][1], cell="mut",
         sprite=leader("Матка", "idle", 1.45), dx=14, sw=56,
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               ("val", "на выбор", ["кладка чаще", "+1 личинка", "или +1 к размеру"], INK)],
+               dev_choice("Матка")],
         stats=[("здоровье", "80"), ("броня", "2 {хитин}"), ("скорость", "1"), ("размер", "6")],
         attacks=[("matka", "Жвалы", "1–6 +2", "{руб}", "1", "")],
         hover=None,
@@ -1426,7 +1436,7 @@ def cards():
         seed=61, title="РАЗУМ УЛЬЯ", sub=EPITHET["Разум улья"][0], epi=EPITHET["Разум улья"][1], cell="find",
         sprite=leader("Разум улья", "idle", 2.6), dx=4, sw=46,
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               ("val", "на выбор", ["пси-удар на 4 клетки", "Захват раз в 4 хода", "или Помутнение на 3 клетки"], INK)],
+               dev_choice("Разум улья")],
         stats=[("здоровье", "22"), ("броня", "0 {мягкое}"), ("скорость", "1"), ("размер", "4")],
         attacks=[("razum", "Пси-удар", "1–6", "{пси}", "3", "{мимо}")],
         hover=None,
@@ -1447,7 +1457,7 @@ def cards():
         seed=65, title="ПОЖИРАТЕЛЬ", sub=EPITHET["Пожиратель"][0], epi=EPITHET["Пожиратель"][1], cell="eat",
         sprite=leader("Пожиратель", "idle", 2.1), dx=8, sw=56,
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               ("val", "на выбор", ["стартует крупнее", "растёт с каждого тела", "или лечится вдвое"], INK)],
+               dev_choice("Пожиратель")],
         stats=[("здоровье", "41"), ("броня", "2 {тяжхитин}"), ("скорость", "2"), ("размер", "5–7")],
         attacks=[("pozh", "Пасть", "1–8 +2", "{руб}", "1", "")],
         hover=None,
@@ -1466,7 +1476,7 @@ def cards():
         seed=69, title="ЧУМА", sub=EPITHET["Чума"][0], epi=EPITHET["Чума"][1], cell="new",
         sprite=leader("Чума", "idle", 2.4), dx=6, sw=44,
         facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               ("val", "на выбор", ["личинок 3", "заражает и яд скорпионов", "или подкидышей двое"], INK)],
+               dev_choice("Чума")],
         stats=[("здоровье", "12"), ("броня", "1 {хитин}"), ("скорость", "2"), ("размер", "3")],
         attacks=[("kuk", "Яйцеклад", "1–6", "{кол}", "2", "{инициатива:+3} · {пробой} → {заражение}")],
         hover=None,
@@ -1637,7 +1647,7 @@ def leaders_field():
     BT.ground(sc)
     UI.WOBBLE[0] = 1.0
     UI.wing(sc, 0, 0, WW, 44)
-    title(sc, "ЛИДЕРЫ НА ПОЛЕ", "всё, что бой показывает о лидере", seed=43)
+    title(sc, "ЛИДЕРЫ НА ПОЛЕ", seed=43)
     PWd, PHd = 316, 242
     rnd = np.random.RandomState(5)
 
