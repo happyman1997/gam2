@@ -309,12 +309,13 @@ def camp():
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
     UI.engrave(sc, bug((), "idle", 4.2, 70, soldier=True), 820, 330, col="#2a2234", k=0.9)
     heading(sc, "КАКИМ СТАНЕТ", 676, 64, seed=3)
-    put(sc, W.build((), 0.03, "idle", True, k=2.3, genes=W.genes_for(70)), 728, 236, 26)
-    put(sc, W.build(("ant", "horn"), 0.03, "idle", True, k=2.3, genes=W.genes_for(70)), 876, 236, 26)
-    letters(sc, "сейчас", 728, 246, "text", 16, col=MUTED, align="center")
-    letters(sc, "с рогом", 876, 246, "text", 16, col=GOLD, align="center")
-    UI.silk(sc, (762, 190), (834, 190), sag=-6, col="#e8c050")
-    fx_rows(sc, 676, 290, 262, offers[0][3] + ["{@horn} {наследие}"], lh=30)
+    put(sc, W.build((), 0.03, "idle", True, k=3.0, genes=W.genes_for(70)), 724, 262, 30)
+    put(sc, W.build(("ant", "horn"), 0.03, "idle", True, k=3.0, genes=W.genes_for(70)), 878, 262, 30)
+    letters(sc, "сейчас", 724, 272, "text", 16, col=MUTED, align="center")
+    letters(sc, "с рогом", 878, 272, "text", 16, col=GOLD, align="center")
+    UI.silk(sc, (764, 196), (830, 196), sag=-6, col="#e8c050")
+    fx_rows(sc, 676, 316, 262, offers[0][3] + ["{@horn} {наследие}"], lh=30)
+    fx_line(sc, 676, 384, "→ {солдат} ×2 · {потомок}", dim=True)
     # leave / mutate
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Отказаться", 156, 486, "title", 16, col=INK, align="center")
@@ -376,7 +377,7 @@ def evolution(variant=None):
         else:
             fx_line(sc, x0 + 50, 136, f"{{биомасса:{nxt}}}")
         fx_rows(sc, x0 + 12, 170, 180, EV.EVO_FX[key], lh=28)
-        put(sc, W.build((form,), -0.08, "idle", False, k=3.2, genes=W.genes_for(3), evo=(key,)), x0 + 104, 350, 28)
+        put(sc, W.build((form,), -0.08, "idle", False, k=3.2, genes=W.genes_for(3), evo=(key,)), x0 + 104, 380, 34)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
     act_button(sc, 660, 466, 948, 524, f"ВЗЯТЬ · {nxt}")
@@ -650,11 +651,20 @@ def battle_hud():
     sc0, count, ng = BT.build("Матка")
     qx, qy = BT.X0 + 15.6 * BT.CW, BT.Y0 + 8.4 * BT.CH
     qtop = ST.top_of(W.queen(0.0, "attack", k=0.92), qy)
-    for paused in (False, True):
+    lx, ly = BT.X0 + 2.5 * BT.CW, BT.Y0 + 6.8 * BT.CH                  # the Foundry's leader, Зодчий
+    ltop = ST.top_of(BT.LH.GH.build(BT.LH.ZODCHIY, "idle", 1.05), ly)
+    n6 = BT.CELLS[6]                                                    # the Guard, for the enemy's card
+    gx, gy = BT.X0 + (5 + n6 / 2) * BT.CW + 16, BT.Y0 + (6 + n6 * 0.72) * BT.CH
+    for mode in ("run", "pause", "enemy"):
+        paused = mode != "run"
         sc = copy.deepcopy(sc0)
+        HOVER.clear()
         UI.WOBBLE[0] = 1.0
-        # on the field: the leader's health over the leader, and Кладка popping up as it fires
+        # on the field: both leaders' health over them, a crown by it; Кладка popping up as it fires
         UI.meter(sc, qx - 46, qtop - 12, qx + 46, 7, 10, 8, "#c04a3a")
+        glyph(sc, "лидер", qx - 64, qtop - 14, 2)
+        UI.meter(sc, lx - 40, ltop - 12, lx + 40, 7, 10, 6, "#d08a3a")
+        glyph(sc, "лидер", lx - 58, ltop - 14, 2)
         px_, py_ = qx - 104, qtop - 34
         sc.glow(px_ + 16, py_ + 16, 22, hexc("#f0c060"), 0.45)
         icon(sc, "clutch", px_, py_, 2)
@@ -669,7 +679,18 @@ def battle_hud():
             UI.button(sc, x0, 6, x1, 28, "amber" if on else "chitin")
             letters(sc, t, (x0 + x1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
         name = "swarm_battle_hud.png"
-        if paused:                                  # on pause: point at a spitter and read its card
+        if mode == "enemy":                         # the enemy has a card too: the Guard
+            cx0, cy0, cx1 = int(gx - 330), int(gy - 40), int(gx - 50)
+            rows_ = ["{здоровье:100} {броня:4} {скорость:1}", "{урон:1–6 +3} {дроб} {дальность:1}",
+                     "заслон: {радиус:1} → {цель:1}", "{огонь} ×¼ · {яд:✕} · {страх:✕}"]
+            cy1 = fx_rows(sc, cx0 + 10, cy0 + 44, cx1 - cx0 - 20, rows_, draw=False) + 10
+            UI.cell(sc, cx0, cy0, cx1, cy1, "normal", col="#b0743a")
+            letters(sc, "Страж", cx0 + 12, cy0 + 10, "text", 16, col=(240, 196, 140), jitter=1, seed=3)
+            letters(sc, "голем Литейщика", cx0 + 12, cy0 + 26, "text", 16, col=MUTED)
+            fx_rows(sc, cx0 + 10, cy0 + 44, cx1 - cx0 - 20, rows_)
+            cursor(sc, int(gx) + 10, int(gy) - 40)
+            name = "swarm_battle_enemy.png"
+        elif paused:                                # on pause: point at a spitter and read its card
             sx_, sy_ = 566, 452
             cx0, cy0, cx1 = 572, 296, 826
             rows_ = ["{каждые:2} → {яд} {клей:1} {дальность:3}", "{через:1}", "минус: {атака} → {урон:−}"]
@@ -706,6 +727,11 @@ def aftermath(variant=None):
     fx_line(sc, 26, 322, "{тело}")
     letters(sc, "14", 64, 314, "title", 24, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     fx_line(sc, 120, 322, "→ {биомасса:+14}")
+    for j, (key, nm, n) in enumerate((("ant", "муравьи", 12), ("wings", "осы", 6), ("stinger", "скорпионы", 5))):
+        y = 366 + j * 24                           # who was lost, by flock
+        icon(sc, key, 28, y)
+        letters(sc, nm, 50, y + 1, "text", 16, col=INK)
+        letters(sc, f"−{n}", 280, y + 1, "text", 16, col=(255, 140, 110), align="right")
     # what the battle gave: the leader's own gift
     UI.plate(sc, 310, 52, 652, 446, antennae=True)
     UI.engrave(sc, leader("Матка", "idle", 1.6), 560, 470, col="#2a2234", k=0.9)
@@ -798,6 +824,14 @@ def thick(sc, pts, w, col, hi=None):
             if hi is not None:
                 sc.rgb[y - w + 1, x] = hi
     sc.occ[...] |= False
+
+
+PICK_FX = {   # on the leader-pick card: the starting swarm by form, and the leader's own rule
+    "Матка": ["{@ant:14} {@wings:3} {@stinger:3}", "{каждые:3} → {личинка:×2}"],
+    "Разум улья": ["{@ant:12} {@firefly:3} {@scythes:2}", "{каждые:6} → {захват}"],
+    "Пожиратель": ["{@ant:17} {@jumper:3}", "{тело:2} → {рост}"],
+    "Чума": ["{@ant:18} {@stinger:3} {@acid:3}", "{пробой} → {заражение}"],
+}
 
 
 def bug_card(sc, cx, y0, name, sel, seed):
@@ -909,6 +943,9 @@ def bug_card(sc, cx, y0, name, sel, seed):
         import swarm_effects as E
         lead = E.lit(lead, (20, 30, 16), 0.25)
     put(sc, lead, cx + 4, y0 + 262, 44)
+    for j, ln in enumerate(PICK_FX[name]):                       # what it starts with, and its own rule
+        w_, _ = fx_line(sc, 0, 0, ln, draw=False)
+        fx_line(sc, int(cx - w_ / 2), y0 + 276 + j * 26, ln)
     # acid off the tips
     for side in (-1, 1):
         x = cx + side * 9
@@ -974,6 +1011,9 @@ def development():
         put(sc, SL.build("Разум улья", "idle", 1.9, dev=key), x0 + 103, 272, 30)
         letters(sc, name, x0 + 14, 300, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
         fx_line(sc, x0 + 14, 330, DEV_FX["Разум улья"][key])
+        fx_line(sc, x0 + 14, 372, "{мутация} чаще:", dim=True)    # its branch of the pool comes more often
+        for k_, mk in enumerate(DEV_BRANCH["Разум улья"][key]):
+            icon(sc, "m_" + mk, x0 + 14 + k_ * 40, 396, 2)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Позже", 156, 486, "title", 16, col=INK, align="center")
     act_button(sc, 690, 466, 948, 524, "ПРОРАСТИ")
@@ -1207,9 +1247,15 @@ DEV_FX = {   # a leader's growth, as what it changes (fxg.py); «⇒» is «was 
 }
 
 
+DEV_BRANCH = {   # the branch of the leader's pool each growth strengthens: its mutations come more often
+    "Разум улья": {"two": ["psi_leash", "psi_last"], "every": ["psi_gland"], "strike": ["psi_reson", "psi_dread"]},
+}
+
+
 def dev_choice(name):
+    """The leader's growth not yet chosen: each option by name, and what it changes."""
     import swarm_leaders as SL
-    return ("fx", "на выбор", [DEV_FX[name][k] for k, _, _ in SL.DEV[name]])
+    return ("dev", "развитие — на выбор", [(nm, DEV_FX[name][k]) for k, nm, _ in SL.DEV[name]])
 
 
 def dots(sc, x0, x1, y):
@@ -1338,6 +1384,14 @@ def big_card(spec, name, save=True):
             lab, rows = row
             letters(sc, lab, 22, y, "text", 16, col=MUTED)
             y = fx_rows(sc, 22, y + 22, 270, rows, lh=26) + 6
+        elif kind == "dev":
+            lab, opts = row
+            letters(sc, lab, 22, y, "text", 16, col=MUTED)
+            y += 22
+            for nm, line in opts:
+                letters(sc, nm, 22, y, "text", 16, col=GOLD, jitter=1, seed=len(nm))
+                fx_line(sc, 30, y + 20, line)
+                y += 48
         else:
             lab, vals, col = row
             letters(sc, lab, 22, y, "text", 16, col=MUTED)
@@ -1446,8 +1500,7 @@ def matka_spec(hover="Брачный полёт"):
     spec = dict(
         seed=57, title="МАТКА", sub=EPITHET["Матка"][0], epi=EPITHET["Матка"][1], cell="mut",
         sprite=leader("Матка", "idle", 1.45), dx=14, sw=56,
-        facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               dev_choice("Матка")],
+        facts=[dev_choice("Матка")],
         stats=[("здоровье", "80"), ("броня", "2 {хитин}"), ("скорость", "1"), ("размер", "6")],
         attacks=[("matka", "Жвалы", "1–6 +2", "{руб}", "1", "")],
         hover=None,
@@ -1493,8 +1546,7 @@ def cards():
     big_card(dict(
         seed=61, title="РАЗУМ УЛЬЯ", sub=EPITHET["Разум улья"][0], epi=EPITHET["Разум улья"][1], cell="find",
         sprite=leader("Разум улья", "idle", 2.6), dx=4, sw=46,
-        facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               dev_choice("Разум улья")],
+        facts=[dev_choice("Разум улья")],
         stats=[("здоровье", "22"), ("броня", "0 {мягкое}"), ("скорость", "1"), ("размер", "4")],
         attacks=[("razum", "Пси-удар", "1–6", "{пси}", "3", "{мимо}")],
         hover=None,
@@ -1514,8 +1566,7 @@ def cards():
     big_card(dict(
         seed=65, title="ПОЖИРАТЕЛЬ", sub=EPITHET["Пожиратель"][0], epi=EPITHET["Пожиратель"][1], cell="eat",
         sprite=leader("Пожиратель", "idle", 2.1), dx=8, sw=56,
-        facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               dev_choice("Пожиратель")],
+        facts=[dev_choice("Пожиратель")],
         stats=[("здоровье", "41"), ("броня", "2 {тяжхитин}"), ("скорость", "2"), ("размер", "5–7")],
         attacks=[("pozh", "Пасть", "1–8 +2", "{руб}", "1", "")],
         hover=None,
@@ -1533,8 +1584,7 @@ def cards():
     big_card(dict(
         seed=69, title="ЧУМА", sub=EPITHET["Чума"][0], epi=EPITHET["Чума"][1], cell="new",
         sprite=leader("Чума", "idle", 2.4), dx=6, sw=44,
-        facts=[("val", "развитие", "ещё не выбрано", MUTED),
-               dev_choice("Чума")],
+        facts=[dev_choice("Чума")],
         stats=[("здоровье", "12"), ("броня", "1 {хитин}"), ("скорость", "2"), ("размер", "3")],
         attacks=[("kuk", "Яйцеклад", "1–6", "{кол}", "2", "{инициатива:+3} · {пробой} → {заражение}")],
         hover=None,

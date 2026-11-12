@@ -6,6 +6,7 @@ GNU Unifont for text (taken from the system package fonts-unifont; PT Serif if i
     python3 tools/sprites/swarm_ui.py      -> out/swarm_ui_kit.png (every piece, in every state)
 """
 import os
+import zlib
 import numpy as np
 from PIL import ImageFont
 from kit import *
@@ -253,6 +254,38 @@ def cell(sc, x0, y0, x1, y1, state="normal", col=None):
             sc.rgb[d <= br] = hexc("#0a060e")
             ring = (d > br) & (d <= br + 1.2) & (m | halo)
             sc.rgb[ring] = hexc(rim)
+    state_mark(sc, x0, y0, x1, y1, state, rim, hi)
+
+
+def _px(sc, rows, x, y, pal, z=2):
+    """A small mark drawn from rows of letters at z× size, with a dark outline round it."""
+    pts = [(i, j, ch) for j, row in enumerate(rows) for i, ch in enumerate(row) if ch != "."]
+    for i, j, _ in pts:
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            xx, yy = int(x + i * z + dx), int(y + j * z + dy)
+            sc.rgb[max(0, yy):max(0, yy + z), max(0, xx):max(0, xx + z)] = OUTL
+    for i, j, ch in pts:
+        xx, yy = int(x + i * z), int(y + j * z)
+        sc.rgb[max(0, yy):max(0, yy + z), max(0, xx):max(0, xx + z)] = hexc(pal[ch])
+        sc.occ[max(0, yy):max(0, yy + z), max(0, xx):max(0, xx + z)] = True
+
+
+def state_mark(sc, x0, y0, x1, y1, state, rim, hi):
+    """Each state of a cell has a shape as well as a colour, so it reads without telling green from red:
+    chosen — a tab pointing in from the left; new — an arrow up; to be eaten — teeth along the bottom;
+    a mutation — a twist of a helix; a find — a gem; under the mouse — the bites (in cell())."""
+    cy = (y0 + y1) // 2
+    if state == "hi":
+        _px(sc, ["a..", "aa.", "aAa", "aa.", "a.."], x0 - 3, cy - 7, {"a": hi, "A": "#fff0b0"}, z=3)
+    elif state == "new":
+        _px(sc, [".g.", "gGg", ".G.", ".G."], x1 - 14, y0 + 5, {"g": hi, "G": "#f0ffd0"})
+    elif state == "eat":
+        for k in range(4):
+            _px(sc, ["www", ".w."], x1 - 60 + k * 9, y1 - 9, {"w": "#f4ecd8"})
+    elif state == "mut":
+        _px(sc, ["a.b", ".a.", "b.a"], x1 - 14, y0 + 6, {"a": hi, "b": "#c04a3a"})
+    elif state == "find":
+        _px(sc, ["..p..", ".pWp.", "pWWWp", ".pWp.", "..p.."], x1 - 18, y0 + 5, {"p": hi, "W": "#ffffff"})
 
 
 def _ramp_fill(sc, m, x0, y0, h, ramp_, X, Y):
@@ -473,7 +506,7 @@ def segbar(sc, x0, y0, x1, h, total, limit, marked, creature=True):
 def meter(sc, x0, y0, x1, h, n, filled, col="#b04a3a"):
     """A short row of gem scales: how many of n are lit (kills by trait and the like)."""
     w = (x1 - x0) / n
-    kind = "over" if col in ("#c04a3a", "#b04a3a") else "violet"
+    kind = "over" if col in ("#c04a3a", "#b04a3a") else ("eat" if col in ("#d08a3a",) else "violet")
     for i in range(n):
         gem(sc, x0 + (i + 0.5) * w, y0 + h / 2, max(2.5, w * 0.6), h / 2 + 1.5, kind if i < filled else "dim")
 
@@ -529,7 +562,7 @@ def letters(sc, text, x, y, kind="text", px=16, col=INK, col2=None, outline=True
     the letters dancing off the baseline (jitter), ichor running down (drips), bristles on top (hairs)."""
     from PIL import Image, ImageDraw
     f_ = _font(kind, px)
-    rnd = np.random.RandomState((abs(hash(text)) + seed) % 2 ** 31)
+    rnd = np.random.RandomState((zlib.crc32(text.encode("utf-8")) + seed) % 2 ** 31)   # the same every run
     W_ = int(f_.getlength(text)) + 8
     H_ = px + 8 + jitter * 2 + drips + 4
     im = Image.new("L", (W_, H_), 0)
