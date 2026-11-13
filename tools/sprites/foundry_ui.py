@@ -134,7 +134,7 @@ CELL = {   # rim, its lit edge, the fill
 }
 
 
-def cell(sc, x0, y0, x1, y1, state="normal"):
+def cell(sc, x0, y0, x1, y1, state="normal", seed=0):
     """An iron frame round a dark well, brass angles at the corners. The state is its rim's metal, and a shape:
     chosen — a brass tab on the left; under the mouse — red-hot rim, heat in the well and sparks off the edge;
     new — a cold-blue arrow up; broken — a crack across the corner; rare — a gem; a trophy — a gear."""
@@ -162,8 +162,8 @@ def cell(sc, x0, y0, x1, y1, state="normal"):
             ring = r2 & (d < dd) & (d >= (dd - 3 if k else 0))
             th = BAYER[sc.yy % 4, sc.xx % 4]
             sc.rgb[ring & (th < 0.75 - k * 0.2)] = sc.rgb[ring & (th < 0.75 - k * 0.2)] * 0.45 + hexc(col) * 0.55
-        sparks(sc, x1 - 8, y0 + 3, 10, seed=x0 + y0)
-        sparks(sc, x0 + 12, y1 - 3, 6, seed=x1 + y1)
+        sparks(sc, x1 - 8, y0 + 3, 10, seed=x0 + y0 + seed)
+        sparks(sc, x0 + 12, y1 - 3, 6, seed=x1 + y1 + seed)
     brass_corners(sc, x0 + 2, y0 + 2, x1 - 2, y1 - 2, L=5, col="#9a7a40" if state != "hi" else "#e0b860")
     cy = (y0 + y1) // 2
     if state == "hi":
@@ -519,11 +519,13 @@ def tab(sc, x0, y0, x1, y1, text, active=False, badge=None, dy=0, flash=None, pu
     sc.light[m] = 0
 
 
-def cap_button(sc, cx, cy, r, text, kind="steel", pressed=False):
-    """A small round push-button with its sign stamped on the cap (the battle's speed: pause, ×2, to the end)."""
-    pushbutton(sc, cx, cy, r, kind=kind, pressed=pressed)
+def cap_button(sc, cx, cy, r, text, kind="steel", pressed=False, press=None):
+    """A small round push-button with its sign stamped on the cap (the battle's speed: pause, ×2, to the end);
+    press 0..1 (below 0 springing back) — a frame of a click."""
+    pushbutton(sc, cx, cy, r, kind=kind, pressed=pressed, press=press)
+    pr = (1.0 if pressed else 0.0) if press is None else press
     dark = kind in ("brass", "hot")
-    letters(sc, text, cx, cy - 8 + (1 if pressed else -1), "text", 16, col=(40, 26, 10) if dark else (226, 220, 210),
+    letters(sc, text, cx, cy - 8 + int(round(-1 + 2 * pr)), "text", 16, col=(40, 26, 10) if dark else (226, 220, 210),
             outline=not dark, shadow=False, align="center")
 
 

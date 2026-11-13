@@ -71,9 +71,12 @@ def blend(sc, fr, x, y, pivot=(0, 0), k=1.0):
     sc.rgb[ya:yb, xa:xb] = reg * (1 - a) + f[..., :3] * a
 
 
-def save_gif(images, path, fps=24, durations=None):
-    """Frames (PIL RGB images) to a GIF on one shared palette, so nothing flickers between frames."""
+def save_gif(images, path, fps=24, durations=None, half=False):
+    """Frames (PIL RGB images) to a GIF on one shared palette, so nothing flickers between frames; half — the frames
+    are at twice the art's scale and go out at the art's own (nearest: no art pixel lost), a quarter the size."""
     from PIL import Image
+    if half:
+        images = [im.resize((im.width // 2, im.height // 2), Image.NEAREST) for im in images]
     n = len(images)
     probe = Image.new("RGB", (images[0].width, images[0].height * min(n, 6)))
     for i, k in enumerate(np.linspace(0, n - 1, min(n, 6)).astype(int)):

@@ -885,7 +885,7 @@ def steps_bar(sc, cur, y=52):
         FU.step_plate(sc, x, y, x + w, y + 32, f"{i + 1}. {st}", kind, first=i == 0)
 
 
-def assembly(step=0):
+def assembly(step=0, anim=None, ret=False):
     """A new golem, built from nothing: 1 — the frame (one of two, as drawings on blueprint paper: role, size, cells,
     its own rule, price); 2 — the core (three, glowing in their cradles, one goes into the chest); 3 — the modules,
     on the slipway (workshop()); 4 — the start: steam, sparks, and its passport — what it was built of."""
@@ -989,10 +989,11 @@ def assembly(step=0):
         sc.rgb[440:452, 190:410] = hexc("#24222a")                   # the stand
         sc.rgb[440, 190:410] = hexc("#6a6870")
         sc.blit(g, int(300 - g.ox), int(442 - g.oy))
-        FU.steam(sc, 270, 200, 18, seed=1)
-        FU.steam(sc, 340, 190, 14, seed=2)
-        FU.sparks(sc, 200, 440, 14, seed=3)
-        FU.sparks(sc, 400, 440, 12, seed=4)
+        if anim is None:                                              # (moving: ui_anim lays steam and sparks on)
+            FU.steam(sc, 270, 200, 18, seed=1)
+            FU.steam(sc, 340, 190, 14, seed=2)
+            FU.sparks(sc, 200, 440, 14, seed=3)
+            FU.sparks(sc, 400, 440, 12, seed=4)
         letters(sc, "ГОРН ГОТОВ", 300, 116, "title", 24, col=(255, 200, 120), col2=(140, 60, 10), align="center")
         # its passport: what it was built of, step by step
         FU.cell(sc, 540, 116, 936, 450, "hi")
@@ -1027,6 +1028,8 @@ def assembly(step=0):
         action(sc, 12, 478, 300, 526, "Назад", "steel")
         action(sc, 660, 472, 948, 532, "В МАСТЕРСКУЮ", "hot", big=True)
         name = "foundry_new_start.png"
+    if ret:
+        return sc
     img = sc.image(S)
     img.save(out(name))
     print(name, img.size)
@@ -1136,7 +1139,7 @@ ABIL = {   # the frame's and the class's own, in glyphs
 }
 
 
-def card(frame="Орудие", hover="mortar"):
+def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     """A golem's card, in the slipway's language: on the left its drawing, a callout from every mount to its module
     (the one under the mouse opened in a tooltip), the chest with its core, its own rule and its cells under it; on
     the right its passport — leadership, core, last battle; body; blow; what its class can and can't."""
@@ -1198,17 +1201,26 @@ def card(frame="Орудие", hover="mortar"):
     FU.sill(sc, 482)
     action(sc, 760, 488, WW - 10, 532, "Закрыть", "steel")
     # the module under the mouse: its tooltip under its box
+    a_ = anim or {}
     if hot:
         pt, cx, cy, bx, by, side = hot
         lines = MOD_FX[hover]
         tw = 300
         th = H.fx_rows(sc, 0, 0, tw - 24, lines, draw=False) + 40
         tx = bx if side == "l" else bx + 152 - tw
-        FU.cell(sc, tx, by + 52, tx + tw, by + 52 + th, "normal")
-        letters(sc, MOD_NAME[hover], tx + 12, by + 60, "text", 16, col=GOLD)
-        FU.levels(sc, tx + tw - 30, by + 62, mods[hover])
-        H.fx_rows(sc, tx + 12, by + 84, tw - 24, lines)
+        k = a_.get("tip", 1.0)                                         # the tooltip coming in: up from below, fading in
+        if k > 0:
+            before = sc.rgb.copy()
+            dy = int(round((1 - k) * 8))
+            FU.cell(sc, tx, by + 52 + dy, tx + tw, by + 52 + th + dy, "normal")
+            letters(sc, MOD_NAME[hover], tx + 12, by + 60 + dy, "text", 16, col=GOLD)
+            FU.levels(sc, tx + tw - 30, by + 62 + dy, mods[hover])
+            H.fx_rows(sc, tx + 12, by + 84 + dy, tw - 24, lines)
+            if k < 1:
+                sc.rgb[:] = before * (1 - k) + sc.rgb * k
         H.cursor(sc, cx, cy)
+    if ret:
+        return sc
     img = sc.image(S)
     img.save(out("foundry_card.png"))
     print("foundry_card.png", img.size)
@@ -1307,7 +1319,7 @@ def leaders_pick(anim=None, ret=False):
 
 
 # ---------------------------------------------------------------- after the battle
-def damage_drawing(sc, frame, mods, key, x, y, K):
+def damage_drawing(sc, frame, mods, key, x, y, K, pulse=1.0):
     """The golem as a drawing on the blueprint, the part that broke picked out in red — its own pixels, found as
     what changes when the frame is drawn without it. Returns the part's mount, for the callout."""
     full = golem_sprite(frame, mods, K)
@@ -1326,8 +1338,36 @@ def damage_drawing(sc, frame, mods, key, x, y, K):
     p = mounts()[frame][key]
     sk = K / 1.6
     pt = (x + p[0] * sk, y + p[1] * sk)
-    sc.glow(pt[0], pt[1], 12, red, 0.5)
+    sc.glow(pt[0], pt[1], 12, red, 0.5 * pulse)
     return pt
+
+
+def stamp_falling(sc, x, y, text, scale=1.0, alpha=1.0):
+    """The stamp coming down: drawn as it will land, then shown larger and fainter about its own centre — it falls
+    onto the paper and lands at scale 1, full strength."""
+    from PIL import Image
+    tmp = sc.rgb.copy()
+    stamp(sc, x, y, text)
+    diff = np.abs(sc.rgb - tmp).sum(axis=2) > 1
+    ys, xs = np.nonzero(diff)
+    if not len(xs):
+        return
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    patch = sc.rgb[y0:y1, x0:x1].copy()
+    pm = diff[y0:y1, x0:x1]
+    sc.rgb[:] = tmp
+    if scale != 1.0:
+        h, w = patch.shape[:2]
+        nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+        patch = np.asarray(Image.fromarray(patch.astype(np.uint8)).resize((nw, nh), Image.NEAREST)).astype(np.float32)
+        pm = np.asarray(Image.fromarray(pm.astype(np.uint8) * 255).resize((nw, nh), Image.NEAREST)) > 127
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    px0, py0 = int(cx - patch.shape[1] / 2), int(cy - patch.shape[0] / 2)
+    ya, yb = max(0, py0), min(sc.h, py0 + patch.shape[0])
+    xa, xb = max(0, px0), min(sc.w, px0 + patch.shape[1])
+    sub = pm[ya - py0:yb - py0, xa - px0:xb - px0]
+    reg = sc.rgb[ya:yb, xa:xb]
+    reg[sub] = reg[sub] * (1 - alpha) + patch[ya - py0:yb - py0, xa - px0:xb - px0][sub] * alpha
 
 
 def stamp(sc, x, y, text, col="#e0503a"):
@@ -1346,7 +1386,7 @@ def stamp(sc, x, y, text, col="#e0503a"):
         sc.rgb[sy, sx] = hexc("#14243a")
 
 
-def aftermath():
+def aftermath(anim=None, ret=False):
     """Victory: what broke and what it cost, what the battle paid, who did what."""
     import frames as F
     from swarm_effects import lit
@@ -1362,8 +1402,13 @@ def aftermath():
     FU.cell(sc, 30, 98, 178, 134, "normal")
     letters(sc, "КОРПУС: МУДРЕЦ", 38, 103, "title", 8, col=(150, 200, 230), outline=False)
     letters(sc, ROLE["Мудрец"], 38, 116, "text", 16, col=(170, 220, 250), outline=False)
-    pt = damage_drawing(sc, "Мудрец", {"chain": 1, "fireball": 1, "overload": 2}, "overload", 236, 292, 2.4)
-    stamp(sc, 32, 268, "В РЕМОНТ")
+    a_ = anim or {}
+    pt = damage_drawing(sc, "Мудрец", {"chain": 1, "fireball": 1, "overload": 2}, "overload", 236, 292, 2.4,
+                        pulse=a_.get("pulse", 1.0))
+    if "stamp" not in a_:
+        stamp(sc, 32, 268, "В РЕМОНТ")
+    elif a_["stamp"] is not None:
+        stamp_falling(sc, 32, 268, "В РЕМОНТ", *a_["stamp"])
     lane = 160
     callout(sc, pt, (lane, 314), col=hexc("#ff6a4a"), lane=lane)
     FU.cell(sc, 22, 314, 320, 378, "broken")
@@ -1388,7 +1433,10 @@ def aftermath():
     heading(sc, "КТО ЧТО", 354, 272)
     for j, (fr, kills, dmg_) in enumerate((("Страж", 6, 31), ("Мудрец", 12, 40), ("Орудие", 17, 12), ("Механик", 0, 3))):
         y = 298 + j * 40
-        g = F.build(fr, "idle", k=F.FRAMES[fr][0] * 0.42)
+        ck = ("who", fr)
+        if ck not in _LEADERS:
+            _LEADERS[ck] = F.build(fr, "idle", k=F.FRAMES[fr][0] * 0.42)
+        g = _LEADERS[ck]
         sc.blit(g, int(374 - g.ox), int(y + 34 - g.oy))
         letters(sc, fr, 400, y + 4, "text", 16, col=INK)
         H.fx_line(sc, 500, y + 2, f"{{убийство:{kills}}}")
@@ -1403,6 +1451,8 @@ def aftermath():
     FU.sparks(sc, 740, 420, 10, seed=8)
     FU.sill(sc, 468)
     action(sc, 650, 474, 948, 530, "В МАСТЕРСКУЮ", "hot", big=True)
+    if ret:
+        return sc
     img = sc.image(S)
     img.save(out("foundry_aftermath.png"))
     print("foundry_aftermath.png", img.size)

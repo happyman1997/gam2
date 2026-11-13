@@ -138,7 +138,7 @@ def hearth():
         sc = copy.deepcopy(base)
         HT.scene(sc, 316, 60, 644, 454, melt, cast, frame=i, phase=i / n)
         images.append(sc.image(2))
-    pxfx.save_gif(images, out("foundry_hearth.gif"), meta["fps"])
+    pxfx.save_gif(images, out("foundry_hearth.gif"), meta["fps"], half=True)
     print("foundry_hearth.gif", n, "frames")
 
 
@@ -173,7 +173,7 @@ def workshop():
                 pxfx.blend(sc, spark[j], 518, 362, km["pivot"])
         images.append(sc.image(2))
         print(i, end=" ", flush=True)
-    pxfx.save_gif(images, out("foundry_workshop_anim.gif"), FPS)
+    pxfx.save_gif(images, out("foundry_workshop_anim.gif"), FPS, half=True)
     print("\nfoundry_workshop_anim.gif", len(images), "frames")
 
 
@@ -284,11 +284,168 @@ def leaders():
         sc = FH.leaders_pick(anim={"frame": i}, ret=True)
         images.append(sc.image(2))
         print(i, end=" ", flush=True)
-    pxfx.save_gif(images, out("foundry_leader_fire.gif"), meta["fps"])
+    pxfx.save_gif(images, out("foundry_leader_fire.gif"), meta["fps"], half=True)
     print("\nfoundry_leader_fire.gif", len(images))
+
+
+def heat_env(i, a, b, c, d):
+    """How hot a thing under the mouse is at frame i: heating a..b, held b..c, cooling c..d (eased)."""
+    if i < a or i >= d:
+        return 0.0
+    if i < b:
+        return in_out_cubic((i - a) / max(1, b - a))
+    if i < c:
+        return 1.0
+    return 1.0 - in_out_cubic((i - c) / max(1, d - c))
+
+
+def hover():
+    """The mouse passing over things: a part's box on the drawing, a golem's bay on the army's rack, a card in the
+    crate — each rim heats red from the edge in, holds with the sparks flickering, and cools when the mouse moves on."""
+    import swarm_hud as H
+    from swarm_ui import letters
+    import frames as F
+
+    def draw(sc, states, seed):
+        sc.rgb[:] = hexc("#1c1a20")
+        FH.blueprint_sheet(sc, 10, 10, 200, 110)
+        FH.part_box(sc, 28, 38, "canister", "ствол", 1, state=states[0], w=152, h=42) if states[0] != "hover" else None
+        if states[0] == "hover":
+            FU.cell(sc, 28, 38, 180, 80, "hover", seed=seed)
+            letters(sc, "СТВОЛ", 36, 42, "title", 8, col=(150, 200, 230), outline=False)
+            FH.mod_icon(sc, "canister", 36, 56)
+            letters(sc, "Картечь", 58, 55, "text", 16, col=FH.INK)
+            FU.levels(sc, 180 - 26, 44, 1)
+        FU.cell(sc, 222, 14, 382, 100, states[1], seed=seed)                 # a bay on the army's rack
+        g = FH.golem_sprite("Механик", {"repair": 1, "oiler": 1}, 0.48)
+        sc.blit(g, int(222 + 34 - g.ox), int(14 + 78 - g.oy))
+        letters(sc, "Механик", 222 + 66, 22, "text", 16, col=FH.INK)
+        for j in range(3):
+            cx_ = 222 + 68 + j * 12
+            sc.rgb[46:56, cx_:cx_ + 9] = (14, 12, 18)
+            sc.rgb[47:55, cx_ + 1:cx_ + 8] = FU.hexc("#e0b860") if j < 2 else FU.hexc("#24222a")
+        FU.core_port(sc, 222 + 74, 76, "cast")
+        FU.cell(sc, 404, 8, 628, 114, states[2], seed=seed)                  # a card in the crate
+        FU.cell(sc, 412, 18, 464, 70, "locked")
+        FH.mod_icon(sc, "grapple", 422, 28, 2)
+        letters(sc, "Крюк-кошка", 474, 22, "text", 16, col=FH.INK)
+        letters(sc, "любой", 474, 40, "text", 16, col=FH.PALE)
+        H.fx_rows(sc, 412, 84, 210, FH.MOD_FX["grapple"])
+
+    base = Scene(640, 124)
+    draw(base, ("normal", "normal", "rare"), 0)
+    hot = []
+    for sd in range(4):
+        sc = Scene(640, 124)
+        draw(sc, ("hover", "hover", "hover"), sd * 7)
+        hot.append(sc.rgb.copy())
+    spans = ((4, 10, 18, 24), (20, 26, 34, 40), (36, 42, 52, 58))
+    xs = ((10, 200), (216, 388), (398, 634))
+    cur = ((120, 66), (330, 70), (560, 64))
+    images = []
+    for i in range(64):
+        sc = Scene(640, 124)
+        sc.rgb[:] = base.rgb
+        hb = hot[(i // 3) % 4]
+        for (x0, x1), sp in zip(xs, spans):
+            h = heat_env(i, *sp)
+            if h > 0:
+                sc.rgb[:, x0:x1] = base.rgb[:, x0:x1] * (1 - h) + hb[:, x0:x1] * h
+        for (x0, x1), sp, (cx_, cy_) in zip(xs, spans, cur):
+            if sp[0] <= i < sp[2] + 2:
+                H.cursor(sc, cx_, cy_)
+        images.append(sc.image(2))
+    pxfx.save_gif(images, out("foundry_hover.gif"), FPS)
+    print("foundry_hover.gif", len(images))
+
+
+def speed():
+    """The battle's speed buttons: ×2 clicked off, then pause clicked on — each cap sinks, its key lights."""
+    import swarm_hud as H
+    import swarm_ui as SU
+    images = []
+    for i in range(40):
+        sc = Scene(240, 48)
+        FU.wing(sc, 0, 0, 240, 34)
+        sc.rgb[34:] = FU.hexc("#1c1a20")
+        two_on = i < 12
+        pause_on = i >= 30
+        pc = press_curve(14)
+        p2 = pc[i - 6] if 6 <= i < 20 else 0.0
+        pp = pc[i - 24] if 24 <= i < 38 else 0.0
+        for cx, t_, on, key, pr in ((40, "II", pause_on, "Пробел", pp), (110, "×2", two_on, "Tab", p2),
+                                    (180, "»", False, "End", 0.0)):
+            FU.cap_button(sc, cx, 17, 11, t_, "brass" if on else "steel", press=pr)
+            kw = SU.text_width(key, "title", 8) + 14
+            H.keycap(sc, int(cx - kw / 2), 32, key, lit=pr > 0.5)
+        if 3 <= i < 20:
+            H.cursor(sc, 116, 22)
+        elif 21 <= i < 38:
+            H.cursor(sc, 46, 22)
+        images.append(sc.image(2))
+    pxfx.save_gif(images, out("foundry_speed.gif"), FPS)
+    print("foundry_speed.gif", len(images))
+
+
+def start():
+    """A new golem started: steam going up off its chimney and shoulders in turns, sparks at the foot of the stand,
+    as a loop."""
+    import copy
+    base = FH.assembly(4, anim={}, ret=True)
+    steam, sm = pxfx.load("valve-steam")
+    n = 36
+    vents = ((280, 258, 0, 0.9), (280, 258, 18, 0.9), (326, 318, 9, 0.55))   # the chimney twice, a shoulder valve
+    images = []
+    for i in range(n):
+        sc = copy.deepcopy(base)
+        for x, y, off, k in vents:
+            j = (i + off) % n
+            if j < len(steam):
+                pxfx.blend(sc, steam[j], x, y, sm["pivot"], k=k)
+        FU.sparks(sc, 200, 440, 12, seed=3 + i // 2)
+        FU.sparks(sc, 400, 440, 10, seed=40 + i // 2)
+        images.append(sc.image(2))
+    pxfx.save_gif(images, out("foundry_start.gif"), FPS, half=True)
+    print("foundry_start.gif", n)
+
+
+def aftermath_anim():
+    """The victory screen: the repair stamp comes down — big and faint, smaller, lands with a jolt — and the part
+    that broke throbs red on the drawing; the cogs in the title turn all the while."""
+    images = []
+    seq = [None] * 6 + [(2.2, 0.35), (1.6, 0.6), (1.15, 0.85), (1.0, 1.0)] + [(1.0, 1.0)] * 26
+    for i, st in enumerate(seq):
+        pulse = 0.55 + 0.45 * np.sin(2 * np.pi * i / 18.0)
+        sc = FH.aftermath(anim={"stamp": st, "pulse": pulse}, ret=True)
+        # the cogs in the title turning: redraw the title bar over the screen's
+        FU.wing(sc, 0, 0, 960, 44)
+        FH.title_center(sc, "ПОБЕДА", "gears", turn=(2 * np.pi / 12) * i / 24)
+        FH.metal(sc, 20, x=18)
+        FH.toolbar(sc)
+        if i in (9, 10):
+            sc.rgb[:] = np.roll(sc.rgb, 1, axis=0)
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_aftermath_anim.gif"), FPS, half=True)
+    print("\nfoundry_aftermath_anim.gif", len(images))
+
+
+def card_tip():
+    """The golem's card: the mouse comes onto the Mortar's box, the box heats, its tooltip slides up into place
+    and fades in."""
+    import copy
+    images = []
+    seq = [0.0] * 6 + [0.2, 0.45, 0.7, 0.88, 1.0] + [1.0] * 13
+    for i, k in enumerate(seq):
+        sc = FH.card(anim={"tip": k}, ret=True)
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_card_tip.gif"), FPS, half=True)
+    print("\nfoundry_card_tip.gif", len(images))
 
 
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "console"
     {"console": console, "hearth": hearth, "workshop": workshop, "tabs": tabs, "steps": steps,
-     "metal": metal_tick, "gears": gears_title, "leaders": leaders}[what]()
+     "metal": metal_tick, "gears": gears_title, "leaders": leaders,
+     "hover": hover, "speed": speed, "start": start, "aftermath": aftermath_anim, "card": card_tip}[what]()
