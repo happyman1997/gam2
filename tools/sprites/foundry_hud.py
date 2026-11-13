@@ -157,27 +157,31 @@ def metal(sc, n, x=700):
     letters(sc, str(n), x + 30, 12, "title", 16, col=(214, 220, 236), col2=(90, 96, 120))
 
 
-def action(sc, x0, y0, x1, y1, text, kind="hot", heated=False, big=False):
+def action(sc, x0, y0, x1, y1, text, kind="hot", heated=False, big=False, anim=None):
     """A control on the console at the foot of the screen. The screen's own action (big): a throttle lever beside a
     cast nameplate. The rest: a push-button in a hex nut with its stamped tag on a wire; repairing: a valve's
-    handwheel. heated — the mouse on it: the lever thrown, the button pressed, the wheel turning."""
+    handwheel. heated — the mouse on it: the lever thrown, the button pressed, the wheel turning. anim — a frame of
+    a click: press (0..1, below 0 springing back), angle (the lever), turn (the wheel), swing (the tag), glow (the
+    nameplate's enamel)."""
+    a = anim or {}
     yc = (y0 + y1) // 2
     if big:
-        FU.lever(sc, x0 + 18, y0 - 4, y1 + 2, pulled=heated)
-        FU.nameplate(sc, x0 + 44, y0 + 3, x1, y1 - 3, text, hot=kind == "hot", heated=heated)
+        FU.lever(sc, x0 + 18, y0 - 4, y1 + 2, pulled=heated, angle=a.get("angle"))
+        FU.nameplate(sc, x0 + 44, y0 + 3, x1, y1 - 3, text, hot=kind == "hot", heated=heated, glow=a.get("glow"))
         return
     r = 13
     bx = x0 + r + 9
     if text.startswith("Починить"):
-        FU.valve(sc, bx, yc, r + 2, turning=heated)
+        FU.valve(sc, bx, yc, r + 2, turning=heated, turn=a.get("turn"))
         tk = "brass"
     else:
         cap = {"rust": "rust", "dull": "dull", "brass": "brass"}.get(kind, "steel")
-        FU.pushbutton(sc, bx, yc, r, kind=cap, pressed=heated)
+        FU.pushbutton(sc, bx, yc, r, kind=cap, pressed=heated, press=a.get("press"))
         tk = {"rust": "rust", "dull": "dull", "brass": "brass"}.get(kind, "steel")
     tx0 = bx + r + 12
     tw = SU.text_width(text, "text", 16)
-    FU.tag(sc, tx0, yc - 13, min(x1, int(tx0 + 13 * 1.6 + 6 + tw + 9)), yc + 13, text, tk, wire_to=bx + r + 6)
+    FU.tag(sc, tx0, yc - 13, min(x1, int(tx0 + 13 * 1.6 + 6 + tw + 9)), yc + 13, text, tk, wire_to=bx + r + 6,
+           dy=a.get("swing", 0))
 
 
 def heading(sc, text, x, y):
@@ -1016,7 +1020,7 @@ def value_noise_cached(sc):
     return _VN[key]
 
 
-def smelt():
+def smelt(base_only=False):
     """Переплавка: a module goes into the crucible and its melt gives a level to another module of the same hull; a
     spare part melts down to metal. Left — what goes in; in the middle the crucible over the hearth pouring into the
     mould; right — what takes the level."""
@@ -1045,7 +1049,8 @@ def smelt():
     # the crucible
     FU.plate(sc, 308, 52, 652, 462, seed=43)
     sc.rgb[60:454, 316:644] = sc.rgb[60:454, 316:644] * 0.55
-    crucible_scene(sc, 316, 60, 644, 454, "canister", "long")
+    if not base_only:
+        crucible_scene(sc, 316, 60, 644, 454, "canister", "long")
     # into the mould
     FU.plate(sc, 660, 52, 948, 462, seed=42)
     heading(sc, "В ЛИТЬЁ", 674, 64)
@@ -1066,6 +1071,8 @@ def smelt():
     action(sc, 12, 478, 300, 526, "Назад", "steel")
     action(sc, 620, 472, 948, 532, "ПЕРЕПЛАВИТЬ · 3", "hot", big=True)
     H.cursor(sc, 200, 120)
+    if base_only:
+        return sc
     img = sc.image(S)
     img.save(out("foundry_smelt.png"))
     print("foundry_smelt.png", img.size)

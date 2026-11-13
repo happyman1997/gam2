@@ -274,7 +274,7 @@ CAP = {   # the push-button's cap, dark → light
 }
 
 
-def pushbutton(sc, cx, cy, r=14, kind="steel", pressed=False):
+def pushbutton(sc, cx, cy, r=14, kind="steel", pressed=False, press=None):
     """A mushroom push-button in a hex-nut bezel: the nut's facets lit from the top left, a dark well, the domed cap
     with a hard highlight; pressed (the mouse on it) — the cap sinks a pixel and the nut warms."""
     X, Y = sc.xx - cx, sc.yy - cy
@@ -287,14 +287,15 @@ def pushbutton(sc, cx, cy, r=14, kind="steel", pressed=False):
     nrm = facet * np.pi / 3                                    # the facet's outward direction
     lit = 0.5 + 0.5 * np.cos(nrm - (-2.35))                    # light from the top left
     base = hexc("#262428")[None, None, :] * (1 - lit[..., None]) + hexc("#8a8892")[None, None, :] * lit[..., None]
-    if pressed:
-        base = base * 0.75 + hexc("#ff7a2a") * 0.25
+    pr = (1.0 if pressed else 0.0) if press is None else press           # 0 up … 1 sunk; below 0 — springing back
+    if pr > 0:
+        base = base * (1 - 0.25 * pr) + hexc("#ff7a2a") * (0.25 * pr)
     sc.rgb[nut] = base[nut]
     o, _, _ = edges(nut)
     sc.rgb[o] = OUTL
     well = d <= r + 2
     sc.rgb[well] = hexc("#0a090c")
-    dy = 1 if pressed else -1
+    dy = -1 + 2 * pr
     dc = np.hypot(X, Y - dy)
     cap = dc <= r
     lt = np.clip(0.55 - (X * 0.6 + (Y - dy) * 0.8) / (2.2 * r) - (dc / r) ** 4 * 0.35, 0, 1)
@@ -319,10 +320,11 @@ TAG = {   # the tag's ink, its metal, its lit edge
     "dull": ("#1a1a1c", "#56565c", "#6e6e74")}
 
 
-def tag(sc, x0, y0, x1, y1, text, kind="steel", wire_to=None):
+def tag(sc, x0, y0, x1, y1, text, kind="steel", wire_to=None, dy=0):
     """A stamped tag on the console beside its control: pointed at the control, a hole at the point with a wire to
     it, the letters struck into the metal (dark, with the light catching the lower edge of each stroke)."""
     X, Y = sc.xx, sc.yy
+    y0, y1 = y0 + dy, y1 + dy                                    # swinging on its wire
     yc = (y0 + y1) / 2
     p = (y1 - y0) / 2
     m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
@@ -357,7 +359,7 @@ def tag(sc, x0, y0, x1, y1, text, kind="steel", wire_to=None):
     return tw
 
 
-def nameplate(sc, x0, y0, x1, y1, text, hot=True, heated=False):
+def nameplate(sc, x0, y0, x1, y1, text, hot=True, heated=False, glow=None):
     """A cast plate like a locomotive's: an arched top, a raised brass rim, raised brass letters on enamel — black
     enamel, or glowing ember-red when it is the step that moves the run on."""
     X, Y = sc.xx, sc.yy
@@ -379,7 +381,7 @@ def nameplate(sc, x0, y0, x1, y1, text, hot=True, heated=False):
     t = np.clip((Y - y0) / max(1, y1 - y0), 0, 1)
     if hot:
         enamel = ("#2a0604", "#4a0e08", "#7a1c0c", "#b0361a", "#e86a2a")
-        tt = 0.72 - t * 0.55 + (0.12 if heated else 0.0)
+        tt = 0.72 - t * 0.55 + ((0.12 if heated else 0.0) if glow is None else glow)
     else:
         enamel = ("#0a090c", "#121016", "#1a1820", "#24222a", "#302e38")
         tt = 0.6 - t * 0.4
@@ -391,14 +393,14 @@ def nameplate(sc, x0, y0, x1, y1, text, hot=True, heated=False):
         sc.rgb[by - 1:by + 2, bx - 1:bx + 2] = hexc("#d0a848")
         sc.rgb[by - 1, bx - 1] = hexc("#f4dc96")
     letters(sc, text, xc, (y0 + y1) / 2 - 7, "title", 16, col=(255, 222, 150), col2=(150, 100, 40), align="center")
-    if heated:
+    if heated and glow is None:
         sparks(sc, x1 - 14, y0 + 6, 9, seed=x0)
         sparks(sc, x0 + 18, y1 - 4, 6, seed=x1)
     sc.occ[m] = True
     sc.light[m] = 0
 
 
-def lever(sc, x, y0, y1, pulled=False, hot=True):
+def lever(sc, x, y0, y1, pulled=False, hot=True, angle=None):
     """A throttle lever (рубильник): a toothed iron quadrant on a base block, a thick arm from a pivot at its foot,
     a red ball for a handle; pulled (the mouse on it) — thrown forward, sparks at the pivot."""
     X, Y = sc.xx, sc.yy
@@ -421,7 +423,7 @@ def lever(sc, x, y0, y1, pulled=False, hot=True):
     sc.rgb[btop & ~bo] = hexc("#6a6870")
     for bx in (px - R + 1, px + R - 1):
         rivet(sc, int(bx), int(py + 4))
-    a = 0.62 if pulled else -0.5
+    a = (0.62 if pulled else -0.5) if angle is None else angle
     L = (y1 - y0) - 14
     ex, ey = px + np.sin(a) * L, py - np.cos(a) * L
     ux, uy = np.sin(a), -np.cos(a)
@@ -441,7 +443,7 @@ def lever(sc, x, y0, y1, pulled=False, hot=True):
     pv = np.hypot(X - px, Y - py) <= 3.2                           # the pivot
     _ramp_fill(sc, pv, ("#3a2410", "#6a4818", "#a0782c", "#d0a848", "#f4dc96"), np.clip(0.6 - ((X - px) + (Y - py)) / 6, 0, 1))
     sc.rgb[int(py), int(px)] = OUTL
-    if pulled:
+    if pulled and angle is None:
         sparks(sc, px + 5, py - 3, 8, seed=int(px))
     sc.occ[q | ball | base | arm] = True
     sc.light[q | base] = 0
@@ -519,7 +521,7 @@ def cap_button(sc, cx, cy, r, text, kind="steel", pressed=False):
             outline=not dark, shadow=False, align="center")
 
 
-def valve(sc, cx, cy, r=16, turning=False):
+def valve(sc, cx, cy, r=16, turning=False, turn=None):
     """A valve's handwheel, red-painted iron: a flange behind it with bolts, a rim, four spokes, a brass nut on the
     hub; turning (the mouse on it) — the spokes a little round, a puff of steam."""
     X, Y = sc.xx - cx, sc.yy - cy
@@ -534,7 +536,7 @@ def valve(sc, cx, cy, r=16, turning=False):
     rim = (d <= r) & (d >= r - 3.5)
     lt = np.clip(0.55 - (X * 0.6 + Y * 0.8) / (2.0 * r), 0, 1)
     _ramp_fill(sc, rim, CAP["rust"], lt)
-    a0 = 0.35 if turning else 0.0
+    a0 = (0.35 if turning else 0.0) if turn is None else turn
     for k in range(4):
         a = a0 + k * np.pi / 2 + np.pi / 4
         dx, dy = np.cos(a), np.sin(a)
@@ -548,7 +550,7 @@ def valve(sc, cx, cy, r=16, turning=False):
     sc.rgb[edges(d <= r)[0]] = OUTL
     sc.rgb[edges((d < r - 3.5))[0] & ~(d <= 4)] = sc.rgb[edges((d < r - 3.5))[0] & ~(d <= 4)] * 0.6
     sc.rgb[cy, cx] = OUTL
-    if turning:
+    if turning and turn is None:
         steam(sc, cx + r - 2, cy - r, 8, seed=cx)
     sc.occ[fl] = True
 

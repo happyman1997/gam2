@@ -1,0 +1,698 @@
+{
+ "frames": [
+  {
+   "filename": "lever_pull 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 1",
+   "frame": {
+    "x": 260,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 2",
+   "frame": {
+    "x": 520,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 3",
+   "frame": {
+    "x": 780,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 4",
+   "frame": {
+    "x": 1040,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 5",
+   "frame": {
+    "x": 1300,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 6",
+   "frame": {
+    "x": 1560,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 7",
+   "frame": {
+    "x": 1820,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 8",
+   "frame": {
+    "x": 0,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 9",
+   "frame": {
+    "x": 260,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 10",
+   "frame": {
+    "x": 520,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 11",
+   "frame": {
+    "x": 780,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 12",
+   "frame": {
+    "x": 1040,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 13",
+   "frame": {
+    "x": 1300,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 14",
+   "frame": {
+    "x": 1560,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 15",
+   "frame": {
+    "x": 1820,
+    "y": 100,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 16",
+   "frame": {
+    "x": 0,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 17",
+   "frame": {
+    "x": 260,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 18",
+   "frame": {
+    "x": 520,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 19",
+   "frame": {
+    "x": 780,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 20",
+   "frame": {
+    "x": 1040,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 21",
+   "frame": {
+    "x": 1300,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 22",
+   "frame": {
+    "x": 1560,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 23",
+   "frame": {
+    "x": 1820,
+    "y": 200,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 24",
+   "frame": {
+    "x": 0,
+    "y": 300,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 25",
+   "frame": {
+    "x": 260,
+    "y": 300,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 26",
+   "frame": {
+    "x": 520,
+    "y": 300,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 27",
+   "frame": {
+    "x": 780,
+    "y": 300,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 28",
+   "frame": {
+    "x": 1040,
+    "y": 300,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lever_pull 29",
+   "frame": {
+    "x": 1300,
+    "y": 300,
+    "w": 260,
+    "h": 100
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 260,
+    "h": 100
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 100
+   },
+   "duration": 42
+  }
+ ],
+ "meta": {
+  "app": "gam2 tools/sprites",
+  "version": "1",
+  "image": "lever_pull.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 2080,
+   "h": 400
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "lever_pull",
+    "from": 0,
+    "to": 29,
+    "direction": "forward"
+   }
+  ],
+  "pixelfx": {
+   "id": "lever_pull",
+   "fps": 24,
+   "loop": false,
+   "frames": 30,
+   "frameSize": [
+    260,
+    100
+   ],
+   "pivot": [
+    0,
+    0
+   ],
+   "columns": 8
+  }
+ }
+}

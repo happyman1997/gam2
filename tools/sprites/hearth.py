@@ -368,8 +368,17 @@ def smoke(sc, x, y_bot, y_top, seed=0):
         sc.rgb[thin] = sc.rgb[thin] * (1 - k * 0.6) + _h("#5a5662") * (k * 0.6)
 
 
-def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True):
-    """The whole hearth in the box x0..x1, y0..y1 (the forge on the floor at y1)."""
+def _pfire():
+    try:
+        import pxfx
+        return pxfx.load("forge-fire")
+    except Exception:
+        return None
+
+
+def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True, frame=0, phase=0.0):
+    """The whole hearth in the box x0..x1, y0..y1 (the forge on the floor at y1). frame — which frame of the forge
+    fire (pixelfx, assets/fx/forge-fire) burns in it; phase 0..1 — where in its loop the coals' breathing is."""
     cx = (x0 + x1) // 2 - 34
     fy = y1 - 18                                                                 # the floor
     e = ((sc.xx - cx) / 120.0) ** 2 + ((sc.yy - fy) / 6.0) ** 2 <= 1            # the shadow on the floor
@@ -410,13 +419,20 @@ def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True):
     sc.rgb[po] = OUTL
     # the hood over it all
     top, bot = ftop - 96, ftop - 4
-    smoke(sc, cx - 14, top - 58, y0 + 34, seed=2)
     tool_rack(sc, x0 + 14, x1 - 14, y0 + 22, seed=1)
-    # the heap of coal, the crucible sunk in it, the fire round it
+    # the heap of coal, the crucible sunk in it, the fire round it: pixelfx's forge fire, frame by frame
     firept = (cx, ftop - 22)
-    fire(sc, cx, ftop - 26, ((-46, 46, 13, -0.35), (-24, 30, 11, -0.2), (24, 34, 11, 0.25), (48, 50, 13, 0.4),
-                             (-70, 24, 9, -0.25), (70, 22, 9, 0.3), (0, 20, 14, 0.0)), seed=3)
+    pf = _pfire()
     heap(sc, cx, ftop - 4, 98, 40)
+    if pf is not None:
+        import pxfx
+        frames, meta = pf
+        fr = frames[frame % len(frames)]
+        pxfx.blend(sc, fr, cx, ftop - 18, meta["pivot"])
+    else:
+        fire(sc, cx, ftop - 26, ((-46, 46, 13, -0.35), (-24, 30, 11, -0.2), (24, 34, 11, 0.25), (48, 50, 13, 0.4),
+                                 (-70, 24, 9, -0.25), (70, 22, 9, 0.3), (0, 20, 14, 0.0)), seed=3)
+        smoke(sc, cx - 14, top - 58, y0 + 34, seed=2)
     rnd = np.random.RandomState(11)
     lumps = []
     for i in range(70):
@@ -427,6 +443,8 @@ def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True):
         r = rnd.uniform(4.5, 8.0) * (1.0 - 0.3 * abs(u))
         dist = np.hypot((hx - firept[0]) / 60.0, (ly_ - firept[1]) / 30.0)
         heat = np.clip(1.25 - dist * 1.15 + rnd.uniform(-0.2, 0.15), 0, 1)
+        if heat > 0.3:                                                         # the coals breathe in the draught
+            heat = float(np.clip(heat + 0.13 * np.sin(2 * np.pi * (2 * phase + rnd.rand())), 0, 1))
         lumps.append((ly_, hx, r, heat, i))
     lumps.sort()
     for ly_, hx, r, heat, i in lumps:
@@ -437,9 +455,18 @@ def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True):
     for ly_, hx, r, heat, i in lumps:
         if not (ly_ < top + 40 and abs(hx - cx) < 40):
             lump(sc, hx, ly_, r, heat, i, firept)
-    fire(sc, cx, ftop - 10, ((-30, 20, 8, -0.4), (6, 14, 7, 0.1), (34, 22, 8, 0.45)), seed=5)
+    if pf is not None:                                                         # the flames in front of the coals too
+        import pxfx
+        fr = pf[0][frame % len(pf[0])].copy()
+        h_, w_ = fr.shape[:2]
+        px0, py0 = int(cx - pf[1]["pivot"][0]), int(ftop - 18 - pf[1]["pivot"][1])
+        keep = ~cm[py0:py0 + h_, px0:px0 + w_] if (py0 >= 0 and px0 >= 0) else np.ones((h_, w_), bool)
+        fr[..., 3] *= (fr[..., 3] > 0.55) * keep * 0.85
+        pxfx.blend(sc, fr, cx, ftop - 18, pf[1]["pivot"])
+    else:
+        fire(sc, cx, ftop - 10, ((-30, 20, 8, -0.4), (6, 14, 7, 0.1), (34, 22, 8, 0.45)), seed=5)
     if glow:
-        sc.glow(cx, ftop - 24, 120, _h("#ff7a2a"), 0.3)
+        sc.glow(cx, ftop - 24, 120, _h("#ff7a2a"), 0.3 * (0.92 + 0.08 * np.sin(2 * np.pi * 3 * phase)))
     # the module going into the melt
     if melt_icon is not None:
         sc.blit(melt_icon, int(cx - melt_icon.w / 2 - 6), int(top - melt_icon.h + 10))
