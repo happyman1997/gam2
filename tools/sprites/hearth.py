@@ -237,32 +237,135 @@ def flask(sc, x0, x1, y0, y1):
     sc.rgb[o] = OUTL
 
 
-def hood(sc, cx, y_top, y_bot, w_bot, y_lim=0):
-    """The forge's hood: a riveted sheet-iron cone over the fire, its flue going up, soot inside, its lower rim lit
-    from below by the fire."""
-    X, Y = sc.xx.astype(float), sc.yy.astype(float)
-    t = np.clip((Y - y_top) / max(1, y_bot - y_top), 0, 1)
-    hw = 14 + (w_bot - 14) * t ** 1.3
-    cone = (Y >= y_top) & (Y < y_bot) & (np.abs(X - cx) <= hw)
-    flue = (Y >= y_lim) & (Y < y_top + 2) & (np.abs(X - cx) <= 12)
-    iron = [_h(c) for c in ("#121114", "#1e1c22", "#2c2a32", "#3e3c46", "#5a5862")]
-    u = (X - cx) / np.maximum(hw, 1)
-    lit = np.clip(0.5 + 0.4 * np.cos((u + 0.35) * 1.6), 0, 1)
-    idx = np.clip(np.floor(lit * 4.0 + 0.5), 0, 4).astype(int)
-    sc.rgb[cone | flue] = np.array(iron)[idx][cone | flue]
-    for yy in range(int(y_top) + 10, int(y_bot), 14):                            # the seams and their rivets
-        row = cone & (np.abs(Y - yy) < 0.5)
-        sc.rgb[row] = iron[0]
-        w_ = 14 + (w_bot - 14) * ((yy - y_top) / (y_bot - y_top)) ** 1.3
-        for rx in np.arange(cx - w_ + 4, cx + w_ - 3, 9):
-            sc.rgb[yy - 2, int(rx)] = iron[4]
-    for yy in range(int(y_lim) + 6, int(y_top), 12):                              # the flue's joints
-        sc.rgb[yy, int(cx - 12):int(cx + 13)] = iron[0]
-        sc.rgb[yy + 1, int(cx - 12):int(cx + 13)] = iron[3]
-    rim = cone & (Y >= y_bot - 3)
-    sc.rgb[rim] = sc.rgb[rim] * 0.5 + _h("#e0702a") * 0.5                          # lit from the fire below
-    o, _, _ = edges(cone | flue)
+IRONP = ("#121116", "#2c2a32", "#4a4852", "#74727e", "#acaab6")
+
+
+def _seg(X, Y, p0, p1, r):
+    (ax, ay), (bx, by) = p0, p1
+    dx, dy = bx - ax, by - ay
+    L2 = max(1e-6, dx * dx + dy * dy)
+    t = np.clip(((X - ax) * dx + (Y - ay) * dy) / L2, 0, 1)
+    return np.hypot(X - (ax + t * dx), Y - (ay + t * dy)) <= r
+
+
+def _ironpaint(sc, m, pal=IRONP, glow=None):
+    """Paint a forged shape: a mid tone, its top and left edges caught by the light, its bottom and right in shade,
+    an outline; glow — a mask of where it is still hot."""
+    from swarm_ui import shrink
+    p = [_h(c) for c in pal]
+    sc.rgb[m] = p[2]
+    up = np.zeros_like(m); up[1:] = m[:-1]
+    dn = np.zeros_like(m); dn[:-1] = m[1:]
+    lf = np.zeros_like(m); lf[:, 1:] = m[:, :-1]
+    rt = np.zeros_like(m); rt[:, :-1] = m[:, 1:]
+    inner = shrink(m)
+    sc.rgb[m & ~inner & (~up | ~lf)] = p[4]
+    sc.rgb[m & ~inner & ~dn & up & lf] = p[1]
+    sc.rgb[m & ~inner & ~rt & up & lf & dn] = p[1]
+    warm = m & ~inner & ~dn                                                   # the fire's light from below
+    sc.rgb[warm] = sc.rgb[warm] * 0.45 + _h("#d8803a") * 0.55
+    if glow is not None:
+        g = m & glow
+        sc.rgb[g] = sc.rgb[g] * 0.3 + _h("#e05a1a") * 0.7
+    o, _, _ = edges(m)
     sc.rgb[o] = OUTL
+
+
+def s_hook(X, Y, x, y):
+    """An S-hook hanging from the rail at (x, y): two small open loops."""
+    a = (np.abs(np.hypot(X - x, Y - (y + 3)) - 2.6) <= 0.8) & ~((X > x) & (Y > y + 3))
+    b = (np.abs(np.hypot(X - x, Y - (y + 8)) - 2.6) <= 0.8) & ~((X < x) & (Y < y + 8))
+    return a | b
+
+
+def tool_rack(sc, x0, x1, y_rail, seed=0):
+    """The forge's back wall: an iron rail on two brackets, and hanging from it on S-hooks the smith's own tools,
+    each its own length — long tongs, a ladle with a crust of metal set in it, a skimmer, a poker still warm at
+    its end, a hand hammer."""
+    X, Y = sc.xx.astype(float), sc.yy.astype(float)
+    rail = (X >= x0) & (X < x1) & (Y >= y_rail) & (Y < y_rail + 4)
+    br = np.zeros_like(rail)
+    for bx in (x0 + 10, x1 - 12):                                             # the brackets into the wall
+        br |= (X >= bx - 2) & (X <= bx + 2) & (Y >= y_rail + 3) & (Y < y_rail + 16) & ((Y - y_rail - 3) <= (X - bx + 2) * 6)
+        br |= _seg(X, Y, (bx, y_rail + 2), (bx - 8, y_rail + 14), 1.4)
+    _ironpaint(sc, rail | br)
+    for bx in (x0 + 4, x0 + 18, x1 - 6, x1 - 20):
+        sc.rgb[int(y_rail + 1), int(bx)] = _h("#a8a6b0")
+    # the tools, by hand: where each hangs, how long it is
+    W = x1 - x0
+    hx = [x0 + W * f for f in (0.13, 0.3, 0.62, 0.78, 0.92)]
+    hooks = np.zeros_like(rail)
+    for x in hx:
+        hooks |= s_hook(X, Y, x, y_rail + 3)
+    _ironpaint(sc, hooks)
+    yh = y_rail + 14                                                          # where the tools hang from
+    # 1. long tongs: two reins from a ring, a rivet, two short jaws
+    x = hx[0]
+    ring = np.abs(np.hypot(X - x, Y - (yh + 2)) - 2.5) <= 1.0
+    reins = _seg(X, Y, (x - 1, yh + 4), (x - 4, yh + 70), 1.7) | _seg(X, Y, (x + 1, yh + 4), (x + 4, yh + 70), 1.7)
+    piv = np.hypot(X - x, Y - (yh + 72)) <= 3.2
+    jaws = _seg(X, Y, (x - 2, yh + 72), (x - 6, yh + 84), 1.8) | _seg(X, Y, (x + 2, yh + 72), (x + 5, yh + 85), 1.8)
+    jaws |= _seg(X, Y, (x - 6, yh + 84), (x - 3, yh + 89), 1.6) | _seg(X, Y, (x + 5, yh + 85), (x + 2, yh + 89), 1.6)
+    _ironpaint(sc, ring | reins | piv | jaws)
+    # 2. a ladle: a long handle, a round bowl with a crust of set metal inside
+    x = hx[1]
+    handle = _seg(X, Y, (x, yh), (x + 2, yh + 58), 1.8) | (np.abs(np.hypot(X - x, Y - (yh + 1)) - 2.6) <= 1.0)
+    bowl = ((((X - (x + 2)) / 9.0) ** 2 + ((Y - (yh + 62)) / 7.5) ** 2) <= 1) & (Y >= yh + 58)
+    rim = _seg(X, Y, (x - 8, yh + 58), (x + 12, yh + 58), 1.5)
+    _ironpaint(sc, handle | bowl | rim)
+    crust = ((((X - (x + 2)) / 6.5) ** 2 + ((Y - (yh + 60)) / 2.2) ** 2) <= 1)
+    sc.rgb[crust & bowl] = _h("#7a4a2a")
+    sc.rgb[crust & bowl & (Y < yh + 60)] = _h("#a8683a")
+    # 3. a skimmer: a flat perforated disc on a thin handle
+    x = hx[2]
+    handle = _seg(X, Y, (x, yh), (x - 1, yh + 52), 1.6) | (np.abs(np.hypot(X - x, Y - (yh + 1)) - 2.4) <= 1.0)
+    disc = (((X - (x - 1)) / 8.0) ** 2 + ((Y - (yh + 60)) / 8.5) ** 2) <= 1
+    _ironpaint(sc, handle | disc)
+    for hx_, hy_ in ((-4, -4), (0, -5), (3, -2), (-3, 1), (1, 2), (-1, 5), (4, 3)):
+        sc.rgb[int(yh + 60 + hy_), int(x - 1 + hx_)] = _h("#0a090c")
+    # 4. a poker: a rod with a bent hook, its end still dull red
+    x = hx[3]
+    rod = _seg(X, Y, (x, yh), (x + 1, yh + 80), 1.8) | _seg(X, Y, (x + 1, yh + 80), (x - 6, yh + 87), 1.8)
+    rod |= np.abs(np.hypot(X - x, Y - (yh + 1)) - 2.6) <= 1.0
+    _ironpaint(sc, rod, glow=(Y > yh + 72))
+    # 5. a hand hammer, head down
+    x = hx[4]
+    wood = _seg(X, Y, (x, yh + 2), (x, yh + 40), 2.2)
+    loop = np.abs(np.hypot(X - x, Y - (yh + 1)) - 2.6) <= 1.0
+    head = (np.abs(X - (x + 1)) <= 9) & (Y >= yh + 40) & (Y < yh + 49)
+    head &= ~((X > x + 6) & (Y < yh + 42))                                  # the peen's slope
+    _ironpaint(sc, loop | head)
+    wp = [_h(c) for c in WOODP]
+    sc.rgb[wood] = wp[2]
+    sc.rgb[wood & (X < x)] = wp[3]
+    o, _, _ = edges(wood)
+    sc.rgb[o] = OUTL
+
+
+def smoke(sc, x, y_bot, y_top, seed=0):
+    """Smoke going up from the fire: separate puffs, small and dense low down, larger and fainter as they rise,
+    leaning a little; each with its own light top and shaded underside."""
+    X, Y = sc.xx.astype(float), sc.yy.astype(float)
+    rnd = np.random.RandomState(seed)
+    th = BAYER[sc.yy % 4, sc.xx % 4]
+    n = 6
+    for i in range(n):
+        t = i / (n - 1)
+        cy = y_bot - (y_bot - y_top) * t
+        cx = x + 14 * np.sin(t * 2.2 + 0.4) + rnd.uniform(-2, 2)
+        r = 9 + 14 * t
+        k = 0.42 - 0.3 * t                                                   # fainter as it rises
+        m = np.zeros((sc.h, sc.w), bool)
+        for j in range(4):
+            ox, oy = rnd.uniform(-r * 0.7, r * 0.7), rnd.uniform(-r * 0.35, r * 0.35)
+            m |= np.hypot(X - (cx + ox), Y - (cy + oy)) <= r * rnd.uniform(0.45, 0.7)
+        edge = m & ~(np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1))
+        body = m & ~edge
+        sc.rgb[body] = sc.rgb[body] * (1 - k) + _h("#5a5662") * k
+        lit = m & ~np.roll(m, 2, 0)                                          # the tops of the billows catch light
+        sc.rgb[lit] = sc.rgb[lit] * (1 - k) + _h("#8a8692") * k
+        thin = edge & (th < 0.5)                                             # a ragged, thinning edge
+        sc.rgb[thin] = sc.rgb[thin] * (1 - k * 0.6) + _h("#5a5662") * (k * 0.6)
 
 
 def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True):
@@ -307,7 +410,8 @@ def scene(sc, x0, y0, x1, y1, melt_icon, cast_icon, glow=True):
     sc.rgb[po] = OUTL
     # the hood over it all
     top, bot = ftop - 96, ftop - 4
-    hood(sc, cx, y0 + 40, top - 56, 96, y_lim=y0)
+    smoke(sc, cx - 14, top - 58, y0 + 34, seed=2)
+    tool_rack(sc, x0 + 14, x1 - 14, y0 + 22, seed=1)
     # the heap of coal, the crucible sunk in it, the fire round it
     firept = (cx, ftop - 22)
     fire(sc, cx, ftop - 26, ((-46, 46, 13, -0.35), (-24, 30, 11, -0.2), (24, 34, 11, 0.25), (48, 50, 13, 0.4),
