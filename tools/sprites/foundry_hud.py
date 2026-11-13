@@ -999,89 +999,10 @@ def molten(spr, k=1.0):
 
 
 def crucible_scene(sc, x0, y0, x1, y1, melt_key, cast_key):
-    from swarm_ui import edges
-    """The hearth with its coals, the crucible over it with the melt and the module going down into it, the spout
-    pouring a thread of metal into the mould where the other module is being cast."""
-    X, Y = sc.xx, sc.yy
-    th = BAYER[sc.yy % 4, sc.xx % 4]
-    cx = (x0 + x1) // 2 - 30
-    # the hearth: a brick firebox, its mouth full of coals
-    hx0, hx1, hy0, hy1 = cx - 90, cx + 90, y1 - 150, y1 - 60
-    box = (X >= hx0) & (X < hx1) & (Y >= hy0) & (Y < hy1)
-    sc.rgb[box] = hexc("#3a1a14")
-    for yy in range(hy0, hy1, 8):                                       # brick courses
-        sc.rgb[yy, hx0:hx1] = hexc("#1e0e0a")
-        off = 0 if ((yy - hy0) // 8) % 2 else 10
-        for xx in range(hx0 + off, hx1, 20):
-            sc.rgb[yy:yy + 8, xx] = hexc("#1e0e0a")
-    mouth = (X >= hx0 + 20) & (X < hx1 - 20) & (Y >= hy0 + 30) & (Y < hy1 - 8)
-    t = np.clip((Y - (hy0 + 30)) / 40.0, 0, 1)
-    coal = np.where((th + t * 0.8 + value_noise_cached(sc) * 0.6) > 1.0, 1, 0)
-    pal = np.array([hexc(c) for c in ("#2a0a06", "#7a1c0c", "#e86a1a", "#ffd070")])
-    lvl = np.clip((t * 2.2 + th * 0.9 + value_noise_cached(sc) * 1.4).astype(int), 0, 3)
-    sc.rgb[mouth] = pal[lvl][mouth]
-    o, _, _ = edges(box)
-    sc.rgb[o] = SU.OUTL
-    mo, _, _ = edges(mouth)
-    sc.rgb[mo] = SU.OUTL
-    # flames licking up round the crucible's foot
-    rnd = np.random.RandomState(5)
-    for k_ in range(14):                                                 # tongues of flame, uneven, dithered
-        fx_ = cx - 62 + k_ * 9 + rnd.randint(-2, 3)
-        hgt = rnd.randint(8, 20)
-        sway = rnd.uniform(-2.5, 2.5)
-        for j in range(hgt):
-            f = j / hgt
-            w_ = max(0, int(round(3.4 * (1 - f) ** 0.7)))
-            xx = int(fx_ + sway * f * f)
-            yy = hy0 - j + 2
-            col = "#fff0a0" if f < 0.25 else ("#ffb43a" if f < 0.55 else ("#e86a1a" if f < 0.8 else "#a8320e"))
-            for x_ in range(xx - w_, xx + w_ + 1):
-                if f > 0.6 and (x_ + yy) % 2:
-                    continue
-                sc.rgb[yy, x_] = hexc(col)
-    # the crucible: an iron bowl, its rim, a spout to the right; the melt inside
-    top, bot = hy0 - 86, hy0 - 6
-    half = lambda yy: 52 - (yy - top) * 0.22
-    bowl = (Y >= top) & (Y < bot) & (np.abs(X - cx) <= half(Y))
-    lt = np.clip(0.62 - (X - cx) / 110.0 - (Y - top) / 200.0, 0, 1)
-    FU._ramp_fill(sc, bowl, ("#121114", "#1e1c22", "#2e2c34", "#45434c", "#66646e"), lt)
-    rim = (Y >= top - 4) & (Y < top + 3) & (np.abs(X - cx) <= 56)
-    FU._ramp_fill(sc, rim, ("#1e1c22", "#2e2c34", "#45434c", "#66646e", "#9a98a2"), np.clip(0.7 - (X - cx) / 120.0, 0, 1))
-    spout = (Y >= top - 6) & (Y < top + 6) & (X >= cx + 50) & (X < cx + 66) & ((X - cx - 50) * 0.5 >= (Y - top + 6) * 0.4 - 2)
-    FU._ramp_fill(sc, spout, ("#1e1c22", "#2e2c34", "#45434c", "#66646e", "#9a98a2"), np.clip(0.6 - (Y - top) / 20.0, 0, 1))
-    for m_ in (bowl | rim | spout,):
-        o, _, _ = edges(m_)
-        sc.rgb[o] = SU.OUTL
-    melt = (np.abs(X - cx) <= 50) & (((X - cx) / 50.0) ** 2 + ((Y - (top + 2)) / 6.0) ** 2 <= 1)
-    mpal = np.array([hexc(c) for c in ("#e86a1a", "#ffb43a", "#ffe08a", "#fff6d0")])
-    ml = np.clip((th * 1.6 + value_noise_cached(sc) * 2.4 + 0.3).astype(int), 0, 3)
-    sc.rgb[melt] = mpal[ml][melt]
-    sc.glow(cx, top, 70, hexc("#ff8a2a"), 0.45)
-    # the module going down into the melt, red-hot, its lower half already under
-    spr = molten(IC.icon(melt_key, 3, "module"))
-    sx, sy = cx - 34, top - 32
-    sc.blit(spr, sx, sy)
-    under = (X >= sx) & (X < sx + spr.w) & (Y >= top - 2) & (Y < top + 9) & melt
-    sc.rgb[under] = mpal[ml][under]
-    FU.sparks(sc, cx - 10, top - 4, 12, seed=7)
-    FU.steam(sc, cx - 24, top - 46, 12, seed=3)
-    # the mould on a block to the right, the other module being cast in it; the thread of metal into it
-    mx, my = x1 - 62, y1 - 64
-    block = (X >= mx - 40) & (X < mx + 40) & (Y >= my) & (Y < my + 34)
-    FU._ramp_fill(sc, block, ("#121114", "#1e1c22", "#2e2c34", "#45434c", "#66646e"), np.clip(0.7 - (Y - my) / 40.0, 0, 1))
-    o, _, _ = edges(block)
-    sc.rgb[o] = SU.OUTL
-    cast = molten(IC.icon(cast_key, 3, "module"), 1.2)
-    sc.blit(cast, mx - cast.w // 2, my - cast.h + 18)
-    sc.glow(mx, my, 34, hexc("#ff8a2a"), 0.4)
-    ax, ay = cx + 66, top - 2
-    for i in range(60):                                                  # the pour
-        tt = i / 59
-        px_ = ax + (mx - 6 - ax) * tt
-        py_ = ay + (my - 30 - ay) * tt ** 2 - 14 * np.sin(np.pi * tt)
-        sc.rgb[int(py_) - 1:int(py_) + 2, int(px_):int(px_) + 2] = hexc("#ffe08a") if i % 3 else hexc("#ffb43a")
-    FU.sparks(sc, mx - 6, my - 26, 8, seed=9)
+    """The hearth (hearth.py): a firebrick forge under its hood, a heap of coal with the crucible sunk in it, the
+    module going down into the melt, the pour into the sand mould where the other module is being cast."""
+    import hearth
+    hearth.scene(sc, x0, y0, x1, y1, molten(IC.icon(melt_key, 3, "module")), molten(IC.icon(cast_key, 3, "module"), 1.2))
 
 
 _VN = {}
@@ -1125,9 +1046,6 @@ def smelt():
     FU.plate(sc, 308, 52, 652, 462, seed=43)
     sc.rgb[60:454, 316:644] = sc.rgb[60:454, 316:644] * 0.55
     crucible_scene(sc, 316, 60, 644, 454, "canister", "long")
-    letters(sc, "Картечь I — в тигель", 450, 118, "text", 16, col=(255, 200, 140), align="center")
-    letters(sc, "Длинный ствол", 582, 428, "text", 16, col=(255, 222, 150), align="center")
-    H.fx_line(sc, 548, 404, "{модуль:I} ⇒ {модуль:II}")
     # into the mould
     FU.plate(sc, 660, 52, 948, 462, seed=42)
     heading(sc, "В ЛИТЬЁ", 674, 64)
