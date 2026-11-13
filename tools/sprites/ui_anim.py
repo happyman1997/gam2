@@ -142,6 +142,153 @@ def hearth():
     print("foundry_hearth.gif", n, "frames")
 
 
+def workshop():
+    """The workshop alive, then a part set in: the part on the crane swaying, the mount it goes to pulsing hot, a
+    glint running along the spanners, sparks at the slipway, the lever's enamel breathing; then the crane lowers the
+    Long Barrel onto the Gun's arm — it lands with a clank and a spray of sparks, its box flares and cools, the drawn
+    golem now carries it, the empty hook goes back up."""
+    import copy
+    spark, km = pxfx.load("hit-spark")
+    n_idle, n_drop, n_after = 24, 10, 26
+    images = []
+    pt = None
+    for i in range(n_idle + n_drop + n_after):
+        t = i / FPS
+        a = dict(sway=2.2 * np.sin(2 * np.pi * t / 1.6), pulse=0.75 + 0.25 * np.sin(2 * np.pi * t / 0.8),
+                 plate=0.05 * np.sin(2 * np.pi * t / 1.2), seed=i // 2)
+        g = (t % 2.0) / 0.6
+        a["glint"] = g if g <= 1 else None
+        if n_idle <= i < n_idle + n_drop:                                  # lowering
+            a["drop"] = (i - n_idle + 1) / n_drop
+            a["sway"] *= 1 - a["drop"]
+        elif i >= n_idle + n_drop:                                         # set in, the hook going back up
+            j = i - n_idle - n_drop
+            a.update(installed="long", retract=min(1.0, j / 12.0), sway=0, flash="long" if j < 4 else None)
+        sc = FH.workshop(anim=a, ret=True)
+        if i >= n_idle + n_drop:
+            j = i - n_idle - n_drop
+            if j == 0 or j == 1:                                           # the clank: the screen jolts
+                sc.rgb[:] = np.roll(sc.rgb, 1, axis=0)
+            if j < len(spark):
+                pxfx.blend(sc, spark[j], 518, 362, km["pivot"])
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_workshop_anim.gif"), FPS)
+    print("\nfoundry_workshop_anim.gif", len(images), "frames")
+
+
+def tabs():
+    """A click on the panel's tabs: ДОБЫЧА open, the mouse on СТОЙКА, it sinks under the click, opens — a glint runs
+    across its brass; the repair badge throbs all the while."""
+    images = []
+    for i in range(40):
+        sc = Scene(960, 100)
+        sc.rgb[:] = hexc("#1c1a20")
+        FU.plate(sc, 708, 52, 948, 100, seed=4)
+        cur = "loot" if i < 12 else "rack"
+        a = dict(pulse=1.0 * max(0.0, np.sin(2 * np.pi * i / 16.0)))
+        if 8 <= i < 12:
+            a["press"] = "rack"
+        if 12 <= i < 22:
+            a["flash"] = (i - 12) / 9.0
+        FH.panel_tabs(sc, cur, anim=a)
+        if 6 <= i < 12:
+            import swarm_hud as H
+            H.cursor(sc, 800, 72 + (1 if 8 <= i < 12 else 0))
+        images.append(sc.image(2).crop((700 * 2, 50 * 2, 952 * 2, 92 * 2)))
+    pxfx.save_gif(images, out("foundry_tabs_click.gif"), FPS)
+    print("foundry_tabs_click.gif", len(images))
+
+
+def steps():
+    """The new golem's steps moving on: the heat runs out of ТЕЛО's point into ЯДРО, ЯДРО heats from the left,
+    ТЕЛО cools to brass behind it, sparks fly off the new step's point."""
+    def bar(cur):
+        sc = Scene(960, 96)
+        sc.rgb[:] = hexc("#1c1a20")
+        FH.steps_bar(sc, cur, y=52 - 40)
+        return sc
+    A, B = bar(1), bar(2)
+    n = len(FH.STEPS)
+    w = (960 - 24 + 12 * (n - 1)) // n
+    xa0, xa1 = 12 + 1 * (w - 12), 12 + 1 * (w - 12) + w                     # ТЕЛО
+    xb0, xb1 = 12 + 2 * (w - 12), 12 + 2 * (w - 12) + w                     # ЯДРО
+    images = []
+    for i in range(30):
+        sc = Scene(960, 96)
+        sc.rgb[:] = A.rgb.copy()
+        if i >= 6:
+            f = min(1.0, (i - 6) / 10.0)
+            front = xb0 + (xb1 - xb0) * f
+            cool = np.clip(f * 1.2, 0, 1)
+            sc.rgb[:, xa0:xa1] = A.rgb[:, xa0:xa1] * (1 - cool) + B.rgb[:, xa0:xa1] * cool
+            sc.rgb[:, xb0:int(front)] = B.rgb[:, xb0:int(front)]
+            if f < 1:
+                col = (sc.yy >= 12) & (sc.yy < 44) & (np.abs(sc.xx - front) < 1.5) & (B.rgb.sum(axis=2) > 120)
+                sc.rgb[col] = np.array((255.0, 236.0, 160.0))
+        if 16 <= i < 26:
+            FU.sparks(sc, xb1 - 10, 28, 10, seed=i)
+        images.append(sc.image(2).crop((0, 8 * 2, 960 * 2, 50 * 2)))
+    pxfx.save_gif(images, out("foundry_steps.gif"), FPS)
+    print("foundry_steps.gif", len(images))
+
+
+def metal_tick():
+    """The purse paying: the ingot hops, 14 slides up and out, 12 slides in from below, a red −2 floats away."""
+    import swarm_hud as H
+    from swarm_ui import letters
+    images = []
+    for i in range(30):
+        sc = Scene(220, 44)
+        FU.wing(sc, 0, 0, 220, 44)
+        f = np.clip((i - 6) / 8.0, 0, 1)
+        hop = -int(round(3 * np.sin(np.pi * np.clip((i - 5) / 6.0, 0, 1))))
+        H.glyph(sc, "металл", 18, 10 + hop, 2)
+        bg = sc.rgb.copy()
+        if f < 1:
+            letters(sc, "14", 48, 12 - int(16 * f), "title", 16, col=(214, 220, 236), col2=(90, 96, 120))
+        if f > 0:
+            letters(sc, "12", 48, 12 + int(16 * (1 - f)), "title", 16, col=(214, 220, 236), col2=(90, 96, 120))
+        win = np.zeros((sc.h, sc.w), bool)                                 # the numbers show only in their slot
+        win[9:33, 44:92] = True
+        outside = ~win & (sc.xx >= 40) & (sc.xx < 96)
+        sc.rgb[outside] = bg[outside]
+        if 6 <= i < 26:
+            k = (i - 6) / 20.0
+            letters(sc, "−2", 98, 12 - int(10 * k), "text", 16, col=(255, 120, 90))
+        images.append(sc.image(2))
+    pxfx.save_gif(images, out("foundry_metal_tick.gif"), FPS)
+    print("foundry_metal_tick.gif", len(images))
+
+
+def gears_title():
+    """The victory's title: its cogs turning in mesh, the small ones the other way and faster; one tooth's turn
+    loops seamlessly."""
+    images = []
+    n = 24
+    for i in range(n):
+        sc = Scene(960, 44)
+        FU.wing(sc, 0, 0, 960, 44)
+        FH.title_center(sc, "ПОБЕДА", "gears", turn=(2 * np.pi / 12) * i / n)
+        images.append(sc.image(2).crop((560, 0, 1360, 88)))
+    pxfx.save_gif(images, out("foundry_gears.gif"), FPS)
+    print("foundry_gears.gif", n)
+
+
+def leaders():
+    """Choosing the leader: the chosen one's furnace burning behind him — pixelfx's fire in the arch, sparks at its
+    mouth — as a loop."""
+    frames, meta = pxfx.load("forge-fire")
+    images = []
+    for i in range(len(frames)):
+        sc = FH.leaders_pick(anim={"frame": i}, ret=True)
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_leader_fire.gif"), meta["fps"])
+    print("\nfoundry_leader_fire.gif", len(images))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "console"
-    {"console": console, "hearth": hearth}[what]()
+    {"console": console, "hearth": hearth, "workshop": workshop, "tabs": tabs, "steps": steps,
+     "metal": metal_tick, "gears": gears_title, "leaders": leaders}[what]()

@@ -484,10 +484,11 @@ def step_plate(sc, x0, y0, x1, y1, text, kind="dull", first=False):
     sc.light[m] = 0
 
 
-def tab(sc, x0, y0, x1, y1, text, active=False, badge=None):
+def tab(sc, x0, y0, x1, y1, text, active=False, badge=None, dy=0, flash=None, pulse=0.0):
     """A tab on top of a panel: a cast plate with its top corners cut away; the active one brass and open into the
     panel below, the rest dull iron. badge — a red number riveted to its corner (what needs doing there)."""
     X, Y = sc.xx, sc.yy
+    y0, y1 = y0 + dy, y1 + dy                                          # pressed: it sinks a pixel
     m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
     m &= (X - x0) + (Y - y0) * 0.0 >= np.maximum(0, 5 - (Y - y0))       # the cut top corners
     m &= (x1 - 1 - X) >= np.maximum(0, 5 - (Y - y0))
@@ -500,14 +501,19 @@ def tab(sc, x0, y0, x1, y1, text, active=False, badge=None):
         col = (150, 142, 136)
     o, top, _ = edges(m)
     sc.rgb[o & ~((Y == y1 - 1) & active)] = OUTL
+    if flash is not None and 0 <= flash <= 1:                          # a glint running across the brass
+        gx = x0 + (x1 - x0) * flash
+        band = m & (np.abs(X - gx + (Y - y0) * 0.7) < 2.0)
+        sc.rgb[band] = sc.rgb[band] * 0.3 + np.array((255.0, 246.0, 210.0)) * 0.7
     letters(sc, text, (x0 + x1) / 2, (y0 + y1) / 2 - 8, "text", 16, col=col, outline=False, shadow=not active,
             align="center")
     if badge:
         bx, by = x1 - 6, y0 + 3
         d = np.hypot(X - bx, Y - by)
-        sc.rgb[d <= 6] = OUTL
-        sc.rgb[d <= 5] = hexc("#c8402a")
-        sc.rgb[d <= 2] = hexc("#e8603a")
+        rb = 6 + pulse                                                  # it throbs: something needs doing
+        sc.rgb[d <= rb] = OUTL
+        sc.rgb[d <= rb - 1] = hexc("#c8402a")
+        sc.rgb[d <= 2 + pulse * 0.5] = hexc("#e8603a")
         letters(sc, str(badge), bx, by - 8, "text", 16, col=(255, 236, 220), outline=False, shadow=False, align="center")
     sc.occ[m] = True
     sc.light[m] = 0
@@ -664,6 +670,7 @@ def wrench(sc, x0, x1, yc, flip=False, size="24", seed=0):
                         sc.rgb[yy + 1, xx] = np.maximum(sc.rgb[yy + 1, xx], pal[2])
     sc.occ[m] = True
     sc.light[m] = 0
+    return m
 
 
 def _seg(X, Y, p0, p1, r):
@@ -801,16 +808,13 @@ def gear(sc, cx, cy, r, teeth=10, phase=0.0, ramp_=BRASSR):
     return m
 
 
-def gears(sc, x0, x1, yc, flip=False, seed=0):
-    """A pair of brass cogs meshing, the big one by the title; flip — mirrored."""
-    xs = [x1 - 20, x1 - 20 - 33]
-    if flip:
-        xs = [x0 + 20, x0 + 20 + 33]
-    m = np.zeros((sc.h, sc.w), bool)
-    _shadow_m = []
+def gears(sc, x0, x1, yc, flip=False, seed=0, turn=0.0):
+    """A pair of cogs meshing, the big brass one by the title, the steel one outside it; turn — how far the big one
+    has turned (radians): the small one turns the other way, faster by the ratio of their teeth."""
     xs = [x1 - 20, x1 - 20 - 37] if not flip else [x0 + 20, x0 + 20 + 37]
-    gear(sc, xs[1], yc + 2, 12, teeth=9, phase=0.4 + seed, ramp_=STEEL)
-    gear(sc, xs[0], yc, 16, teeth=12, phase=0.1 + seed)
+    d = -1 if flip else 1
+    gear(sc, xs[1], yc + 2, 12, teeth=9, phase=0.4 + seed - d * turn * 12 / 9, ramp_=STEEL)
+    gear(sc, xs[0], yc, 16, teeth=12, phase=0.1 + seed + d * turn)
 
 
 def core_port(sc, cx, cy, kind, r=6):

@@ -117,7 +117,7 @@ def title(sc, text, sub=None, epi=None, x=16):
     return w
 
 
-def title_center(sc, text, tool="wrench"):
+def title_center(sc, text, tool="wrench", glint=None, turn=0.0):
     """A screen's name in the middle of the beam, a big tool either side of it turned to it: spanners for the
     workshop, smith's hammers for a new golem, tongs with a hot bar for smelting, brass cogs for a victory."""
     tw = SU.text_width(text, "title", 24)
@@ -127,8 +127,12 @@ def title_center(sc, text, tool="wrench"):
         sc.rgb[31, x + k] = sc.rgb[31, x + k] * 0.4 + hexc("#ff8a3a") * 0.6
     L = int(min(156, 286 - tw // 2, WW // 2 - tw // 2 - 14 - 128))
     if tool == "wrench":
-        FU.wrench(sc, x - 14 - L, x - 14, 21, flip=False, size="24", seed=1)
-        FU.wrench(sc, x + tw + 14, x + tw + 14 + L, 21, flip=True, size="19", seed=2)
+        ml = FU.wrench(sc, x - 14 - L, x - 14, 21, flip=False, size="24", seed=1)
+        mr = FU.wrench(sc, x + tw + 14, x + tw + 14 + L, 21, flip=True, size="19", seed=2)
+        if glint is not None and 0 <= glint <= 1:                      # a glint running out along both spanners
+            for m_, gx in ((ml, x - 14 - glint * L), (mr, x + tw + 14 + glint * L)):
+                band = m_ & (np.abs(sc.xx - gx + (sc.yy - 21) * 0.6) < 1.6)
+                sc.rgb[band] = sc.rgb[band] * 0.3 + np.array((255.0, 250.0, 236.0)) * 0.7
     elif tool == "hammer":
         L = min(L, 112)
         FU.hammer(sc, x - 12 - L, x - 12, 21, flip=False, seed=1)
@@ -138,8 +142,8 @@ def title_center(sc, text, tool="wrench"):
         FU.tongs(sc, x - 24 - L, x - 24, 21, flip=False, seed=1)
         FU.tongs(sc, x + tw + 24, x + tw + 24 + L, 21, flip=True, seed=2)
     else:
-        FU.gears(sc, x - 12 - 80, x - 12, 21, flip=False, seed=0.0)
-        FU.gears(sc, x + tw + 12, x + tw + 12 + 80, 21, flip=True, seed=0.3)
+        FU.gears(sc, x - 12 - 80, x - 12, 21, flip=False, seed=0.0, turn=turn)
+        FU.gears(sc, x + tw + 12, x + tw + 12 + 80, 21, flip=True, seed=0.3, turn=turn)
 
 
 def toolbar(sc, alt=False, on=False):
@@ -188,11 +192,18 @@ def heading(sc, text, x, y):
     return letters(sc, text, x, y, "title", 16, col=GOLD, col2=(130, 90, 40))
 
 
+_GOLEMS = {}
+
+
 def golem_sprite(frame, mods, k, body=None, core=None):
-    """The golem assembled from its parts (golem_parts): hull, legs, arms, head, its modules; k — over its battle scale."""
+    """The golem assembled from its parts (golem_parts): hull, legs, arms, head, its modules; k — over its battle
+    scale. Kept once drawn, so the frames of an animation don't draw it again."""
     import golem_parts as GP
     import frames as F
-    return GP.build(frame, k=F.FRAMES[frame][0] * k, mods=dict(mods), core=core, **(body or {}))
+    key = (frame, tuple(sorted(dict(mods).items())), round(k, 4), tuple(sorted((body or {}).items())), core)
+    if key not in _GOLEMS:
+        _GOLEMS[key] = GP.build(frame, k=F.FRAMES[frame][0] * k, mods=dict(mods), core=core, **(body or {}))
+    return _GOLEMS[key]
 
 
 # what each body part does, in glyphs
@@ -452,18 +463,28 @@ def part_box(sc, x, y, key, label, lv=1, state="normal", w=118, h=46):
     return x + w, y + h // 2
 
 
-def crane_hook(sc, x, y_top, y_hook, key, part=None):
-    """The gantry's trolley, its chain down, the hook, and the part hanging from it."""
+def crane_hook(sc, x, y_top, y_hook, key, part=None, sway=0, carry=True):
+    """The gantry's trolley, its chain down, the hook, and the part hanging from it; sway — how far the hook has
+    swung aside (the chain slants to it); carry=False — the hook going back up empty."""
     sc.rgb[y_top:y_top + 8, x - 16:x + 17] = hexc("#3a3840")
     sc.rgb[y_top, x - 16:x + 17] = hexc("#6a6870")
     sc.rgb[y_top + 7, x - 16:x + 17] = SU.OUTL
     FU.rivet(sc, x - 10, y_top + 4)
     FU.rivet(sc, x + 10, y_top + 4)
-    FU.chain(sc, x, y_top + 8, y_hook)
+    y_hook = int(y_hook)
+    if abs(sway) < 0.5:
+        FU.chain(sc, x, y_top + 8, y_hook)
+    else:                                                             # link by link along the slant
+        for k_, yy in enumerate(range(y_top + 8, y_hook, 5)):
+            xx = int(round(x + sway * (yy - y_top - 8) / max(1, y_hook - y_top - 8)))
+            FU.chain(sc, xx, yy, yy + 5) if k_ % 2 == 0 else FU.chain(sc, xx, yy - 5, yy + 5)
+    x = int(round(x + sway))
     for k in range(6):                                                # the hook
         sc.rgb[y_hook + k, x - 1:x + 2] = hexc("#8a8890")
     sc.rgb[y_hook + 5:y_hook + 8, x - 4:x + 2] = hexc("#8a8890")
     sc.rgb[y_hook + 3:y_hook + 6, x - 5] = hexc("#8a8890")
+    if not carry:
+        return y_hook + 8
     if part:                                                          # a body part: its own drawing on the hook
         import golem_parts as GP
         slot, pk = part
@@ -514,7 +535,7 @@ SCALE = {"Страж": 1.55, "Механик": 2.5}          # how large each fr
 
 def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role=None, broken=False,
             damaged=(), hover=None, crane=True, lw=150, rw=152, body=None, body_hot=None, body_new=None,
-            body_only=False):
+            body_only=False, anim=None):
     """The drawing with the golem before it: the gantry beam, the hull's plate top left, the golem on its stand.
     On the left its body — a callout from the head, the right arm, the left arm and the legs to each part's box; on
     the right what is inside — the chest with its core and every module cell (measured mounts), empty cells dashed.
@@ -522,6 +543,12 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
     crane; body_hot — the body slot being chosen; damaged — modules that broke (red); hover — the box under the mouse.
     Returns where the hot part is (or the hovered box), for the cursor."""
     x0, y0, x1, y1 = rect
+    a_ = anim or {}
+    inst = a_.get("installed")                                        # a module just set in by the crane
+    if inst:
+        mods = dict(mods)
+        mods[inst] = 1
+        new_key = None
     body = dict(body or {})
     if body_new:
         body[body_new[0]] = body_new[1]
@@ -618,21 +645,34 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
             callout(sc, pt, (ex, by + BH // 2), col=RED_, lane=lane)
             sc.glow(pt[0], pt[1], 8, RED_, 0.5)
         else:
-            part_box(sc, bx, by, key, lab, lv, state="hover" if key and key == hover else "normal", w=bw, h=BH)
+            part_box(sc, bx, by, key, lab, lv, state="hover" if key and (key == hover or key == a_.get("flash")) else "normal",
+                     w=bw, h=BH)
             callout(sc, pt, (ex, by + BH // 2), col=hexc("#ffe0a0") if key and key == hover else BLUE,
                     dash=st == "free", lane=lane)
             if key and key == hover:
                 hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
+    sway, pulse, drop = a_.get("sway", 0), a_.get("pulse", 1.0), a_.get("drop")
     if hot and crane and (new_key or body_new):                       # the crane: the part over its mount
         pt = hot[0]
         hx = min(int(pt[0]), x1 - 10 - rw - 30)                       # never over the boxes of the right column
+        y_rest = y0 + (30 if body_new else 38)
+        y_hook = y_rest
+        if drop is not None:                                          # lowering it onto the mount
+            y_low = int(pt[1]) - 56
+            y_hook = int(y_rest + (y_low - y_rest) * drop * drop)
         if body_new:
-            bottom = crane_hook(sc, hx, y0 + 8, y0 + 30, None, part=body_new)
+            bottom = crane_hook(sc, hx, y0 + 8, y_hook, None, part=body_new, sway=sway)
         else:
-            bottom = crane_hook(sc, hx, y0 + 8, y0 + 38, new_key)
-        sc.glow(pt[0], pt[1], 10, HOTC, 0.6)
+            bottom = crane_hook(sc, hx, y0 + 8, y_hook, new_key, sway=sway)
+        sc.glow(pt[0], pt[1], 10, HOTC, 0.6 * pulse)
         for k in range(bottom + 4, int(pt[1]) - 8, 4):
             sc.rgb[k:k + 2, hx] = HOTC
+    if inst:                                                          # the hook going back up, empty
+        p_ = at(M.get(inst, [0, -60]))
+        hx = min(int(p_[0]), x1 - 10 - rw - 30)
+        up = a_.get("retract", 1.0)
+        y_low, y_rest = int(p_[1]) - 56, y0 + 38
+        crane_hook(sc, hx, y0 + 8, int(y_low + (y_rest - y_low) * (1 - (1 - up) ** 2)), None, sway=sway, carry=False)
     return hot
 
 
@@ -641,11 +681,15 @@ RACK = {   # the parts rack: spare parts lying on it, by slot kind
 }
 
 
-def panel_tabs(sc, cur, broken=1):
-    """The right panel's tabs: what the battle brought, the parts rack, the repairs."""
+def panel_tabs(sc, cur, broken=1, anim=None):
+    """The right panel's tabs: what the battle brought, the parts rack, the repairs. anim: press (which tab is
+    held down), flash (a glint across the open one, 0..1), pulse (the repair badge's throb)."""
+    a_ = anim or {}
     for j, (key, text) in enumerate((("loot", "ДОБЫЧА"), ("rack", "СТОЙКА"), ("repair", "РЕМОНТ"))):
         x0 = 714 + j * 78
-        FU.tab(sc, x0, 58, x0 + 74, 84, text, active=key == cur, badge=broken if key == "repair" and broken else None)
+        FU.tab(sc, x0, 58, x0 + 74, 84, text, active=key == cur, badge=broken if key == "repair" and broken else None,
+               dy=1 if a_.get("press") == key else 0, flash=a_.get("flash") if key == cur else None,
+               pulse=a_.get("pulse", 0.0))
     sc.rgb[84, 710:946] = hexc("#8a6a34")
 
 
@@ -728,15 +772,17 @@ def repair_panel(sc):
     H.fx_line(sc, 720, 428, "{металл:14} → {металл:12}")
 
 
-def workshop(variant=None, frame="Орудие", new_key="long", name=None, panel="loot", body_new=None):
+def workshop(variant=None, frame="Орудие", new_key="long", name=None, panel="loot", body_new=None, anim=None,
+             ret=False):
     """The slipway: the golem on the workbench before its drawing, its body on the left, what is inside on the right;
     the chosen part hangs from the crane over the mount it takes. On the left the army on its rack; on the right the
     panel with its tabs: what the battle brought (one of three), the parts rack (a body slot chosen — what can go in
     it), the repairs (a broken golem chosen — what broke and what it costs)."""
     import frames as F
+    a_ = anim or {}
     sc = screen(11)
     FU.wing(sc, 0, 0, WW, 44)
-    title_center(sc, "МАСТЕРСКАЯ")
+    title_center(sc, "МАСТЕРСКАЯ", glint=a_.get("glint"))
     metal(sc, 14, x=18)
     toolbar(sc)
     rack(sc, 10, 52, 168, sel=frame)
@@ -753,7 +799,7 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
         FU.steam(sc, 430, 150, 14, seed=4)
     else:
         hot = slipway(sc, frame, mods, core, ncell, (186, 62, 690, 408), new_key=new_key, variant=variant,
-                      role=role, broken=state == "broken", body=body)
+                      role=role, broken=state == "broken", body=body, anim=a_)
     # under the drawing: the frame's own and its cells
     passive = {"Страж": "Заслон: {радиус:1} → {цель:1}", "Мудрец": "Питание: {свой} {радиус:1} → {через:−1}",
                "Горн": "Жар горна: {каждые:1} → {огонь} {радиус:1}", "Орудие": "Наводка: {дальность} → {урон} без потерь",
@@ -778,8 +824,10 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
     action(sc, 178, 478, 356, 526, "Починить · 2", "hot", heated=panel == "repair")
     action(sc, 360, 478, 522, 526, "Переплавка", "rust")
     action(sc, 526, 478, 704, 526, "Пропуск · +4", "steel")
-    action(sc, 710, 472, 948, 532, "В БОЙ", "hot", big=True)
-    FU.sparks(sc, 186, 400, 10, seed=5)
+    action(sc, 710, 472, 948, 532, "В БОЙ", "hot", big=True, anim={"glow": a_["plate"]} if "plate" in a_ else None)
+    FU.sparks(sc, 186, 400, 10, seed=5 + a_.get("seed", 0))
+    if ret:
+        return sc
     if panel == "repair":
         H.cursor(sc, 201, 506)
     elif variant is None and hot:
@@ -1176,15 +1224,22 @@ PICK = [   # (name, epithet, sprite, scale on the card, the army it starts with,
 ]
 
 
+_LEADERS = {}
+
+
 def leader_sprite(kind, k, pose="idle"):
     import golems_h as GH
     import leaders_h as LH
-    if kind == "colossus":
-        return GH.colossus_build(pose, k)
-    return GH.build({"inventor": LH.INVENTOR, "maniac": GH.MANIAC, "zodchiy": LH.ZODCHIY}[kind], pose, k)
+    key = (kind, round(k, 4), pose)
+    if key not in _LEADERS:
+        if kind == "colossus":
+            _LEADERS[key] = GH.colossus_build(pose, k)
+        else:
+            _LEADERS[key] = GH.build({"inventor": LH.INVENTOR, "maniac": GH.MANIAC, "zodchiy": LH.ZODCHIY}[kind], pose, k)
+    return _LEADERS[key]
 
 
-def leaders_pick():
+def leaders_pick(anim=None, ret=False):
     """Four leaders, each behind a furnace door: the chosen one's door is open and hot. Under each: the golems it
     starts with, and its own rule; the rest behind «Полное описание»."""
     import frames as F
@@ -1202,21 +1257,29 @@ def leaders_pick():
         ax, ay, ar = (x0 + x1) / 2, 200, 86
         arch = ((((X - ax) / ar) ** 2 + ((Y - ay) / ar) ** 2 <= 1) & (Y <= ay)) | ((np.abs(X - ax) <= ar) & (Y > ay) & (Y < 300))
         t = np.clip((Y - 114) / 186, 0, 1)
-        if sel:
-            fire = hexc("#3a1606")[None, None, :] * (1 - t[..., None]) + hexc("#ff7a1a")[None, None, :] * t[..., None]
+        if sel:                                                       # the furnace's depth, dark; the fire lights it
+            fire = hexc("#1e0a06")[None, None, :] * (1 - t[..., None]) + hexc("#7a2410")[None, None, :] * t[..., None]
         else:
             fire = hexc("#141216")[None, None, :] * (1 - t[..., None]) + hexc("#4a2010")[None, None, :] * t[..., None]
         sc.rgb[arch] = fire[arch]
         rim = arch & ~((((X - ax) / (ar - 3)) ** 2 + ((Y - ay) / (ar - 3)) ** 2 <= 1) & (Y <= ay) | ((np.abs(X - ax) <= ar - 3) & (Y > ay) & (Y < 300)))
         sc.rgb[rim] = hexc("#b8904a") if sel else hexc("#4a4850")
+        if sel:                                                       # the furnace burning: pixelfx's fire, in the arch
+            import pxfx
+            frames, meta = pxfx.load("forge-fire")
+            before = sc.rgb.copy()
+            inside = arch & ~rim
+            pxfx.blend(sc, frames[(anim or {}).get("frame", 0) % len(frames)], ax, 300, meta["pivot"])
+            sc.rgb[~inside] = before[~inside]
         for kk in range(-4, 5):                                       # the voussoirs: rivets round the arch
             a_ = np.pi * (0.5 + kk / 10)
             FU.rivet(sc, ax - np.cos(a_) * (ar + 4), ay - np.sin(a_) * (ar + 4))
         spr = leader_sprite(kind, k)
         sc.blit(spr, int(ax - spr.ox), int(296 - spr.oy))
         if sel:
-            FU.sparks(sc, ax - 60, 296, 10, seed=3)
-            FU.sparks(sc, ax + 64, 290, 8, seed=4)
+            fs = (anim or {}).get("frame", 0) // 3
+            FU.sparks(sc, ax - 60, 296, 10, seed=3 + fs)
+            FU.sparks(sc, ax + 64, 290, 8, seed=4 + fs)
         # the brass nameplate
         FU.cell(sc, x0 + 10, 62, x1 - 10, 104, "hi" if sel else "normal")
         letters(sc, nm.upper(), ax, 68, "title", 16, col=(255, 210, 140) if sel else INK, align="center")
@@ -1224,7 +1287,10 @@ def leaders_pick():
         # what it starts with: its golems small, and its rule
         gx = ax - (len(army) - 1) * 28
         for j, fr in enumerate(army):
-            g = F.build(fr, "idle", k=F.FRAMES[fr][0] * 0.58)
+            ck = ("army", fr)
+            if ck not in _LEADERS:
+                _LEADERS[ck] = F.build(fr, "idle", k=F.FRAMES[fr][0] * 0.58)
+            g = _LEADERS[ck]
             sc.blit(g, int(gx + j * 56 - g.ox), int(380 - g.oy))
         wl, _ = H.fx_line(sc, 0, 0, rule, draw=False)
         H.fx_line(sc, int(ax - wl / 2), 396, rule)
@@ -1233,6 +1299,8 @@ def leaders_pick():
     action(sc, 12, 474, 300, 526, "Назад", "steel")
     action(sc, 326, 474, 634, 526, "Полное описание", "steel")
     action(sc, 660, 470, 948, 530, "В ПОХОД", "hot", big=True)
+    if ret:
+        return sc
     img = sc.image(S)
     img.save(out("foundry_leader_pick.png"))
     print("foundry_leader_pick.png", img.size)
