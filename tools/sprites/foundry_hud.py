@@ -133,6 +133,10 @@ def title_center(sc, text, tool="wrench", glint=None, turn=0.0):
             for m_, gx in ((ml, x - 14 - glint * L), (mr, x + tw + 14 + glint * L)):
                 band = m_ & (np.abs(sc.xx - gx + (sc.yy - 21) * 0.6) < 1.6)
                 sc.rgb[band] = sc.rgb[band] * 0.3 + np.array((255.0, 250.0, 236.0)) * 0.7
+    elif tool == "lantern":                                            # the camp: lanterns hung either side
+        for side, base_x in ((-1, x - 30), (1, x + tw + 30)):
+            FU.lantern(sc, base_x, 0, 24, size=1.15, lit=1.0 if glint is None else glint)
+            FU.lantern(sc, base_x + side * 64, 0, 20, size=0.85, lit=0.85 if glint is None else glint * 0.9)
     elif tool == "hammer":
         L = min(L, 112)
         FU.hammer(sc, x - 12 - L, x - 12, 21, flip=False, seed=1)
@@ -1040,6 +1044,136 @@ def new_golem():
         assembly(st)
 
 
+# ---------------------------------------------------------------- the camp: the whole army taken apart and put together again
+CAMP_FIND = [   # (key or (slot, part), kind, state, name, for whom, lines)
+    (("arm_n", "flail"), "редкая рука", "rare", "Кистень", "рука · любой", PART_FX["flail"]),
+    ("fire", "ядро", "hi", "Огненное ядро", "любой", MOD_FX["fire"]),
+    ("rest", "отдых", "normal", "Отдых у горна", "вся армия", ["{ремонт} всех · {металл:0}"]),
+]
+
+
+def camp(drag=0.55, ret=False):
+    """Привал у горна: the army on its stands in a row, each golem with its body parts, its module cells and its
+    core under it — here anything comes off and goes on anywhere, free; a core is being carried from the Sage to the
+    Gun (the Gun's core socket glows to take it, the others dim); the bench with what lies spare; one of three things
+    found at the camp."""
+    import golem_parts as GP
+    sc = screen(37)
+    FU.wing(sc, 0, 0, WW, 44)
+    title_center(sc, "ПРИВАЛ", "lantern")
+    metal(sc, 14, x=18)
+    toolbar(sc)
+    # the army on its stands
+    FU.plate(sc, 12, 52, 948, 300, seed=51)
+    heading(sc, "АРМИЯ", 26, 64)
+    letters(sc, "всё снимается и ставится — бесплатно", 934, 70, "text", 16, col=MUTED, align="right")
+    targets = {}
+    for i, (fr, ncell, mods, core, state) in enumerate(ARMY):
+        cx = 128 + i * 232
+        body = dict(GP.STOCK[fr], **BODY.get(fr, {}))
+        FU.cell(sc, cx - 108, 90, cx + 108, 292, "broken" if state == "broken" else "normal")
+        sc.rgb[202:208, cx - 60:cx + 60] = hexc("#24222a")                       # its stand
+        sc.rgb[202, cx - 60:cx + 60] = hexc("#5a5860")
+        g = golem_sprite(fr, mods, {"Страж": 0.9, "Механик": 1.45}.get(fr, 1.15), body=BODY.get(fr))
+        if state == "broken":
+            from swarm_effects import lit
+            g = lit(g, (70, 70, 80), 0.45)
+        sc.blit(g, int(cx - g.ox), int(203 - g.oy))
+        letters(sc, fr, cx - 100, 96, "text", 16, col=RED if state == "broken" else INK)
+        # its body parts, its modules, its core — each in its own socket
+        for j, (slot, _) in enumerate(SLOTS):
+            sx = cx - 100 + j * 26
+            FU.socket(sc, sx, 212, sx + 22, 234)
+            part_icon(sc, slot, body[slot], sx + 3, 215, hull=fr)
+        for j in range(ncell):
+            sx = cx - 100 + j * 26
+            ks = list(mods)
+            st = "hi" if j < len(ks) else "locked"
+            FU.cell(sc, sx, 240, sx + 22, 262, st)
+            if j < len(ks):
+                mod_icon(sc, ks[j], sx + 3, 243)
+        # the core's socket
+        px, py = cx + 82, 252
+        targets[fr] = (px, py)
+        d = np.hypot(sc.xx - px, sc.yy - py)
+        sc.rgb[d <= 11] = SU.OUTL
+        sc.rgb[(d <= 10) & (d > 8)] = hexc("#4a4850")
+        sc.rgb[d <= 8] = hexc("#0c0b0e")
+        if fr != "Мудрец" or drag is None:
+            FU.core_port(sc, px, py, core, r=7)
+        letters(sc, "ядро", px, 266, "text", 16, col=MUTED, align="center")
+    # carrying the Sage's storm core to the Gun: where it can go glows, where it can't is dimmed
+    if drag is not None:
+        (sx, sy), (tx, ty) = targets["Мудрец"], targets["Орудие"]
+        hx, hy = sx + (tx - sx) * drag, sy + (ty - sy) * drag - 34 * np.sin(np.pi * drag)
+        for fr, (px, py) in targets.items():
+            if fr == "Орудие":
+                ring = np.abs(np.hypot(sc.xx - px, sc.yy - py) - 13) <= 1.3
+                sc.rgb[ring] = hexc("#8ad8ff")
+                sc.glow(px, py, 18, hexc("#8ad8ff"), 0.5)
+            elif fr != "Мудрец":
+                d = np.hypot(sc.xx - px, sc.yy - py) <= 11
+                sc.rgb[d] = sc.rgb[d] * 0.45
+        for k in range(40):                                                    # its path, dotted
+            t_ = k / 40 * drag
+            qx, qy = sx + (tx - sx) * t_, sy + (ty - sy) * t_ - 60 * np.sin(np.pi * t_)
+            if k % 2 == 0:
+                sc.rgb[int(qy):int(qy) + 2, int(qx):int(qx) + 2] = hexc("#8ad8ff")
+        hy = sy + (ty - sy) * drag - 60 * np.sin(np.pi * drag)
+        ring = np.abs(np.hypot(sc.xx - sx, sc.yy - sy) - 9) <= 0.8              # where it was taken from
+        sc.rgb[ring & ((sc.xx + sc.yy) % 3 == 0)] = hexc("#8ad8ff")
+        sc.glow(hx, hy, 26, hexc("#8ad8ff"), 0.55)
+        FU.core_port(sc, int(hx), int(hy), "volt", r=11)
+        H.cursor(sc, int(hx + 4), int(hy + 4))
+    # the bench: what lies spare
+    FU.plate(sc, 12, 306, 470, 462, seed=52)
+    heading(sc, "ВЕРСТАК", 26, 318)
+    sc.rgb[352:446, 22:460] = hexc("#3a2614")                                     # the bench top, planks
+    for yy in range(352, 446, 12):
+        sc.rgb[yy, 22:460] = hexc("#24160a")
+        sc.rgb[yy + 1, 22:460] = hexc("#5a3e22")
+    o_, _, _ = SU.edges((sc.xx >= 22) & (sc.xx < 460) & (sc.yy >= 352) & (sc.yy < 446))
+    sc.rgb[o_] = SU.OUTL
+    spare = [("arm", "shield"), ("arm", "tongs"), ("head", "lamp"), ("legs", "spider"), ("mod", "canister")]
+    for j, (kind, k_) in enumerate(spare):
+        bx = 36 + j * 84
+        FU.cell(sc, bx, 362, bx + 70, 436, "normal")
+        if kind == "mod":
+            mod_icon(sc, k_, bx + 19, 372, 2)
+            nm = MOD_NAME[k_]
+        else:
+            slot = {"arm": "arm_n", "head": "head", "legs": "legs"}[kind]
+            part_icon(sc, slot, k_, bx + 19, 372, 32)
+            nm = part_name(slot, k_)
+        letters(sc, nm.split()[0] if len(nm) > 9 else nm, bx + 35, 412, "text", 16, col=INK, align="center")
+    # found at the camp: one of three
+    FU.plate(sc, 478, 306, 948, 462, seed=53)
+    heading(sc, "ЧТО НАШЛОСЬ", 492, 318)
+    H.fx_line(sc, 934 - 92, 320, "{выбор:1 из 3}", dim=True)
+    for j, (key, kind, st, nm, who, lines) in enumerate(CAMP_FIND):
+        x0 = 488 + j * 152
+        FU.cell(sc, x0, 344, x0 + 146, 456, "hi" if j == 1 else st)
+        if isinstance(key, tuple):
+            part_icon(sc, key[0], key[1], x0 + 8, 352, 32)
+        elif key == "rest":
+            H.glyph(sc, "ремонт", x0 + 12, 358, 3)
+        else:
+            FU.core_port(sc, x0 + 24, 368, key, r=12)
+        letters(sc, kind, x0 + 50, 352, "text", 16, col={"rare": (190, 150, 240), "hi": BRASS, "normal": MUTED}[st])
+        letters(sc, nm, x0 + 8, 392, "text", 16, col=GOLD if j == 1 else INK)
+        letters(sc, who, x0 + 8, 410, "text", 16, col=PALE)
+        H.fx_rows(sc, x0 + 8, 430, 132, lines)
+    FU.sill(sc, 468)
+    action(sc, 12, 478, 200, 526, "Как было", "steel")
+    action(sc, 210, 478, 420, 526, "Разобрать всё", "steel")
+    action(sc, 680, 472, 948, 532, "В ПУТЬ", "hot", big=True)
+    if ret:
+        return sc
+    img = sc.image(S)
+    img.save(out("foundry_camp.png"))
+    print("foundry_camp.png", img.size)
+
+
 # ---------------------------------------------------------------- melting down
 def molten(spr, k=1.0):
     """A sprite gone red-hot: its shading mapped onto the melt's ramp."""
@@ -1505,7 +1639,7 @@ def battle():
     print("foundry_battle.png", img.size)
 
 
-SCREENS = {"workshop": workshop, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
+SCREENS = {"workshop": workshop, "camp": camp, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"

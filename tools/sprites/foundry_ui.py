@@ -819,6 +819,40 @@ def gears(sc, x0, x1, yc, flip=False, seed=0, turn=0.0):
     gear(sc, xs[0], yc, 16, teeth=12, phase=0.1 + seed + d * turn)
 
 
+def lantern(sc, x, y_hang, y, size=1.0, lit=1.0, seed=0):
+    """An oil lantern hanging on a chain from the beam: a ring and a cap, an iron cage of four bars round amber glass,
+    the flame inside, a base; its light on the iron round it. lit — how bright the flame is (it flickers)."""
+    X, Y = sc.xx.astype(float), sc.yy.astype(float)
+    k = size
+    for yy in range(int(y_hang), int(y - 14 * k), 4):                       # the chain
+        sc.rgb[yy:yy + 3, int(x) - 1] = OUTL
+        sc.rgb[yy:yy + 3, int(x) + 1] = OUTL
+        sc.rgb[yy + 1, int(x)] = hexc("#8a8890")
+    ring = np.abs(np.hypot(X - x, Y - (y - 13 * k)) - 2.2 * k) <= 0.9
+    cap = (Y >= y - 11 * k) & (Y < y - 6 * k) & (np.abs(X - x) <= 3 * k + (Y - (y - 11 * k)) * 0.9)
+    glass = (Y >= y - 6 * k) & (Y < y + 6 * k) & (np.abs(X - x) <= 6.2 * k)
+    base = (Y >= y + 6 * k) & (Y < y + 9 * k) & (np.abs(X - x) <= 7.5 * k - (Y - (y + 6 * k)) * 0.8)
+    iron = ring | cap | base
+    pal = _bands(sc, iron, IRON, 0.62 - (X - x) / (14 * k) - (Y - y) / (40 * k))
+    # the glass, amber, brighter in the middle where the flame is
+    g = np.clip(1 - np.hypot((X - x) / (6.2 * k), (Y - y) / (6.5 * k)), 0, 1) * lit
+    amber = np.array([hexc(c) for c in ("#3a1a08", "#7a3a10", "#c8701a", "#f0a838", "#ffe08a")])
+    idx = np.clip(np.floor(g * 4.2 + 0.4), 0, 4).astype(int)
+    sc.rgb[glass] = amber[idx][glass]
+    fl = (np.abs(X - x) <= 1.6 * k * (1 - (y + 2 * k - Y) / (7 * k))) & (Y >= y - 5 * k) & (Y < y + 2 * k)
+    sc.rgb[fl] = hexc("#fff4c0")
+    bars = glass & ((np.abs(X - (x - 6.2 * k)) < 1.0) | (np.abs(X - (x + 6.2 * k)) < 1.0) | (np.abs(X - x) < 0.6)
+                    | (np.abs(Y - (y - 6 * k)) < 1.0) | (np.abs(Y - (y + 5.5 * k)) < 1.0))
+    sc.rgb[bars] = hexc(IRON[1])
+    sc.rgb[bars & (X < x - 5 * k)] = hexc(IRON[3])
+    m = iron | glass
+    o, _, _ = edges(m)
+    sc.rgb[o] = OUTL
+    sc.glow(x, y, 26 * k, hexc("#ffb050"), 0.32 * lit)
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
 def core_port(sc, cx, cy, kind, r=6):
     """The golem's core as a small porthole: an iron ring, the core's own colour inside — cast iron grey, fire
     orange, the storm's blue — glowing a little."""
