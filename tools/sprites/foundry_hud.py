@@ -2285,6 +2285,139 @@ def development(kind="colossus", hot="cell", ret=False):
     print("foundry_development.png", img.size)
 
 
+# ---------------------------------------------------------------- defeat: the forge gone cold
+def cold(sc, m, k=0.55):
+    """The colour drained out to cold grey-blue where the heat has gone."""
+    g = sc.rgb[m].mean(axis=1, keepdims=True)
+    sc.rgb[m] = sc.rgb[m] * (1 - k) + (g * np.array((0.86, 0.92, 1.06))) * k
+
+
+def defeat(ret=False):
+    """Defeat, and the run summed up. The forge has gone cold: the title in grey without its heat, the spanners
+    by it dark and cracked, ash drifting down. Left, the furnace out — a last few embers — and the army a heap of
+    scrap before it. In the middle what the run came to, and how little was missing: the enemy leader's health
+    that was left. Right, what the run opened, and what is next to open."""
+    import frames as F
+    from swarm_effects import lit
+    sc = screen(97)
+    FU.wing(sc, 0, 0, WW, 44)
+    tw = SU.text_width("ПОРАЖЕНИЕ", "title", 24)
+    x = WW // 2 - tw // 2
+    letters(sc, "ПОРАЖЕНИЕ", x, 6, "title", 24, col=(176, 178, 186), col2=(56, 58, 68))
+    L = 140
+    ml = FU.wrench(sc, x - 14 - L, x - 14, 21, flip=False, size="24", seed=1)
+    mr = FU.wrench(sc, x + tw + 14, x + tw + 14 + L, 21, flip=True, size="19", seed=2)
+    for m_, cx in ((ml, x - 14 - L // 2), (mr, x + tw + 14 + L // 2)):
+        sc.rgb[m_] *= 0.42                                                  # gone dark
+        for k in range(9):                                                  # and cracked across
+            yy, xx = 15 + k, int(cx + (k % 3) - 1)
+            if m_[yy, xx]:
+                sc.rgb[yy, xx] = SU.OUTL
+    cold(sc, (sc.yy < 44), 0.6)
+    toolbar(sc)
+    # left: the furnace out, the army a heap of scrap before it
+    FU.plate(sc, 12, 52, 330, 462, seed=98)
+    heading(sc, "ЧТО ОСТАЛОСЬ", 26, 62)
+    X, Y = sc.xx, sc.yy
+    ax, ay, ar = 171, 150, 74
+    arch = ((((X - ax) / ar) ** 2 + ((Y - ay) / ar) ** 2 <= 1) & (Y <= ay)) | ((np.abs(X - ax) <= ar) & (Y > ay) & (Y < 260))
+    sc.rgb[arch] = hexc("#0e0d10")
+    rim = arch & ~(np.roll(arch, 4, 0) & np.roll(arch, -4, 0) & np.roll(arch, 4, 1) & np.roll(arch, -4, 1))
+    sc.rgb[rim] = hexc("#3a3842")
+    for kk in range(-4, 5):                                                 # the voussoirs' rivets, cold
+        a_ = np.pi * (0.5 + kk / 10)
+        FU.rivet(sc, ax - np.cos(a_) * (ar + 5), ay - np.sin(a_) * (ar + 5))
+    ash = arch & (Y >= 238) & (np.abs(X - ax) <= 60 - (Y - 238) * 0.0) & (Y >= 238 + np.abs(X - ax) * 0.18)
+    sc.rgb[ash] = hexc("#4a4850")                                           # a bank of ash in the grate
+    sc.rgb[ash & ((X + Y) % 5 == 0)] = hexc("#6a6870")
+    rnd = np.random.RandomState(4)
+    for _ in range(9):                                                      # the last embers in it
+        ex, ey = int(ax + rnd.uniform(-44, 44)), int(rnd.uniform(244, 256))
+        sc.glow(ex, ey, 6, hexc("#c2500e"), 0.25)
+        sc.rgb[ey, ex] = hexc("#7a2208") if rnd.rand() < 0.6 else hexc("#e86a1a")
+    for k in range(5):                                                      # a thread of smoke from it, thinning
+        sx_, sy_ = int(ax + np.sin(k * 1.3) * 6), 120 - k * 9
+        sc.rgb[sy_:sy_ + 4, sx_:sx_ + 2] = sc.rgb[sy_:sy_ + 4, sx_:sx_ + 2] * 0.6 + hexc("#5e5c66") * 0.4
+    for (fr, dx, dy, kk) in (("Страж", -78, 0, 0.92), ("Мудрец", 70, -4, 0.85), ("Орудие", -10, 18, 0.88),
+                             ("Механик", 104, 22, 0.9)):
+        g = lit(F.build(fr, "broken", k=F.FRAMES[fr][0] * kk), (60, 64, 76), 0.5)
+        sc.blit(g, int(ax + dx - g.ox), int(378 + dy - g.oy))
+    sc.rgb[404:410, 24:318] = hexc("#24222a")
+    cold(sc, (X >= 20) & (X < 322) & (Y >= 84) & (Y < 410), 0.55)
+    rnd2 = np.random.RandomState(4)
+    for _ in range(9):                                                      # the embers keep their last red
+        ex, ey = int(ax + rnd2.uniform(-44, 44)), int(rnd2.uniform(244, 256))
+        sc.glow(ex, ey, 5, hexc("#c2500e"), 0.3)
+        sc.rgb[ey, ex] = hexc("#a8320e") if rnd2.rand() < 0.6 else hexc("#ff8a2a")
+    H.fx_line(sc, 26, 420, "{гибель} лидер · бой 8 из 15")
+    letters(sc, "армия ушла в лом", 26, 440, "text", 16, col=MUTED)
+    # the middle: what the run came to
+    FU.plate(sc, 340, 52, 626, 462, seed=99)
+    heading(sc, "ИТОГ ПОХОДА", 354, 62)
+    rows = (("бой", "дошёл до боя", "8 из 15"), ("лидер", "боссов побеждено", "1"),
+            ("убийство", "врагов убито", "412"), ("металл", "металла добыто", "86"),
+            ("модуль", "модулей поставлено", "11"))
+    y = 96
+    for g, lab, val in rows:
+        a_ = H.glyph(sc, g if g != "бой" else "атака", 354, y - 4, 2)
+        letters(sc, lab, 354 + a_ + 8, y - 2, "text", 16, col=MUTED)
+        w = SU.text_width(val, "text", 16)
+        for xx in range(354 + a_ + 14 + SU.text_width(lab, "text", 16), 610 - w - 6, 4):
+            sc.rgb[y + 10, xx] = sc.rgb[y + 10, xx] * 0.4 + np.array(MUTED) * 0.6
+        letters(sc, val, 610, y - 2, "text", 16, col=INK, align="right")
+        y += 24
+    FU.cell(sc, 350, y + 4, 616, y + 70, "hi")                              # the best golem
+    gs = golem_sprite("Орудие", {"mortar": 1, "canister": 1}, 0.62, body=BODY.get("Орудие"))
+    sc.blit(gs, int(386 - gs.ox), int(y + 66 - gs.oy))
+    letters(sc, "лучший — Орудие", 420, y + 12, "text", 16, col=GOLD)
+    H.fx_line(sc, 420, y + 36, "{убийство:64} · Мортира II")
+    y += 84
+    heading(sc, "НЕ ХВАТИЛО", 354, y)
+    y += 28
+    H.glyph(sc, "лидер", 354, y - 2, 2)
+    letters(sc, "Матка", 380, y, "text", 16, col=(240, 140, 120))
+    SU.meter(sc, 440, y + 4, 610, 7, 10, 2, "#c04a3a")
+    letters(sc, "у неё оставалось 18 здоровья —", 354, y + 26, "text", 16, col=INK)
+    letters(sc, "один залп Мортиры", 354, y + 44, "text", 16, col=INK)
+    # the right: what the run opened, and what is next
+    FU.plate(sc, 634, 52, 948, 462, seed=100)
+    heading(sc, "ОТКРЫТО", 648, 62)
+    for j, (key, nm, sub) in enumerate((("nozzles", "Сопла", "редкий модуль · в мастерской"),
+                                        ("dome", "Щит-купол", "редкий модуль · в мастерской"))):
+        y0 = 90 + j * 66
+        FU.cell(sc, 642, y0, 940, y0 + 58, "new")
+        FU.cell(sc, 650, y0 + 8, 692, y0 + 50, "locked")
+        mod_icon(sc, key, 655, y0 + 13, 2)
+        letters(sc, nm, 704, y0 + 10, "text", 16, col=GOLD)
+        letters(sc, sub, 704, y0 + 30, "text", 16, col=MUTED)
+    heading(sc, "ДАЛЬШЕ ОТКРОЕТСЯ", 648, 236)
+    for j, (nm, cond, have, need) in enumerate((("Маньяк", "победить 2-го босса", 1, 2),
+                                                ("Зодчий", "дойти до 12-го боя", 8, 12),
+                                                ("Сложность II", "пройти поход", 0, 1))):
+        y0 = 264 + j * 62
+        FU.cell(sc, 642, y0, 940, y0 + 54, "locked")
+        letters(sc, nm, 654, y0 + 6, "text", 16, col=INK)
+        letters(sc, f"{have} из {need}", 928, y0 + 6, "text", 16, col=MUTED, align="right")
+        letters(sc, cond, 654, y0 + 28, "text", 16, col=MUTED)
+        bx0, bx1 = 820, 928
+        sc.rgb[y0 + 34:y0 + 40, bx0:bx1] = hexc("#08070a")
+        fill = int(bx0 + (bx1 - bx0) * have / need)
+        if fill > bx0:
+            sc.rgb[y0 + 34:y0 + 40, bx0:fill] = hexc("#c2500e")
+            sc.rgb[y0 + 34, bx0:fill] = hexc("#ffb040")
+    for k in range(60):                                                     # ash drifting down over it all
+        ax_, ay_ = rnd.randint(0, WW), rnd.randint(44, 466)
+        sc.rgb[ay_, ax_] = sc.rgb[ay_, ax_] * 0.4 + hexc("#8e8c96") * 0.6
+    FU.sill(sc, 468)
+    action(sc, 12, 478, 220, 526, "В меню", "steel")
+    action(sc, 640, 472, 948, 532, "НОВЫЙ ПОХОД", "hot", big=True)
+    if ret:
+        return sc
+    img = sc.image(S)
+    img.save(out("foundry_defeat.png"))
+    print("foundry_defeat.png", img.size)
+
+
 def module_pop(sc, key, name, cx, top, k=1.0, rise=0.0, heat=1.0):
     """A module firing, over its golem: its icon in a red-hot box, rising, its name under it; k fades the lot in
     and out, heat cools the box's rim from red back to iron."""
@@ -2439,7 +2572,7 @@ SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack"
            "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True),
            "drag": lambda: workshop("drag"), "trophy": lambda: aftermath(variant="trophy"),
            "states": states, "settings": lambda: [settings(k) for k, _ in SETTINGS], "pause": pause,
-           "development": development}
+           "development": development, "defeat": defeat}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
