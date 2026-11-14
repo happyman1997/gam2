@@ -1470,7 +1470,7 @@ LEADER_FULL = {
 }
 
 
-def leader_card(kind="colossus", frame=0, ret=False):
+def leader_card(kind="colossus", frame=0, ret=False, alt=False):
     """A Foundry leader in full: the leader large in its open furnace (pixelfx's fire), its nameplate, its own cells
     with the modules it starts with; its passport — leadership, body, weapons, who comes with it; its abilities, each
     a line of glyphs with when it fires; how it grows."""
@@ -1480,7 +1480,7 @@ def leader_card(kind="colossus", frame=0, ret=False):
     sc = screen(39)
     FU.wing(sc, 0, 0, WW, 44)
     title_center(sc, L["name"], "hammer")
-    toolbar(sc)
+    toolbar(sc, alt=alt)
     # the furnace and the leader in it
     FU.plate(sc, 12, 52, 330, 462, seed=61)
     X, Y = sc.xx, sc.yy
@@ -1539,7 +1539,14 @@ def leader_card(kind="colossus", frame=0, ret=False):
         letters(sc, nm, x0, y, "text", 16, col=GOLD)
         w, _ = H.fx_line(sc, 0, 0, "{дальность:" + rng + "}", draw=False)
         H.fx_line(sc, x1 - w, y, "{дальность:" + rng + "}")
-        H.fx_line(sc, x0 + 12, y + 19, dmg + ("" if not extra else " · " + extra))
+        if alt:                                                        # Alt: the damage's kind said after its glyph
+            import fxg
+            dw, _ = H.fx_line(sc, x0 + 12, y + 19, dmg)
+            ww = letters(sc, fxg.words(dmg).split(" ")[-1], x0 + 18 + dw, y + 21, "text", 16, col=(200, 178, 118))
+            if extra:
+                letters(sc, "· " + extra, x0 + 26 + dw + ww, y + 21, "text", 16, col=INK)
+        else:
+            H.fx_line(sc, x0 + 12, y + 19, dmg + ("" if not extra else " · " + extra))
         y += 42
     heading(sc, "С НИМ", x0, y)
     y += 26
@@ -1557,24 +1564,33 @@ def leader_card(kind="colossus", frame=0, ret=False):
     rx0, rx1 = 646, WW - 26
     FU.plate(sc, 634, 52, 948, 462, seed=63)
     heading(sc, "СПОСОБНОСТИ", rx0, 62)
-    y = 90
+    y = 90 if not alt else 84
     for nm, when, line, col in L["abil"]:
-        FU.cell(sc, rx0 - 4, y, rx1 + 4, y + 47, "broken" if col == RED else ("hi" if col == GOLD else "normal"))
+        hh = 47
+        if alt:                                                        # Alt held: the line said in words under it
+            hh = H.alt_words(sc, rx0 + 6, y + 40, rx1 - rx0 - 8, line, draw=False) - y + 2 if "{" in line else 44
+        FU.cell(sc, rx0 - 4, y, rx1 + 4, y + hh, "broken" if col == RED else ("hi" if col == GOLD else "normal"))
         letters(sc, nm, rx0 + 6, y + 4, "text", 16, col=col)
         letters(sc, when, rx1 - 4, y + 4, "text", 16, col=MUTED, align="right")
-        H.fx_line(sc, rx0 + 6, y + 24, line)
-        y += 51
-    y += 2
-    letters(sc, "развитие " + L["grow"][0], rx0, y, "text", 16, col=MUTED)
-    letters(sc, L["grow"][1], rx0, y + 18, "text", 16, col=INK)
+        if alt and "{" in line:
+            H.fx_line(sc, rx0 + 6, y + 22, line)
+            H.alt_words(sc, rx0 + 6, y + 40, rx1 - rx0 - 8, line)
+        else:
+            H.fx_line(sc, rx0 + 6, y + (24 if hh == 47 else 22), line)
+        y += hh + 4
+    if not alt:
+        y += 2
+        letters(sc, "развитие " + L["grow"][0], rx0, y, "text", 16, col=MUTED)
+        letters(sc, L["grow"][1], rx0, y + 18, "text", 16, col=INK)
     FU.sill(sc, 468)
     action(sc, 12, 478, 220, 526, "Назад", "steel")
     action(sc, 640, 472, 948, 532, "ВЫБРАТЬ", "hot", big=True)
     if ret:
         return sc
+    name = "foundry_alt.png" if alt else "foundry_leader_card.png"
     img = sc.image(S)
-    img.save(out("foundry_leader_card.png"))
-    print("foundry_leader_card.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
 # ---------------------------------------------------------------- after the battle
@@ -1718,6 +1734,142 @@ def aftermath(anim=None, ret=False):
 
 
 # ---------------------------------------------------------------- the battle, seen from the Foundry
+# ---------------------------------------------------------------- «?»: the glossary, as the Foundry's own journal
+GLOSS = ["Когда", "Время", "Что делает", "Состояния", "Тело", "Мастерская", "Враги", "Урон"]   # no brood for golems
+
+
+def foundry_uses(key, limit=4, width=270):
+    """Where a term is met in the Foundry: its modules' lines, its parts', its leader's abilities —
+    (icon or None, whose, line)."""
+    import golem_parts as GP
+    src = [(("mod", k), IC.ICONS[k][1], rows) for k, rows in MOD_FX.items() if k in IC.ICONS]
+    names = {**{k: v[0] for k, v in GP.ARMS.items()}, **GP.LEGS, **{k: v[0] for k, v in GP.HEADS.items()}}
+    src += [(None, names.get(k, k), rows) for k, rows in PART_FX.items()]
+    for L in LEADER_FULL.values():
+        src += [(None, nm, [ln]) for nm, _, ln, _ in L["abil"]]
+    out_, seen = [], set()
+    for ic, who, rows in src:
+        for ln in rows:
+            if ("{" + key + "}" in ln or "{" + key + ":" in ln) and who not in seen:
+                w_, _ = H.fx_line(None, 0, 0, ln, draw=False)
+                if w_ <= width:
+                    out_.append((ic, who, ln))
+                    seen.add(who)
+                    break
+        if len(out_) >= limit:
+            break
+    return out_
+
+
+def glossary(chapter="Когда", term="атака"):
+    """«?» in the Foundry: the glyphs by chapter on iron plates; the chosen one large on a sheet of blueprint, its
+    meaning, and where the Foundry meets it — modules with their icons, parts, the leader's abilities."""
+    import fxg
+    sc = screen(91)
+    FU.wing(sc, 0, 0, WW, 44)
+    title_center(sc, "СПРАВОЧНИК", "wrench")
+    toolbar(sc, on=True)
+    groups = dict(fxg.GROUPS)
+    FU.plate(sc, 12, 52, 196, 462, seed=71)                            # the chapters
+    for i, ch in enumerate(GLOSS):
+        keys = groups[ch]
+        y0 = 60 + i * 49
+        on = ch == chapter
+        FU.cell(sc, 20, y0, 188, y0 + 43, "hi" if on else "normal")
+        a_ = fxg.rgba(keys[0])
+        fxg.draw(sc, keys[0], 30 + (22 - a_.shape[1] * 2) // 2, y0 + 22 - a_.shape[0], 2)
+        cw_ = letters(sc, ch, 60, y0 + 13, "text", 16, col=GOLD if on else INK)
+        letters(sc, str(len(keys)), 68 + cw_, y0 + 13, "text", 16, col=MUTED)
+    keys = groups[chapter]                                             # the chapter's glyphs, two columns
+    FU.plate(sc, 206, 52, 624, 462, seed=72)
+    heading(sc, chapter.upper(), 220, 62)
+    half = (len(keys) + 1) // 2
+    for j, k_ in enumerate(keys):
+        x0, y0 = 218 + (j // half) * 202, 92 + (j % half) * 36
+        if k_ == term:
+            FU.cell(sc, x0 - 6, y0 - 6, x0 + 196, y0 + 30, "hi")
+        a_ = fxg.rgba(k_)
+        H.glyph(sc, k_, x0 + (26 - a_.shape[1] * 2) // 2, y0 + 12 - a_.shape[0], 2)
+        letters(sc, fxg.TERMS[k_][0], x0 + 34, y0 + 4, "text", 16, col=GOLD if k_ == term else INK)
+    nm, what, _ = fxg.TERMS[term]                                      # the chosen one, on the drawing
+    FU.plate(sc, 634, 52, 948, 462, seed=73)
+    blueprint_sheet(sc, 644, 62, 938, 162, stamp=None)
+    a_ = fxg.rgba(term)
+    gx, gy = 680 - a_.shape[1] * 2, 112 - a_.shape[0] * 2
+    sc.rgb[gy - 8, gx:gx + a_.shape[1] * 4] = hexc("#9ad8ff")      # a dimension line over it, as on a drawing
+    sc.rgb[gy - 11:gy - 5, gx] = hexc("#9ad8ff")
+    sc.rgb[gy - 11:gy - 5, gx + a_.shape[1] * 4 - 1] = hexc("#9ad8ff")
+    fxg.draw(sc, term, gx, gy, 4)
+    letters(sc, nm.upper(), 724, 92, "title", 16, col=(170, 220, 250), col2=(40, 80, 120))
+    letters(sc, "лист " + str(GLOSS.index(chapter) + 1) + "." + str(keys.index(term) + 1), 724, 116, "text", 16,
+            col=(110, 160, 200), outline=False)
+    y = 174
+    for ln in H.wrap(what[:1].upper() + what[1:], 280):
+        SU.rich(sc, ln, 648, y, "text", 16, col=INK)
+        y += 18
+    y += 12
+    letters(sc, "встречается", 648, y, "text", 16, col=MUTED)
+    y += 22
+    for ic, who, ln in foundry_uses(term, 4, 280):
+        if ic:
+            mod_icon(sc, ic[1], 648, y - 1, 1)
+        letters(sc, who, 648 + (22 if ic else 0), y, "text", 16, col=GOLD)
+        H.fx_line(sc, 656, y + 20, ln)
+        y += 50
+    FU.sill(sc, 468)
+    action(sc, 12, 478, 240, 526, "Закрыть", "steel")
+    kw = H.keycap(sc, 420, 492, "Alt")
+    letters(sc, "— подписи под значками", 428 + kw, 493, "text", 16, col=MUTED)
+    img = sc.image(S)
+    img.save(out("foundry_glossary.png"))
+    print("foundry_glossary.png", img.size)
+
+
+def confirm(sc, title_, rows, yes, items=()):
+    """Asking first, only where something is gone for good (a module into the crucible, the leader's growth, the
+    finds left behind): the screen dims, an iron plate says what goes — its icons, lines of glyphs — and two
+    controls: the lever with the cast plate that does it (Enter), the push-button back (Esc)."""
+    sc.rgb[:] = sc.rgb * 0.38
+    w = 480
+    x0 = WW // 2 - w // 2
+    hh = H.fx_rows(sc, 0, 0, w - 48, rows, draw=False)
+    ih = 58 if items else 0
+    y0 = HH // 2 - (78 + ih + hh + 68) // 2 - 10
+    y1 = y0 + 78 + ih + hh + 68
+    FU.plate(sc, x0, y0, x0 + w, y1, seed=77)
+    FU.wing(sc, x0 + 4, y0 + 4, x0 + w - 4, y0 + 44)
+    tw = SU.text_width(title_, "title", 16)
+    letters(sc, title_, WW // 2 - tw // 2, y0 + 16, "title", 16, col=GOLD, col2=(130, 90, 40))
+    y = y0 + 60
+    for j, (key, lvl, st) in enumerate(items):                       # what goes in, an arrow, what it gives
+        ix = WW // 2 - len(items) * 40 + 19 + j * 80
+        if j:
+            letters(sc, "→", ix - 24, y + 12, "title", 16, col=(255, 170, 80), col2=(120, 40, 10), align="center")
+        FU.cell(sc, ix, y, ix + 42, y + 42, st)
+        mod_icon(sc, key, ix + 5, y + 5, 2)
+        if lvl:
+            letters(sc, lvl, ix + 21, y + 44, "title", 8, col=BRASS, outline=False, align="center")
+    y += ih
+    H.fx_rows(sc, x0 + 24, y + 6, w - 48, rows)
+    by = y1 - 66
+    action(sc, x0 + 16, by + 8, x0 + 170, by + 56, "Назад", "steel")
+    action(sc, x0 + 186, by + 2, x0 + w - 16, by + 62, yes, "hot", big=True)
+    return sc
+
+
+def confirm_smelt():
+    """The crucible's question: the Canister into the melt for the Long barrel's second level."""
+    sc = smelt(base_only=True)
+    H.HOVER.clear()
+    confirm(sc, "В ТИГЕЛЬ НАВСЕГДА?", ["{модуль} Картечь I → тигель · не вернуть",
+                                         "Длинный ствол {модуль:I} ⇒ {модуль:II}", "{металл:14} → {металл:11}"],
+            "ПЕРЕПЛАВИТЬ", items=(("canister", "I", "broken"), ("long", "I → II", "hi")))
+    H.cursor(sc, 640, 360)
+    img = sc.image(S)
+    img.save(out("foundry_confirm.png"))
+    print("foundry_confirm.png", img.size)
+
+
 def module_pop(sc, key, name, cx, top, k=1.0, rise=0.0, heat=1.0):
     """A module firing, over its golem: its icon in a red-hot box, rising, its name under it; k fades the lot in
     and out, heat cools the box's rim from red back to iron."""
@@ -1868,7 +2020,8 @@ def battle():
         battle_view(mode)
 
 
-SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
+SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle, "glossary": glossary,
+           "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True)}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
