@@ -1,0 +1,962 @@
+{
+ "name": "Литейщик",
+ "scale": "art px (960×540 screen); draw ×2 nearest",
+ "pieces": {
+  "plate": {
+   "file": "plate.png",
+   "size": [
+    128,
+    128
+   ],
+   "slice": [
+    23,
+    25,
+    15,
+    13
+   ],
+   "tile_x": [
+    23,
+    41
+   ],
+   "tile_y": [
+    25,
+    43
+   ],
+   "mode": "9-slice",
+   "period": 18,
+   "snap": "w = 38 + 18·n, h = 38 + 18·n (a rivet never cut in half)",
+   "shade": {
+    "top": 1.18,
+    "bottom": 0.82,
+    "note": "vertical multiply over the whole plate"
+   }
+  },
+  "cell_normal": {
+   "file": "cell_normal.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    16,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_hi_tab": {
+   "file": "cell_hi_tab.png",
+   "size": [
+    14,
+    17
+   ],
+   "anchor": "the cell's left edge at x = 4, its middle at y = 8 (the piece's pad included)"
+  },
+  "cell_hi": {
+   "file": "cell_hi.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    16,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_hover": {
+   "file": "cell_hover.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    16,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_new": {
+   "file": "cell_new.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    22,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_broken": {
+   "file": "cell_broken.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    16,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_rare": {
+   "file": "cell_rare.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    22,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_trophy": {
+   "file": "cell_trophy.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    22,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "cell_locked": {
+   "file": "cell_locked.png",
+   "size": [
+    104,
+    104
+   ],
+   "slice": [
+    16,
+    16,
+    24,
+    20
+   ],
+   "tile_x": [
+    48,
+    52
+   ],
+   "tile_y": [
+    64,
+    68
+   ],
+   "mode": "9-slice",
+   "pad": 4
+  },
+  "tag_steel": {
+   "file": "tag_steel.png",
+   "size": [
+    120,
+    26
+   ],
+   "slice": [
+    20,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    20,
+    24
+   ],
+   "tile_y": [
+    0,
+    26
+   ],
+   "mode": "3-slice",
+   "text": {
+    "x": 27,
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "tag_brass": {
+   "file": "tag_brass.png",
+   "size": [
+    120,
+    26
+   ],
+   "slice": [
+    20,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    20,
+    24
+   ],
+   "tile_y": [
+    0,
+    26
+   ],
+   "mode": "3-slice",
+   "text": {
+    "x": 27,
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "tag_rust": {
+   "file": "tag_rust.png",
+   "size": [
+    120,
+    26
+   ],
+   "slice": [
+    20,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    20,
+    24
+   ],
+   "tile_y": [
+    0,
+    26
+   ],
+   "mode": "3-slice",
+   "text": {
+    "x": 27,
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "tag_dull": {
+   "file": "tag_dull.png",
+   "size": [
+    120,
+    26
+   ],
+   "slice": [
+    20,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    20,
+    24
+   ],
+   "tile_y": [
+    0,
+    26
+   ],
+   "mode": "3-slice",
+   "text": {
+    "x": 27,
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "wing": {
+   "file": "wing.png",
+   "size": [
+    109,
+    44
+   ],
+   "slice": [
+    21,
+    0,
+    0,
+    0
+   ],
+   "tile_x": [
+    21,
+    43
+   ],
+   "tile_y": [
+    0,
+    44
+   ],
+   "mode": "3-slice",
+   "period": 22
+  },
+  "sill": {
+   "file": "sill.png",
+   "size": [
+    129,
+    72
+   ],
+   "slice": [
+    25,
+    0,
+    0,
+    0
+   ],
+   "tile_x": [
+    25,
+    51
+   ],
+   "tile_y": [
+    0,
+    72
+   ],
+   "mode": "3-slice",
+   "period": 26
+  },
+  "tab_open": {
+   "file": "tab_open.png",
+   "size": [
+    74,
+    26
+   ],
+   "slice": [
+    6,
+    0,
+    6,
+    0
+   ],
+   "tile_x": [
+    6,
+    10
+   ],
+   "tile_y": [
+    0,
+    26
+   ],
+   "mode": "3-slice",
+   "text": {
+    "align": "center",
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "tab_shut": {
+   "file": "tab_shut.png",
+   "size": [
+    74,
+    26
+   ],
+   "slice": [
+    6,
+    0,
+    6,
+    0
+   ],
+   "tile_x": [
+    6,
+    10
+   ],
+   "tile_y": [
+    0,
+    26
+   ],
+   "mode": "3-slice",
+   "text": {
+    "align": "center",
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "tab_badge": {
+   "file": "tab_badge.png",
+   "size": [
+    14,
+    12
+   ],
+   "anchor": "the tab's top right, x = w − 14"
+  },
+  "key": {
+   "file": "key.png",
+   "size": [
+    14,
+    20
+   ],
+   "slice": [
+    4,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    4,
+    10
+   ],
+   "tile_y": [
+    0,
+    20
+   ],
+   "mode": "3-slice",
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 8
+   }
+  },
+  "key_lit": {
+   "file": "key_lit.png",
+   "size": [
+    14,
+    20
+   ],
+   "slice": [
+    4,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    4,
+    10
+   ],
+   "tile_y": [
+    0,
+    20
+   ],
+   "mode": "3-slice",
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 8
+   }
+  },
+  "socket": {
+   "file": "socket.png",
+   "size": [
+    32,
+    24
+   ]
+  },
+  "nameplate_hot_160": {
+   "file": "nameplate_hot_160.png",
+   "size": [
+    160,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_lit_160": {
+   "file": "nameplate_hot_lit_160.png",
+   "size": [
+    160,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_black_160": {
+   "file": "nameplate_black_160.png",
+   "size": [
+    160,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_192": {
+   "file": "nameplate_hot_192.png",
+   "size": [
+    192,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_lit_192": {
+   "file": "nameplate_hot_lit_192.png",
+   "size": [
+    192,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_black_192": {
+   "file": "nameplate_black_192.png",
+   "size": [
+    192,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_224": {
+   "file": "nameplate_hot_224.png",
+   "size": [
+    224,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_lit_224": {
+   "file": "nameplate_hot_lit_224.png",
+   "size": [
+    224,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_black_224": {
+   "file": "nameplate_black_224.png",
+   "size": [
+    224,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_256": {
+   "file": "nameplate_hot_256.png",
+   "size": [
+    256,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_lit_256": {
+   "file": "nameplate_hot_lit_256.png",
+   "size": [
+    256,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_black_256": {
+   "file": "nameplate_black_256.png",
+   "size": [
+    256,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_288": {
+   "file": "nameplate_hot_288.png",
+   "size": [
+    288,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_hot_lit_288": {
+   "file": "nameplate_hot_lit_288.png",
+   "size": [
+    288,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "nameplate_black_288": {
+   "file": "nameplate_black_288.png",
+   "size": [
+    288,
+    42
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 16,
+    "y": 14
+   }
+  },
+  "button_steel_rest": {
+   "file": "button_steel_rest.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_steel_down": {
+   "file": "button_steel_down.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_brass_rest": {
+   "file": "button_brass_rest.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_brass_down": {
+   "file": "button_brass_down.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_rust_rest": {
+   "file": "button_rust_rest.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_rust_down": {
+   "file": "button_rust_down.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_dull_rest": {
+   "file": "button_dull_rest.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_dull_down": {
+   "file": "button_dull_down.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_hot_rest": {
+   "file": "button_hot_rest.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "button_hot_down": {
+   "file": "button_hot_down.png",
+   "size": [
+    40,
+    40
+   ],
+   "pivot": [
+    20,
+    20
+   ]
+  },
+  "valve_rest": {
+   "file": "valve_rest.png",
+   "size": [
+    44,
+    44
+   ],
+   "pivot": [
+    22,
+    22
+   ]
+  },
+  "valve_turning": {
+   "file": "valve_turning.png",
+   "size": [
+    44,
+    44
+   ],
+   "pivot": [
+    22,
+    22
+   ]
+  },
+  "lever_rest": {
+   "file": "lever_rest.png",
+   "size": [
+    48,
+    64
+   ],
+   "pivot": [
+    22,
+    58
+   ]
+  },
+  "lever_thrown": {
+   "file": "lever_thrown.png",
+   "size": [
+    48,
+    64
+   ],
+   "pivot": [
+    22,
+    58
+   ]
+  },
+  "cap_steel_rest": {
+   "file": "cap_steel_rest.png",
+   "size": [
+    30,
+    30
+   ],
+   "pivot": [
+    15,
+    15
+   ],
+   "text": {
+    "align": "center",
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "cap_steel_down": {
+   "file": "cap_steel_down.png",
+   "size": [
+    30,
+    30
+   ],
+   "pivot": [
+    15,
+    15
+   ],
+   "text": {
+    "align": "center",
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "cap_brass_rest": {
+   "file": "cap_brass_rest.png",
+   "size": [
+    30,
+    30
+   ],
+   "pivot": [
+    15,
+    15
+   ],
+   "text": {
+    "align": "center",
+    "kind": "text",
+    "px": 16
+   }
+  },
+  "cap_brass_down": {
+   "file": "cap_brass_down.png",
+   "size": [
+    30,
+    30
+   ],
+   "pivot": [
+    15,
+    15
+   ],
+   "text": {
+    "align": "center",
+    "kind": "text",
+    "px": 16
+   }
+  }
+ },
+ "slicing": "9-slice: corners as they are, edges and middle repeat tile_x / tile_y of the source, cut at the far end; 3-slice: the same along x only. pad — transparent margin kept for halos and sparks.",
+ "glyphs": {
+  "file": "glyphs.json",
+  "count": 126,
+  "z": 2
+ },
+ "icons": {
+  "modules": "../../module_icons.png",
+  "index": "../../module_icons.json",
+  "cell": 16
+ },
+ "animations": {
+  "button_click": "../../ui_anim/button_click.json",
+  "lever_pull": "../../ui_anim/lever_pull.json",
+  "valve_turn": "../../ui_anim/valve_turn.json"
+ },
+ "effects": {
+  "forge-fire": "../../fx/forge-fire.json",
+  "hit-spark": "../../fx/hit-spark.json",
+  "valve-steam": "../../fx/valve-steam.json"
+ },
+ "fonts": {
+  "title": {
+   "file": "tools/sprites/fonts/PressStart2P-Regular.ttf",
+   "px": [
+    8,
+    16,
+    24
+   ],
+   "license": "OFL 1.1 (в репо)"
+  },
+  "text": {
+   "file": "GNU Unifont (unifont.otf), 16 px",
+   "license": "GPL-2+ в пакете Debian; апстрим даёт и OFL 1.1",
+   "note": "не в репозитории: шрифт системный — до выпуска положить в репо с лицензией"
+  }
+ },
+ "colours": {
+  "ink": "#e6dccc",
+  "muted": "#8a8478",
+  "gold": "#f0c878",
+  "red": "#e05a3a",
+  "blue": "#9ad8ff",
+  "outline": "#100c10"
+ }
+}

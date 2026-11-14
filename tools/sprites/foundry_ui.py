@@ -95,11 +95,12 @@ def hammered(sc, m, seed, k=0.12):
     sc.rgb[m] = sc.rgb[m] * (1 - k + 2 * k * n[m][:, None])
 
 
-def plate(sc, x0, y0, x1, y1, seed=1, rivets=True):
+def plate(sc, x0, y0, x1, y1, seed=1, rivets=True, shade=True):
     """A forged iron sheet: darker toward the bottom, hammered, a bright bevel along the top, rivets round the edge
-    and brass angles at the corners."""
+    and brass angles at the corners. shade=False — the sheet's mid tone all over (the engine kit's 9-slice: the
+    engine lays the top-to-bottom shading over it)."""
     m = chamfer_mask(sc, x0, y0, x1, y1, 4)
-    t = np.clip((sc.yy - y0) / max(1, y1 - y0), 0, 1)[..., None]
+    t = np.clip((sc.yy - y0) / max(1, y1 - y0), 0, 1)[..., None] if shade else np.full((sc.h, sc.w, 1), 0.5)
     top_c, bot_c = hexc("#2c2a30"), hexc("#18171c")
     sc.rgb[m] = (top_c * (1 - t) + bot_c * t)[m]
     hammered(sc, m, seed)
