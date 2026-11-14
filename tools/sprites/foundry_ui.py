@@ -862,7 +862,11 @@ def notch_slider(sc, x0, x1, y, n, value, labels=None, off=(), melt=False):
             letters(sc, labels[i], x, y + 10, "text", 16, col=col, align="center")
             if i in off:
                 sc.rgb[y + 18, x - 8:x + 9] = hexc("#a8402e")
-    bx = int(round(xv))
+    slider_block(sc, int(round(xv)), y)
+
+
+def slider_block(sc, bx, y):
+    """The slide's brass block at (bx, y): grip grooves cut across it, lit top and left."""
     blk = (sc.xx >= bx - 5) & (sc.xx <= bx + 5) & (sc.yy >= y - 8) & (sc.yy <= y + 8)
     sh = np.roll(np.roll(blk, 2, 0), 2, 1) & ~blk
     sc.rgb[sh] *= 0.5

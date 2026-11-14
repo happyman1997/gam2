@@ -442,8 +442,8 @@
   "key": {
    "file": "key.png",
    "size": [
-    14,
-    20
+    12,
+    22
    ],
    "slice": [
     4,
@@ -453,24 +453,25 @@
    ],
    "tile_x": [
     4,
-    10
+    8
    ],
    "tile_y": [
     0,
-    20
+    22
    ],
    "mode": "3-slice",
    "text": {
     "align": "center",
-    "kind": "title",
-    "px": 8
+    "kind": "text",
+    "px": 16,
+    "y": 1
    }
   },
   "key_lit": {
    "file": "key_lit.png",
    "size": [
-    14,
-    20
+    12,
+    22
    ],
    "slice": [
     4,
@@ -480,17 +481,18 @@
    ],
    "tile_x": [
     4,
-    10
+    8
    ],
    "tile_y": [
     0,
-    20
+    22
    ],
    "mode": "3-slice",
    "text": {
     "align": "center",
-    "kind": "title",
-    "px": 8
+    "kind": "text",
+    "px": 16,
+    "y": 1
    }
   },
   "socket": {
@@ -912,6 +914,169 @@
     "kind": "text",
     "px": 16
    }
+  },
+  "slider_groove": {
+   "file": "slider_groove.png",
+   "size": [
+    16,
+    9
+   ],
+   "slice": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "tile_x": [
+    0,
+    16
+   ],
+   "tile_y": [
+    0,
+    9
+   ],
+   "mode": "3-slice",
+   "note": "the block rides at y = 4 (its middle); notches 3 px under the groove"
+  },
+  "slider_notch": {
+   "file": "slider_notch.png",
+   "size": [
+    1,
+    3
+   ],
+   "note": "off (can't be chosen): #4a4850"
+  },
+  "slider_melt": {
+   "file": "slider_melt.png",
+   "size": [
+    4,
+    5
+   ],
+   "slice": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "tile_x": [
+    0,
+    4
+   ],
+   "tile_y": [
+    0,
+    5
+   ],
+   "mode": "3-slice",
+   "anchor": "inside the groove (y 2..6), from its left end to the block"
+  },
+  "slider_block": {
+   "file": "slider_block.png",
+   "size": [
+    16,
+    22
+   ],
+   "pivot": [
+    7,
+    10
+   ]
+  },
+  "toggle_on": {
+   "file": "toggle_on.png",
+   "size": [
+    34,
+    26
+   ],
+   "pivot": [
+    10,
+    13
+   ]
+  },
+  "toggle_off": {
+   "file": "toggle_off.png",
+   "size": [
+    34,
+    26
+   ],
+   "pivot": [
+    10,
+    13
+   ]
+  },
+  "arrow_left": {
+   "file": "arrow_left.png",
+   "size": [
+    20,
+    20
+   ],
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  "arrow_right": {
+   "file": "arrow_right.png",
+   "size": [
+    20,
+    20
+   ],
+   "pivot": [
+    10,
+    10
+   ]
+  },
+  "stamp": {
+   "file": "stamp.png",
+   "size": [
+    16,
+    24
+   ],
+   "slice": [
+    4,
+    0,
+    4,
+    0
+   ],
+   "tile_x": [
+    4,
+    12
+   ],
+   "tile_y": [
+    0,
+    24
+   ],
+   "mode": "3-slice",
+   "text": {
+    "x": 8,
+    "y": 4,
+    "kind": "text",
+    "px": 16,
+    "colour": "#e0503a"
+   },
+   "note": "on the blueprint; worn spots — the paper's blue"
+  },
+  "blueprint": {
+   "file": "blueprint.png",
+   "size": [
+    128,
+    128
+   ],
+   "slice": [
+    40,
+    40,
+    48,
+    48
+   ],
+   "tile_x": [
+    40,
+    80
+   ],
+   "tile_y": [
+    40,
+    80
+   ],
+   "mode": "9-slice",
+   "period": 40,
+   "snap": "w, h = 88 + 40·n (the bold grid runs on)"
   }
  },
  "slicing": "9-slice: corners as they are, edges and middle repeat tile_x / tile_y of the source, cut at the far end; 3-slice: the same along x only. pad — transparent margin kept for halos and sparks.",
@@ -923,8 +1088,7 @@
  "icons": {
   "modules": "../../module_icons.png",
   "index": "../../module_icons.json",
-  "cell": 16,
-  "source": "Pixel Art Atlas (Angais, CC0 1.0); спрайты сгенерированы Krea 2 Turbo — см. docs/STEAM.md"
+  "cell": 16
  },
  "animations": {
   "button_click": "../../ui_anim/button_click.json",

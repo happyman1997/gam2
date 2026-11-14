@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 from kit import Scene, hexc
 import foundry_ui as FU
+import foundry_hud as FH
 import swarm_hud as H
 import pxfx
 from paths import out
@@ -122,9 +123,9 @@ def tabs_keys():
     a = np.asarray(im)[0:12, 60:74]
     save("tab_badge", Image.fromarray(a.copy(), "RGBA"), anchor="the tab's top right, x = w − 14")
     for lit in (False, True):
-        im = lift(lambda sc, lit=lit: H.keycap(sc, 0, 0, "", lit=lit), 14, 20)
-        save("key_lit" if lit else "key", im, slice=[4, 0, 4, 0], tile_x=[4, 10], tile_y=[0, 20], mode="3-slice",
-             text=dict(align="center", kind="title", px=8))
+        im = lift(lambda sc, lit=lit: H.keycap(sc, 0, 0, "", lit=lit), 12, 22)
+        save("key_lit" if lit else "key", im, slice=[4, 0, 4, 0], tile_x=[4, 8], tile_y=[0, 22], mode="3-slice",
+             text=dict(align="center", kind="text", px=16, y=1))
     save("socket", lift(lambda sc: FU.socket(sc, 0, 0, 32, 24), 32, 24))
 
 
@@ -157,6 +158,83 @@ def controls():
         for pr, nm in ((0.0, "rest"), (1.0, "down")):
             im = lift(lambda sc, kind=kind, pr=pr: FU.pushbutton(sc, 15, 15, 11, kind=kind, press=pr), 30, 30)
             save(f"cap_{kind}_{nm}", im, pivot=[15, 15], text=dict(align="center", kind="text", px=16))
+
+
+def settings_pieces():
+    """The settings' controls and the drawing's pieces: the slide's groove (3-slice) with its notch and its brass
+    block, the molten fill of a level, the tumbler on and off, the list's arrow buttons, the rubber stamp's frame
+    (3-slice), the blueprint sheet (9-slice on its 40 px grid)."""
+    def groove(sc):
+        sc.rgb[1, :] = hexc("#24222a")
+        sc.rgb[2:7, :] = hexc("#08070a")
+        sc.rgb[7, :] = hexc("#5e5c66")
+    save("slider_groove", lift(groove, 16, 9), slice=[0, 0, 0, 0], tile_x=[0, 16], tile_y=[0, 9], mode="3-slice",
+         note="the block rides at y = 4 (its middle); notches 3 px under the groove")
+    save("slider_notch", lift(lambda sc: sc.rgb.__setitem__((slice(0, 3), 0), hexc("#d0a848")), 1, 3),
+         note="off (can't be chosen): #4a4850")
+
+    def melt(sc):
+        t = np.clip(sc.yy / 4.0, 0, 1)[..., None]
+        sc.rgb[:] = hexc("#ffd890") * (1 - t) + hexc("#c2500e") * t
+    save("slider_melt", lift(melt, 4, 5), slice=[0, 0, 0, 0], tile_x=[0, 4], tile_y=[0, 5], mode="3-slice",
+         anchor="inside the groove (y 2..6), from its left end to the block")
+    save("slider_block", lift(lambda sc: FU.slider_block(sc, 7, 10), 16, 22), pivot=[7, 10])
+    for on in (True, False):
+        save(f"toggle_{'on' if on else 'off'}", lift(lambda sc, on=on: FU.toggle(sc, 10, 13, on), 34, 26), pivot=[10, 13])
+
+    def arrow(sc, d):
+        FU.pushbutton(sc, 10, 10, 8, kind="steel")
+        cx, y = 10, 10
+        sc.rgb[y - 2:y + 3, cx - d * 2] = hexc("#e6eaf0")
+        sc.rgb[y - 1:y + 2, cx - d * 1] = hexc("#e6eaf0")
+        sc.rgb[y, cx] = hexc("#e6eaf0")
+    save("arrow_left", lift(lambda sc: arrow(sc, 1), 20, 20), pivot=[10, 10])
+    save("arrow_right", lift(lambda sc: arrow(sc, -1), 20, 20), pivot=[10, 10])
+
+    def stamp(sc):
+        c = hexc("#e0503a")
+        for k in (0, 2):
+            sc.rgb[k, k:16 - k] = c
+            sc.rgb[23 - k, k:16 - k] = c
+            sc.rgb[k:24 - k, k] = c
+            sc.rgb[k:24 - k, 15 - k] = c
+    save("stamp", lift(stamp, 16, 24), slice=[4, 0, 4, 0], tile_x=[4, 12], tile_y=[0, 24], mode="3-slice",
+         text=dict(x=8, y=4, kind="text", px=16, colour="#e0503a"), note="on the blueprint; worn spots — the paper's blue")
+    save("blueprint", lift(lambda sc: FH.blueprint_sheet(sc, 0, 0, 128, 128), 128, 128), slice=[40, 40, 48, 48],
+         tile_x=[40, 80], tile_y=[40, 80], mode="9-slice", period=40, snap="w, h = 88 + 40·n (the bold grid runs on)")
+
+
+def preview2():
+    """The second proof sheet: the new pieces, grown and laid out as the settings and the drawing use them."""
+    from swarm_ui import letters
+    sc = FU.forge(960, 300, 6)
+    FU.wing(sc, 0, 0, 960, 44)
+    letters(sc, "НАБОР: НАСТРОЙКИ И ЧЕРТЁЖ", 480, 8, "title", 24, col=(232, 222, 206), col2=(120, 96, 70), align="center")
+    canvas = Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+    def src(name):
+        return Image.open(os.path.join(DST, PIECES[name]["file"])).convert("RGBA")
+
+    def g(name, W, H):
+        p = PIECES[name]
+        return grow(src(name), W, H, p["slice"], p["tile_x"], p["tile_y"])
+    y = 70
+    canvas.alpha_composite(g("slider_groove", 260, 9), (24, y))
+    canvas.alpha_composite(g("slider_melt", 150, 5), (24, y + 2))
+    for i in range(4):
+        canvas.alpha_composite(src("slider_notch"), (30 + i * 83, y + 12))
+    canvas.alpha_composite(src("slider_block"), (174 - 7, y + 4 - 10))
+    canvas.alpha_composite(src("toggle_on"), (320, y - 8))
+    canvas.alpha_composite(src("toggle_off"), (370, y - 8))
+    canvas.alpha_composite(src("arrow_left"), (430, y - 6))
+    canvas.alpha_composite(src("arrow_right"), (600, y - 6))
+    for i, name in enumerate(("key", "key_lit")):
+        canvas.alpha_composite(g(name, 52, 22), (660 + i * 64, y - 6))
+    canvas.alpha_composite(g("blueprint", 88 + 40 * 7, 88 + 40 * 2), (24, 110))
+    canvas.alpha_composite(g("stamp", 120, 24), (40, 230))
+    canvas = canvas.convert("RGB").resize((1920, 600), Image.NEAREST)
+    canvas.save(out("foundry_engine_kit2.png"))
+    print("foundry_engine_kit2.png", canvas.size)
 
 
 def glyphs():
@@ -306,7 +384,9 @@ if __name__ == "__main__":
     tabs_keys()
     nameplates()
     controls()
+    settings_pieces()
     n = glyphs()
     manifest(n)
     print(len(PIECES), "pieces,", n, "glyphs ->", DST)
     preview()
+    preview2()
