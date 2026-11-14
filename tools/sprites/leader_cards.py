@@ -138,8 +138,18 @@ def patent_slip(sc, x0, y0, x1, y1, key, name, line, seed=0):
     sc.rgb[(d <= 2) & wax] = hexc("#f08060")
 
 
-def inventor(ret=False):
+def arc_pts(x0, y0, x1, y1, n, rnd, amp=6):
+    """A jagged path from one point to another: n kinks thrown off the straight line at random."""
+    pts = [(x0, y0)]
+    for k in range(1, n):
+        t = k / n
+        pts.append((int(x0 + (x1 - x0) * t + rnd.uniform(-amp, amp) * 0.4), int(y0 + (y1 - y0) * t + rnd.uniform(-amp, amp))))
+    return pts + [(x1, y1)]
+
+
+def inventor(ret=False, frame=None):
     sc = screen(71)
+    rnd = np.random.RandomState(5 if frame is None else 100 + frame)
     sc.rgb[:] = sc.rgb * 0.8 + hexc("#10202a") * 0.2
     FU.wing(sc, 0, 0, WW, 44)
     tw = SU.text_width("ИЗОБРЕТАТЕЛЬ", "title", 24)
@@ -148,7 +158,10 @@ def inventor(ret=False):
     for side, bx in ((-1, x - 30), (1, x + tw + 30)):                         # tesla coils, arcing to each other
         tesla(sc, bx, 42)
         tesla(sc, bx + side * 54, 42)
-        jag(sc, [(bx, 12), (bx + side * 14, 7), (bx + side * 26, 14), (bx + side * 40, 8), (bx + side * 54, 12)])
+        if frame is None:
+            jag(sc, [(bx, 12), (bx + side * 14, 7), (bx + side * 26, 14), (bx + side * 40, 8), (bx + side * 54, 12)])
+        elif frame % 6 != 5:                                                  # the arc flickers, now and then out
+            jag(sc, arc_pts(bx, 12, bx + side * 54, 12, 5, rnd, 6))
     toolbar(sc)
     # the bell jar, the leader inside it, arcs crawling between the electrodes
     FU.plate(sc, 12, 52, 330, 462, seed=72)
@@ -161,8 +174,15 @@ def inventor(ret=False):
         sc.rgb[d <= 5] = hexc("#a0782c")
     spr = leader_sprite("inventor", 5.2)
     sc.blit(spr, int(171 - spr.ox), int(392 - spr.oy))
-    jag(sc, [(64, 292), (84, 270), (96, 284), (118, 262)])
-    jag(sc, [(278, 292), (262, 276), (250, 290), (226, 270)])
+    if frame is None:
+        jag(sc, [(64, 292), (84, 270), (96, 284), (118, 262)])
+        jag(sc, [(278, 292), (262, 276), (250, 290), (226, 270)])
+    else:                                                                     # the arcs crawl toward the leader
+        reach = 30 + (frame % 12) * 4
+        jag(sc, arc_pts(64, 292, 64 + reach, 292 - reach * 0.6, 4, rnd, 8))
+        jag(sc, arc_pts(278, 292, 278 - reach, 292 - reach * 0.6, 4, rnd, 8))
+        if frame % 12 >= 9:                                                   # and meet in a flash over him
+            sc.glow(171, 250, 40, hexc("#9ad8f0"), 0.35)
     bell_jar(sc, 28, 74, 314, 394)
     base = (sc.xx >= 20) & (sc.xx < 322) & (sc.yy >= 394) & (sc.yy < 412)
     FU._bands(sc, base, FU.BRASSR, 0.75 - (sc.yy - 394) / 30.0)
@@ -221,7 +241,7 @@ def inventor(ret=False):
         H.fx_line(sc, 650, y0 + 22, line)
     bottom(sc)
     letters(sc, "развитие: новый аугмент или +1 на голема", 236, 495, "text", 16, col=MUTED)
-    return finish(sc, "inventor", ret)
+    return finish(sc, "inventor", ret or frame is not None)
 
 
 # ---------------------------------------------------------------- Маньяк: the lair on the scrapheap
@@ -274,16 +294,18 @@ def note(sc, x0, y0, x1, y1, name, when, line, ink=INK_DARK, seed=0):
     H.fx_line(sc, x0 + 10, y0 + 30, line)
 
 
-def maniac(ret=False):
+def maniac(ret=False, frame=None):
     sc = screen(77)
+    ph = 0.0 if frame is None else frame * 2 * np.pi / 12 / 8
     FU.wing(sc, 0, 0, WW, 44)
     tw = SU.text_width("МАНЬЯК", "title", 24)
     x = WW // 2 - tw // 2
-    letters(sc, "МАНЬЯК", x, 4, "title", 24, col=(220, 150, 255), col2=(60, 140, 70), jitter=2, seed=5)
-    sawblade(sc, x - 40, 22, 17, 0.2)
-    sawblade(sc, x + tw + 40, 22, 17, 0.9)
-    sawblade(sc, x - 82, 26, 11, 0.5)
-    sawblade(sc, x + tw + 82, 26, 11, 0.1)
+    letters(sc, "МАНЬЯК", x, 4, "title", 24, col=(220, 150, 255), col2=(60, 140, 70), jitter=2,
+            seed=5 if frame is None else 5 + frame // 3)                      # the letters jump, every few frames
+    sawblade(sc, x - 40, 22, 17, 0.2 + ph)                                    # the saws spin, in opposite ways
+    sawblade(sc, x + tw + 40, 22, 17, 0.9 - ph)
+    sawblade(sc, x - 82, 26, 11, 0.5 - ph * 1.5)
+    sawblade(sc, x + tw + 82, 26, 11, 0.1 + ph * 1.5)
     toolbar(sc)
     hazard(sc, 0, 44, WW, 50)
     # the cage, patchwork plates, the leader behind the bars
@@ -352,7 +374,7 @@ def maniac(ret=False):
     hazard(sc, 0, 460, WW, 466)
     bottom(sc)
     letters(sc, "развитие: безумный модуль · полезные причуды", 236, 495, "text", 16, col=MUTED)
-    return finish(sc, "maniac", ret)
+    return finish(sc, "maniac", ret or frame is not None)
 
 
 # ---------------------------------------------------------------- Зодчий: the building site

@@ -491,9 +491,64 @@ def battle_anim():
     print("\nfoundry_battle_anim.gif", len(images))
 
 
+def settings_anim():
+    """Settings: the mouse drags the interface's size from ×1 to ×2 — the brass block slides along its groove
+    (eased, a little overshoot), the preview monitor grows the interface with it; then a click on the vsync
+    tumbler, its lamp going out."""
+    images = []
+    seq = [0.0] * 6 + [out_back(t / 10) for t in range(1, 11)] + [1.0] * 6
+    for i, v in enumerate(seq):
+        sc = FH.settings("screen", ret=True, anim={"scale": v, "vsync": True})
+        images.append(sc.image(2).crop((400, 160, 1900, 760)))
+        print(i, end=" ", flush=True)
+    for i in range(10):
+        sc = FH.settings("screen", ret=True, anim={"scale": 1.0, "vsync": i < 3})
+        images.append(sc.image(2).crop((400, 160, 1900, 760)))
+    pxfx.save_gif(images, out("foundry_settings_anim.gif"), FPS, half=True)
+    print("\nfoundry_settings_anim.gif", len(images))
+
+
+def development_anim():
+    """The dock alive: the rivet gun spitting sparks in bursts over the new cell, the colossal module swinging
+    a little on its chains — a loop."""
+    images = []
+    for i in range(24):
+        sc = FH.development("colossus", "cell", ret=True, anim={"frame": i})
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_development_anim.gif"), FPS, half=True)
+    print("\nfoundry_development_anim.gif", len(images))
+
+
+def defeat_anim():
+    """The cold forge: the last embers breathing each at its own pace, ash drifting down — a loop."""
+    images = []
+    for i in range(36):
+        sc = FH.defeat(ret=True, anim={"frame": i})
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_defeat_anim.gif"), 12, half=True)
+    print("\nfoundry_defeat_anim.gif", len(images))
+
+
+def cards_anim():
+    """The leader cards: the Inventor's arcs crawling up the electrodes and meeting over him; the Maniac's title
+    jumping between spinning saws — each a loop."""
+    import leader_cards as LC
+    for name, fn, crop in (("inventor", LC.inventor, (0, 0, 1920, 1080)), ("maniac", LC.maniac, (0, 0, 1920, 1080))):
+        images = []
+        for i in range(24):
+            sc = fn(frame=i)
+            images.append(sc.image(2).crop(crop))
+            print(i, end=" ", flush=True)
+        pxfx.save_gif(images, out(f"foundry_card_{name}_anim.gif"), FPS, half=True)
+        print(f"\nfoundry_card_{name}_anim.gif", len(images))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "console"
     {"console": console, "hearth": hearth, "workshop": workshop, "tabs": tabs, "steps": steps,
      "metal": metal_tick, "gears": gears_title, "leaders": leaders,
      "hover": hover, "speed": speed, "start": start, "aftermath": aftermath_anim, "card": card_tip, "leadercard": leader_card,
-     "battle": battle_anim}[what]()
+     "battle": battle_anim, "settings": settings_anim, "development": development_anim, "defeat": defeat_anim,
+     "cards": cards_anim}[what]()

@@ -2061,7 +2061,7 @@ def scale_preview(sc, x0, y0, w, h, frac, chosen=False, label=""):
         letters(sc, label, x0 + w // 2, y0 + h + 10, "text", 16, col=GOLD if chosen else MUTED, align="center")
 
 
-def settings(section="screen", ret=False):
+def settings(section="screen", ret=False, anim=None):
     """Settings, in the forge's metal: the sections on iron cells on the left, the chosen one's rows on the right —
     each a label and its control: a brass block in a notched groove for a choice, the same groove filled with
     molten metal for a level, a tumbler with its lamp for on and off, arrows round an enamel window for a list.
@@ -2092,17 +2092,21 @@ def settings(section="screen", ret=False):
         letters(sc, "крупнее или мельче —", 224, 216, "text", 16, col=MUTED)
         letters(sc, "целыми шагами,", 224, 234, "text", 16, col=MUTED)
         letters(sc, "пиксели ровные", 224, 252, "text", 16, col=MUTED)
-        FU.notch_slider(sc, 430, 690, 214, 4, 1, ["×1", "×2", "×3", "×4"], off=(2, 3))
+        a_ = anim or {}
+        sv = a_.get("scale", 1.0)                                       # the block's place: 0 = ×1, 1 = ×2
+        FU.notch_slider(sc, 430, 690, 214, 4, sv, ["×1", "×2", "×3", "×4"], off=(2, 3))
         letters(sc, "мельче", 430, 254, "text", 16, col=MUTED)
         letters(sc, "крупнее", 690, 254, "text", 16, col=MUTED, align="right")
         H.fx_line(sc, 430, 280, "на этом экране: ×1 или ×2")
         letters(sc, "×3 и ×4 не помещаются", 430, 300, "text", 16, col=PALE)
-        scale_preview(sc, 730, 200, 176, 99, 0.75, True, "")
-        letters(sc, "×2: холст 1280 × 720", 818, 312, "text", 16, col=GOLD, align="center")
+        scale_preview(sc, 730, 200, 176, 99, 0.375 + 0.375 * sv, True, "")
+        letters(sc, "×2: холст 1280 × 720" if sv >= 0.5 else "×1: холст 2560 × 1440", 818, 312, "text", 16,
+                col=GOLD, align="center")
         sc.rgb[332, 222:934] = sc.rgb[332, 222:934] * 0.5 + hexc("#8a6a34") * 0.5
         lab("Вертикальная синхронизация", 356)
-        FU.toggle(sc, 470, 356, True)
-        letters(sc, "вкл", 496, 348, "text", 16, col=INK)
+        on = a_.get("vsync", True)
+        FU.toggle(sc, 470, 356, on)
+        letters(sc, "вкл" if on else "выкл", 496, 348, "text", 16, col=INK if on else MUTED)
         lab("Частота кадров", 412)
         FU.notch_slider(sc, 430, 690, 404, 4, 3, ["60", "120", "144", "без предела"])
     elif section == "sound":
@@ -2210,7 +2214,7 @@ def shoulder_battery(sc, x0, y0, k=1.0):
     return (x0 + 6, y0), (x0 + w - 7, y0)
 
 
-def development(kind="colossus", hot="cell", ret=False):
+def development(kind="colossus", hot="cell", ret=False, anim=None):
     """The leader grows, after a boss — not a menu but the assembly dock: the leader stands on its plinth between
     two riveted columns under a girder that runs over the whole dock. Left, the riveting bench: a plate of its hull
     with its cells in a row and the new one red-hot, being riveted in, sparks off the rivet gun. Right, a crane
@@ -2265,7 +2269,10 @@ def development(kind="colossus", hot="cell", ret=False):
         if key and key != "new":
             mod_icon(sc, key, cx0 + 6, 275, 1)
     letters(sc, "7 → 8", 162, 306, "text", 16, col=(170, 220, 250), align="center")
-    FU.sparks(sc, 262, 276, 12, seed=7)                                      # the rivet gun at work
+    fr_ = (anim or {}).get("frame", 0)
+    if fr_ % 8 < 5:                                                          # the rivet gun at work, in bursts
+        FU.sparks(sc, 262, 276, 12, seed=7 + fr_)
+        sc.glow(262, 283, 10, hexc("#ffb060"), 0.5)
     sc.rgb[214:226, 250:288] = hexc("#5e5c66")                               # the rivet gun, hung over it
     sc.rgb[214, 250:288] = hexc("#8e8c96")
     sc.rgb[226:262, 266:272] = hexc("#3a3842")
@@ -2280,7 +2287,8 @@ def development(kind="colossus", hot="cell", ret=False):
     sc.rgb[66, 770:820] = hexc("#6a6870")
     FU.rivet(sc, 778, 72)
     FU.rivet(sc, 812, 72)
-    (ax, ay), (bx, by) = shoulder_battery(sc, 742, 262, 1.45)
+    sway = int(round(2.4 * np.sin(fr_ * 2 * np.pi / 24)))                   # the battery swinging on its chains
+    (ax, ay), (bx, by) = shoulder_battery(sc, 742 + sway, 262, 1.45)
     for (cx, cy) in ((ax, ay), (bx, by)):
         FU.chain(sc, cx, 80, cy)
     letters(sc, "плечевая батарея", 795, 360, "text", 16, col=INK, align="center")
@@ -2503,7 +2511,7 @@ def cold(sc, m, k=0.55):
     sc.rgb[m] = sc.rgb[m] * (1 - k) + (g * np.array((0.86, 0.92, 1.06))) * k
 
 
-def defeat(ret=False):
+def defeat(ret=False, anim=None):
     """Defeat, and the run summed up. The forge has gone cold: the title in grey without its heat, the spanners
     by it dark and cracked, ash drifting down. Left, the furnace out — a last few embers — and the army a heap of
     scrap before it. In the middle what the run came to, and how little was missing: the enemy leader's health
@@ -2555,11 +2563,13 @@ def defeat(ret=False):
         sc.blit(g, int(ax + dx - g.ox), int(378 + dy - g.oy))
     sc.rgb[404:410, 24:318] = hexc("#24222a")
     cold(sc, (X >= 20) & (X < 322) & (Y >= 84) & (Y < 410), 0.55)
+    fr_ = (anim or {}).get("frame", 0)
     rnd2 = np.random.RandomState(4)
-    for _ in range(9):                                                      # the embers keep their last red
+    for e in range(9):                                                      # the embers keep their last red
         ex, ey = int(ax + rnd2.uniform(-44, 44)), int(rnd2.uniform(244, 256))
-        sc.glow(ex, ey, 5, hexc("#c2500e"), 0.3)
-        sc.rgb[ey, ex] = hexc("#a8320e") if rnd2.rand() < 0.6 else hexc("#ff8a2a")
+        br = 0.5 + 0.5 * np.sin(fr_ * 2 * np.pi / 36 * (1 + e % 3) + e * 1.7)   # each breathing at its own pace
+        sc.glow(ex, ey, 5, hexc("#c2500e"), 0.12 + 0.3 * br)
+        sc.rgb[ey, ex] = hexc("#ff8a2a") if br > 0.6 else (hexc("#a8320e") if br > 0.25 else hexc("#5a1408"))
     H.fx_line(sc, 26, 420, "{гибель} лидер · бой 8 из 15")
     letters(sc, "армия ушла в лом", 26, 440, "text", 16, col=MUTED)
     # the middle: what the run came to
@@ -2617,7 +2627,9 @@ def defeat(ret=False):
             sc.rgb[y0 + 34:y0 + 40, bx0:fill] = hexc("#c2500e")
             sc.rgb[y0 + 34, bx0:fill] = hexc("#ffb040")
     for k in range(60):                                                     # ash drifting down over it all
-        ax_, ay_ = rnd.randint(0, WW), rnd.randint(44, 466)
+        ax0, ay0 = rnd.randint(0, WW), rnd.randint(44, 466)
+        ay_ = 44 + (ay0 - 44 + fr_ * (1 + k % 2)) % 422                     # falling, a loop of 36 frames
+        ax_ = int(ax0 + 2 * np.sin((ay_ + k * 13) / 30.0)) % WW
         sc.rgb[ay_, ax_] = sc.rgb[ay_, ax_] * 0.4 + hexc("#8e8c96") * 0.6
     FU.sill(sc, 468)
     action(sc, 12, 478, 220, 526, "В меню", "steel")
