@@ -204,12 +204,43 @@ def settings_pieces():
          tile_x=[40, 80], tile_y=[40, 80], mode="9-slice", period=40, snap="w, h = 88 + 40·n (the bold grid runs on)")
 
 
+def run_pieces():
+    """The pieces of the last screens: the artifact socket in its states (and the eight artifacts' icons, an atlas),
+    the leader's ability box (a cell with the crown glyph — the crown as an overlay), the battle's end plate (a
+    nameplate 340 wide), and the damage numbers' style (a spec, not pictures: the engine writes them)."""
+    import artifacts_ui as AU
+    import icons_drawn as D
+    for st in ("empty", "normal", "awake", "fire"):
+        def draw(sc, st=st):
+            AU.socket(sc, 14, 14, None, "normal" if st == "empty" else st)
+        save(f"artifact_socket_{st}", lift(draw, 28, 28), pivot=[14, 14],
+             note="the artifact's icon goes in at (6, 6), ×1" if st != "empty" else "an empty socket")
+    keys = list(D.ART)
+    atlas = np.zeros((16, 16 * len(keys), 4), np.uint8)
+    for j, k in enumerate(keys):
+        atlas[:, j * 16:(j + 1) * 16] = D.ART[k]()
+    Image.fromarray(atlas, "RGBA").save(os.path.join(DST, "artifacts.png"))
+    PIECES["artifacts"] = dict(file="artifacts.png", size=[16 * len(keys), 16], cells=keys, cell=16)
+    save("crown", lift(lambda sc: H.glyph(sc, "лидер", 0, 0, 2), 26, 20),
+         note="the leader's ability box: cell_hi grown to 196×46, the crown at (8, 8), name at (36, 4), line at (36, 22)")
+    for kind, hot in (("win", True), ("lose", False)):
+        im = lift(lambda sc, hot=hot: FU.nameplate(sc, 0, 0, 340, 64, "", hot=hot), 340, 64)
+        save(f"end_plate_{kind}", im, text=dict(align="center", kind="title", px=24, y=20),
+             note="across the dimmed field; cogs either side (win), the field cooled to grey-blue (lose)")
+    PIECES["damage_numbers"] = dict(kind="spec", font="title", rise="out_back over 4 frames, then 0.8 px/frame up, fade the last 5",
+                                    styles=dict(hit=dict(px=16, colour="#ffb050", edge="#781e0a"),
+                                                crit=dict(px=24, colour="#fff6d2", edge="#be3c14", glow="#ff8a2a", suffix="!"),
+                                                hurt=dict(px=16, colour="#ff6e5a", edge="#5a0a0a"),
+                                                miss=dict(px=16, colour="#aaa6a0", edge="#323034", text="мимо"),
+                                                heal=dict(px=16, colour="#96f082", edge="#286e28", prefix="+")))
+
+
 def preview2():
     """The second proof sheet: the new pieces, grown and laid out as the settings and the drawing use them."""
     from swarm_ui import letters
     sc = FU.forge(960, 300, 6)
     FU.wing(sc, 0, 0, 960, 44)
-    letters(sc, "НАБОР: НАСТРОЙКИ И ЧЕРТЁЖ", 480, 8, "title", 24, col=(232, 222, 206), col2=(120, 96, 70), align="center")
+    letters(sc, "НАБОР: НАСТРОЙКИ, ЧЕРТЁЖ, БОЙ", 480, 8, "title", 24, col=(232, 222, 206), col2=(120, 96, 70), align="center")
     canvas = Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
 
     def src(name):
@@ -232,6 +263,11 @@ def preview2():
         canvas.alpha_composite(g(name, 52, 22), (660 + i * 64, y - 6))
     canvas.alpha_composite(g("blueprint", 88 + 40 * 7, 88 + 40 * 2), (24, 110))
     canvas.alpha_composite(g("stamp", 120, 24), (40, 230))
+    for j, st in enumerate(("empty", "normal", "awake", "fire")):
+        canvas.alpha_composite(src(f"artifact_socket_{st}"), (420 + j * 34, 120))
+    canvas.alpha_composite(src("artifacts"), (420, 160))
+    canvas.alpha_composite(src("end_plate_win"), (420, 190))
+    canvas.alpha_composite(src("crown"), (780, 120))
     canvas = canvas.convert("RGB").resize((1920, 600), Image.NEAREST)
     canvas.save(out("foundry_engine_kit2.png"))
     print("foundry_engine_kit2.png", canvas.size)
@@ -385,6 +421,7 @@ if __name__ == "__main__":
     nameplates()
     controls()
     settings_pieces()
+    run_pieces()
     n = glyphs()
     manifest(n)
     print(len(PIECES), "pieces,", n, "glyphs ->", DST)

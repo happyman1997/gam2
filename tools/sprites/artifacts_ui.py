@@ -30,7 +30,7 @@ def art_icon(sc, key, x, y, z=1):
     sc.rgb[y:y + rgba.shape[0], x:x + rgba.shape[1]][m] = rgba[..., :3][m]
 
 
-def socket(sc, cx, cy, key=None, state="normal"):
+def socket(sc, cx, cy, key=None, state="normal", phase=None):
     """A round socket in the beam: a brass rim (gold and glowing when awoken, red-hot when firing), a dark well,
     the artifact in it."""
     X, Y = sc.xx - cx, sc.yy - cy
@@ -45,15 +45,19 @@ def socket(sc, cx, cy, key=None, state="normal"):
     sc.rgb[d <= 8.4] = hexc("#0c0b0e")
     if key:
         art_icon(sc, key, cx - 8, cy - 8, 1)
+    if state == "awake" and phase is not None:                                # a glint running round the gold rim
+        a = phase * 2 * np.pi
+        gx_, gy_ = int(cx + np.cos(a) * 10), int(cy + np.sin(a) * 10)
+        sc.rgb[gy_ - 1:gy_ + 2, gx_ - 1:gx_ + 2] = hexc("#fff4c8")
     if state == "awake":                                                      # the awakened star
         for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)):
             sc.rgb[cy - 10 + dy, cx + 9 + dx] = hexc("#fff4c8")
 
 
 def rack(sc, x0=88, cy=21, items=(("banner", "awake"), ("chalice", "normal"), ("anvil", "normal"), ("bell", "normal"),
-                                  (None, "normal")), fire=None):
+                                  (None, "normal")), fire=None, phase=None):
     for j, (key, st) in enumerate(items):
-        socket(sc, x0 + j * 23, cy, key, "fire" if key and key == fire else st)
+        socket(sc, x0 + j * 23, cy, key, "fire" if key and key == fire else st, phase)
     return [(key, x0 + j * 23, cy) for j, (key, _) in enumerate(items)]
 
 

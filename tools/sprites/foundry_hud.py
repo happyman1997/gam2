@@ -610,6 +610,7 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
         for lab_, where, key_, st_ in extra:                          # an augment's cell, a module off another hull
             p_ = BP[where] if isinstance(where, str) else where
             right.append((lab_, at(p_), key_, 1, st_))
+            _STATE.setdefault("pts", {})[key_] = at(p_)
         right.sort(key=lambda t: t[1][1])
         top = M["_body"][2]
         if core:

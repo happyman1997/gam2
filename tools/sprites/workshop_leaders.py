@@ -74,7 +74,28 @@ def save(sc, name):
 
 
 # ---------------------------------------------------------------- Изобретатель: small hulls, an augment cell each
-def inventor():
+def anim_spot(sc, kind, frame):
+    """What moves at a leader's own mount: an arc crawling off the augment, mad sparks circling the alien module."""
+    import leader_cards as LC
+    pt = FH._STATE.get("pts", {}).get("a_coil" if kind == "inventor" else "mortar")
+    if pt is None:
+        return
+    x, y = int(pt[0]), int(pt[1])
+    rnd = np.random.RandomState(200 + frame)
+    if kind == "inventor":
+        sc.glow(x, y, 12, hexc("#2ab0c8"), 0.3 + 0.3 * (frame % 6 < 3))
+        if frame % 6 != 5:
+            ang = rnd.uniform(-2.6, -0.6)
+            LC.jag(sc, LC.arc_pts(x, y, int(x + np.cos(ang) * 22), int(y + np.sin(ang) * 22), 4, rnd, 5))
+    else:
+        sc.glow(x, y, 12, hexc("#d860d0"), 0.35 + 0.25 * np.sin(frame * 2 * np.pi / 12))
+        for k in range(6):
+            a = frame * 0.5 + k * np.pi / 3
+            r = 8 + 3 * np.sin(frame * 0.7 + k)
+            sc.rgb[int(y + np.sin(a) * r), int(x + np.cos(a) * r)] = hexc("#70e080") if k % 2 else hexc("#ffc0f4")
+
+
+def inventor(frame=None):
     sc = frame_screen(21)
     bay_rack(sc, 10, 52, 168, [("Мудрец", 1, 3, True, True, True, 0.42), ("Орудие", 1, 3, True, False, True, 0.4),
                                ("Механик", 1, 2, True, False, True, 0.4)])
@@ -108,11 +129,14 @@ def inventor():
     console(sc)
     if hot:
         H.cursor(sc, hot[1], hot[2])
+    if frame is not None:
+        anim_spot(sc, "inventor", frame)
+        return sc
     save(sc, "foundry_workshop_inventor.png")
 
 
 # ---------------------------------------------------------------- Маньяк: a module off another hull, and its quirk
-def maniac():
+def maniac(frame=None):
     sc = frame_screen(23)
     bay_rack(sc, 10, 52, 168, [("Мудрец", 3, 6, False, True, False, 0.46), ("Орудие", 2, 6, False, False, False, 0.44)])
     FU.plate(sc, 176, 52, 700, 462, seed=3)
@@ -148,6 +172,9 @@ def maniac():
     sc.rgb[412:420, 828:934] = hexc("#9a2aa0")
     letters(sc, "развитие: к зелёному", 722, 426, "text", 16, col=PALE)
     console(sc)
+    if frame is not None:
+        anim_spot(sc, "maniac", frame)
+        return sc
     save(sc, "foundry_workshop_maniac.png")
 
 

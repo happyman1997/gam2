@@ -656,6 +656,100 @@ def dev_others_anim():
         print(f"\nfoundry_development_{kind}_anim.gif", len(images))
 
 
+def leader_workshops_anim():
+    """The leaders' workshops: an arc crawling off the Inventor's augment cell; mad sparks circling the Mortar on
+    the Maniac's Sage — loops."""
+    import workshop_leaders as WL
+    for kind, fn in (("inventor", WL.inventor), ("maniac", WL.maniac)):
+        images = []
+        for i in range(24):
+            images.append(fn(frame=i).image(2).crop((352, 104, 1400, 920)))
+            print(i, end=" ", flush=True)
+        pxfx.save_gif(images, out(f"foundry_workshop_{kind}_anim.gif"), FPS, half=True)
+        print(f"\nfoundry_workshop_{kind}_anim.gif", len(images))
+
+
+def artifacts_anim():
+    """The artifacts on the beam: a glint running round the awoken one's gold rim; then the Chalice fires — its
+    socket flares red-hot and cools."""
+    import copy
+    import artifacts_ui as AU
+    base = FH.workshop(ret=True)
+    images = []
+    for i in range(36):
+        sc = copy.deepcopy(base)
+        fire = "chalice" if 18 <= i < 30 else None
+        AU.rack(sc, fire=fire, phase=(i % 18) / 18.0)
+        images.append(sc.image(2).crop((0, 0, 800, 100)))
+    pxfx.save_gif(images, out("foundry_artifacts_anim.gif"), FPS)
+    print("foundry_artifacts_anim.gif", len(images))
+
+
+def moments_anim():
+    """The battle's numbers: each blow's number jumps up out of the target, hangs, drifts up and fades; the heavy
+    blow's white-hot «18!» last a little longer."""
+    import copy
+    import battle_moments as BM
+    import swarm_status as ST
+    sc0 = FH.battle_view("run", ret=True, pops=[])
+    fd = FH._FIELD
+    gp = fd["gpos"]
+    lx, ly, lspr = fd["lead"]
+    BM.wall_run(sc0, int(lx + 30), int(ly + 4))
+    BM.leader_pop(sc0, "Кладка", "{каждые:2} → стена I", lx, ST.top_of(lspr, ly) - 4)
+    BM.breaking(sc0, *gp[("Горн", 6, 2)])
+    sx, sy, ss = gp[("Страж", 5, 6)]
+    ox, oy, os_ = gp[("Орудие", 3, 2)]
+    mx, my, ms = gp[("Мудрец", 5, 0)]
+    hx, hy, hs = gp[("Горн", 6, 11)]
+    kx, ky, ks = gp[("Механик", 3, 9)]
+    nums = [(sx + 70, ST.top_of(ss, sy) + 4, "18!", "crit", 0, 22), (sx + 96, ST.top_of(ss, sy) + 40, "6", "hit", 4, 16),
+            (ox + 250, ST.top_of(os_, oy) + 30, "9", "hit", 2, 16), (ox + 280, ST.top_of(os_, oy) + 56, "мимо", "miss", 8, 16),
+            (mx + 140, ST.top_of(ms, my) + 52, "7", "hit", 6, 16), (hx - 6, ST.top_of(hs, hy) - 28, "-4", "hurt", 10, 16),
+            (kx, ST.top_of(ks, ky) - 26, "+4", "heal", 12, 16)]
+    images = []
+    for i in range(36):
+        sc = copy.deepcopy(sc0)
+        for x, y, t, kind, st, life in nums:
+            age = i - st
+            if age < 0 or age >= life:
+                continue
+            pop = out_back(min(1.0, age / 4))
+            dy = int(round(-6 * pop - max(0, age - 8) * 0.8))
+            before = sc.rgb.copy()
+            BM.number(sc, x, int(y + dy + (1 - pop) * 6), t, kind)
+            fade = 1.0 if age < life - 5 else (life - age) / 5.0
+            sc.rgb[:] = before * (1 - fade) + sc.rgb * fade
+        images.append(sc.image(2).crop((300, 60, 1500, 1000)))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_battle_numbers.gif"), FPS, half=True)
+    print("\nfoundry_battle_numbers.gif", len(images))
+
+
+def battle_end_anim():
+    """The battle's end: the field dims and the cast plate drops across it."""
+    from PIL import Image as I
+    base = FH.battle_view("run", ret=True, pops=[]).image(2)
+    final = I.open(out("foundry_battle_end.png")).convert("RGB")
+    pxfx.save_gif(overlay_in(base, final, (0, 390, 1920, 700)), out("foundry_battle_end_anim.gif"), FPS, half=True)
+    print("foundry_battle_end_anim.gif")
+
+
+def menu_anim():
+    """The main menu alive: the furnace burning, the bugs in the breach snapping and shifting; the class pick's
+    furnace burning — loops."""
+    import menu as MN
+    frames_, meta = pxfx.load("forge-fire")
+    for name, fn in (("menu_main_anim.gif", lambda i: MN.main_menu(i, ret=True)),
+                     ("menu_class_anim.gif", lambda i: MN.class_pick("foundry", ret=True, frame=i))):
+        images = []
+        for i in range(0, len(frames_), 2):
+            images.append(fn(i).image(2))
+            print(i, end=" ", flush=True)
+        pxfx.save_gif(images, out(name), 12, half=True)
+        print("\n" + name, len(images))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "console"
     {"console": console, "hearth": hearth, "workshop": workshop, "tabs": tabs, "steps": steps,
@@ -663,4 +757,6 @@ if __name__ == "__main__":
      "hover": hover, "speed": speed, "start": start, "aftermath": aftermath_anim, "card": card_tip, "leadercard": leader_card,
      "battle": battle_anim, "settings": settings_anim, "development": development_anim, "defeat": defeat_anim,
      "cards": cards_anim, "camp": camp_anim, "glossary": glossary_anim, "overlays": overlays_anim,
-     "drag": drag_anim, "zodchiy_card": zodchiy_card_anim, "dev_others": dev_others_anim}[what]()
+     "drag": drag_anim, "zodchiy_card": zodchiy_card_anim, "dev_others": dev_others_anim,
+     "leader_workshops": leader_workshops_anim, "artifacts": artifacts_anim, "moments": moments_anim,
+     "battle_end": battle_end_anim, "menu": menu_anim}[what]()

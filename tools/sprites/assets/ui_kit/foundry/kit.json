@@ -1077,6 +1077,144 @@
    "mode": "9-slice",
    "period": 40,
    "snap": "w, h = 88 + 40·n (the bold grid runs on)"
+  },
+  "artifact_socket_empty": {
+   "file": "artifact_socket_empty.png",
+   "size": [
+    28,
+    28
+   ],
+   "pivot": [
+    14,
+    14
+   ],
+   "note": "an empty socket"
+  },
+  "artifact_socket_normal": {
+   "file": "artifact_socket_normal.png",
+   "size": [
+    28,
+    28
+   ],
+   "pivot": [
+    14,
+    14
+   ],
+   "note": "the artifact's icon goes in at (6, 6), ×1"
+  },
+  "artifact_socket_awake": {
+   "file": "artifact_socket_awake.png",
+   "size": [
+    28,
+    28
+   ],
+   "pivot": [
+    14,
+    14
+   ],
+   "note": "the artifact's icon goes in at (6, 6), ×1"
+  },
+  "artifact_socket_fire": {
+   "file": "artifact_socket_fire.png",
+   "size": [
+    28,
+    28
+   ],
+   "pivot": [
+    14,
+    14
+   ],
+   "note": "the artifact's icon goes in at (6, 6), ×1"
+  },
+  "artifacts": {
+   "file": "artifacts.png",
+   "size": [
+    128,
+    16
+   ],
+   "cells": [
+    "banner",
+    "boots",
+    "chalice",
+    "anvil",
+    "bell",
+    "dice",
+    "hourglass",
+    "fog_lantern"
+   ],
+   "cell": 16
+  },
+  "crown": {
+   "file": "crown.png",
+   "size": [
+    26,
+    20
+   ],
+   "note": "the leader's ability box: cell_hi grown to 196×46, the crown at (8, 8), name at (36, 4), line at (36, 22)"
+  },
+  "end_plate_win": {
+   "file": "end_plate_win.png",
+   "size": [
+    340,
+    64
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 24,
+    "y": 20
+   },
+   "note": "across the dimmed field; cogs either side (win), the field cooled to grey-blue (lose)"
+  },
+  "end_plate_lose": {
+   "file": "end_plate_lose.png",
+   "size": [
+    340,
+    64
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 24,
+    "y": 20
+   },
+   "note": "across the dimmed field; cogs either side (win), the field cooled to grey-blue (lose)"
+  },
+  "damage_numbers": {
+   "kind": "spec",
+   "font": "title",
+   "rise": "out_back over 4 frames, then 0.8 px/frame up, fade the last 5",
+   "styles": {
+    "hit": {
+     "px": 16,
+     "colour": "#ffb050",
+     "edge": "#781e0a"
+    },
+    "crit": {
+     "px": 24,
+     "colour": "#fff6d2",
+     "edge": "#be3c14",
+     "glow": "#ff8a2a",
+     "suffix": "!"
+    },
+    "hurt": {
+     "px": 16,
+     "colour": "#ff6e5a",
+     "edge": "#5a0a0a"
+    },
+    "miss": {
+     "px": 16,
+     "colour": "#aaa6a0",
+     "edge": "#323034",
+     "text": "мимо"
+    },
+    "heal": {
+     "px": 16,
+     "colour": "#96f082",
+     "edge": "#286e28",
+     "prefix": "+"
+    }
+   }
   }
  },
  "slicing": "9-slice: corners as they are, edges and middle repeat tile_x / tile_y of the source, cut at the far end; 3-slice: the same along x only. pad — transparent margin kept for halos and sparks.",

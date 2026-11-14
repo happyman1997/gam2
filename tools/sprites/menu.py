@@ -55,7 +55,8 @@ def main_menu(frame=0, ret=False):
     for j, (bx, by, tr, kk) in enumerate(((800, 250, ("wings",), 1.4), (850, 330, (), 1.3), (770, 320, ("horn",), 1.6),
                                          (830, 400, ("stinger",), 1.7), (740, 420, ("acid",), 1.8), (690, 380, (), 1.9),
                                          (880, 430, ("scythes",), 1.5), (660, 300, ("stinger",), 1.6))):
-        SH.put(sc, SH.bug(tr, "attack" if j % 3 == 0 else "idle", kk, 300 + j), bx, by, 10)   # coming through
+        pose = "attack" if (j + frame // 4) % 3 == 0 else "idle"             # snapping as they come through
+        SH.put(sc, SH.bug(tr, pose, kk, 300 + j), bx + int(2 * np.sin(frame * 0.5 + j)), by, 10)
     g = F.build("Страж", "idle", k=F.FRAMES["Страж"][0] * 1.5)                # a Guard standing before the fire
     sc.blit(g, int(560 - g.ox), int(420 - g.oy))
     sc.rgb[410:416, 220:620] = hexc("#24222a")
@@ -78,7 +79,7 @@ def main_menu(frame=0, ret=False):
     print("menu_main.png", img.size)
 
 
-def class_pick(chosen="foundry", ret=False):
+def class_pick(chosen="foundry", ret=False, frame=0):
     sc = FH.screen(103)
     nest = UI.nest(WW, HH, 7)
     right = sc.xx >= WW // 2
@@ -93,7 +94,7 @@ def class_pick(chosen="foundry", ret=False):
     letters(sc, "КЛАСС", WW // 2 - tw // 2, 8, "title", 24, col=(232, 222, 206), col2=(120, 96, 70))
     # the Foundry's half
     FU.plate(sc, 16, 56, 462, 420, seed=31)
-    furnace(sc, 239, 190, 96, 300, 0)
+    furnace(sc, 239, 190, 96, 300, frame)
     spr = leader_sprite("colossus", 1.9)
     sc.blit(spr, int(239 - spr.ox), int(296 - spr.oy))
     for fr, x in (("Механик", 120), ("Орудие", 362)):

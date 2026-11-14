@@ -123,6 +123,54 @@ def sheet():
     print("foundry_wide.png", canvas.size)
 
 
+def plates_layout(name, cols, W, H, sill_split=600, beam_left=170):
+    """Any screen built of plates side by side, laid out by the rule: the beam the full width (its left end and
+    its right end pinned, the title in the middle); the plates pinned to their edges, the one marked «grow» taking
+    the extra width (its content centred in it); every plate taking the extra height (content at its top); the
+    console the full width, its left controls pinned left and its right ones right."""
+    src = np.asarray(Image.open(out(name)).convert("RGB").resize((960, 540), Image.NEAREST)).astype(np.float32)
+    dw, dh = W - 960, H - 540
+    sc = FU.forge(W, H, 13)
+    FU.wing(sc, 0, 0, W, 44)
+    paste(sc, src, 0, 0, beam_left, 41, 0, 0)
+    paste(sc, src, beam_left, 0, 776, 41, beam_left + dw // 2, 0)
+    paste(sc, src, 776, 0, 960, 41, W - 184, 0)
+    for x0, y0, x1, y1, mode in cols:
+        nx0 = x0 + (dw if mode == "pin_r" else 0)
+        nx1 = x1 + (dw if mode in ("pin_r", "grow") else 0)
+        FU.plate(sc, nx0, y0, nx1, y1 + dh, seed=x0 + 5)
+        ox = nx0 + (dw // 2 if mode == "grow" else 0)
+        oy = dh // 2 if mode == "grow" else 0
+        paste(sc, src, x0 + 5, y0 + 5, x1 - 5, y1 - 5, ox + 5, y0 + 5 + oy)
+    sy = 466 + dh
+    FU.sill(sc, sy)
+    paste(sc, src, 0, 470, sill_split, 540, 0, sy + 4)
+    paste(sc, src, sill_split, 468, 960, 540, W - (960 - sill_split), sy + 2)
+    return sc
+
+
+SCREENS = [   # file, its plates (x0, y0, x1, y1, how it grows), where the console splits
+    ("foundry_leader_card.png", [(12, 52, 330, 462, "pin_l"), (338, 52, 626, 462, "grow"), (634, 52, 948, 462, "pin_r")], 600),
+    ("foundry_defeat.png", [(12, 52, 330, 462, "pin_l"), (340, 52, 626, 462, "grow"), (634, 52, 948, 462, "pin_r")], 600),
+    ("foundry_settings.png", [(12, 52, 196, 462, "pin_l"), (206, 52, 948, 462, "grow")], 600),
+    ("foundry_smelt.png", [(12, 52, 300, 462, "pin_l"), (308, 52, 652, 462, "grow"), (660, 52, 948, 462, "pin_r")], 600),
+]
+
+
+def screens_sheet():
+    """Four more screens at 1280×720, two by two."""
+    k = 0.5
+    cw, ch = int(1280 * k), int(720 * k)
+    canvas = Image.new("RGB", (cw * 2 + 48, ch * 2 + 48), (20, 18, 22))
+    for i, (name, cols, split) in enumerate(SCREENS):
+        sc = plates_layout(name, cols, 1280, 720, split)
+        im = Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8)).resize((cw, ch), Image.BOX)
+        canvas.paste(im, (16 + (i % 2) * (cw + 16), 16 + (i // 2) * (ch + 16)))
+    canvas = canvas.resize((canvas.width * 2, canvas.height * 2), Image.NEAREST)
+    canvas.save(out("foundry_wide_screens.png"))
+    print("foundry_wide_screens.png", canvas.size)
+
+
 def battle_layout(W, H):
     """The battle on a bigger canvas: the field keeps its size in cells — it is not stretched — and stands in the
     middle; round it the same ground runs on without the cells' marks (fading into it at the seam). The beam runs
@@ -178,3 +226,4 @@ def battle_sheet():
 if __name__ == "__main__":
     sheet()
     battle_sheet()
+    screens_sheet()
