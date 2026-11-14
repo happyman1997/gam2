@@ -1,6 +1,6 @@
-"""Icons from the Pixel Art Atlas dataset — now only the swarm's (assets/swarm_icons.png). The Foundry's module icons
-are drawn in code instead (icons_drawn.py → assets/module_icons.png); this module still reads that atlas
-(icon(), icon_rgba()) and holds the ramps both use (R).
+"""The icon atlases: reading them (icon(), icon_rgba(), sheet()) and the ramps the drawn icons use (R). The icons
+themselves are drawn in code — the Foundry's modules in icons_drawn.py, the swarm's in swarm_icons_drawn.py; the
+build from the Pixel Art Atlas dataset below (build_atlas) is the old way and is no longer used.
 
 Originally: module icons, 16×16 pixel icons for the Foundry's modules.
 
