@@ -1,4 +1,8 @@
-"""Module icons: 16×16 pixel icons for the Foundry's modules.
+"""Icons from the Pixel Art Atlas dataset — now only the swarm's (assets/swarm_icons.png). The Foundry's module icons
+are drawn in code instead (icons_drawn.py → assets/module_icons.png); this module still reads that atlas
+(icon(), icon_rgba()) and holds the ramps both use (R).
+
+Originally: module icons, 16×16 pixel icons for the Foundry's modules.
 
 They are made from sprites of the CC0 dataset Angais/pixel-art-atlas-1.4m
 (https://huggingface.co/datasets/Angais/pixel-art-atlas-1.4m, public domain, CC0 1.0 — its sprites are AI-generated,
