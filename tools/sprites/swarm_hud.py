@@ -200,40 +200,103 @@ SPEND = [   # what biomass buys in the brood: (icon, the button, what it does, c
 ]
 
 
-def brood(variant=None):
+LEADER_EN = {"Матка": "matka", "Разум улья": "razum", "Пожиратель": "pozh", "Чума": "kuk"}
+BROOD_LEADER = {   # what the brood looks like under each leader: (name in the spend, its line, cost, the marks on
+                   # groups {index: (icons, cell state)}, a line by the biomass counter, the limit)
+    "Матка": ("Кормить Матку", "{выводок} → {потомок:+1}", 10, {}, None, 45),
+    "Разум улья": ("Кормить Разум", "{выводок} → {потомок:+1}", 10,
+                   {1: (("m_psi_gland",), "mut"), 4: (("m_psi_dread",), "mut")}, "пси-мутации: 2 — у стоявших рядом", 45),
+    "Пожиратель": ("Растить Пожирателя", "{биомасса} → ступень 2 из 3", 18, {}, "из пасти: +12", 35),
+    "Чума": ("Кормить Чуму", "{выводок} → {потомок:+1}", 10,
+             {2: (("hand", "worm"), "eat"), 5: (("bones", "quills"), "eat")}, "химеры: по две чужие черты", 45),
+}
+
+
+def brood_leader_overlay(sc, leader_name, marks, grid):
+    """What the leader's rule does to the brood, made plain: the Hive Mind's psi threads to the groups that took a
+    psi mutation; the Devourer's table under the groups (bodies eaten in battle → biomass) and his growth; the
+    Plague's chimeras in a blood-red rim with their two alien traits."""
+    import swarm_abilities as SA
+    GX0, GY0, GCW, GCH = grid
+    cellxy = lambda k_: (GX0 + (k_ % 3) * (GCW + 8), GY0 + (k_ // 3) * (GCH + 6))
+    if leader_name == "Разум улья":
+        bx, by = 690, 440
+        sc.glow(bx, by, 26, hexc("#ac80ec"), 0.45)
+        icon(sc, "razum", bx - 16, by - 16, 2)
+        for k_ in marks:
+            x0, y0 = cellxy(k_)
+            SA.thread(sc, (bx - 6, by - 10), (x0 + 16, y0 + 14), sag=-14, k=0.9)
+            m = UI.edges((sc.xx >= x0 - 2) & (sc.xx < x0 + GCW + 2) & (sc.yy >= y0 - 2) & (sc.yy < y0 + GCH + 2))[0]
+            sc.rgb[m] = hexc("#ac80ec")
+            letters(sc, "пси", x0 + GCW - 10, y0 + GCH - 22, "text", 16, col=(196, 150, 255), align="right")
+    elif leader_name == "Пожиратель":
+        UI.plate(sc, 12, 438, 700, 474)
+        icon(sc, "m_table", 22, 447)
+        letters(sc, "за столом: тела, съеденные в бою", 46, 446, "text", 16, col=(236, 120, 96))
+        fx_line(sc, 360, 446, "{биомасса:+12}")
+        for j, kk in enumerate((0.34, 0.46, 0.6)):                         # his growth: three stages
+            spr = leader("Пожиратель", "idle", kk)
+            x = 480 + j * 72
+            if j > 1:
+                spr = lit_dim(spr)
+            put(sc, spr, x, 470, 0)
+            if j == 1:
+                glyph(sc, "лидер", x - 8, 440, 1)
+    elif leader_name == "Чума":
+        for k_ in marks:
+            x0, y0 = cellxy(k_)
+            m = UI.edges((sc.xx >= x0 - 2) & (sc.xx < x0 + GCW + 2) & (sc.yy >= y0 - 2) & (sc.yy < y0 + GCH + 2))[0]
+            sc.rgb[m] = hexc("#d65a4a")
+            sc.glow(x0 + 30, y0 + 20, 22, hexc("#d65a4a"), 0.3)
+            letters(sc, "химера ×2", x0 + GCW - 8, y0 + GCH - 22, "text", 16, col=(236, 120, 96), align="right")
+
+
+def lit_dim(spr):
+    import copy
+    s2 = copy.copy(spr)
+    s2.rgb = spr.rgb * 0.35 + np.array((40, 30, 50)) * 0.65
+    return s2
+
+
+def brood(variant=None, leader_name="Матка"):
     """The brood: everything has hatched and the swarm is over its limit. The auto-selection has already eaten
     the extra — those whose traits killed least — so the swarm fits and «В БОЙ» is open from the start; the player
     only corrects it: a click on a group eats one more, a right click gives one back. Each creature is a gem in
     its group's row, the eaten ones bitten. Biomass is spent in its own column, each button saying on whom."""
     import brood as B
     sc = frame_screen(31)
-    UI.engrave(sc, leader("Матка", "idle", 2.2), 640, 560, k=0.8)
+    feed_name, feed_line, feed_cost, marks, top_line, limit = BROOD_LEADER[leader_name]
+    UI.engrave(sc, leader(leader_name, "idle", 2.2 if leader_name == "Матка" else 2.6), 640, 560, k=0.8)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
     title(sc, "НАША СУДЬБА", seed=5)
     icon(sc, "biomass", 700, 6, 2)
     letters(sc, "34", 740, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    if top_line:                                       # the leader's own rule, by the purse
+        letters(sc, top_line, 680, 12, "text", 16, col=B.POOL_COL[leader_name], align="right")
     help_button(sc)
     # the auto-selection, already done: plain ants go first, their traits killed least
     groups = [list(g) for g in B.GROUPS]
     total = sum(B.pts(g) * g[5] for g in groups)
-    over = total - B.LIMIT
+    over = total - limit
     for g in groups:
         g[8] = 0
     groups[0][8] = over
     # the limit: an abdomen of segments, all within it now
     UI.plate(sc, 12, 50, 948, 94)
     fx_line(sc, 24, 60, "{предел}")
-    letters(sc, f"{total - over}/{B.LIMIT}", 50, 62, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    letters(sc, f"{total - over}/{limit}", 50, 62, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     bx0, bx1 = 150, 938
-    sb0, sw = UI.segbar(sc, bx0, 62, bx1, 16, total, B.LIMIT, over)
+    sb0, sw = UI.segbar(sc, bx0, 62, bx1, 16, total, limit, over)
     UI.drips(sc, 300, 900, 94, "#7a9a30", n=3, seed=7, Lmax=9)
     # the groups: comb cells, three across
     GX0, GY0, GCW, GCH = 12, 100, 224, 78
     for k_, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(groups):
         x0, y0 = GX0 + (k_ % 3) * (GCW + 8), GY0 + (k_ // 3) * (GCH + 6)
         hov = variant is None and k_ == 2                 # the mouse over the wasps
-        UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "hover" if hov else ("eat" if eat else ("new" if new else "normal")))
+        mk = marks.get(k_)
+        UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "hover" if hov else (mk[1] if mk else
+                ("eat" if eat else ("new" if new else "normal"))))
         if hov:
             hover_at = (x0, y0)
         mut = B.MUTS.get(k_, (None,))[0]
@@ -242,10 +305,15 @@ def brood(variant=None):
             spr2 = W.build(traits, hue + 0.03, "idle", soldier, k=0.85 if soldier else 1.1, chimera=chim, genes=W.genes_for(k_ * 7 + 4), rare=mut)
             put(sc, spr2, x0 + 26, y0 + GCH - 22, 0)
         put(sc, spr, x0 + 44, y0 + GCH - 8, 12)
-        if k_ in B.MUTS:                                   # what it carries: the mutation's icon, top left
+        if mk:                                             # the leader's own mark: psi, two alien traits
+            for m_, ik in enumerate(mk[0]):
+                icon(sc, ik, x0 + 8 + m_ * 18, y0 + 6)
+        elif k_ in B.MUTS and leader_name == "Матка":      # what it carries: the mutation's icon, top left
             icon(sc, "m_" + B.MUTS[k_][0], x0 + 8, y0 + 6)
         elif badge:
             icon(sc, B.KID_ICON[badge], x0 + 8, y0 + 6)
+        if leader_name != "Матка" and "гнезд" in name:      # the nest is the Queen's own mutation
+            name = "муравей-химера" if leader_name == "Чума" else "муравей"
         letters(sc, name, x0 + 80, y0 + 6, "text", 16, col=INK, jitter=1, seed=k_)
         cw = letters(sc, f"×{count}", x0 + 80, y0 + 28, "title", 16, col=(236, 220, 190), col2=(160, 130, 100))
         glyph(sc, "предел", x0 + 86 + cw, y0 + 31, 1)
@@ -275,7 +343,8 @@ def brood(variant=None):
     # spending biomass: each button says on whom, a line says what it does, the price beside it
     UI.plate(sc, 710, 100, 948, 474, antennae=True)
     heading(sc, "БИОМАССА", 724, 110, seed=4)
-    for i, (key, label, line, cost) in enumerate(SPEND):
+    spend = [("feed", feed_name, feed_line, feed_cost)] + SPEND[1:]
+    for i, (key, label, line, cost) in enumerate(spend):
         y0 = 138 + i * 82
         UI.button(sc, 720, y0, 938, y0 + 34, "acid")
         icon(sc, key, 744, y0 + 9)
@@ -296,7 +365,8 @@ def brood(variant=None):
     UI.creature(sc, larva("idle", 0.85), 690, 476)
     UI.creature(sc, bug(("wings",), "idle", 0.95, 43), 930, 104)
     UI.cobweb(sc, 2, 480, 26, quad=(1, 1))
-    name = "brood.png"
+    brood_leader_overlay(sc, leader_name, marks, (GX0, GY0, GCW, GCH))
+    name = "brood.png" if leader_name == "Матка" else f"brood_{LEADER_EN[leader_name]}.png"
     if variant == "tip":                         # the mouse over a group's newborn
         point_at(sc, "потомок", 0)
         name = "swarm_tip_glyph.png"
@@ -2110,7 +2180,7 @@ def hints():
     camp("confirm")
 
 
-SCREENS = {"brood": brood, "camp": camp, "evolution": evolution, "finds": finds, "pools": pools,
+SCREENS = {"brood": brood, "brood_leaders": lambda: [brood("plain", n) for n in ("Разум улья", "Пожиратель", "Чума")], "camp": camp, "evolution": evolution, "finds": finds, "pools": pools,
            "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development,
            "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif,
            "glossary": glossary_screen, "hints": hints, "roles": roles}
