@@ -1,7 +1,7 @@
 """The swarm's interface kit, in the insects' own materials: a nest of wax cells behind everything, chitin plates for
 panels, chamfered comb cells for cards, resin drops for buttons, a wing membrane for the title bar, an abdomen of
 segments for the limit bar, antennae on the big panels. Pixel fonts: Press Start 2P for headings (OFL, in fonts/),
-GNU Unifont for text (taken from the system package fonts-unifont; PT Serif if it is missing).
+GNU Unifont for text (tools/sprites/fonts/unifont-18.0.01.otf, SIL OFL 1.1 — or GPL-2+ with the font exception).
 
     python3 tools/sprites/swarm_ui.py      -> out/swarm_ui_kit.png (every piece, in every state)
 """
@@ -16,7 +16,7 @@ from paths import font
 OUTL = hexc("#08060c")
 INK, MUTED, GOLD, BIO, RED, GREEN, DARK = (236, 224, 196), (170, 156, 180), (240, 190, 90), (160, 230, 110), (240, 122, 96), (150, 220, 120), (40, 22, 8)
 VIOLET = (196, 150, 255)
-UNIFONT = "/usr/share/fonts/opentype/unifont/unifont.otf"
+UNIFONT = font("unifont-18.0.01.otf")        # GNU Unifont: SIL OFL 1.1 (or GPL-2+ with the font exception), fonts/
 
 # rims of the comb cells: (rim, rim highlight, fill)
 CELL = {

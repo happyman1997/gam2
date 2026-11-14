@@ -923,7 +923,8 @@
  "icons": {
   "modules": "../../module_icons.png",
   "index": "../../module_icons.json",
-  "cell": 16
+  "cell": 16,
+  "source": "Pixel Art Atlas (Angais, CC0 1.0); спрайты сгенерированы Krea 2 Turbo — см. docs/STEAM.md"
  },
  "animations": {
   "button_click": "../../ui_anim/button_click.json",
@@ -946,9 +947,11 @@
    "license": "OFL 1.1 (в репо)"
   },
   "text": {
-   "file": "GNU Unifont (unifont.otf), 16 px",
-   "license": "SIL OFL 1.1 (двойная с GPL-2+ и исключением для шрифтов, с версии 13.0.04)",
-   "note": "не в репозитории: шрифт системный — до выпуска взять релиз с unifoundry.com с текстом OFL"
+   "file": "tools/sprites/fonts/unifont-18.0.01.otf",
+   "px": [
+    16
+   ],
+   "license": "SIL OFL 1.1 (или GPL-2+ с исключением для шрифтов); OFL-Unifont.txt, LICENSE-Unifont.txt"
   }
  },
  "colours": {

@@ -1,7 +1,9 @@
 """Module icons: 16×16 pixel icons for the Foundry's modules.
 
 They are made from sprites of the CC0 dataset Angais/pixel-art-atlas-1.4m
-(https://huggingface.co/datasets/Angais/pixel-art-atlas-1.4m, public domain, CC0 1.0) and reworked for the game:
+(https://huggingface.co/datasets/Angais/pixel-art-atlas-1.4m, public domain, CC0 1.0 — its sprites are AI-generated,
+by Krea 2 Turbo with a pixel-art LoRA; the Krea 2 licence allows commercial use of its outputs under $1M yearly
+revenue, see docs/STEAM.md) and reworked for the game:
 recoloured into the Foundry's palettes (iron, brass, copper, fire, the arc's blue, the frames' own paints, the
 Maniac's purple for his modules), turned to face right like our creatures, given our outline and a rim light along
 the top edge. Only the reworked icons are kept in the repository (assets/module_icons.png); the dataset is not.

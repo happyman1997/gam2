@@ -200,9 +200,8 @@ def manifest(n_glyphs):
         effects={f: rel("..", "..", "fx", f + ".json") for f in fx},
         fonts=dict(
             title=dict(file="tools/sprites/fonts/PressStart2P-Regular.ttf", px=[8, 16, 24], license="OFL 1.1 (в репо)"),
-            text=dict(file="GNU Unifont (unifont.otf), 16 px",
-                      license="SIL OFL 1.1 (двойная с GPL-2+ и исключением для шрифтов, с версии 13.0.04)",
-                      note="не в репозитории: шрифт системный — до выпуска взять релиз с unifoundry.com с текстом OFL")),
+            text=dict(file="tools/sprites/fonts/unifont-18.0.01.otf", px=[16],
+                      license="SIL OFL 1.1 (или GPL-2+ с исключением для шрифтов); OFL-Unifont.txt, LICENSE-Unifont.txt")),
         colours=dict(ink="#e6dccc", muted="#8a8478", gold="#f0c878", red="#e05a3a", blue="#9ad8ff",
                      outline="#100c10"),
     )
