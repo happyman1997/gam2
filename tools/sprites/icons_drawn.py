@@ -526,22 +526,25 @@ def smokestack():
 
 @icon("whistle")
 def steam_whistle():
-    """Паровой свисток: a brass whistle on a copper pipe — a domed bell, a dark ring of a slot near its foot, a
-    lever pulled down at the side — blowing a big cloud of steam out of its top, its scream ringing out to both
-    sides."""
+    """Паровой свисток: a brass bell whistle standing on its pipe, side on — the domed bell, the dark ring of its
+    slot, the pull-cord lever with its red knob — and a white plume of steam shooting straight up out of the slot,
+    widening as it rises, with the sound in arcs either side."""
     p = Pix()
-    p.col(7, 12, 14, "copper", [4, 3])                        # the pipe
-    p.col(8, 12, 14, "copper", [2, 1])
-    bell = grid(lambda x, y: (5 <= x <= 10 and 6 <= y <= 11) or (y == 5 and 6 <= x <= 9))
+    p.rect(6, 13, 9, 14, "copper", [3, 1])                    # the pipe's flange
+    p.col(7, 11, 12, "copper", [4, 3])                        # the pipe
+    p.col(8, 11, 12, "copper", [2, 1])
+    bell = grid(lambda x, y: (6 <= x <= 9 and 7 <= y <= 10) or (y == 6 and 7 <= x <= 8))
     p.fill(bell, "brass", inner=(3, 2))
-    for x in range(5, 11):
-        p.px(x, 10, "iron", 1)                                # the slot
-    p.line([(4, 8), (2, 11)], "iron", 3)                      # the lever, pulled
-    p.px(2, 11, "red", 3)
-    p.disc(6.0, 2.4, 2.1, "steel", levels=(4, 4, 3))          # the steam
-    p.disc(9.6, 2.0, 2.3, "steel", levels=(4, 4, 3, 2))
-    for x, y in ((13, 6), (14, 8), (13, 10), (1, 6)):
-        p.px(x, y, "steel", 2)                                # its scream
+    for x in range(6, 10):
+        p.px(x, 9, "iron", 0)                                 # the slot
+    p.line([(10, 8), (12, 10)], "iron", 3)                    # the lever
+    p.px(13, 11, "red", 3)
+    for y, half in ((5, 1), (4, 1), (3, 2), (2, 2), (1, 3), (0, 3)):   # the plume, widening upward
+        for x in range(8 - half, 8 + half):
+            p.px(x, y, "steel", 4 if abs(x - 7.5) < half - 0.5 else 3)
+    for x, ys in ((3, (4, 5, 6)), (12, (4, 5, 6)), (1, (3, 7)), (14, (3, 7))):
+        for y in ys:
+            p.px(x, y, "steel", 2)                            # its scream
     return p.done()
 
 
@@ -855,19 +858,17 @@ def grappling_hook():
 
 @icon("mill")
 def millstone_wheels():
-    """Колёса-жернова: a millstone wheel face on — a groove round it, furrows cut out from the square iron hub to
-    the rim; its axle running off behind it to the next wheel, grit flying as it rolls."""
+    """Колёса-жернова: a pair of round grindstones on one iron axle, seen a little from the front — each a disc
+    with a bright rim, a ring groove and a square iron hub; the axle between them; grit spraying off the back."""
     p = Pix()
-    p.rect(12, 6, 14, 8, "iron", [3, 2, 1])                    # the axle, off to the next wheel
-    p.disc(7.0, 7.5, 6.3, "stone", levels=(4, 4, 3, 3, 2, 1))
-    for a in np.linspace(0, 2 * np.pi, 28, endpoint=False):     # the groove round it
-        p.px(round(7.0 + np.cos(a) * 4.3), round(7.5 + np.sin(a) * 4.3), "stone", 1)
-    for a in (0.8, 2.4, 3.9, 5.5):                             # the furrows
-        for rr in (2.2, 3.2, 5.2):
-            p.px(round(7.0 + np.cos(a) * rr), round(7.5 + np.sin(a) * rr), "stone", 1)
-    p.rect(6, 7, 7, 8, "iron", [3, 1])                         # the hub
-    for x, y in ((14, 12), (15, 14), (12, 14)):
-        p.px(x, y, "stone", 3)                                 # grit
+    p.rect(4, 7, 11, 8, "iron", [3, 1])                       # the axle
+    for cx, lv in ((4.5, (4, 3, 3, 2, 1)), (11.0, (3, 3, 2, 2, 1))):
+        p.disc(cx, 8.0, 4.2, "stone", levels=lv)
+        for a in np.linspace(0, 2 * np.pi, 18, endpoint=False):
+            p.px(round(cx + np.cos(a) * 2.6), round(8.0 + np.sin(a) * 2.6), "stone", 1)   # the ring groove
+        p.rect(round(cx) - 1, 7, round(cx), 8, "iron", [3, 1])                           # the hub
+    for x, y in ((0, 12), (1, 14), (2, 13)):
+        p.px(x, y, "stone", 3)                                # grit
     return p.done()
 
 

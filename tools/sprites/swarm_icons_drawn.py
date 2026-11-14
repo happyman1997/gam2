@@ -483,16 +483,17 @@ def larva():
 
 @icon("selection")
 def selection():
-    """Естественный отбор: a weak bug dead on its back, legs in the air; the strong one standing over it."""
+    """Естественный отбор: a big bug standing on a small dead one — the dead one curled pale on its back under
+    it, the winner whole and dark, an eye bright."""
     p = Pix()
-    p.fill(ell(4.5, 12.5, 3.6, 1.7), "bone", inner=(2, 2), rim=3, shade=1)   # the dead one, a pale husk on its back
-    for x in (2, 4, 6):
-        p.line([(x, 11), (x + 1, 9), (x, 8)], "bone", 3)           # its legs in the air
-    legs(p, [(9, 9), (11, 9), (13, 9)], spread=1.0, foot=13)
-    p.fill(ell(11.0, 7.0, 3.6, 2.4), "chitin", inner=(3, 2))       # the strong one
-    p.fill(ell(14.2, 6.0, 1.4, 1.4), "chitin", inner=(3, 2))
-    p.px(14, 5, "acid", 4)
-    antennae(p, 14, 5, long=1, elbow=False)
+    p.fill(ell(7.5, 12.5, 5.0, 2.0), "bone", inner=(2, 2), rim=3, shade=1)   # the dead one, a pale husk
+    for x in (4, 7, 10):
+        p.px(x, 10, "bone", 3)                                # its legs curled up
+    legs(p, [(6, 8), (9, 8), (12, 8)], spread=0.9, foot=11)
+    p.fill(ell(8.0, 5.5, 4.4, 2.6), "chitin", inner=(3, 2))   # the winner, standing on it
+    p.fill(ell(13.0, 4.5, 1.8, 1.7), "chitin", inner=(3, 2))
+    p.px(14, 4, "acid", 4)
+    p.line([(14, 3), (15, 1)], "chitin", 3)
     return p.done()
 
 
@@ -627,14 +628,20 @@ def neurotoxin():
 
 @icon("evo_longlegs")
 def long_legs():
-    """Длинные лапы: a scorpion raised high on long thin legs, its body carried well off the ground."""
+    """Длинные лапы: a scorpion carried high on long stilt legs splayed wide — its segmented tail curled up over
+    its back to the hooked sting, its claws reaching forward; a strip of ground far below."""
     p = Pix()
-    for x in (5, 7, 9, 11):
-        p.line([(x, 6), (x - 2 + (x > 8) * 4, 3), (x - 3 + (x > 8) * 6, 14)], "rust", 1 + x % 2)
-    p.fill(ell(8.0, 6.0, 4.2, 1.6), "rust", inner=(3, 2))
-    p.line([(4, 5), (2, 3), (3, 1), (5, 1)], "rust", 3)            # the tail
-    p.px(6, 2, "crimson", 4)
-    p.fill(ell(13.0, 5.0, 1.4, 1.0), "rust", inner=(3, 2))         # a claw
+    p.rect(0, 15, 15, 15, "fur", [1])                         # the ground
+    for x0, x1 in ((6, 1), (7, 4), (9, 11), (10, 14)):        # the legs: up to a knee, then far down and out
+        kx = x0 + (-1 if x1 < x0 else 1)
+        p.line([(x0, 8), (kx, 6), (x1, 14)], "rust", 2)
+    p.fill(ell(8.0, 8.0, 3.6, 1.5), "rust", inner=(3, 2))     # the body
+    for (cx, cy) in ((4.5, 7.0), (3.2, 5.0), (3.4, 3.0), (5.0, 1.6)):
+        p.fill(ell(cx, cy, 1.1, 1.0), "rust", inner=(3, 2))   # the tail's segments, curling over
+    p.line([(6, 1), (7, 2), (7, 3)], "crimson", 4)            # the sting
+    p.fill(ell(12.6, 7.0, 1.4, 1.0), "rust", inner=(3, 2))    # the claw
+    p.px(14, 6, "rust", 4)
+    p.px(14, 8, "rust", 3)
     return p.done()
 
 
