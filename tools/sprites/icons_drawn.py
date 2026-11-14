@@ -1414,6 +1414,130 @@ def col_scoop():
     return p.done()
 
 
+# ---------------------------------------------------------------- artifacts: always passive, the army's
+ART = {}
+
+
+def art(key):
+    def reg(f):
+        ART[key] = f
+        return f
+    return reg
+
+
+@art("banner")
+def banner():
+    """Знамя двух ветров: a pole with a swallow-tailed banner, half red half blue, streaming."""
+    p = Pix()
+    p.col(3, 1, 14, "wood", [4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 1])
+    p.px(3, 0, "brass", 4)
+    for y in range(2, 10):
+        x1 = 13 - (abs(y - 6) if y >= 6 else 0)
+        for x in range(4, x1 + 1):
+            p.px(x, y, "red" if y < 6 else "blue", 3 if x < 9 else 2)
+    p.px(13, 7, "blue", 1)
+    return p.done()
+
+
+@art("boots")
+def boots():
+    """Сапоги преследователя: a tall leather boot with a brass spur and wind lines behind it."""
+    p = Pix()
+    p.fill(grid(lambda x, y: (5 <= x <= 9 and 2 <= y <= 11) or (5 <= x <= 13 and 10 <= y <= 13)), "wood", inner=(3, 2))
+    p.rect(5, 13, 13, 13, "wood", [1])
+    p.rect(5, 2, 9, 3, "wood", [4, 3])
+    p.px(4, 12, "brass", 4)
+    p.px(3, 12, "brass", 3)
+    for y in (5, 8, 11):
+        p.line([(0, y), (2, y)], "steel", 2)
+    return p.done()
+
+
+@art("chalice")
+def chalice():
+    """Кровавая чаша: a golden goblet brimming red, a drop running down its bowl."""
+    p = Pix()
+    bowl = grid(lambda x, y: 3 <= y <= 7 and abs(x - 7.5) <= 5 - (y - 3) * 0.6)
+    p.fill(bowl, "brass", inner=(3, 2))
+    p.rect(3, 2, 12, 2, "crimson", [3])
+    p.px(5, 4, "crimson", 4)
+    p.px(5, 5, "crimson", 3)
+    p.col(7, 8, 11, "brass", [3, 2, 2, 2])
+    p.col(8, 8, 11, "brass", [2, 1, 1, 1])
+    p.rect(4, 12, 11, 13, "brass", [4, 2])
+    return p.done()
+
+
+@art("anvil")
+def heavy_anvil():
+    """Тяжёлая наковальня: a squat black anvil, its horn to the left, a dent in its face."""
+    p = Pix()
+    p.fill(grid(lambda x, y: (y in (4, 5) and 1 <= x <= 14 and (x >= 4 or y == 5)) or (6 <= y <= 8 and 5 <= x <= 11)
+                or (9 <= y <= 12 and 3 <= x <= 13)), "iron", inner=(3, 2))
+    p.rect(4, 4, 14, 4, "steel", [4])
+    p.px(9, 4, "iron", 1)
+    p.rect(2, 13, 14, 13, "iron", [1])
+    return p.done()
+
+
+@art("bell")
+def alarm_bell():
+    """Колокол тревоги: a bronze bell swinging, its clapper out, the ringing in arcs."""
+    p = Pix()
+    bell = grid(lambda x, y: 3 <= y <= 11 and abs(x - 7.5) <= 2 + (y - 3) * 0.5)
+    p.fill(bell, "copper", inner=(3, 2))
+    p.rect(3, 11, 12, 12, "copper", [4, 2])
+    p.rect(7, 1, 8, 2, "iron", [3, 2])
+    p.px(9, 13, "iron", 3)
+    for x, y in ((1, 5), (0, 7), (14, 5), (15, 7), (1, 9), (14, 9)):
+        p.px(x, y, "brass", 3)
+    return p.done()
+
+
+@art("dice")
+def cut_dice():
+    """Гранёные кости: two dice of polished bone, their pips sharp."""
+    p = Pix()
+    p.fill(grid(lambda x, y: 1 <= x <= 7 and 6 <= y <= 12), "bone", inner=(4, 3))
+    p.fill(grid(lambda x, y: 8 <= x <= 14 and 2 <= y <= 8), "bone", inner=(4, 3))
+    for x, y in ((3, 8), (5, 10), (4, 9), (10, 4), (12, 6), (10, 6), (12, 4)):
+        p.px(x, y, "chitin", 1)
+    return p.done()
+
+
+@art("hourglass")
+def hourglass():
+    """Песочные часы: a brass-framed hourglass, the sand half run through."""
+    p = Pix()
+    p.rect(3, 1, 12, 2, "brass", [4, 2])
+    p.rect(3, 13, 12, 14, "brass", [4, 2])
+    glass = grid(lambda x, y: 3 <= y <= 12 and abs(x - 7.5) <= 0.6 + abs(y - 7.5) * 0.8)
+    p.fill(glass, "steel", inner=(4, 3), rim=4, shade=2)
+    for y in range(9, 13):
+        for x in range(16):
+            if glass[y, x] and abs(x - 7.5) <= (y - 8) * 0.8:
+                p.px(x, y, "amber", 3)
+    p.px(7, 8, "amber", 4)
+    for y in range(4, 6):
+        for x in range(16):
+            if glass[y, x]:
+                p.px(x, y, "amber", 2)
+    return p.done()
+
+
+@art("fog_lantern")
+def fog_lantern():
+    """Туманный фонарь: a lantern glowing pale through a curl of fog."""
+    p = Pix()
+    p.rect(6, 1, 9, 2, "iron", [3, 2])
+    p.fill(grid(lambda x, y: 4 <= x <= 11 and 3 <= y <= 11), "iron", inner=(2, 2), rim=3)
+    p.rect(5, 4, 10, 10, "lantern", [4, 4, 3, 3, 3, 2, 2])
+    p.rect(4, 12, 11, 12, "iron", [2])
+    for x, y in ((0, 9), (1, 8), (2, 9), (13, 6), (14, 5), (15, 6), (1, 13), (14, 12)):
+        p.px(x, y, "slate", 3)
+    return p.done()
+
+
 # ---------------------------------------------------------------- small icons for the interface itself (settings)
 UI = {}
 
