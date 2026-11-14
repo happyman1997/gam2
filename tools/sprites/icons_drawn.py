@@ -1348,6 +1348,72 @@ def spring_dash():
     return p.done()
 
 
+# ---------------------------------------------------------------- the Colossus's own colossal modules
+@icon("col_battery")
+def col_battery():
+    """Плечевая батарея: a riveted box of six rocket tubes, red warheads in their mouths, a brass band."""
+    p = Pix()
+    p.fill(grid(lambda x, y: 1 <= x <= 14 and 3 <= y <= 12), "iron", inner=(3, 2))
+    p.col(7, 3, 12, "brass", [4, 3, 3, 3, 3, 3, 3, 3, 2, 2])
+    for cx in (3, 5, 10, 12):
+        for cy in (5, 9):
+            if (cx in (5, 10)):
+                continue
+    for cx, cy in ((3, 5), (5, 5), (10, 5), (12, 5), (3, 9), (5, 9), (10, 9), (12, 9)):
+        p.dark(cx, cy)
+    for cx, cy in ((3, 6), (5, 6), (10, 6), (12, 6), (3, 10), (5, 10), (10, 10), (12, 10)):
+        p.px(cx, cy, "red", 4)
+    p.rect(5, 13, 10, 14, "iron", [2, 1])                    # the bracket
+    return p.done()
+
+
+@icon("col_reactor")
+def col_reactor():
+    """Реактор с трубами: a round reactor glowing through its grille, two exhaust pipes standing up from it,
+    heat shimmering off their mouths."""
+    p = Pix()
+    p.disc(7.5, 10.0, 4.8, "iron", levels=(4, 3, 2, 2, 1))
+    p.disc(7.5, 10.0, 2.8, "fire", levels=(4, 4, 3, 2))
+    for x in (6, 8):
+        p.col(x, 8, 12, "iron", [1])                         # the grille
+    for x0 in (3, 11):
+        p.rect(x0, 1, x0 + 1, 6, "steel", [4, 3, 3, 3, 2, 2])  # the pipes
+        p.px(x0, 0, "fire", 3)
+        p.px(x0 + 1, 0, "fire", 2)
+    return p.done()
+
+
+@icon("col_rail")
+def col_rail():
+    """Рельсотрон: two long copper rails side by side with blue coils between them, a bolt of light along them."""
+    p = Pix()
+    p.line([(1, 10), (13, 3)], "copper", 4)                  # the rails
+    p.line([(2, 12), (14, 5)], "copper", 2)
+    for k in range(3):
+        x, y = 4 + k * 3, 10 - k * 2
+        p.rect(x, y, x + 1, y + 1, "volt", [3, 2])          # coils
+    p.line([(3, 11), (15, 4)], "volt", 4)                    # the bolt
+    p.px(15, 3, "lantern", 4)
+    p.rect(0, 11, 2, 14, "iron", [3, 2, 1])                  # the breech
+    return p.done()
+
+
+@icon("col_scoop")
+def col_scoop():
+    """Ковш-дробилка: a toothed iron bucket on a hydraulic arm, crushing a lump of rock in its jaws."""
+    p = Pix()
+    p.line([(1, 14), (5, 8)], "iron", 3)                     # the arm
+    p.rect(2, 11, 3, 12, "brass", [4, 3])                    # the piston's collar
+    bucket = grid(lambda x, y: 5 <= x <= 13 and 4 <= y <= 11 and (x - 5) + (11 - y) >= 2)
+    p.fill(bucket, "iron", inner=(3, 2))
+    for x in (6, 8, 10, 12):
+        p.px(x, 3, "steel", 4)                               # teeth
+    p.rect(8, 6, 11, 8, "stone", [3, 2, 1])                  # the rock in its jaws
+    p.px(14, 9, "stone", 3)
+    p.px(15, 11, "stone", 2)
+    return p.done()
+
+
 # ---------------------------------------------------------------- small icons for the interface itself (settings)
 UI = {}
 
@@ -1407,7 +1473,8 @@ def ui_keys():
     return p.done()
 
 
-NAMES = {k: IC.ICONS[k][1] for k in IC.ICONS}
+NAMES = {**{k: IC.ICONS[k][1] for k in IC.ICONS}, "col_battery": "Плечевая батарея", "col_reactor": "Реактор с трубами",
+         "col_rail": "Рельсотрон", "col_scoop": "Ковш-дробилка"}
 
 
 def review(keys, fname, title):
@@ -1473,6 +1540,10 @@ def sheet():
     print("icons_redraw.png", img.size)
 
 
+EXTRA_NAMES = {"col_battery": "Плечевая батарея", "col_reactor": "Реактор с трубами", "col_rail": "Рельсотрон",
+               "col_scoop": "Ковш-дробилка"}
+
+
 def atlas():
     """The module icons' atlas for the game and the screens, from the drawn icons: the same cells and keys as
     before (assets/module_icons.png, .json), so everything that draws an icon by its key gets the new one."""
@@ -1488,6 +1559,18 @@ def atlas():
         cx, cy = v["cell"]
         sheet[cy * 16:(cy + 1) * 16, cx * 16:(cx + 1) * 16] = NEW[k]()
         index[k] = dict(cell=[cx, cy], name=v["name"], owner=v["owner"])
+    used = {tuple(v["cell"]) for v in index.values()}
+    free = [(x, y) for y in range(H) for x in range(W) if (x, y) not in used]
+    for k in NEW:                                           # icons drawn since: into the free cells
+        if k in index:
+            continue
+        if not free:
+            sheet = np.concatenate([sheet, np.zeros((16, W * 16, 4), np.uint8)])
+            free = [(x, H) for x in range(W)]
+            H += 1
+        cx, cy = free.pop(0)
+        sheet[cy * 16:(cy + 1) * 16, cx * 16:(cx + 1) * 16] = NEW[k]()
+        index[k] = dict(cell=[cx, cy], name=EXTRA_NAMES.get(k, k), owner="Колосс" if k.startswith("col_") else "")
     Image.fromarray(sheet, "RGBA").save(png_path)
     json.dump(dict(source="drawn in code, pixel by pixel: tools/sprites/icons_drawn.py", icons=index),
               open(idx_path, "w"), ensure_ascii=False, indent=1)
@@ -1531,6 +1614,7 @@ BATCHES = {"guard": ["tower", "intercept", "anchor", "plates", "counter", "hot"]
            "rare3": ["tracks", "flail", "cast", "fire", "volt", "mill"],
            "architect": ["w_tower", "w_wall", "w_gate", "w_pitch", "w_press", "w_thunder"],
            "maniac": ["w_boom", "w_forge", "c_saw", "c_catapult", "c_fist", "c_triple"],
+           "colossal": ["col_battery", "col_reactor", "col_rail", "col_scoop", "plates", "flail"],
            "inventor": ["c_upside", "c_burning", "c_salute", "a_coil", "a_mirror", "a_spring"]}
 
 if __name__ == "__main__":

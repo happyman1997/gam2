@@ -552,7 +552,7 @@ SCALE = {"Страж": 1.55, "Механик": 2.5}          # how large each fr
 
 def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role=None, broken=False,
             damaged=(), hover=None, crane=True, lw=150, rw=152, body=None, body_hot=None, body_new=None,
-            body_only=False, anim=None):
+            body_only=False, anim=None, scale=1.0, extra=()):
     """The drawing with the golem before it: the gantry beam, the hull's plate top left, the golem on its stand.
     On the left its body — a callout from the head, the right arm, the left arm and the legs to each part's box; on
     the right what is inside — the chest with its core and every module cell (measured mounts), empty cells dashed.
@@ -575,7 +575,7 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
     sc.rgb[y0 + 15, x0 + 4:x1 - 4] = SU.OUTL
     for x in range(x0 + 10, x1 - 4, 14):
         FU.rivet(sc, x, y0 + 12)
-    K = SCALE.get(frame, 2.15) * (y1 - y0) / 346
+    K = SCALE.get(frame, 2.15) * (y1 - y0) / 346 * scale
     spr = golem_sprite(frame, {} if body_only else dict(mods), K, body=body)
     fx_ = x0 + 12 + lw + int((x1 - x0 - 24 - lw - rw) / 2)
     fy_ = y1 - 18
@@ -606,6 +606,9 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
                 right.append((MOUNT_NAME.get(new_key, "ячейка"), at(p), new_key, 1, "incoming"))
             else:
                 right.append(("ячейка", at(p), None, 0, "free"))
+        for lab_, where, key_, st_ in extra:                          # an augment's cell, a module off another hull
+            p_ = BP[where] if isinstance(where, str) else where
+            right.append((lab_, at(p_), key_, 1, st_))
         right.sort(key=lambda t: t[1][1])
         top = M["_body"][2]
         if core:
@@ -664,6 +667,18 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
             letters(sc, MOD_NAME[key], bx + 28, by + 21, "text", 16, col=(255, 210, 150))
             callout(sc, pt, (ex, by + BH // 2), col=HOTC, lane=lane)
             hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
+        elif st in ("augment", "augment_hot"):                       # the Inventor's: cold blue, an arc at the mount
+            part_box(sc, bx, by, key, lab, lv, state="hover" if st == "augment_hot" else "new", w=bw, h=BH)
+            callout(sc, pt, (ex, by + BH // 2), col=hexc("#9ad8f0"), lane=lane)
+            sc.glow(pt[0], pt[1], 8, hexc("#2ab0c8"), 0.6)
+            if st == "augment_hot":
+                hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
+        elif st == "illegal":                                         # the Maniac's: a module where it doesn't belong
+            part_box(sc, bx, by, key, lab, lv, state="rare", w=bw, h=BH)
+            callout(sc, pt, (ex, by + BH // 2), col=hexc("#d860d0"), lane=lane)
+            sc.glow(pt[0], pt[1], 9, hexc("#d860d0"), 0.6)
+            for k_, (dx_, dy_) in enumerate(((-4, -3), (3, -5), (5, 2), (-3, 4))):
+                sc.rgb[int(pt[1]) + dy_, int(pt[0]) + dx_] = hexc("#70e080") if k_ % 2 else hexc("#ffc0f4")
         elif st == "broken":
             part_box(sc, bx, by, key, lab, lv, state="broken", w=bw, h=BH)
             callout(sc, pt, (ex, by + BH // 2), col=RED_, lane=lane)
