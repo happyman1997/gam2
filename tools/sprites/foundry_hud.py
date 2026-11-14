@@ -204,6 +204,7 @@ def heading(sc, text, x, y):
 
 
 _GOLEMS = {}
+_STATE = {}       # what the last screen left for an animation to pick up (the hot box, the dock's frame)
 
 
 def golem_sprite(frame, mods, k, body=None, core=None):
@@ -865,6 +866,7 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
     action(sc, 526, 478, 704, 526, "Пропуск · +4", "steel")
     action(sc, 710, 472, 948, 532, "В БОЙ", "hot", big=True, anim={"glow": a_["plate"]} if "plate" in a_ else None)
     FU.sparks(sc, 186, 400, 10, seed=5 + a_.get("seed", 0))
+    _STATE["hot"] = hot
     if ret:
         return sc
     if panel == "repair":
@@ -1182,7 +1184,7 @@ CAMP_FIND = [   # (key or (slot, part), kind, state, name, for whom, lines)
 ]
 
 
-def camp(drag=0.55, ret=False):
+def camp(drag=0.55, ret=False, lit=None):
     """Привал у горна: the army on its stands in a row, each golem with its body parts, its module cells and its
     core under it — here anything comes off and goes on anywhere, free; a core is being carried from the Sage to the
     Gun (the Gun's core socket glows to take it, the others dim); the bench with what lies spare; one of three things
@@ -1190,7 +1192,7 @@ def camp(drag=0.55, ret=False):
     import golem_parts as GP
     sc = screen(37)
     FU.wing(sc, 0, 0, WW, 44)
-    title_center(sc, "ПРИВАЛ", "lantern")
+    title_center(sc, "ПРИВАЛ", "lantern", glint=lit)
     metal(sc, 14, x=18)
     toolbar(sc)
     # the army on its stands
@@ -1970,7 +1972,7 @@ def foundry_uses(key, limit=4, width=270):
     return out_
 
 
-def glossary(chapter="Когда", term="атака"):
+def glossary(chapter="Когда", term="атака", ret=False):
     """«?» in the Foundry: the glyphs by chapter on iron plates; the chosen one large on a sheet of blueprint, its
     meaning, and where the Foundry meets it — modules with their icons, parts, the leader's abilities."""
     import fxg
@@ -2029,6 +2031,8 @@ def glossary(chapter="Когда", term="атака"):
     action(sc, 12, 478, 240, 526, "Закрыть", "steel")
     kw = H.keycap(sc, 420, 492, "Alt")
     letters(sc, "— подписи под значками", 428 + kw, 493, "text", 16, col=MUTED)
+    if ret:
+        return sc
     img = sc.image(S)
     img.save(out("foundry_glossary.png"))
     print("foundry_glossary.png", img.size)
@@ -2291,6 +2295,7 @@ def development(kind="colossus", hot="cell", ret=False, anim=None):
     letters(sc, name, 480, 80, "text", 16, col=GOLD, align="center")
     letters(sc, f"после босса — 1 из {nopt}", 480, 96, "text", 16, col=MUTED, align="center")
     if kind != "colossus":
+        _STATE["dev_frame"] = (anim or {}).get("frame", 0)
         DEV_SCENE[kind](sc, hot)
         if ret:
             return sc
@@ -2404,7 +2409,8 @@ def dev_inventor(sc, hot):
                 sc.rgb[yy, fx + (yy - 305) // 6] = hexc("#6a5a3c")
     o, _, _ = SU.edges(cloth)
     sc.rgb[o] = SU.OUTL
-    sc.glow(160, 320, 40, hexc("#9ad8ff"), 0.2)                              # something glowing under it
+    fr_ = _STATE.get("dev_frame", 0)
+    sc.glow(160, 320, 40, hexc("#9ad8ff"), 0.12 + 0.12 * (1 + np.sin(fr_ * 2 * np.pi / 24)))   # glowing under it
     trolley(sc, 795)
     for cx in (765, 825):
         FU.chain(sc, cx, 80, 300)
@@ -2418,7 +2424,8 @@ def dev_inventor(sc, hot):
     sc.rgb[282:286, 652:690] = hexc("#5e5c66")                               # the drill boring the new one
     sc.rgb[283:285, 690:696] = hexc("#b0b4bc")
     sc.rgb[278:290, 636:652] = hexc("#a0782c")
-    FU.sparks(sc, 700, 284, 8, seed=11)
+    if fr_ % 6 < 4:                                                           # the drill biting, in bursts
+        FU.sparks(sc, 700, 284, 8, seed=11 + fr_)
     option_card(sc, 660, 120, 936, 222, ["+1 АУГМЕНТ"], "{свой} аугментов: 1 → 2", "на каждого голема", hr)
     FU.sill(sc, 468)
     action(sc, 20, 472, 310, 532, "НОВЫЙ ВИД", "hot", big=True, heated=hl)
@@ -2444,21 +2451,23 @@ def dev_maniac(sc, hot):
         mod_icon(sc, k_, 70 + j * 70, 404 + (j % 2) * 10, 1)
     trolley(sc, 160)
     sc.rgb[80:240, 159:161] = hexc("#24222a")                                # the magnet's cable
-    mag = (np.abs(sc.xx - 160) <= 30) & (sc.yy >= 240) & (sc.yy < 254)
+    fr_ = _STATE.get("dev_frame", 0)
+    lift_ = int(round(3 * np.sin(fr_ * 2 * np.pi / 24)))                      # the crate swinging up and down a little
+    mag = (np.abs(sc.xx - 160) <= 30) & (sc.yy >= 240 + lift_) & (sc.yy < 254 + lift_)
     FU._bands(sc, mag, FU.STEEL, 0.7 - (sc.yy - 240) / 20.0)
-    sc.rgb[252:254, 130:191] = hexc("#c04a3a")
+    sc.rgb[252 + lift_:254 + lift_, 130:191] = hexc("#c04a3a")
     o, _, _ = SU.edges(mag)
     sc.rgb[o] = SU.OUTL
-    crate = (np.abs(sc.xx - 160) <= 34) & (sc.yy >= 256) & (sc.yy < 318)
+    crate = (np.abs(sc.xx - 160) <= 34) & (sc.yy >= 256 + lift_) & (sc.yy < 318 + lift_)
     FU._bands(sc, crate, FU.WOOD, 0.7 - (sc.yy - 256) / 80.0)
     o, _, _ = SU.edges(crate)
     sc.rgb[o] = SU.OUTL
-    band = crate & (sc.yy >= 280) & (sc.yy < 290)
+    band = crate & (sc.yy >= 280 + lift_) & (sc.yy < 290 + lift_)
     stripes = ((sc.xx + sc.yy) // 5) % 2 == 0
     sc.rgb[band & stripes] = hexc("#e2ca50")
     sc.rgb[band & ~stripes] = hexc("#1a1612")
-    sc.glow(160, 300, 30, hexc("#d860d0"), 0.3)
-    letters(sc, "?", 160, 293, "title", 16, col=(220, 150, 255), col2=(60, 20, 80), align="center")
+    sc.glow(160, 300 + lift_, 30, hexc("#d860d0"), 0.3)
+    letters(sc, "?", 160, 293 + lift_, "title", 16, col=(220, 150, 255), col2=(60, 20, 80), align="center")
     option_card(sc, 660, 120, 936, 222, ["ПРИЧУДЫ"], "чаще полезные, реже опасные", "подкрутить шкалу", hr)
     cx, cy, r = 798, 320, 52
     d = np.hypot(sc.xx - cx, sc.yy - cy)
@@ -2473,7 +2482,8 @@ def dev_maniac(sc, hot):
     sc.rgb[danger] = hexc("#9a2aa0")
     sc.rgb[face & (d > 18) & (a > -np.pi * 0.85) & (a < -np.pi * 0.78)] = hexc("#70e080")   # the green just widened
     for t in np.linspace(0, 1, 40):                                            # the needle in the green
-        x, y = int(cx + np.cos(-np.pi * 0.6) * r * 0.85 * t), int(cy + np.sin(-np.pi * 0.6) * r * 0.85 * t)
+        na = -np.pi * 0.6 + 0.08 * np.sin(fr_ * 2 * np.pi / 8)                 # the needle trembling in the green
+        x, y = int(cx + np.cos(na) * r * 0.85 * t), int(cy + np.sin(na) * r * 0.85 * t)
         sc.rgb[y, x] = hexc("#1a1612")
     sc.rgb[d <= 4] = hexc("#a0782c")
     letters(sc, "полезно", cx - 30, cy + r + 10, "text", 16, col=(110, 220, 130), align="center")
@@ -2502,7 +2512,8 @@ def dev_zodchiy(sc, hot):
         x, y = int(cx + np.cos(a) * (r - 6)), int(cy + np.sin(a) * (r - 6))
         sc.rgb[y - 1:y + 2, x - 1:x + 2] = hexc("#3a342a")
     for t in np.linspace(0, 1, 40):
-        x, y = int(cx + np.cos(-np.pi * 0.5 - 0.52) * r * 0.75 * t), int(cy + np.sin(-np.pi * 0.5 - 0.52) * r * 0.75 * t)
+        ha = -np.pi * 0.5 - 0.52 * (_STATE.get("dev_frame", 0) % 24) / 23.0     # the hand wound back an hour
+        x, y = int(cx + np.cos(ha) * r * 0.75 * t), int(cy + np.sin(ha) * r * 0.75 * t)
         sc.rgb[y, x] = hexc("#1a1612")
     for a in np.linspace(-np.pi * 0.42, -np.pi * 0.6, 10):                   # the arrow winding it back
         x, y = int(cx + np.cos(a) * (r + 12)), int(cy + np.sin(a) * (r + 12))
@@ -2526,7 +2537,7 @@ def dev_zodchiy(sc, hot):
     bal = (sc.xx >= 780) & (sc.xx < 818) & (sc.yy >= 262) & (sc.yy < 276)
     FU._bands(sc, bal, FU.WOOD, 0.7 - (sc.yy - 262) / 20.0)                   # the new ballista on top
     sc.rgb[268:270, 760:840] = hexc("#5e5c66")
-    sc.glow(799, 270, 30, hexc("#9ad8ff"), 0.35)
+    sc.glow(799, 270, 30, hexc("#9ad8ff"), 0.2 + 0.15 * (1 + np.sin(_STATE.get("dev_frame", 0) * 2 * np.pi / 24)))
     # the Citadel's blueprint, hung over the leader
     FU.chain(sc, 380, 80, 122)
     FU.chain(sc, 580, 80, 122)

@@ -123,5 +123,58 @@ def sheet():
     print("foundry_wide.png", canvas.size)
 
 
+def battle_layout(W, H):
+    """The battle on a bigger canvas: the field keeps its size in cells — it is not stretched — and stands in the
+    middle; round it the same ground runs on without the cells' marks (fading into it at the seam). The beam runs
+    the full width: the Foundry's count pinned left, the tug of war in the middle, the turn and the speed pinned
+    right with their keys."""
+    import battle as BT
+    src = np.asarray(Image.open(out("foundry_battle.png")).convert("RGB").resize((960, 540), Image.NEAREST)).astype(np.float32)
+    mx, my = (W - 960) // 2, (H - 540) // 2
+    if mx == 0 and my == 0:
+        big = Scene(W, H)
+        big.rgb[:] = src
+        return big
+    keep = (BT.WW, BT.HH, BT.X0, BT.Y0)
+    BT.WW, BT.HH, BT.X0, BT.Y0 = W, H, BT.X0 + mx, BT.Y0 + my + 400       # cell marks pushed off the canvas
+    big = Scene(W, H)
+    BT.ground(big)
+    BT.WW, BT.HH, BT.X0, BT.Y0 = keep
+    field = src[34:540]
+    fy0 = my + 34
+    yy, xx = np.mgrid[0:506, 0:960]
+    e = np.minimum(np.minimum(xx, 959 - xx), np.minimum(yy, 505 - yy)).astype(np.float32)
+    a = np.clip(e / 24.0, 0, 1)[..., None]
+    a[0:28, 640:960] = 0                                                       # the keys under the speed caps go with them
+    big.rgb[fy0:fy0 + 506, mx:mx + 960] = big.rgb[fy0:fy0 + 506, mx:mx + 960] * (1 - a) + field * a
+    FU.wing(big, 0, 0, W, 34)
+    paste(big, src, 0, 0, 146, 33, 0, 0)                                      # the Foundry's count
+    paste(big, src, 146, 0, 600, 33, W // 2 - 227, 0)                         # the tug and the swarm's count
+    paste(big, src, 650, 0, 960, 60, W - 310, 0)                              # the turn, the speed, their keys
+    return big
+
+
+def battle_sheet():
+    lays = [(960, 540, "960 × 540"), (1280, 720, "1280 × 720 · поле тем же размером, по центру")]
+    k = 0.5
+    tw = int(960 * k) + int(1280 * k) + 48
+    th = int(720 * k) + 50
+    canvas = Image.new("RGB", (tw, th), (20, 18, 22))
+    x = 16
+    for W, H, lab in lays:
+        sc = battle_layout(W, H)
+        im = Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8)).resize((int(W * k), int(H * k)), Image.BOX)
+        canvas.paste(im, (x, 40))
+        lsc = Scene(int(W * k), 30)
+        lsc.rgb[:] = (20, 18, 22)
+        letters(lsc, lab, 0, 4, "text", 16, col=(240, 200, 120))
+        canvas.paste(Image.fromarray(np.clip(lsc.rgb, 0, 255).astype(np.uint8)), (x, 6))
+        x += int(W * k) + 16
+    canvas = canvas.resize((canvas.width * 2, canvas.height * 2), Image.NEAREST)
+    canvas.save(out("foundry_wide_battle.png"))
+    print("foundry_wide_battle.png", canvas.size)
+
+
 if __name__ == "__main__":
     sheet()
+    battle_sheet()

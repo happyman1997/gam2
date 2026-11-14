@@ -13,6 +13,8 @@ from kit import *
 import foundry_ui as FU
 import foundry_hud as FH
 import pxfx
+from PIL import Image
+import swarm_hud as H
 from paths import out
 
 FPS = 24
@@ -545,10 +547,120 @@ def cards_anim():
         print(f"\nfoundry_card_{name}_anim.gif", len(images))
 
 
+def camp_anim():
+    """The camp: a core carried along from the Sage to the Gun (eased), the Gun's socket waiting for it; the
+    lanterns by the title flickering."""
+    images = []
+    N = 30
+    for i in range(N):
+        t = in_out_cubic(min(1.0, i / (N - 8)))
+        lit = 0.8 + 0.2 * np.sin(i * 1.7) * np.sin(i * 0.6)
+        sc = FH.camp(drag=0.05 + 0.9 * t, ret=True, lit=lit)
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_camp_anim.gif"), FPS, half=True)
+    print("\nfoundry_camp_anim.gif", len(images))
+
+
+def glossary_anim():
+    """The glossary: the mouse goes down the chapter's glyphs — each it rests on lights up and opens on the sheet."""
+    import fxg
+    keys = dict(fxg.GROUPS)["Когда"][:5]
+    images = []
+    for k_ in keys:
+        sc = FH.glossary("Когда", k_, ret=True)
+        im = sc.image(2)
+        images += [im] * 8
+        print(k_, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_glossary_anim.gif"), FPS, half=True)
+    print("\nfoundry_glossary_anim.gif", len(images))
+
+
+def overlay_in(base, final, box, n=12):
+    """A plate coming over a screen: the screen dims, the plate drops into place from above (out_back) and
+    fades in — composited from the screen before and the screen with the plate."""
+    a = np.asarray(base).astype(np.float32)
+    b = np.asarray(final).astype(np.float32)
+    x0, y0, x1, y1 = box
+    frames = []
+    for i in range(n + 6):
+        t = min(1.0, i / n)
+        dim = 1 - 0.62 * min(1.0, t * 2)
+        f = a * dim
+        e = out_back(t)
+        dy = int(round((1 - e) * -40))
+        k = min(1.0, t * 1.6)
+        plate = b[y0:y1, x0:x1]
+        ya, yb = max(0, y0 + dy), min(f.shape[0], y1 + dy)
+        f[ya:yb, x0:x1] = f[ya:yb, x0:x1] * (1 - k) + plate[ya - (y0 + dy):yb - (y0 + dy)] * k
+        frames.append(Image.fromarray(np.clip(f, 0, 255).astype(np.uint8)))
+    return frames
+
+
+def overlays_anim():
+    """Pause over the battle, and the crucible's question over the smelting — each plate dropping in."""
+    base = FH.battle_view("run", ret=True).image(2)
+    final = FH.pause(ret=True).image(2)
+    pxfx.save_gif(overlay_in(base, final, (660, 192, 1260, 888)), out("foundry_pause_anim.gif"), FPS, half=True)
+    print("foundry_pause_anim.gif")
+    base = FH.smelt(base_only=True).image(2)
+    sc = FH.smelt(base_only=True)
+    H.HOVER.clear()
+    FH.confirm(sc, "В ТИГЕЛЬ НАВСЕГДА?", ["{модуль} Картечь I → тигель · не вернуть",
+                                          "Длинный ствол {модуль:I} ⇒ {модуль:II}", "{металл:14} → {металл:11}"],
+               "ПЕРЕПЛАВИТЬ", items=(("canister", "I", "broken"), ("long", "I → II", "hi")))
+    final = sc.image(2)
+    pxfx.save_gif(overlay_in(base, final, (480, 260, 1440, 820)), out("foundry_confirm_anim.gif"), FPS, half=True)
+    print("foundry_confirm_anim.gif")
+
+
+def drag_anim():
+    """Dragging a module from the loot to the drawing: the module rides the cursor along an eased path from its
+    card to the free cell; the cell it can take brightens as it nears."""
+    images = []
+    a, b = (780, 150), (560, 214)
+    N = 18
+    for i in range(N + 6):
+        t = in_out_cubic(min(1.0, i / N))
+        at = (int(a[0] + (b[0] - a[0]) * t), int(a[1] + (b[1] - a[1]) * t - 30 * np.sin(np.pi * t)))
+        sc = FH.workshop("drag", ret=True)
+        FH.drag_over(sc, "long", FH._STATE.get("hot"), "Орудие", at, 0.4 + 0.6 * t)
+        images.append(sc.image(2))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_drag_anim.gif"), FPS, half=True)
+    print("\nfoundry_drag_anim.gif", len(images))
+
+
+def zodchiy_card_anim():
+    """The Architect's card: the stars through the arch twinkling, mortar dust sifting off the scaffolding."""
+    import leader_cards as LC
+    images = []
+    for i in range(24):
+        images.append(LC.zodchiy(frame=i).image(2).crop((0, 88, 672, 900)))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_card_zodchiy_anim.gif"), FPS, half=True)
+    print("\nfoundry_card_zodchiy_anim.gif", len(images))
+
+
+def dev_others_anim():
+    """The dock for the other three: the drill biting in bursts and the glow under the canvas (Inventor); the
+    crate swinging on the magnet and the quirks' needle trembling (Maniac); the clock's hand wound back and the
+    ballista's glow (Architect)."""
+    for kind, hot in (("inventor", "type"), ("maniac", "quirks"), ("zodchiy", "citadel")):
+        images = []
+        for i in range(24):
+            sc = FH.development(kind, hot, ret=True, anim={"frame": i})
+            images.append(sc.image(2))
+            print(i, end=" ", flush=True)
+        pxfx.save_gif(images, out(f"foundry_development_{kind}_anim.gif"), FPS, half=True)
+        print(f"\nfoundry_development_{kind}_anim.gif", len(images))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "console"
     {"console": console, "hearth": hearth, "workshop": workshop, "tabs": tabs, "steps": steps,
      "metal": metal_tick, "gears": gears_title, "leaders": leaders,
      "hover": hover, "speed": speed, "start": start, "aftermath": aftermath_anim, "card": card_tip, "leadercard": leader_card,
      "battle": battle_anim, "settings": settings_anim, "development": development_anim, "defeat": defeat_anim,
-     "cards": cards_anim}[what]()
+     "cards": cards_anim, "camp": camp_anim, "glossary": glossary_anim, "overlays": overlays_anim,
+     "drag": drag_anim, "zodchiy_card": zodchiy_card_anim, "dev_others": dev_others_anim}[what]()

@@ -459,7 +459,7 @@ def scaffold(sc, x0, x1, y_floor, levels):
             sc.rgb[int(yb + (ya - yb) * t), int(x0 + (x1 - x0) * t)] = hexc("#5a3a1e")
 
 
-def zodchiy(ret=False):
+def zodchiy(ret=False, frame=None):
     sc = screen(83)
     ashlar(sc, 0, 44, WW, HH, seed=3, tone=0.62)
     FU.wing(sc, 0, 0, WW, 44)
@@ -484,11 +484,18 @@ def zodchiy(ret=False):
     o, _, _ = SU.edges(ring)
     sc.rgb[o] = SU.OUTL
     sc.rgb[opening] = sc.rgb[opening] * 0.3 + hexc("#1c2230") * 0.7
-    for (sx, sy) in ((90, 120), (240, 100), (200, 150), (120, 80)):          # stars through the arch
-        sc.rgb[sy, sx] = hexc("#d8d0e4")
+    for k, (sx, sy) in enumerate(((90, 120), (240, 100), (200, 150), (120, 80), (150, 60), (260, 170), (70, 180))):
+        tw = 1.0 if frame is None else 0.5 + 0.5 * np.sin(frame * 2 * np.pi / 24 * (1 + k % 3) + k * 2.1)
+        sc.rgb[sy, sx] = sc.rgb[sy, sx] * (1 - tw) + hexc("#d8d0e4") * tw   # stars through the arch, twinkling
     scaffold(sc, 66, 276, 390, [372, 300, 230])
     spr = leader_sprite("zodchiy", 3.1)
     sc.blit(spr, int(171 - spr.ox), int(371 - spr.oy))
+    if frame is not None:                                                     # mortar dust sifting off the planks
+        rnd_ = np.random.RandomState(7)
+        for k in range(10):
+            x_ = int(rnd_.uniform(70, 272))
+            y_ = int(234 + (rnd_.uniform(0, 140) + frame * 3) % 150)
+            sc.rgb[y_, x_] = sc.rgb[y_, x_] * 0.4 + hexc("#c8beaa") * 0.6
     tablet(sc, 20, 396, 322, 434)
     chisel(sc, "ЗОДЧИЙ", 171, 400, "text", 16, align="center")
     chisel(sc, "строитель крепостей", 171, 416, "text", 16, align="center")
@@ -529,7 +536,7 @@ def zodchiy(ret=False):
         H.fx_line(sc, 648 + (j % 2) * 8, y0 + 34, line)
     bottom(sc)
     letters(sc, "развитие: раньше · +1 способность · Цитадель", 236, 495, "text", 16, col=MUTED)
-    return finish(sc, "zodchiy", ret)
+    return finish(sc, "zodchiy", ret or frame is not None)
 
 
 def finish(sc, name, ret):
