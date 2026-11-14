@@ -145,6 +145,9 @@ def title_center(sc, text, tool="wrench", glint=None, turn=0.0):
         L = min(L, 140)
         FU.calipers(sc, x - 16 - L, x - 16, 19, flip=False, seed=1)
         FU.calipers(sc, x + tw + 16, x + tw + 16 + L, 19, flip=True, seed=2)
+    elif tool == "anvils":
+        FU.anvil(sc, x - 44, 40, flip=False)
+        FU.anvil(sc, x + tw + 44, 40, flip=True)
     elif tool == "tongs":
         L = min(L, 132)
         FU.tongs(sc, x - 24 - L, x - 24, 21, flip=False, seed=1)
@@ -2170,6 +2173,118 @@ def pause(ret=False):
     print("foundry_pause.png", img.size)
 
 
+# ---------------------------------------------------------------- the leader grows: the assembly dock
+def shoulder_battery(sc, x0, y0, k=1.0):
+    """A colossal module, the shoulder battery: a riveted iron box of six rocket tubes, their red warheads in
+    the mouths, brass bands, the mounting bracket under it."""
+    w, h = int(74 * k), int(46 * k)
+    box = (sc.xx >= x0) & (sc.xx < x0 + w) & (sc.yy >= y0) & (sc.yy < y0 + h)
+    sh = np.roll(np.roll(box, 4, 0), 3, 1) & ~box
+    sc.rgb[sh] *= 0.45
+    FU._bands(sc, box, FU.IRON, 0.72 - (sc.yy - y0) / 70.0 - (sc.xx - x0) / 300.0)
+    for bx in (x0 + int(22 * k), x0 + int(48 * k)):
+        sc.rgb[y0:y0 + h, bx:bx + 3] = hexc("#a0782c")                       # brass bands
+        sc.rgb[y0:y0 + h, bx] = hexc("#d0a848")
+    for r in range(2):
+        for c in range(3):
+            cx, cy = x0 + int((12 + c * 25) * k), y0 + int((13 + r * 20) * k)
+            d = np.hypot(sc.xx - cx, sc.yy - cy)
+            sc.rgb[d <= 8 * k] = hexc("#5e5c66")
+            sc.rgb[d <= 6.5 * k] = hexc("#08070a")
+            sc.rgb[d <= 3.2 * k] = hexc("#c0402e")                            # the warhead in the mouth
+            sc.rgb[(d <= 1.6 * k) & (sc.yy < cy)] = hexc("#f08060")
+            sc.rgb[(np.abs(d - 7.4 * k) < 0.6) & (sc.yy < cy) & (sc.xx < cx)] = hexc("#8e8c96")
+    br = (sc.xx >= x0 + int(24 * k)) & (sc.xx < x0 + int(50 * k)) & (sc.yy >= y0 + h) & (sc.yy < y0 + h + int(10 * k))
+    FU._bands(sc, br, FU.IRON, 0.5 - (sc.yy - (y0 + h)) / 20.0)
+    for x, y in ((x0 + 4, y0 + 4), (x0 + w - 5, y0 + 4), (x0 + 4, y0 + h - 5), (x0 + w - 5, y0 + h - 5)):
+        FU.rivet(sc, x, y)
+    o, top, _ = SU.edges(box | br)
+    sc.rgb[top] = hexc("#8e8c96")
+    sc.rgb[o] = SU.OUTL
+    return (x0 + 6, y0), (x0 + w - 7, y0)
+
+
+def development(kind="colossus", hot="cell", ret=False):
+    """The leader grows, after a boss — not a menu but the assembly dock: the leader stands on its plinth between
+    two riveted columns under a girder that runs over the whole dock. Left, the riveting bench: a plate of its hull
+    with its cells in a row and the new one red-hot, being riveted in, sparks off the rivet gun. Right, a crane
+    trolley on the girder lowering a colossal module on chains. Under each, its own lever: pull one."""
+    import frames as F
+    sc = screen(63)
+    FU.wing(sc, 0, 0, WW, 44)
+    title_center(sc, "РАЗВИТИЕ", "anvils")
+    toolbar(sc)
+    FU.i_beam(sc, 0, 50, WW, 66)                                              # the girder over the dock
+    for x in (318, 626):
+        FU.i_beam(sc, x, 66, x + 16, 452, vertical=True)                      # the columns
+    for x0, x1 in ((334, 380), (580, 626)):                                   # braces
+        for k in range(40):
+            t = k / 39
+            xx = int(x0 + (x1 - x0) * t) if x0 == 334 else int(x1 - (x1 - x0) * t)
+            sc.rgb[66 + int(t * 46):68 + int(t * 46), xx] = hexc("#3a3842")
+    # the leader on its plinth, the dock's glow on it from below
+    sc.glow(480, 430, 120, hexc("#ff8a3a"), 0.18)
+    sc.rgb[440:452, 360:600] = hexc("#24222a")
+    sc.rgb[440, 360:600] = hexc("#6a6870")
+    sc.rgb[451, 360:600] = SU.OUTL
+    for x in range(368, 600, 16):
+        FU.rivet(sc, x, 446)
+    spr = leader_sprite(kind, 3.5)
+    sc.blit(spr, int(480 - spr.ox), int(440 - spr.oy))
+    FU.cell(sc, 380, 74, 580, 112, "hi")
+    letters(sc, "ОТЕЦ КОЛОССА", 480, 80, "text", 16, col=GOLD, align="center")
+    letters(sc, "после босса — 1 из 2", 480, 96, "text", 16, col=MUTED, align="center")
+    # left: the riveting bench — the hull's cells, the new one being riveted in
+    hot_l, hot_r = hot == "cell", hot == "module"
+    sc.rgb[338:350, 20:300] = hexc("#2a2830")                                 # the bench top
+    sc.rgb[338, 20:300] = hexc("#6a6870")
+    for x in (34, 286):
+        sc.rgb[350:420, x - 4:x + 4] = hexc("#1c1a20")                        # its legs
+    FU.plate(sc, 26, 230, 296, 336, seed=71)
+    letters(sc, "КОРПУС КОЛОССА", 40, 240, "title", 16, col=(150, 200, 230), col2=(40, 80, 120))
+    mods = ("plates", "flail", "magnet", None, None, None, None, "new")
+    for c, key in enumerate(mods):
+        cx0 = 38 + c * 31
+        st = "new" if key == "new" else ("normal" if key else "locked")
+        FU.cell(sc, cx0, 270, cx0 + 27, 297, "hover" if key == "new" and hot_l else st)
+        if key and key != "new":
+            mod_icon(sc, key, cx0 + 6, 275, 1)
+    letters(sc, "7 → 8", 162, 306, "text", 16, col=(170, 220, 250), align="center")
+    FU.sparks(sc, 262, 276, 12, seed=7)                                      # the rivet gun at work
+    sc.rgb[214:226, 250:288] = hexc("#5e5c66")                               # the rivet gun, hung over it
+    sc.rgb[214, 250:288] = hexc("#8e8c96")
+    sc.rgb[226:262, 266:272] = hexc("#3a3842")
+    sc.rgb[262:268, 264:274] = hexc("#c8a060")
+    sc.rgb[66:214, 268:270] = hexc("#24222a")                                # its hose up to the girder
+    FU.cell(sc, 24, 120, 300, 212, "hi" if hot_l else "normal")
+    letters(sc, "+1 ЯЧЕЙКА", 40, 130, "title", 16, col=(255, 210, 140) if hot_l else GOLD, col2=(130, 90, 40))
+    H.fx_line(sc, 40, 156, "{модуль:+1} место на Колоссе")
+    letters(sc, "клепают в корпус", 40, 180, "text", 16, col=MUTED)
+    # right: the crane lowering a colossal module
+    sc.rgb[66:80, 770:820] = hexc("#3a3842")                                 # the trolley on the girder
+    sc.rgb[66, 770:820] = hexc("#6a6870")
+    FU.rivet(sc, 778, 72)
+    FU.rivet(sc, 812, 72)
+    (ax, ay), (bx, by) = shoulder_battery(sc, 742, 262, 1.45)
+    for (cx, cy) in ((ax, ay), (bx, by)):
+        FU.chain(sc, cx, 80, cy)
+    letters(sc, "плечевая батарея", 795, 360, "text", 16, col=INK, align="center")
+    FU.cell(sc, 660, 120, 936, 230, "hi" if hot_r else "normal")
+    letters(sc, "КОЛОССАЛЬНЫЙ", 676, 130, "title", 16, col=(255, 210, 140) if hot_r else GOLD, col2=(130, 90, 40))
+    letters(sc, "МОДУЛЬ", 676, 152, "title", 16, col=(255, 210, 140) if hot_r else GOLD, col2=(130, 90, 40))
+    H.fx_line(sc, 676, 178, "{модуль} только на Колосса")
+    letters(sc, "опускают краном", 676, 202, "text", 16, col=MUTED)
+    FU.sill(sc, 468)
+    action(sc, 20, 472, 310, 532, "+1 ЯЧЕЙКА", "hot", big=True, heated=hot_l)
+    action(sc, 650, 472, 940, 532, "МОДУЛЬ", "hot", big=True, heated=hot_r)
+    letters(sc, "выбор навсегда", 480, 492, "text", 16, col=MUTED, align="center")
+    if ret:
+        return sc
+    img = sc.image(S)
+    img.save(out("foundry_development.png"))
+    print("foundry_development.png", img.size)
+
+
 def module_pop(sc, key, name, cx, top, k=1.0, rise=0.0, heat=1.0):
     """A module firing, over its golem: its icon in a red-hot box, rising, its name under it; k fades the lot in
     and out, heat cools the box's rim from red back to iron."""
@@ -2323,7 +2438,8 @@ def battle():
 SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle, "glossary": glossary,
            "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True),
            "drag": lambda: workshop("drag"), "trophy": lambda: aftermath(variant="trophy"),
-           "states": states, "settings": lambda: [settings(k) for k, _ in SETTINGS], "pause": pause}
+           "states": states, "settings": lambda: [settings(k) for k, _ in SETTINGS], "pause": pause,
+           "development": development}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"

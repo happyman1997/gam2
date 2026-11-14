@@ -797,6 +797,47 @@ def calipers(sc, x0, x1, yc, flip=False, seed=0):
     _finish(sc, m, pal, flip)
 
 
+def anvil(sc, cx, base, flip=False):
+    """A smith's anvil standing on the beam: the face, its horn to the outside (to the left, or the right when
+    flipped), the heel, the waist, the feet."""
+    Xs, Y = sc.xx.astype(float), sc.yy.astype(float)
+    X = 2 * cx - Xs if flip else Xs
+    face = (X >= cx - 16) & (X < cx + 18) & (Y >= base - 26) & (Y < base - 19)
+    horn = (X >= cx - 34) & (X < cx - 16) & (Y >= base - 26) & (Y < base - 19) & (Y - (base - 26) <= (X - (cx - 34)) * 0.4 + 1)
+    heel = (X >= cx + 18) & (X < cx + 24) & (Y >= base - 26) & (Y < base - 22)
+    waist = (X >= cx - 6) & (X < cx + 10) & (Y >= base - 19) & (Y < base - 8)
+    feet = (X >= cx - 13) & (X < cx + 17) & (Y >= base - 8) & (Y < base) & ~((Y < base - 4) & ((X < cx - 9) | (X >= cx + 13)))
+    m = face | horn | heel | waist | feet
+    _shadow(sc, m)
+    pal = _bands(sc, m, IRON, 0.7 - (Y - (base - 26)) / 40.0)
+    sc.rgb[face & (Y == base - 26)] = hexc("#b0b4bc")                         # the polished face
+    _finish(sc, m, pal, flip)
+
+
+def i_beam(sc, x0, y0, x1, y1, vertical=False):
+    """A riveted I-beam girder: flanges along both edges, the web between them darker, rivets down the flanges."""
+    m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+    t = ((sc.xx - x0) / max(1, x1 - x0)) if vertical else ((sc.yy - y0) / max(1, y1 - y0))
+    _bands(sc, m, IRON, 0.62 - t * 0.35)
+    if vertical:
+        web = m & (sc.xx >= x0 + 4) & (sc.xx < x1 - 4)
+        sc.rgb[web] *= 0.62
+        for y in range(y0 + 8, y1 - 4, 14):
+            rivet(sc, x0 + 2, y)
+            rivet(sc, x1 - 3, y)
+    else:
+        web = m & (sc.yy >= y0 + 4) & (sc.yy < y1 - 4)
+        sc.rgb[web] *= 0.62
+        for x in range(x0 + 8, x1 - 4, 14):
+            rivet(sc, x, y0 + 2)
+            rivet(sc, x, y1 - 3)
+    o, top, left = edges(m)
+    sc.rgb[top | left] = hexc("#6a6870")
+    sc.rgb[o] = OUTL
+    sc.occ[m] = True
+    sc.light[m] = 0
+
+
 # ---------------------------------------------------------------- the settings' controls
 def notch_slider(sc, x0, x1, y, n, value, labels=None, off=(), melt=False):
     """A brass slide block in an iron groove with n notches (value: the notch it sits at, or between for a level);
