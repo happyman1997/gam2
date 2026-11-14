@@ -764,6 +764,117 @@ def hammer(sc, x0, x1, yc, flip=False, seed=0):
     _finish(sc, m, pal, flip)
 
 
+def calipers(sc, x0, x1, yc, flip=False, seed=0):
+    """A vernier calliper lying on the beam, its jaws at the inner end: the steel beam engraved with its scale, the
+    fixed jaw and the sliding one with its vernier plate and brass thumbwheel, the depth rod out at the far end.
+    flip — the jaws to the left. For the settings, where the interface's size is measured."""
+    Xs, Y = sc.xx.astype(float), sc.yy.astype(float)
+    X = (x0 + x1 - 1) - Xs if flip else Xs
+    beam = (X >= x0 + 6) & (X < x1) & (Y >= yc - 4) & (Y < yc + 4)
+    rod = (X >= x0) & (X < x0 + 8) & (np.abs(Y - yc) <= 1.0)
+    fj = ((X >= x1 - 8) & (X < x1) & (Y >= yc + 4) & (Y < yc + 20) & (X - (x1 - 8) <= 8 - (Y - (yc + 4)) * 0.35)) \
+        | ((X >= x1 - 5) & (X < x1) & (Y >= yc - 15) & (Y < yc - 4))
+    sx = x1 - 34
+    slide = (X >= sx - 12) & (X < sx + 6) & (Y >= yc - 7) & (Y < yc + 7)
+    sj = ((X >= sx - 2) & (X < sx + 6) & (Y >= yc + 7) & (Y < yc + 18) & (X - (sx - 2) <= 8 - (Y - (yc + 7)) * 0.45)) \
+        | ((X >= sx + 1) & (X < sx + 6) & (Y >= yc - 15) & (Y < yc - 7))
+    wheel = np.hypot(X - (sx - 6), Y - (yc + 10)) <= 3.6
+    m = beam | rod | fj | slide | sj | wheel
+    _shadow(sc, m)
+    pal = _bands(sc, beam | rod | fj | sj, STEEL, 0.72 - (Y - yc) / 24.0)
+    _bands(sc, slide, STEEL, 0.5 - (Y - yc) / 20.0)
+    _bands(sc, wheel, BRASSR, 0.7 - (Y - (yc + 10)) / 8.0 - (X - (sx - 6)) / 16.0)
+    for k, gx in enumerate(range(int(x0 + 10), int(sx - 13), 3)):            # the scale, engraved on the beam
+        xx = int((x0 + x1 - 1) - gx) if flip else gx
+        sc.rgb[int(yc) + (0 if k % 5 else -1):int(yc) + 2, xx] = pal[1]
+    for k in range(3):                                                       # the vernier's lines
+        gx = int(sx - 8 + k * 3)
+        xx = int((x0 + x1 - 1) - gx) if flip else gx
+        sc.rgb[int(yc) - 4:int(yc) - 1, xx] = pal[1]
+    for yy in range(int(yc + 8), int(yc + 13), 2):                           # the thumbwheel's knurl
+        xx = int((x0 + x1 - 1) - (sx - 6)) if flip else int(sx - 6)
+        sc.rgb[yy, xx] = hexc("#6a4818")
+    _finish(sc, m, pal, flip)
+
+
+# ---------------------------------------------------------------- the settings' controls
+def notch_slider(sc, x0, x1, y, n, value, labels=None, off=(), melt=False):
+    """A brass slide block in an iron groove with n notches (value: the notch it sits at, or between for a level);
+    labels under the notches, the chosen one gold, the ones that can't be chosen pale and crossed; melt — the
+    groove behind the block filled with molten metal (a level: the volume)."""
+    from swarm_ui import letters
+    groove = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y - 2) & (sc.yy <= y + 2)
+    sc.rgb[groove] = hexc("#08070a")
+    sc.rgb[y + 3, x0:x1] = hexc("#5e5c66")
+    sc.rgb[y - 3, x0:x1] = hexc("#24222a")
+    pos = lambda i: x0 + 6 + i * (x1 - x0 - 12) / max(1, n - 1)
+    xv = pos(value)
+    if melt:                                                                  # molten metal up to the block
+        lv = groove & (sc.xx < xv)
+        t = np.clip((sc.yy - (y - 2)) / 4.0, 0, 1)[..., None]
+        sc.rgb[lv] = (hexc("#ffd890") * (1 - t) + hexc("#c2500e") * t)[lv]
+    for i in range(n):
+        x = int(round(pos(i)))
+        sc.rgb[y + 5:y + 8, x] = hexc("#d0a848") if i not in off else hexc("#4a4850")
+        if labels:
+            col = (240, 200, 120) if abs(i - value) < 0.5 else ((110, 104, 100) if i in off else (170, 160, 150))
+            letters(sc, labels[i], x, y + 10, "text", 16, col=col, align="center")
+            if i in off:
+                sc.rgb[y + 18, x - 8:x + 9] = hexc("#a8402e")
+    bx = int(round(xv))
+    blk = (sc.xx >= bx - 5) & (sc.xx <= bx + 5) & (sc.yy >= y - 8) & (sc.yy <= y + 8)
+    sh = np.roll(np.roll(blk, 2, 0), 2, 1) & ~blk
+    sc.rgb[sh] *= 0.5
+    _bands(sc, blk, BRASSR, 0.75 - (sc.yy - (y - 8)) / 22.0 - (sc.xx - bx) / 30.0)
+    for gx in (bx - 2, bx, bx + 2):
+        sc.rgb[y - 4:y + 5, gx] = hexc("#6a4818")                             # its grip
+    o, top, left = edges(blk)
+    sc.rgb[top | left] = hexc("#f4dc96")
+    sc.rgb[o] = OUTL
+    sc.occ[blk] = True
+
+
+def toggle(sc, x, y, on):
+    """A tumbler switch on a round brass bezel, its lever up (on) or down (off), a lamp by it lit amber when on."""
+    X, Y = sc.xx - x, sc.yy - y
+    d = np.hypot(X, Y)
+    bez = d <= 7
+    sh = np.roll(np.roll(bez, 2, 0), 2, 1) & ~bez
+    sc.rgb[sh] *= 0.5
+    _bands(sc, bez, BRASSR, 0.7 - (X + Y) / 18.0)
+    sc.rgb[d <= 3.2] = hexc("#121114")
+    ang = -0.5 if on else 0.5
+    lev = _seg(sc.xx, sc.yy, (x, y), (x + 3, y + (-10 if on else 10)), 1.6)
+    lev |= np.hypot(sc.xx - (x + 3), sc.yy - (y + (-10 if on else 10))) <= 2.4
+    _bands(sc, lev, STEEL, 0.75 - (X + Y) / 24.0)
+    o, _, _ = edges(bez | lev)
+    sc.rgb[o] = OUTL
+    lx = x + 16
+    lamp = np.hypot(sc.xx - lx, sc.yy - y) <= 4
+    sc.rgb[np.hypot(sc.xx - lx, sc.yy - y) <= 5] = OUTL
+    if on:
+        sc.glow(lx, y, 10, hexc("#ffb040"), 0.5)
+        _bands(sc, lamp, ("#7a2208", "#c2500e", "#f08a2a", "#ffd890", "#fff3c0"), 0.85 - np.hypot(sc.xx - lx + 1, sc.yy - y + 1) / 6.0)
+    else:
+        _bands(sc, lamp, ("#121114", "#24222a", "#3a3842", "#5e5c66", "#8e8c96"), 0.5 - (sc.yy - y) / 10.0)
+    sc.occ[bez | lev | lamp] = True
+
+
+def chooser(sc, x0, x1, y, text):
+    """Choose one of a list: two small push-buttons with arrows either side of a dark enamel window with the value
+    in brass letters."""
+    from swarm_ui import letters
+    for cx, d in ((x0 + 9, -1), (x1 - 9, 1)):
+        pushbutton(sc, cx, y, 8, kind="steel")
+        for k in range(4):                                                    # the arrow, struck on the cap
+            sc.rgb[y - 3 + k if k < 3 else y - 1, cx - d * 2 + d * k if k < 3 else cx - d * 2 + d * 3] = hexc("#e6eaf0")
+        sc.rgb[y - 2:y + 3, cx - d * 2] = hexc("#e6eaf0")
+        sc.rgb[y - 1:y + 2, cx - d * 1] = hexc("#e6eaf0")
+        sc.rgb[y, cx] = hexc("#e6eaf0")
+    cell(sc, x0 + 22, y - 12, x1 - 22, y + 12, "locked")
+    letters(sc, text, (x0 + x1) / 2, y - 8, "text", 16, col=(240, 200, 120), align="center")
+
+
 def tongs(sc, x0, x1, yc, flip=False, seed=0):
     """Smith's tongs lying on the beam, their jaws at the inner end holding a red-hot bar: two long reins with
     curled ends, a riveted pivot, two short curved jaws. flip — the jaws to the left."""

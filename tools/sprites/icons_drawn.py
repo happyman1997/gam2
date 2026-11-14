@@ -1347,6 +1347,65 @@ def spring_dash():
     return p.done()
 
 
+# ---------------------------------------------------------------- small icons for the interface itself (settings)
+UI = {}
+
+
+def ui(key):
+    def reg(f):
+        UI[key] = f
+        return f
+    return reg
+
+
+@ui("screen")
+def ui_screen():
+    """A monitor: an iron frame, a dark glass with a glint, a foot."""
+    p = Pix()
+    p.fill(grid(lambda x, y: 1 <= x <= 14 and 2 <= y <= 11), "iron", inner=(3, 2))
+    p.rect(3, 4, 12, 9, "volt", [2, 1, 1, 1, 1, 0])
+    p.px(4, 5, "volt", 4)
+    p.px(5, 5, "volt", 3)
+    p.rect(6, 12, 9, 13, "iron", [3, 2])
+    p.rect(4, 14, 11, 14, "iron", [2])
+    return p.done()
+
+
+@ui("sound")
+def ui_sound():
+    """A brass horn speaker, its sound in arcs."""
+    p = Pix()
+    p.rect(2, 6, 4, 10, "iron", [3, 3, 2, 2, 1])
+    horn = grid(lambda x, y: 5 <= x <= 9 and abs(y - 8) <= 2 + (x - 5) * 0.9)
+    p.fill(horn, "brass", inner=(3, 2))
+    for x, ys in ((11, (6, 7, 8, 9, 10)), (13, (4, 5, 8, 11, 12))):
+        for y in ys:
+            p.px(x, y, "steel", 3 if x == 11 else 2)
+    return p.done()
+
+
+@ui("game")
+def ui_game():
+    """A cog with a brass hub."""
+    p = Pix()
+    for k in range(8):
+        a = k * np.pi / 4
+        p.rect(round(7 + np.cos(a) * 5.5), round(7 + np.sin(a) * 5.5), round(8 + np.cos(a) * 5.5), round(8 + np.sin(a) * 5.5), "steel", [3])
+    p.disc(7.5, 7.5, 5.0, "steel", levels=(4, 3, 3, 2), hole=0.0)
+    p.disc(7.5, 7.5, 2.0, "brass", levels=(4, 3), hole=0.8)
+    return p.done()
+
+
+@ui("keys")
+def ui_keys():
+    """A key of the keyboard, its letter worn."""
+    p = Pix()
+    p.fill(grid(lambda x, y: 1 <= x <= 14 and 3 <= y <= 13), "iron", inner=(2, 2), rim=3, shade=1)
+    p.fill(grid(lambda x, y: 3 <= x <= 12 and 4 <= y <= 10), "slate", inner=(3, 3), rim=4, shade=2)
+    p.line([(6, 6), (6, 9), (9, 9)], "iron", 1)
+    return p.done()
+
+
 NAMES = {k: IC.ICONS[k][1] for k in IC.ICONS}
 
 

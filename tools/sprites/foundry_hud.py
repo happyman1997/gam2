@@ -141,6 +141,10 @@ def title_center(sc, text, tool="wrench", glint=None, turn=0.0):
         L = min(L, 112)
         FU.hammer(sc, x - 12 - L, x - 12, 21, flip=False, seed=1)
         FU.hammer(sc, x + tw + 12, x + tw + 12 + L, 21, flip=True, seed=2)
+    elif tool == "calipers":
+        L = min(L, 140)
+        FU.calipers(sc, x - 16 - L, x - 16, 19, flip=False, seed=1)
+        FU.calipers(sc, x + tw + 16, x + tw + 16 + L, 19, flip=True, seed=2)
     elif tool == "tongs":
         L = min(L, 132)
         FU.tongs(sc, x - 24 - L, x - 24, 21, flip=False, seed=1)
@@ -2021,6 +2025,151 @@ def confirm_smelt():
     print("foundry_confirm.png", img.size)
 
 
+# ---------------------------------------------------------------- settings: the screen, the interface's size, sound, keys
+SETTINGS = [("screen", "ЭКРАН"), ("sound", "ЗВУК"), ("game", "ИГРА"), ("keys", "КЛАВИШИ")]
+
+
+def ui_icon(sc, key, x, y, z=2):
+    import icons_drawn as D
+    rgba = np.repeat(np.repeat(D.UI[key](), z, 0), z, 1)
+    m = rgba[..., 3] > 0
+    sc.rgb[y:y + rgba.shape[0], x:x + rgba.shape[1]][m] = rgba[..., :3][m]
+
+
+def scale_preview(sc, x0, y0, w, h, frac, chosen=False, label=""):
+    """A little monitor showing how much of the screen the interface takes at a scale: the workshop shrunk to
+    frac of the screen's width, the forge wall round it where the canvas grew."""
+    from PIL import Image
+    FU.cell(sc, x0 - 6, y0 - 6, x0 + w + 6, y0 + h + 6, "hi" if chosen else "normal")
+    wall = FU.forge(w, h, 3)
+    sc.rgb[y0:y0 + h, x0:x0 + w] = wall.rgb * 0.8
+    shot = Image.open(out("foundry_workshop.png")).convert("RGB")
+    tw, th = int(round(w * frac)), int(round(h * frac))
+    small = np.asarray(shot.resize((tw, th), Image.BOX)).astype(float)
+    ox, oy = x0 + (w - tw) // 2, y0 + (h - th) // 2
+    sc.rgb[oy:oy + th, ox:ox + tw] = small
+    if label:
+        letters(sc, label, x0 + w // 2, y0 + h + 10, "text", 16, col=GOLD if chosen else MUTED, align="center")
+
+
+def settings(section="screen", ret=False):
+    """Settings, in the forge's metal: the sections on iron cells on the left, the chosen one's rows on the right —
+    each a label and its control: a brass block in a notched groove for a choice, the same groove filled with
+    molten metal for a level, a tumbler with its lamp for on and off, arrows round an enamel window for a list.
+    On ЭКРАН the interface's size: whole steps of the scale, the ones this screen can't take crossed out, and
+    two little monitors showing how much of the screen the interface takes."""
+    sc = screen(57)
+    FU.wing(sc, 0, 0, WW, 44)
+    title_center(sc, "НАСТРОЙКИ", "calipers")
+    toolbar(sc)
+    FU.plate(sc, 12, 52, 196, 462, seed=91)
+    for i, (key, nm) in enumerate(SETTINGS):
+        y0 = 62 + i * 52
+        on = key == section
+        FU.cell(sc, 20, y0, 188, y0 + 44, "hi" if on else "normal")
+        ui_icon(sc, key, 30, y0 + 6, 2)
+        letters(sc, nm, 70, y0 + 14, "text", 16, col=GOLD if on else INK)
+    FU.plate(sc, 206, 52, 948, 462, seed=92)
+    heading(sc, dict(SETTINGS)[section], 222, 62)
+    lab = lambda t, y, sub=None: (letters(sc, t, 224, y - 8, "text", 16, col=INK),
+                                  sub and letters(sc, sub, 224, y + 10, "text", 16, col=MUTED))
+    if section == "screen":
+        lab("Режим окна", 104)
+        FU.notch_slider(sc, 430, 690, 104, 3, 2, ["окно", "без рамки", "весь экран"])
+        lab("Разрешение", 158)
+        FU.chooser(sc, 430, 690, 158, "2560 × 1440")
+        sc.rgb[184, 222:934] = sc.rgb[184, 222:934] * 0.5 + hexc("#8a6a34") * 0.5
+        letters(sc, "Масштаб интерфейса", 224, 196, "text", 16, col=GOLD)
+        letters(sc, "крупнее или мельче —", 224, 216, "text", 16, col=MUTED)
+        letters(sc, "целыми шагами,", 224, 234, "text", 16, col=MUTED)
+        letters(sc, "пиксели ровные", 224, 252, "text", 16, col=MUTED)
+        FU.notch_slider(sc, 430, 690, 214, 4, 1, ["×1", "×2", "×3", "×4"], off=(2, 3))
+        letters(sc, "мельче", 430, 254, "text", 16, col=MUTED)
+        letters(sc, "крупнее", 690, 254, "text", 16, col=MUTED, align="right")
+        H.fx_line(sc, 430, 280, "на этом экране: ×1 или ×2")
+        letters(sc, "×3 и ×4 не помещаются", 430, 300, "text", 16, col=PALE)
+        scale_preview(sc, 730, 200, 176, 99, 0.75, True, "")
+        letters(sc, "×2: холст 1280 × 720", 818, 312, "text", 16, col=GOLD, align="center")
+        sc.rgb[332, 222:934] = sc.rgb[332, 222:934] * 0.5 + hexc("#8a6a34") * 0.5
+        lab("Вертикальная синхронизация", 356)
+        FU.toggle(sc, 470, 356, True)
+        letters(sc, "вкл", 496, 348, "text", 16, col=INK)
+        lab("Частота кадров", 412)
+        FU.notch_slider(sc, 430, 690, 404, 4, 3, ["60", "120", "144", "без предела"])
+    elif section == "sound":
+        for j, (nm, v) in enumerate((("Общая громкость", 8), ("Музыка", 6), ("Звуки боя", 9), ("Интерфейс", 7))):
+            y = 110 + j * 56
+            lab(nm, y)
+            FU.notch_slider(sc, 430, 820, y, 11, v, melt=True)
+            letters(sc, str(v * 10), 900, y - 8, "text", 16, col=GOLD, align="right")
+        lab("Звук в фоне", 352, "когда окно не в фокусе")
+        FU.toggle(sc, 470, 352, False)
+        letters(sc, "выкл", 496, 344, "text", 16, col=MUTED)
+    elif section == "game":
+        lab("Скорость боя", 104, "с какой начинается бой")
+        FU.notch_slider(sc, 430, 690, 104, 3, 1, ["×1", "×2", "×4"])
+        lab("Подсказки", 170, "задержка")
+        FU.notch_slider(sc, 430, 690, 170, 3, 1, ["сразу", "0,3 с", "0,6 с"])
+        lab("Подписи значков", 236)
+        FU.notch_slider(sc, 430, 690, 236, 3, 0, ["держать Alt", "Alt включает", "всегда"])
+        lab("Язык", 300)
+        FU.chooser(sc, 430, 690, 300, "Русский")
+        lab("Тряска экрана", 352)
+        FU.toggle(sc, 470, 352, True)
+        letters(sc, "вкл", 496, 344, "text", 16, col=INK)
+        lab("Вспышки ударов", 400)
+        FU.toggle(sc, 470, 400, True)
+        letters(sc, "вкл", 496, 392, "text", 16, col=INK)
+    else:
+        rows = [("Пауза", "Пробел"), ("Скорость боя", "Tab"), ("Бой — в конец", "End"), ("Подписи значков", "Alt"),
+                ("Справочник", "F1"), ("Главное действие", "Enter"), ("Назад, закрыть", "Esc")]
+        for j, (nm, key) in enumerate(rows):
+            y = 100 + j * 44
+            hot = j == 3
+            FU.cell(sc, 216, y - 18, 938, y + 18, "hover" if hot else "normal")
+            letters(sc, nm, 230, y - 8, "text", 16, col=GOLD if hot else INK)
+            if hot:
+                letters(sc, "нажмите клавишу…", 700, y - 8, "text", 16, col=(255, 200, 140), align="right")
+            else:
+                H.keycap(sc, 560, y - 10, key)
+        letters(sc, "клавиша, занятая другим, подсвечивается красным", 222, 440, "text", 16, col=MUTED)
+    FU.sill(sc, 468)
+    action(sc, 12, 478, 200, 526, "Назад", "steel")
+    action(sc, 210, 478, 420, 526, "По умолчанию", "rust")
+    action(sc, 640, 472, 948, 532, "ПРИМЕНИТЬ", "hot", big=True)
+    if ret:
+        return sc
+    name = "foundry_settings.png" if section == "screen" else f"foundry_settings_{section}.png"
+    img = sc.image(S)
+    img.save(out(name))
+    print(name, img.size)
+
+
+def pause(ret=False):
+    """Pause, over the battle: the field dimmed, an iron plate in the middle — the run's place in a line, then
+    the big plate to carry on and the rest on push-buttons: settings, the glossary, give up the run, out to the
+    menu, quit."""
+    sc = battle_view("run", ret=True)
+    sc.rgb[:] = sc.rgb * 0.36
+    x0, y0, x1, y1 = 330, 96, 630, 444
+    FU.plate(sc, x0, y0, x1, y1, seed=95)
+    FU.wing(sc, x0 + 4, y0 + 4, x1 - 4, y0 + 44)
+    tw = SU.text_width("ПАУЗА", "title", 24)
+    letters(sc, "ПАУЗА", (x0 + x1) // 2 - tw // 2, y0 + 12, "title", 24, col=(232, 222, 206), col2=(120, 96, 70))
+    H.fx_line(sc, x0 + 24, y0 + 58, "бой 5 из 15 · ход 5 · {металл:14}")
+    action(sc, x0 + 16, y0 + 86, x1 - 16, y0 + 144, "ПРОДОЛЖИТЬ", "hot", big=True)
+    for j, (t, kind) in enumerate((("Настройки", "steel"), ("Справочник · F1", "steel"), ("Сдаться", "rust"),
+                                   ("Выйти в меню", "steel"), ("Выйти из игры", "dull"))):
+        yy = y0 + 160 + j * 36
+        action(sc, x0 + 24, yy, x1 - 24, yy + 30, t, kind)
+    letters(sc, "Esc — продолжить", (x0 + x1) // 2, y1 - 22, "text", 16, col=MUTED, align="center")
+    if ret:
+        return sc
+    img = sc.image(S)
+    img.save(out("foundry_pause.png"))
+    print("foundry_pause.png", img.size)
+
+
 def module_pop(sc, key, name, cx, top, k=1.0, rise=0.0, heat=1.0):
     """A module firing, over its golem: its icon in a red-hot box, rising, its name under it; k fades the lot in
     and out, heat cools the box's rim from red back to iron."""
@@ -2174,7 +2323,7 @@ def battle():
 SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle, "glossary": glossary,
            "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True),
            "drag": lambda: workshop("drag"), "trophy": lambda: aftermath(variant="trophy"),
-           "states": states}
+           "states": states, "settings": lambda: [settings(k) for k, _ in SETTINGS], "pause": pause}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
