@@ -325,9 +325,9 @@ def hover():
         FH.part_box(sc, 28, 38, "canister", "ствол", 1, state=states[0], w=152, h=42) if states[0] != "hover" else None
         if states[0] == "hover":
             FU.cell(sc, 28, 38, 180, 80, "hover", seed=seed)
-            letters(sc, "СТВОЛ", 36, 42, "title", 8, col=(150, 200, 230), outline=False)
-            FH.mod_icon(sc, "canister", 36, 56)
-            letters(sc, "Картечь", 58, 55, "text", 16, col=FH.INK)
+            letters(sc, "Ствол", 36, 40, "text", 16, col=(150, 200, 230), outline=False)
+            FH.mod_icon(sc, "canister", 36, 60)
+            letters(sc, "Картечь", 58, 59, "text", 16, col=FH.INK)
             FU.levels(sc, 180 - 26, 44, 1)
         FU.cell(sc, 222, 14, 382, 100, states[1], seed=seed)                 # a bay on the army's rack
         g = FH.golem_sprite("Механик", {"repair": 1, "oiler": 1}, 0.48)
@@ -389,7 +389,7 @@ def speed():
         for cx, t_, on, key, pr in ((40, "II", pause_on, "Пробел", pp), (110, "×2", two_on, "Tab", p2),
                                     (180, "»", False, "End", 0.0)):
             FU.cap_button(sc, cx, 17, 11, t_, "brass" if on else "steel", press=pr)
-            kw = SU.text_width(key, "title", 8) + 14
+            kw = SU.text_width(key, "text", 16) + 12
             H.keycap(sc, int(cx - kw / 2), 32, key, lit=pr > 0.5)
         if 3 <= i < 20:
             H.cursor(sc, 116, 22)

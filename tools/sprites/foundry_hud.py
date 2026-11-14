@@ -460,17 +460,23 @@ def callout(sc, p, q, col=BLUE, dash=False, lane=None):
     sc.rgb[int(py) - 1:int(py) + 2, int(px) - 1:int(px) + 2] = col
 
 
+def slot_label(sc, text, x, y, col=(150, 200, 230)):
+    """A box's label (the mount, the slot) — 16 px like all text that means something, first letter up."""
+    t = text[:1].upper() + text[1:]
+    letters(sc, t, x, y, "text", 16, col=col, outline=False)
+
+
 def part_box(sc, x, y, key, label, lv=1, state="normal", w=118, h=46):
     """A module's box at the end of a callout: the mount's name, the module's icon, its name, its level."""
     FU.cell(sc, x, y, x + w, y + h, state)
-    letters(sc, label.upper(), x + 8, y + 4, "title", 8, col=(150, 200, 230), outline=False)
+    slot_label(sc, label, x + 8, y + 2)
     if key:
-        mod_icon(sc, key, x + 8, y + 18)
-        H.HOVER.append(("@" + key, x + 8, y + 18, 16, 16))
-        letters(sc, MOD_NAME[key], x + 30, y + 17, "text", 16, col=INK if state != "new" else (170, 220, 250))
+        mod_icon(sc, key, x + 8, y + 22)
+        H.HOVER.append(("@" + key, x + 8, y + 22, 16, 16))
+        letters(sc, MOD_NAME[key], x + 30, y + 21, "text", 16, col=INK if state != "new" else (170, 220, 250))
         FU.levels(sc, x + w - 26, y + 6, lv)
     else:
-        letters(sc, "свободно", x + 30, y + 17, "text", 16, col=PALE)
+        letters(sc, "свободно", x + 30, y + 21, "text", 16, col=PALE)
     return x + w, y + h // 2
 
 
@@ -605,8 +611,8 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
         if core:
             right.insert(0, ("грудь · ядро", at(((M["_body"][0] + M["_body"][1]) / 2 * 0.3, top * 0.55)), core, 0, "core"))
     FU.cell(sc, x0 + 8, y0 + 22, x0 + 214, y0 + 62, "normal")       # the hull's own plate on the drawing
-    letters(sc, f"КОРПУС: {frame.upper()}", x0 + 18, y0 + 28, "title", 8, col=(150, 200, 230), outline=False)
-    letters(sc, role or ROLE[frame], x0 + 18, y0 + 42, "text", 16, col=(170, 220, 250), outline=False)
+    slot_label(sc, f"корпус: {frame}", x0 + 18, y0 + 23)
+    letters(sc, role or ROLE[frame], x0 + 18, y0 + 41, "text", 16, col=(170, 220, 250), outline=False)
     hot = None
     RED_ = hexc("#ff6a4a")
     HOTC = hexc("#ffb060")
@@ -621,11 +627,11 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
         incoming = body_new and body_new[0] == slot
         st = "hover" if (incoming and variant is None) or slot == body_hot else ("new" if incoming else "normal")
         FU.cell(sc, bx, by, bx + bw, by + BH, st)
-        letters(sc, lab.upper(), bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
-        part_icon(sc, slot, key, bx + 6, by + 18, hull=frame)
-        letters(sc, part_name(slot, key), bx + 26, by + 18, "text", 16,
+        slot_label(sc, lab, bx + 8, by + 2)
+        part_icon(sc, slot, key, bx + 6, by + 22, hull=frame)
+        letters(sc, part_name(slot, key), bx + 26, by + 21, "text", 16,
                 col=(255, 210, 150) if incoming else INK)
-        H.HOVER.append(("@" + key, bx + 6, by + 18, 16, 16))
+        H.HOVER.append(("@" + key, bx + 6, by + 22, 16, 16))
         callout(sc, pt, (ex, by + BH // 2), col=HOTC if incoming or slot == body_hot else BLUE, lane=lane)
         if incoming or slot == body_hot:
             hot = (pt, bx + bw - 26, by + 28, bx, by, "l")
@@ -639,23 +645,23 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
         lane = ex - 10 - j * 7
         if st == "core":
             FU.cell(sc, bx, by, bx + bw, by + BH, "normal")
-            letters(sc, "ГРУДЬ · ЯДРО", bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
-            FU.core_port(sc, bx + 16, by + 26, key)
-            H.HOVER.append(("ядро", bx + 8, by + 18, 16, 16))
-            letters(sc, MOD_NAME[key], bx + 30, by + 17, "text", 16, col=INK)
+            slot_label(sc, "грудь · ядро", bx + 8, by + 2)
+            FU.core_port(sc, bx + 16, by + 30, key)
+            H.HOVER.append(("ядро", bx + 8, by + 22, 16, 16))
+            letters(sc, MOD_NAME[key], bx + 30, by + 21, "text", 16, col=INK)
             callout(sc, pt, (ex, by + BH // 2), lane=lane)
         elif st == "incoming" and variant == "drag":                  # dragged: the free cell waits for it, lit
             FU.cell(sc, bx, by, bx + bw, by + BH, "new")
-            letters(sc, lab.upper(), bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
-            letters(sc, "сюда", bx + bw // 2, by + 17, "text", 16, col=(170, 220, 250), align="center")
+            slot_label(sc, lab, bx + 8, by + 2)
+            letters(sc, "сюда", bx + bw // 2, by + 21, "text", 16, col=(170, 220, 250), align="center")
             callout(sc, pt, (ex, by + BH // 2), col=hexc("#9ad8ff"), lane=lane, dash=True)
             sc.glow(pt[0], pt[1], 9, hexc("#9ad8ff"), 0.6)
             hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
         elif st == "incoming":
             FU.cell(sc, bx, by, bx + bw, by + BH, "hover" if variant is None else "new")
-            letters(sc, lab.upper(), bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
-            mod_icon(sc, key, bx + 8, by + 18)
-            letters(sc, MOD_NAME[key], bx + 28, by + 17, "text", 16, col=(255, 210, 150))
+            slot_label(sc, lab, bx + 8, by + 2)
+            mod_icon(sc, key, bx + 8, by + 22)
+            letters(sc, MOD_NAME[key], bx + 28, by + 21, "text", 16, col=(255, 210, 150))
             callout(sc, pt, (ex, by + BH // 2), col=HOTC, lane=lane)
             hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
         elif st == "broken":
@@ -1757,14 +1763,14 @@ def stamp_falling(sc, x, y, text, scale=1.0, alpha=1.0):
 
 def stamp(sc, x, y, text, col="#e0503a"):
     """A rubber stamp on the drawing: red letters in a double red frame, a little worn."""
-    w = SU.text_width(text, "title", 8) + 16
+    w = SU.text_width(text, "text", 16) + 16
     c = hexc(col)
     for k in (0, 2):
         sc.rgb[y + k, x + k:x + w - k] = c
-        sc.rgb[y + 21 - k, x + k:x + w - k] = c
-        sc.rgb[y + k:y + 22 - k, x + k] = c
-        sc.rgb[y + k:y + 22 - k, x + w - 1 - k] = c
-    letters(sc, text, x + 8, y + 7, "title", 8, col=tuple(int(v) for v in c), outline=False, shadow=False)
+        sc.rgb[y + 23 - k, x + k:x + w - k] = c
+        sc.rgb[y + k:y + 24 - k, x + k] = c
+        sc.rgb[y + k:y + 24 - k, x + w - 1 - k] = c
+    letters(sc, text, x + 8, y + 4, "text", 16, col=tuple(int(v) for v in c), outline=False, shadow=False)
     rng = np.random.default_rng(len(text))
     for _ in range(18):                                               # worn spots
         sx, sy = x + rng.integers(0, w), y + rng.integers(0, 22)
@@ -1800,7 +1806,7 @@ def aftermath(anim=None, ret=False, variant=None):
     heading(sc, "ПОЛОМКИ", 26, 64)
     blueprint_sheet(sc, 22, 90, 320, 304)
     FU.cell(sc, 30, 98, 178, 134, "normal")
-    letters(sc, "КОРПУС: МУДРЕЦ", 38, 103, "title", 8, col=(150, 200, 230), outline=False)
+    slot_label(sc, "корпус: Мудрец", 38, 99)
     letters(sc, ROLE["Мудрец"], 38, 116, "text", 16, col=(170, 220, 250), outline=False)
     a_ = anim or {}
     pt = damage_drawing(sc, "Мудрец", {"chain": 1, "fireball": 1, "overload": 2}, "overload", 236, 292, 2.4,
@@ -1812,10 +1818,10 @@ def aftermath(anim=None, ret=False, variant=None):
     lane = 160
     callout(sc, pt, (lane, 314), col=hexc("#ff6a4a"), lane=lane)
     FU.cell(sc, 22, 314, 320, 378, "broken")
-    letters(sc, "СПИНА", 32, 319, "title", 8, col=(230, 150, 130), outline=False)
-    mod_icon(sc, "overload", 32, 334, 2)
-    letters(sc, "Перегрузка", 74, 332, "text", 16, col=INK)
-    H.fx_line(sc, 74, 352, "{модуль:II} ⇒ {модуль:I}")
+    slot_label(sc, "спина", 32, 316, col=(230, 150, 130))
+    mod_icon(sc, "overload", 32, 338, 2)
+    letters(sc, "Перегрузка", 74, 334, "text", 16, col=INK)
+    H.fx_line(sc, 74, 354, "{модуль:II} ⇒ {модуль:I}")
     H.fx_line(sc, 26, 394, "{ремонт} → {металл:2}")
     H.fx_line(sc, 26, 424, "не починил → пропускает бой", dim=True)
     # the battle's pay
@@ -1991,7 +1997,7 @@ def confirm(sc, title_, rows, yes, items=()):
     w = 480
     x0 = WW // 2 - w // 2
     hh = H.fx_rows(sc, 0, 0, w - 48, rows, draw=False)
-    ih = 58 if items else 0
+    ih = 64 if items else 0
     y0 = HH // 2 - (78 + ih + hh + 68) // 2 - 10
     y1 = y0 + 78 + ih + hh + 68
     FU.plate(sc, x0, y0, x0 + w, y1, seed=77)
@@ -2006,7 +2012,7 @@ def confirm(sc, title_, rows, yes, items=()):
         FU.cell(sc, ix, y, ix + 42, y + 42, st)
         mod_icon(sc, key, ix + 5, y + 5, 2)
         if lvl:
-            letters(sc, lvl, ix + 21, y + 44, "title", 8, col=BRASS, outline=False, align="center")
+            letters(sc, lvl, ix + 21, y + 43, "text", 16, col=BRASS, outline=False, align="center")
     y += ih
     H.fx_rows(sc, x0 + 24, y + 6, w - 48, rows)
     by = y1 - 66
@@ -2229,11 +2235,20 @@ def development(kind="colossus", hot="cell", ret=False):
     sc.rgb[451, 360:600] = SU.OUTL
     for x in range(368, 600, 16):
         FU.rivet(sc, x, 446)
-    spr = leader_sprite(kind, 3.5)
+    name, kk, nopt = DEV_LEADER[kind]
+    spr = leader_sprite(kind, kk)
     sc.blit(spr, int(480 - spr.ox), int(440 - spr.oy))
     FU.cell(sc, 380, 74, 580, 112, "hi")
-    letters(sc, "ОТЕЦ КОЛОССА", 480, 80, "text", 16, col=GOLD, align="center")
-    letters(sc, "после босса — 1 из 2", 480, 96, "text", 16, col=MUTED, align="center")
+    letters(sc, name, 480, 80, "text", 16, col=GOLD, align="center")
+    letters(sc, f"после босса — 1 из {nopt}", 480, 96, "text", 16, col=MUTED, align="center")
+    if kind != "colossus":
+        DEV_SCENE[kind](sc, hot)
+        if ret:
+            return sc
+        img = sc.image(S)
+        img.save(out(f"foundry_development_{kind}.png"))
+        print(f"foundry_development_{kind}.png", img.size)
+        return
     # left: the riveting bench — the hull's cells, the new one being riveted in
     hot_l, hot_r = hot == "cell", hot == "module"
     sc.rgb[338:350, 20:300] = hexc("#2a2830")                                 # the bench top
@@ -2283,6 +2298,202 @@ def development(kind="colossus", hot="cell", ret=False):
     img = sc.image(S)
     img.save(out("foundry_development.png"))
     print("foundry_development.png", img.size)
+
+
+DEV_LEADER = {"colossus": ("ОТЕЦ КОЛОССА", 3.5, 2), "inventor": ("ИЗОБРЕТАТЕЛЬ", 5.0, 2),
+              "maniac": ("МАНЬЯК", 3.6, 2), "zodchiy": ("ЗОДЧИЙ", 2.6, 3)}
+
+
+def option_card(sc, x0, y0, x1, y1, title_lines, line, sub, hot):
+    """What a choice in the dock gives: its name in brass letters, its line, a word on how it's done."""
+    FU.cell(sc, x0, y0, x1, y1, "hi" if hot else "normal")
+    col = (255, 210, 140) if hot else GOLD
+    y = y0 + 10
+    for t in title_lines:
+        letters(sc, t, x0 + 16, y, "title", 16, col=col, col2=(130, 90, 40))
+        y += 22
+    H.fx_line(sc, x0 + 16, y + 4, line)
+    letters(sc, sub, x0 + 16, y + 28, "text", 16, col=MUTED)
+
+
+def bench(sc, x0, x1, y=338):
+    sc.rgb[y:y + 12, x0:x1] = hexc("#2a2830")
+    sc.rgb[y, x0:x1] = hexc("#6a6870")
+    for x in (x0 + 14, x1 - 14):
+        sc.rgb[y + 12:y + 82, x - 4:x + 4] = hexc("#1c1a20")
+
+
+def trolley(sc, x):
+    sc.rgb[66:80, x - 25:x + 25] = hexc("#3a3842")
+    sc.rgb[66, x - 25:x + 25] = hexc("#6a6870")
+    FU.rivet(sc, x - 17, 72)
+    FU.rivet(sc, x + 17, 72)
+
+
+def dev_inventor(sc, hot):
+    """The Inventor grows: left, a test bench with a new augment under a canvas sheet and its drawing pinned up
+    beside the three it has; right, a small golem hung on a lift while a drill bores a second augment socket in
+    its shoulder."""
+    import frames as F
+    hl, hr = hot in ("cell", "type"), hot in ("module", "more")
+    option_card(sc, 24, 120, 300, 230, ["НОВЫЙ ВИД", "АУГМЕНТОВ"], "{модуль} новый — в мастерской", "испытательный стенд", hl)
+    blueprint_sheet(sc, 40, 240, 284, 300)
+    for j, k_ in enumerate(("a_coil", "a_mirror", "a_spring")):
+        mod_icon(sc, k_, 56 + j * 46, 254, 2)
+    FU.cell(sc, 194, 250, 236, 292, "new")
+    letters(sc, "?", 215, 258, "title", 24, col=(170, 220, 250), col2=(30, 70, 110), align="center")
+    bench(sc, 20, 300)
+    cloth = (sc.xx >= 70) & (sc.xx < 250) & (sc.yy >= 290 + np.abs(sc.xx - 160) * 0.35) & (sc.yy < 338)
+    FU._bands(sc, cloth, ("#3a3020", "#6a5a3c", "#a08a5e", "#c8b48a", "#ece2c8"), 0.85 - (sc.yy - 290) / 70.0)
+    for fx in (110, 150, 195):                                                # the canvas's folds
+        for yy in range(305, 337):
+            if cloth[yy, fx + (yy - 305) // 6]:
+                sc.rgb[yy, fx + (yy - 305) // 6] = hexc("#6a5a3c")
+    o, _, _ = SU.edges(cloth)
+    sc.rgb[o] = SU.OUTL
+    sc.glow(160, 320, 40, hexc("#9ad8ff"), 0.2)                              # something glowing under it
+    trolley(sc, 795)
+    for cx in (765, 825):
+        FU.chain(sc, cx, 80, 300)
+    sc.rgb[300:308, 750:842] = hexc("#3a3842")                               # the lift's platform
+    sc.rgb[300, 750:842] = hexc("#6a6870")
+    g = F.build("Мудрец", "idle", k=F.FRAMES["Мудрец"][0] * 1.15)
+    sc.blit(g, int(795 - g.ox), int(300 - g.oy))
+    FU.cell(sc, 696, 236, 724, 264, "normal")                                # its augment sockets, by it
+    mod_icon(sc, "a_coil", 702, 242, 1)
+    FU.cell(sc, 696, 270, 724, 298, "hover" if hr else "new")
+    sc.rgb[282:286, 652:690] = hexc("#5e5c66")                               # the drill boring the new one
+    sc.rgb[283:285, 690:696] = hexc("#b0b4bc")
+    sc.rgb[278:290, 636:652] = hexc("#a0782c")
+    FU.sparks(sc, 700, 284, 8, seed=11)
+    option_card(sc, 660, 120, 936, 222, ["+1 АУГМЕНТ"], "{свой} аугментов: 1 → 2", "на каждого голема", hr)
+    FU.sill(sc, 468)
+    action(sc, 20, 472, 310, 532, "НОВЫЙ ВИД", "hot", big=True, heated=hl)
+    action(sc, 650, 472, 940, 532, "+1 АУГМЕНТ", "hot", big=True, heated=hr)
+    letters(sc, "выбор навсегда", 480, 492, "text", 16, col=MUTED, align="center")
+
+
+def dev_maniac(sc, hot):
+    """The Maniac grows: left, a crane's electromagnet hauling a crate taped in hazard stripes out of a heap of
+    scrap — a new mad module; right, the dial of his quirks, purple for the dangerous, green for the useful, a
+    spanner on its adjusting screw opening the green wider."""
+    hl, hr = hot in ("cell", "module_new"), hot in ("module", "quirks")
+    option_card(sc, 24, 120, 300, 222, ["БЕЗУМНЫЙ МОДУЛЬ"], "{модуль} новый безумный", "из лома", hl)
+    rnd = np.random.RandomState(9)
+    for _ in range(26):                                                       # the scrapheap
+        x0, y0 = int(rnd.uniform(30, 280)), int(rnd.uniform(380, 444))
+        w, h = int(rnd.uniform(10, 30)), int(rnd.uniform(6, 14))
+        m = (sc.xx >= x0) & (sc.xx < x0 + w) & (sc.yy >= y0) & (sc.yy < y0 + h) & (sc.yy >= 380 + np.abs(sc.xx - 155) * 0.35)
+        FU._bands(sc, m, FU.IRON if rnd.rand() < 0.7 else FU.BRASSR, rnd.uniform(0.3, 0.8) - (sc.yy - y0) / 40.0)
+        o, _, _ = SU.edges(m)
+        sc.rgb[o] = SU.OUTL
+    for j, k_ in enumerate(("c_saw", "c_fist", "c_salute")):
+        mod_icon(sc, k_, 70 + j * 70, 404 + (j % 2) * 10, 1)
+    trolley(sc, 160)
+    sc.rgb[80:240, 159:161] = hexc("#24222a")                                # the magnet's cable
+    mag = (np.abs(sc.xx - 160) <= 30) & (sc.yy >= 240) & (sc.yy < 254)
+    FU._bands(sc, mag, FU.STEEL, 0.7 - (sc.yy - 240) / 20.0)
+    sc.rgb[252:254, 130:191] = hexc("#c04a3a")
+    o, _, _ = SU.edges(mag)
+    sc.rgb[o] = SU.OUTL
+    crate = (np.abs(sc.xx - 160) <= 34) & (sc.yy >= 256) & (sc.yy < 318)
+    FU._bands(sc, crate, FU.WOOD, 0.7 - (sc.yy - 256) / 80.0)
+    o, _, _ = SU.edges(crate)
+    sc.rgb[o] = SU.OUTL
+    band = crate & (sc.yy >= 280) & (sc.yy < 290)
+    stripes = ((sc.xx + sc.yy) // 5) % 2 == 0
+    sc.rgb[band & stripes] = hexc("#e2ca50")
+    sc.rgb[band & ~stripes] = hexc("#1a1612")
+    sc.glow(160, 300, 30, hexc("#d860d0"), 0.3)
+    letters(sc, "?", 160, 293, "title", 16, col=(220, 150, 255), col2=(60, 20, 80), align="center")
+    option_card(sc, 660, 120, 936, 222, ["ПРИЧУДЫ"], "чаще полезные, реже опасные", "подкрутить шкалу", hr)
+    cx, cy, r = 798, 320, 52
+    d = np.hypot(sc.xx - cx, sc.yy - cy)
+    a = np.arctan2(sc.yy - cy, sc.xx - cx)
+    sc.rgb[d <= r + 5] = SU.OUTL
+    FU._bands(sc, (d <= r + 4) & (d > r), FU.BRASSR, 0.7 - (sc.yy - cy) / (2 * r))
+    face = d <= r
+    sc.rgb[face] = hexc("#ece2c8")
+    useful = face & (d > 18) & (a > -np.pi * 0.85) & (a < -np.pi * 0.15)
+    danger = face & (d > 18) & (a >= -np.pi * 0.15) & (a < 0.15 * np.pi)
+    sc.rgb[useful] = hexc("#2aa040")
+    sc.rgb[danger] = hexc("#9a2aa0")
+    sc.rgb[face & (d > 18) & (a > -np.pi * 0.85) & (a < -np.pi * 0.78)] = hexc("#70e080")   # the green just widened
+    for t in np.linspace(0, 1, 40):                                            # the needle in the green
+        x, y = int(cx + np.cos(-np.pi * 0.6) * r * 0.85 * t), int(cy + np.sin(-np.pi * 0.6) * r * 0.85 * t)
+        sc.rgb[y, x] = hexc("#1a1612")
+    sc.rgb[d <= 4] = hexc("#a0782c")
+    letters(sc, "полезно", cx - 30, cy + r + 10, "text", 16, col=(110, 220, 130), align="center")
+    letters(sc, "опасно", cx + 34, cy + r + 10, "text", 16, col=(210, 130, 220), align="center")
+    FU.wrench(sc, 850, 930, 380, flip=True, size="19", seed=3)                 # the spanner on its screw
+    FU.sill(sc, 468)
+    action(sc, 20, 472, 310, 532, "БЕЗУМНЫЙ", "hot", big=True, heated=hl)
+    action(sc, 650, 472, 940, 532, "ПРИЧУДЫ", "hot", big=True, heated=hr)
+    letters(sc, "выбор навсегда", 480, 492, "text", 16, col=MUTED, align="center")
+
+
+def dev_zodchiy(sc, hot):
+    """The Architect grows, one of three: left, a big clock whose hand is being wound back a turn — deploying a
+    turn sooner; right, a tower with scaffolding up its side and a new ballista being set on top — one more ability
+    when deployed; over the leader, hung from the girder, the blueprint of the Citadel."""
+    import citadel as CT
+    hl, hm, hr = hot == "early", hot == "citadel", hot == "ability"
+    option_card(sc, 24, 120, 300, 222, ["РАНЬШЕ"], "развёртывание на ход раньше", "перевести часы", hl)
+    cx, cy, r = 160, 318, 52
+    d = np.hypot(sc.xx - cx, sc.yy - cy)
+    sc.rgb[d <= r + 5] = SU.OUTL
+    FU._bands(sc, (d <= r + 4) & (d > r), FU.BRASSR, 0.7 - (sc.yy - cy) / (2 * r))
+    sc.rgb[d <= r] = hexc("#ece2c8")
+    for k in range(12):
+        a = k * np.pi / 6
+        x, y = int(cx + np.cos(a) * (r - 6)), int(cy + np.sin(a) * (r - 6))
+        sc.rgb[y - 1:y + 2, x - 1:x + 2] = hexc("#3a342a")
+    for t in np.linspace(0, 1, 40):
+        x, y = int(cx + np.cos(-np.pi * 0.5 - 0.52) * r * 0.75 * t), int(cy + np.sin(-np.pi * 0.5 - 0.52) * r * 0.75 * t)
+        sc.rgb[y, x] = hexc("#1a1612")
+    for a in np.linspace(-np.pi * 0.42, -np.pi * 0.6, 10):                   # the arrow winding it back
+        x, y = int(cx + np.cos(a) * (r + 12)), int(cy + np.sin(a) * (r + 12))
+        sc.rgb[y - 1:y + 2, x - 1:x + 2] = hexc("#c04a3a")
+    letters(sc, "ход 2 → 1", cx, cy + r + 14, "text", 16, col=INK, align="center")
+    sc.rgb[d <= 4] = hexc("#a0782c")
+    option_card(sc, 660, 120, 936, 222, ["+1 СПОСОБНОСТЬ"], "развёрнутым — ещё одна", "надстройка", hr)
+    tw_ = (np.abs(sc.xx - 798) <= 34) & (sc.yy >= 290) & (sc.yy < 440)
+    sc.rgb[tw_] = hexc("#8a8070")
+    for yy in range(296, 440, 12):
+        sc.rgb[yy, 764:833] = hexc("#5e5648")
+    for xx in (766, 778, 790, 802, 814, 826):
+        if (xx // 12) % 2 == 0:
+            sc.rgb[278:290, xx:xx + 8] = hexc("#8a8070")
+    o, _, _ = SU.edges(tw_)
+    sc.rgb[o] = SU.OUTL
+    for xx in (756, 840):                                                     # its scaffolding
+        sc.rgb[260:440, xx - 1:xx + 2] = hexc("#7c562e")
+    for yy in (330, 390):
+        sc.rgb[yy:yy + 3, 752:846] = hexc("#a07844")
+    bal = (sc.xx >= 780) & (sc.xx < 818) & (sc.yy >= 262) & (sc.yy < 276)
+    FU._bands(sc, bal, FU.WOOD, 0.7 - (sc.yy - 262) / 20.0)                   # the new ballista on top
+    sc.rgb[268:270, 760:840] = hexc("#5e5c66")
+    sc.glow(799, 270, 30, hexc("#9ad8ff"), 0.35)
+    # the Citadel's blueprint, hung over the leader
+    FU.chain(sc, 380, 80, 122)
+    FU.chain(sc, 580, 80, 122)
+    blueprint_sheet(sc, 352, 122, 608, 250, stamp=None)
+    spr = CT.build("deployed", 2, k=0.62)
+    ys, xs = np.nonzero(spr.a)
+    kk = 0.62 * min(1.0, 96.0 / max(1, ys.max() - ys.min()), 236.0 / max(1, xs.max() - xs.min()))
+    spr = drawn(CT.build("deployed", 2, k=kk))                               # fitted to the sheet
+    ys, xs = np.nonzero(spr.a)
+    sc.blit(spr, int(480 - (xs.min() + xs.max()) / 2), int(244 - ys.max()))
+    FU.cell(sc, 404, 126, 556, 148, "hi" if hm else "normal")
+    letters(sc, "ЦИТАДЕЛЬ", 480, 129, "title", 16, col=(255, 210, 140) if hm else (170, 220, 250), col2=(40, 80, 120),
+            align="center")
+    FU.sill(sc, 468)
+    action(sc, 12, 472, 302, 532, "РАНЬШЕ", "hot", big=True, heated=hl)
+    action(sc, 334, 472, 626, 532, "ЦИТАДЕЛЬ", "hot", big=True, heated=hm)
+    action(sc, 658, 472, 948, 532, "СПОСОБНОСТЬ", "hot", big=True, heated=hr)
+
+
+DEV_SCENE = {"inventor": dev_inventor, "maniac": dev_maniac, "zodchiy": dev_zodchiy}
 
 
 # ---------------------------------------------------------------- defeat: the forge gone cold
@@ -2456,7 +2667,7 @@ def golem_tip(sc, gx, gy, name, sub, mods, rows, side="left", w=300):
         mx = x0 + 12 + m_ * 46
         FU.cell(sc, mx, y0 + 32, mx + 40, y0 + 72, st)
         mod_icon(sc, key, mx + 4, y0 + 36, 2)
-        letters(sc, lvl, mx + 20, y0 + 74, "title", 8, col=BRASS if st != "broken" else RED, outline=False,
+        letters(sc, lvl, mx + 20, y0 + 72, "text", 16, col=BRASS if st != "broken" else RED, outline=False,
                 align="center")
     H.fx_rows(sc, x0 + 12, y0 + 96, w - 24, rows)
     return x0, y0, x0 + w, yb
@@ -2496,10 +2707,10 @@ def battle_wing(sc, share, paused=False, t=0, ng=7, count=285):
     sc.rgb[o] = SU.OUTL
     FU.sparks(sc, mid, (y0 + y1) / 2, 8, seed=2 + t // 2)
     letters(sc, f"рой {count - 1}", 530, 9, "text", 16, col=(170, 240, 120))
-    letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
+    letters(sc, "ход 5", 728, 9, "text", 16, col=MUTED, align="right")
     for cx, t_, on, key in ((770, "II", paused, "Пробел"), (840, "×2", not paused, "Tab"), (910, "»", False, "End")):
         FU.cap_button(sc, cx, 17, 11, t_, "brass" if on else "steel")
-        kw = SU.text_width(key, "title", 8) + 14
+        kw = SU.text_width(key, "text", 16) + 12
         H.keycap(sc, int(cx - kw / 2), 36, key)
 
 
@@ -2572,7 +2783,9 @@ SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack"
            "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True),
            "drag": lambda: workshop("drag"), "trophy": lambda: aftermath(variant="trophy"),
            "states": states, "settings": lambda: [settings(k) for k, _ in SETTINGS], "pause": pause,
-           "development": development, "defeat": defeat}
+           "development": lambda: [development(k, h) for k, h in (("colossus", "cell"), ("inventor", "type"),
+                                                                  ("maniac", "quirks"), ("zodchiy", "citadel"))],
+           "defeat": defeat}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"

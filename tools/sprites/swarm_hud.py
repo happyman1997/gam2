@@ -129,8 +129,8 @@ def key_on(sc, x1, y0, t):
     """A button's key, on its top edge near the right end — unless it is one everybody knows (Enter, Esc)."""
     if t in SILENT_KEYS:
         return
-    w = UI.text_width(t, "title", 8) + 14
-    keycap(sc, int(x1 - w - 26), int(y0 - 10), t)
+    w = UI.text_width(t, "text", 16) + 12
+    keycap(sc, int(x1 - w - 26), int(y0 - 11), t)
 
 
 def act_button(sc, x0, y0, x1, y1, text, key="Enter", dim=False):
@@ -180,14 +180,14 @@ def confirm(sc, title_, rows, yes, yes_kind="blood"):
 
 
 def keycap(sc, x, y, t, lit=False):
-    """A key of the keyboard, drawn small."""
-    w = UI.text_width(t, "title", 8) + 14
+    """A key of the keyboard: its name in 16 px text like everything that means something."""
+    w = UI.text_width(t, "text", 16) + 12
     face, rim = (hexc("#f0c060"), hexc("#7a4a10")) if lit else (hexc("#4a4056"), hexc("#1a1420"))
-    sc.rgb[y:y + 20, x:x + w] = rim
-    sc.rgb[y + 1:y + 16, x + 1:x + w - 1] = face
+    sc.rgb[y:y + 22, x:x + w] = rim
+    sc.rgb[y + 1:y + 18, x + 1:x + w - 1] = face
     sc.rgb[y + 1, x + 2:x + w - 2] = np.minimum(face + 40, 255)
-    sc.occ[y:y + 20, x:x + w] = True
-    letters(sc, t, x + w / 2, y + 5, "title", 8, col=DARK if lit else INK, outline=False, align="center")
+    sc.occ[y:y + 22, x:x + w] = True
+    letters(sc, t, x + w / 2, y + 1, "text", 16, col=DARK if lit else INK, outline=False, align="center")
     return w
 
 
@@ -759,12 +759,12 @@ def battle_hud():
         letters(sc, f"рой {count - 1}", 16, 8, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
         tug(sc, 144, 10, 520, 25, 0.6)
         letters(sc, f"Литейщик: {ng - 1} из {ng}", 530, 9, "text", 16, col=(214, 196, 150))
-        letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
+        letters(sc, "ход 5", 728, 9, "text", 16, col=MUTED, align="right")
         for x0, x1, t, on, key in ((736, 784, "II", paused, "Пробел"), (790, 838, "×2", not paused, "Tab"),
                                    (844, 952, "в конец »", False, "End")):
             UI.button(sc, x0, 6, x1, 28, "amber" if on else "chitin")
             letters(sc, t, (x0 + x1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
-            kw = UI.text_width(key, "title", 8) + 14
+            kw = UI.text_width(key, "text", 16) + 12
             keycap(sc, int((x0 + x1) / 2 - kw / 2), 31, key)
         name = "swarm_battle_hud.png"
         if mode == "enemy":                         # the enemy has a card too: the Guard
