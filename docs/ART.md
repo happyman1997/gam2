@@ -735,6 +735,18 @@
 
 ![Карточка голема](images/foundry_card.png)
 
+Карточка у каждого корпуса своя (`CARD` в `foundry_hud.py`): роль, модули, ячейки, ядро, его правило, лидерство,
+тело, удары обеих рук (у щита, линзы, клещей, лейки — «—»). Подсказка модуля открывается под его рамкой, а если
+внизу места нет — над ней.
+
+![Карточка Стража](images/foundry_card_guard.png)
+
+![Карточка Мудреца](images/foundry_card_sage.png)
+
+![Карточка Горна](images/foundry_card_forge.png)
+
+![Карточка Механика](images/foundry_card_mechanic.png)
+
 ![Выбор лидера Литейщика](images/foundry_leader_pick.png)
 
 ![Полное описание лидера](images/foundry_leader_card.png)

@@ -1403,6 +1403,32 @@ ABIL = {   # the frame's and the class's own, in glyphs
 }
 
 
+FRAME_EN = {"Страж": "guard", "Мудрец": "sage", "Горн": "forge", "Орудие": "gun", "Механик": "mechanic"}
+CARD = {   # frame: (role on the beam, modules, cells, core, the box under the mouse, its own rule, leadership,
+           #         body rows, arm rows (slot, part, damage, kind, range), class extras)
+    "Орудие": ("стрелок · голем", {"mortar": 1, "canister": 1, "long": 1}, 4, "cast", "mortar",
+               "Наводка: {дальность} → {урон} без потерь", 5,
+               (("здоровье", "55"), ("броня", "2"), ("скорость", "1"), ("размер", "5"), ("инициатива", "4")),
+               (("arm_n", "cannon", "1–10 +3", "{дроб}", "3"), ("arm_f", "cannon", "1–10 +3", "{дроб}", "3")), ()),
+    "Страж": ("танк · голем", {"tower": 2, "intercept": 1, "plates": 1}, 5, "cast", "intercept",
+              "Заслон: {радиус:1} → {цель:1}", 7,
+              (("здоровье", "100"), ("броня", "4"), ("скорость", "1"), ("размер", "6"), ("инициатива", "3")),
+              (("arm_n", "maul", "1–6 +3", "{дроб}", "1"), ("arm_f", "shield", "—", "", "")), ()),
+    "Мудрец": ("маг · голем", {"chain": 1, "fireball": 1, "overload": 2}, 4, "volt", "chain",
+               "Питание: {свой} {радиус:1} → {через:−1}", 5,
+               (("здоровье", "40"), ("броня", "2"), ("скорость", "1"), ("размер", "5"), ("инициатива", "5")),
+               (("arm_n", "staff", "1–8 +1", "{молния}", "4"), ("arm_f", "focus", "—", "", "")), ()),
+    "Горн": ("контроль · голем", {"magnet": 1, "maw": 1}, 4, "fire", "maw",
+             "Жар горна: {каждые:1} → {огонь} {радиус:1}", 5,
+             (("здоровье", "50"), ("броня", "2"), ("скорость", "1"), ("размер", "5"), ("инициатива", "3")),
+             (("arm_n", "flame", "1–6", "{огонь}", "2"), ("arm_f", "tongs", "—", "", "")), ()),
+    "Механик": ("поддержка · голем", {"repair": 1, "oiler": 1}, 3, "cast", "repair",
+                "Наладка: {каждые:1} → {свой} {радиус:1} {ремонт:1}", 3,
+                (("здоровье", "35"), ("броня", "2"), ("скорость", "2"), ("размер", "4"), ("инициатива", "3")),
+                (("arm_n", "wrench", "—", "", ""), ("arm_f", "can", "—", "", "")), ()),
+}
+
+
 def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     """A golem's card, in the slipway's language: on the left its drawing, a callout from every mount to its module
     (the one under the mouse opened in a tooltip), the chest with its core, its own rule and its cells under it; on
@@ -1410,14 +1436,14 @@ def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     sc = screen(13)
     FU.wing(sc, 0, 0, WW, 44)
     title_center(sc, frame.upper(), "wrench")
-    letters(sc, "стрелок · голем", 16, 13, "text", 16, col=MUTED)
+    role_, mods, ncell, core, hover0, rule, lead, body_rows, arm_rows, _x = CARD[frame]
+    hover = hover if frame == "Орудие" else hover0
+    letters(sc, role_, 16, 13, "text", 16, col=MUTED)
     toolbar(sc)
-    mods = {"mortar": 1, "canister": 1, "long": 1}
-    ncell, core = 4, "cast"
     # left: the drawing
     FU.plate(sc, 6, 50, 590, 476, seed=7)
     hot = slipway(sc, frame, mods, core, ncell, (16, 60, 580, 432), hover=hover, crane=False, body=BODY.get(frame))
-    H.fx_line(sc, 20, 444, "Наводка: {дальность} → {урон} без потерь")
+    H.fx_line(sc, 20, 444, rule)
     for j in range(ncell):
         cx_ = 580 - (ncell - j) * 30
         FU.cell(sc, cx_, 440, cx_ + 24, 464, "hi" if j < len(mods) else "locked")
@@ -1426,11 +1452,11 @@ def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     x0, x1 = 612, WW - 18
     FU.plate(sc, 598, 50, WW - 6, 476, seed=8)
     heading(sc, "ПАСПОРТ", x0, 62)
-    H.fx_line(sc, x0, 90, "{лидер:5} · {ядро} литое · {убийство:3} в прошлом бою")
+    H.fx_line(sc, x0, 90, f"{{лидер:{lead}}} · {{ядро}} {MOD_NAME[core].split()[0].lower()} · {{убийство:3}} в прошлом бою")
     y = 124
     heading(sc, "ТЕЛО", x0, y)
     y += 28
-    for key, val in (("здоровье", "55"), ("броня", "2 {литой}"), ("скорость", "1"), ("размер", "5"), ("инициатива", "4")):
+    for key, val in body_rows:
         a_ = H.glyph(sc, key, x0, y - 4, 2)
         w, _ = H.fx_line(sc, 0, 0, val, draw=False)
         H.dots(sc, x0 + a_ + 8, x1 - w - 6, y + 10)
@@ -1439,18 +1465,19 @@ def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     y += 4
     heading(sc, "ВОЗМОЖНОСТИ", x0, y)
     y += 28
-    cols = (x0 + 20, x0 + 116, x0 + 200, x0 + 262)
+    cols = (x0 + 20, x0 + 138, x0 + 210, x0 + 266)
     for cx, lab in zip(cols, ("атака", "урон", None, "дальность")):
         if lab:
             H.glyph(sc, lab, cx, y - 6, 2)
     y += 14
     sc.rgb[y, x0:x1] = sc.rgb[y, x0:x1] * 0.5 + hexc("#5a5860") * 0.5
-    for slot in ("arm_n", "arm_f"):                                  # a row per arm: what each hand strikes with
-        part_icon(sc, slot, "cannon", x0, y + 5, hull=frame)
-        letters(sc, part_name(slot, "cannon"), cols[0], y + 6, "text", 16, col=GOLD)
-        letters(sc, "1–10 +3", cols[1], y + 6, "text", 16, col=INK)
-        H.fx_line(sc, cols[2], y + 6, "{дроб}")
-        letters(sc, "3", cols[3], y + 6, "text", 16, col=INK)
+    for slot, part, dmg, kind_, rng in arm_rows:                     # a row per arm: what each hand strikes with
+        part_icon(sc, slot, part, x0, y + 5, hull=frame)
+        letters(sc, part_name(slot, part), cols[0], y + 6, "text", 16, col=GOLD)
+        letters(sc, dmg, cols[1], y + 6, "text", 16, col=INK if dmg != "—" else PALE)
+        if kind_:
+            H.fx_line(sc, cols[2], y + 6, kind_)
+        letters(sc, rng, cols[3], y + 6, "text", 16, col=INK)
         y += 22
     y += 6
     heading(sc, "СПОСОБНОСТИ", x0, y)
@@ -1473,6 +1500,8 @@ def card(frame="Орудие", hover="mortar", anim=None, ret=False):
         tw = 300
         th = H.fx_rows(sc, 0, 0, tw - 24, lines, draw=False) + 40
         tx = bx if side == "l" else bx + 152 - tw
+        if by + 52 + th > 470:                                         # no room under the box: open it above
+            by = by - 52 - th - 4
         k = a_.get("tip", 1.0)                                         # the tooltip coming in: up from below, fading in
         if k > 0:
             before = sc.rgb.copy()
@@ -1487,8 +1516,9 @@ def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     if ret:
         return sc
     img = sc.image(S)
-    img.save(out("foundry_card.png"))
-    print("foundry_card.png", img.size)
+    name = "foundry_card.png" if frame == "Орудие" else f"foundry_card_{FRAME_EN[frame]}.png"
+    img.save(out(name))
+    print(name, img.size)
 
 
 # ---------------------------------------------------------------- choosing the leader
