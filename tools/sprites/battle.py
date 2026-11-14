@@ -381,7 +381,11 @@ def build(leader="Матка"):
             x = a[0] + (b[0] - a[0]) * f
             y = a[1] + (b[1] - a[1]) * f
             bolt(sc, int(x), int(y), "fire", 14)
+    LAST.update(gpos=gpos, lead=(lx, ly, lead), spiders=spiders)
     return sc, count, len(golems)
+
+
+LAST = {}     # the last field built: where each golem stands, the leader, the spitters — for the HUDs over it
 
 
 def overlay(img, count, ng, leader="Матка"):

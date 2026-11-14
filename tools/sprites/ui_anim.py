@@ -288,6 +288,19 @@ def leaders():
     print("\nfoundry_leader_fire.gif", len(images))
 
 
+def leader_card():
+    """The leader's full card: his furnace burning behind him, two fires in turns, sparks at his feet — the card's
+    left plate, the only part of the screen that moves, as a loop."""
+    frames, meta = pxfx.load("forge-fire")
+    images = []
+    for i in range(len(frames)):
+        sc = FH.leader_card(frame=i, ret=True)
+        images.append(sc.image(2).crop((0, 96, 672, 932)))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_leader_card.gif"), meta["fps"], half=True)
+    print("\nfoundry_leader_card.gif", len(images))
+
+
 def heat_env(i, a, b, c, d):
     """How hot a thing under the mouse is at frame i: heating a..b, held b..c, cooling c..d (eased)."""
     if i < a or i >= d:
@@ -444,8 +457,43 @@ def card_tip():
     print("\nfoundry_card_tip.gif", len(images))
 
 
+def pop_env(i, start, n=24):
+    """A module's pop over its golem at frame i: (k, rise, heat) — it jumps up out of the golem past its place and
+    settles, glows red-hot, cools to iron, then drifts up and fades. None when it is not up."""
+    t = i - start
+    if t < 0 or t >= n:
+        return None
+    if t < 5:
+        e = out_back(t / 5)
+        return min(1.0, t / 3), -10 * (1 - e), 1.0
+    if t < n - 6:
+        return 1.0, 0.0, max(0.0, 1 - (t - 5) / 10)
+    f = (t - (n - 6)) / 6
+    return 1 - in_out_cubic(f), 6 * out_quad(f), 0.0
+
+
+def battle_anim():
+    """The battle seen by the Foundry: the tug of war on the beam swaying — the iron pushes in after the Canister
+    fires, the swarm presses back — sparks at the seam; the modules' icons popping up over their golems in turn."""
+    images = []
+    N = 48
+    for i in range(N):
+        share = 0.44 + 0.022 * np.sin(2 * np.pi * i / N) + 0.008 * np.sin(6 * np.pi * i / N)
+        pops = []
+        for key, nm, who, st in (("canister", "Картечь", ("Орудие", 3, 2), 0), ("intercept", "Перехват", ("Страж", 5, 6), 22)):
+            e = pop_env(i, st)
+            if e:
+                pops.append((key, nm, who) + e)
+        sc = FH.battle_view("run", t=i, share=share, pops=pops, ret=True)
+        images.append(sc.image(2).crop((0, 0, 1120, 680)))
+        print(i, end=" ", flush=True)
+    pxfx.save_gif(images, out("foundry_battle_anim.gif"), FPS, half=True)
+    print("\nfoundry_battle_anim.gif", len(images))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "console"
     {"console": console, "hearth": hearth, "workshop": workshop, "tabs": tabs, "steps": steps,
      "metal": metal_tick, "gears": gears_title, "leaders": leaders,
-     "hover": hover, "speed": speed, "start": start, "aftermath": aftermath_anim, "card": card_tip}[what]()
+     "hover": hover, "speed": speed, "start": start, "aftermath": aftermath_anim, "card": card_tip, "leadercard": leader_card,
+     "battle": battle_anim}[what]()

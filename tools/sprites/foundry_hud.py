@@ -1452,6 +1452,131 @@ def leaders_pick(anim=None, ret=False):
     print("foundry_leader_pick.png", img.size)
 
 
+# ---------------------------------------------------------------- a leader in full, from «Полное описание»
+LEADER_FULL = {
+    "colossus": dict(
+        name="ОТЕЦ КОЛОССА", epi="армия из одного", k=3.0, lead="3 весь поход", cells=7,
+        mods=("plates", "flail", "magnet"),
+        body=(("здоровье", "здоровье", "160"), ("броня", "броня", "3"), ("скорость", "скорость", "1"),
+              ("размер", "размер", "7 · 4×4"), ("инициатива", "инициатива", "1")),
+        weapons=(("Электробулава", "1–8 +2 {дроб}", "размах", "1"), ("Миниган", "3 × 1–4 {кол}", None, "4")),
+        abil=(("Сотрясение", "каждые 3 хода", "{каждые:3} → {дроб} {радиус:1} · {оглушение:1}", INK),
+              ("Неудержимый", "постоянно", "{притяг:✕} · {оглушение:✕}", INK),
+              ("Ужас", "постоянно", "{радиус:3} → {страх:1–9}", INK),
+              ("Второе дыхание", "раз за бой", "{поломка} → встаёт с ½", INK),
+              ("Прожорливый", "слабость", "{ремонт} → {металл:×2}", RED),
+              ("Один за всех", "правило похода", "7 ячеек · модули любого корпуса", GOLD)),
+        army=(("Механик", ("repair",)),), grow=("после босса, 1 из 2:", "+1 ячейка · колоссальный модуль")),
+}
+
+
+def leader_card(kind="colossus", frame=0, ret=False):
+    """A Foundry leader in full: the leader large in its open furnace (pixelfx's fire), its nameplate, its own cells
+    with the modules it starts with; its passport — leadership, body, weapons, who comes with it; its abilities, each
+    a line of glyphs with when it fires; how it grows."""
+    import pxfx
+    import frames as F
+    L = LEADER_FULL[kind]
+    sc = screen(39)
+    FU.wing(sc, 0, 0, WW, 44)
+    title_center(sc, L["name"], "hammer")
+    toolbar(sc)
+    # the furnace and the leader in it
+    FU.plate(sc, 12, 52, 330, 462, seed=61)
+    X, Y = sc.xx, sc.yy
+    ax, ay, ar, fl = 171, 186, 116, 348
+    arch = ((((X - ax) / ar) ** 2 + ((Y - ay) / ar) ** 2 <= 1) & (Y <= ay)) | ((np.abs(X - ax) <= ar) & (Y > ay) & (Y < fl))
+    t = np.clip((Y - ay + ar) / (fl - ay + ar), 0, 1)
+    fire = hexc("#1e0a06")[None, None, :] * (1 - t[..., None]) + hexc("#7a2410")[None, None, :] * t[..., None]
+    sc.rgb[arch] = fire[arch]
+    inner = ((((X - ax) / (ar - 3)) ** 2 + ((Y - ay) / (ar - 3)) ** 2 <= 1) & (Y <= ay)) | ((np.abs(X - ax) <= ar - 3) & (Y > ay) & (Y < fl))
+    frames_, meta = pxfx.load("forge-fire")
+    before = sc.rgb.copy()
+    for dx in (-62, 58):
+        pxfx.blend(sc, frames_[(frame + (dx > 0) * 7) % len(frames_)], ax + dx, fl, meta["pivot"])
+    sc.rgb[~inner] = before[~inner]
+    sc.rgb[arch & ~inner] = hexc("#b8904a")
+    for kk in range(-4, 5):                                           # the voussoirs: rivets round the arch
+        a_ = np.pi * (0.5 + kk / 10)
+        FU.rivet(sc, ax - np.cos(a_) * (ar + 5), ay - np.sin(a_) * (ar + 5))
+    spr = leader_sprite(kind, L["k"])
+    sc.blit(spr, int(ax - spr.ox), int(fl - 4 - spr.oy))
+    sc.rgb[fl:fl + 3, ax - ar - 6:ax + ar + 7] = hexc("#5a5860")
+    FU.sparks(sc, ax - 80, fl - 6, 10, seed=3 + frame // 3)
+    FU.sparks(sc, ax + 84, fl - 10, 8, seed=4 + frame // 3)
+    FU.cell(sc, 24, 358, 318, 398, "hi")
+    letters(sc, L["name"], ax, 363, "title", 16, col=(255, 210, 140), align="center")
+    letters(sc, L["epi"], ax, 380, "text", 16, col=BRASS, align="center")
+    # its own cells: 7, three of them filled
+    n = L["cells"]
+    cw = (294 - (n - 1) * 4) / n
+    for c in range(n):
+        cx0 = int(round(24 + c * (cw + 4)))
+        has = c < len(L["mods"])
+        FU.cell(sc, cx0, 410, int(round(cx0 + cw)), 452, "normal" if has else "locked")
+        if has:
+            mod_icon(sc, L["mods"][c], cx0 + cw / 2 - 16, 415, 2)
+    # the passport
+    x0, x1 = 352, 612
+    FU.plate(sc, 338, 52, 626, 462, seed=62)
+    heading(sc, "ПАСПОРТ", x0, 62)
+    H.fx_line(sc, x0, 90, "{лидер} лидерство " + L["lead"])
+    y = 118
+    heading(sc, "ТЕЛО", x0, y)
+    y += 30
+    for g, lab, val in L["body"]:
+        a_ = H.glyph(sc, g, x0, y - 4, 2)
+        letters(sc, lab, x0 + a_ + 8, y - 2, "text", 16, col=MUTED)
+        lw = len(lab) * 8
+        w, _ = H.fx_line(sc, 0, 0, val, draw=False)
+        H.dots(sc, x0 + a_ + 14 + lw, x1 - w - 6, y + 10)
+        H.fx_line(sc, x1 - w, y - 2, val)
+        y += 21
+    y += 6
+    heading(sc, "ОРУЖИЕ", x0, y)
+    y += 28
+    for nm, dmg, extra, rng in L["weapons"]:
+        letters(sc, nm, x0, y, "text", 16, col=GOLD)
+        w, _ = H.fx_line(sc, 0, 0, "{дальность:" + rng + "}", draw=False)
+        H.fx_line(sc, x1 - w, y, "{дальность:" + rng + "}")
+        H.fx_line(sc, x0 + 12, y + 19, dmg + ("" if not extra else " · " + extra))
+        y += 42
+    heading(sc, "С НИМ", x0, y)
+    y += 26
+    for j, (fr, mods) in enumerate(L["army"]):
+        ck = ("army_big", fr)
+        if ck not in _LEADERS:
+            _LEADERS[ck] = F.build(fr, "idle", k=F.FRAMES[fr][0] * 0.95)
+        g = _LEADERS[ck]
+        sc.blit(g, int(x0 + 22 - g.ox), int(y + 64 - g.oy))
+        letters(sc, fr, x0 + 52, y + 8, "text", 16, col=INK)
+        for m_, key in enumerate(mods):
+            FU.cell(sc, x0 + 52 + m_ * 40, y + 28, x0 + 88 + m_ * 40, y + 62, "normal")
+            mod_icon(sc, key, x0 + 54 + m_ * 40, y + 29, 2)
+    # the abilities
+    rx0, rx1 = 646, WW - 26
+    FU.plate(sc, 634, 52, 948, 462, seed=63)
+    heading(sc, "СПОСОБНОСТИ", rx0, 62)
+    y = 90
+    for nm, when, line, col in L["abil"]:
+        FU.cell(sc, rx0 - 4, y, rx1 + 4, y + 47, "broken" if col == RED else ("hi" if col == GOLD else "normal"))
+        letters(sc, nm, rx0 + 6, y + 4, "text", 16, col=col)
+        letters(sc, when, rx1 - 4, y + 4, "text", 16, col=MUTED, align="right")
+        H.fx_line(sc, rx0 + 6, y + 24, line)
+        y += 51
+    y += 2
+    letters(sc, "развитие " + L["grow"][0], rx0, y, "text", 16, col=MUTED)
+    letters(sc, L["grow"][1], rx0, y + 18, "text", 16, col=INK)
+    FU.sill(sc, 468)
+    action(sc, 12, 478, 220, 526, "Назад", "steel")
+    action(sc, 640, 472, 948, 532, "ВЫБРАТЬ", "hot", big=True)
+    if ret:
+        return sc
+    img = sc.image(S)
+    img.save(out("foundry_leader_card.png"))
+    print("foundry_leader_card.png", img.size)
+
+
 # ---------------------------------------------------------------- after the battle
 def damage_drawing(sc, frame, mods, key, x, y, K, pulse=1.0):
     """The golem as a drawing on the blueprint, the part that broke picked out in red — its own pixels, found as
@@ -1593,53 +1718,157 @@ def aftermath(anim=None, ret=False):
 
 
 # ---------------------------------------------------------------- the battle, seen from the Foundry
-def battle():
-    """The same battle as the swarm's, the interface the Foundry's: an iron beam with the tug of war (hot iron from
-    the left, the swarm's green from the right), the speed, the keys; both leaders' health over them."""
+def module_pop(sc, key, name, cx, top, k=1.0, rise=0.0, heat=1.0):
+    """A module firing, over its golem: its icon in a red-hot box, rising, its name under it; k fades the lot in
+    and out, heat cools the box's rim from red back to iron."""
+    before = sc.rgb.copy() if k < 1 else None
+    y = int(round(top - 48 - rise))
+    if y < 42:                                       # no room over its head (the field's top row): by its side
+        y, cx = int(round(42 - rise * 0.3)), cx - 58
+    x0 = int(round(cx - 19))
+    sc.glow(cx, y + 19, 30, hexc("#ff8a2a"), 0.5 * heat)
+    FU.cell(sc, x0, y, x0 + 38, y + 38, "hover" if heat > 0.5 else "normal", seed=3)
+    mod_icon(sc, key, x0 + 3, y + 3, 2)
+    letters(sc, name, cx, y + 42, "text", 16, col=GOLD, align="center")
+    if before is not None:
+        sc.rgb[:] = before * (1 - k) + sc.rgb * k
+
+
+def mark_broken(sc, cx, cy):
+    """The Foundry's own state on the field: a golem broken in the fight — the breakdown glyph in a rust-red box
+    with its crack, by the golem's side; it waits there for the repair after the battle."""
+    x0, y0 = int(cx - 13), int(cy - 13)
+    sc.glow(cx, cy, 18, hexc("#e04a2a"), 0.35)
+    FU.cell(sc, x0, y0, x0 + 26, y0 + 26, "broken")
+    H.glyph(sc, "поломка", x0 + 4, y0 + 4, 2)
+
+
+def golem_tip(sc, gx, gy, name, sub, mods, rows, side="left", w=300):
+    """On pause, the golem under the mouse opens its card by it: name, frame and leadership, its modules as icons
+    with their levels, then its lines of glyphs (body, blow, what's wrong with it)."""
+    x0 = int(gx - 40 - w) if side == "left" else int(gx + 40)
+    y0 = int(gy - 150)
+    yb = H.fx_rows(sc, x0 + 12, y0 + 96, w - 24, rows, draw=False) + 8
+    FU.cell(sc, x0, y0, x0 + w, yb, "hi")
+    letters(sc, name, x0 + 12, y0 + 9, "text", 16, col=GOLD)
+    letters(sc, sub, x0 + w - 12, y0 + 9, "text", 16, col=MUTED, align="right")
+    for m_, (key, lvl, st) in enumerate(mods):
+        mx = x0 + 12 + m_ * 46
+        FU.cell(sc, mx, y0 + 32, mx + 40, y0 + 72, st)
+        mod_icon(sc, key, mx + 4, y0 + 36, 2)
+        letters(sc, lvl, mx + 20, y0 + 74, "title", 8, col=BRASS if st != "broken" else RED, outline=False,
+                align="center")
+    H.fx_rows(sc, x0 + 12, y0 + 96, w - 24, rows)
+    return x0, y0, x0 + w, yb
+
+
+_FIELD = {}
+
+
+def battle_field():
+    """The battle under the HUD — built once (it is the slow part) and copied for every view and frame."""
+    import battle as BT
+    if "sc" not in _FIELD:
+        sc, count, ng = BT.build("Матка")
+        _FIELD.update(sc=sc, count=count, ng=ng, gpos=BT.LAST["gpos"], lead=BT.LAST["lead"])
+    return _FIELD
+
+
+def battle_wing(sc, share, paused=False, t=0, ng=7, count=285):
+    """The iron beam: the Foundry's count, the tug of war (hot iron pushing from the left, the swarm's green from the
+    right, sparks where they meet), the swarm's count, the turn, the speed caps with their keys."""
+    FU.wing(sc, 0, 0, WW, 34)
+    letters(sc, f"Литейщик {ng - 1}/{ng}", 14, 9, "text", 16, col=(240, 200, 150))
+    x0, x1, y0, y1 = 150, 520, 10, 25
+    mid = x0 + (x1 - x0) * share
+    X, Y = sc.xx, sc.yy
+    m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
+    tt = np.clip((Y - y0) / (y1 - y0), 0, 1)[..., None]
+    left, right = m & (X < mid), m & (X >= mid)
+    sc.rgb[left] = (hexc("#ffb050") * (1 - tt) + hexc("#7a2a0a") * tt)[left]
+    sc.rgb[right] = (hexc("#b4f47a") * (1 - tt) + hexc("#2a6224") * tt)[right]
+    heat = left & (X > mid - 26)                                       # the iron's edge hottest where it pushes
+    a_ = np.clip(1 - (mid - X) / 26, 0, 1)[..., None] * 0.6
+    sc.rgb[heat] = (sc.rgb * (1 - a_) + hexc("#fff0c0") * a_)[heat]
+    for x in range(x0 + 8, int(mid) - 6, 12):
+        FU.rivet(sc, x, (y0 + y1) // 2)
+    o, _, _ = SU.edges(m)
+    sc.rgb[o] = SU.OUTL
+    FU.sparks(sc, mid, (y0 + y1) / 2, 8, seed=2 + t // 2)
+    letters(sc, f"рой {count - 1}", 530, 9, "text", 16, col=(170, 240, 120))
+    letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
+    for cx, t_, on, key in ((770, "II", paused, "Пробел"), (840, "×2", not paused, "Tab"), (910, "»", False, "End")):
+        FU.cap_button(sc, cx, 17, 11, t_, "brass" if on else "steel")
+        kw = SU.text_width(key, "title", 8) + 14
+        H.keycap(sc, int(cx - kw / 2), 36, key)
+
+
+def battle_view(mode="run", t=0, share=0.42, pops=None, ret=False):
+    """The battle with the Foundry's interface over it. On the field: both leaders' health over them, a module's
+    icon popping up over its golem when it fires, states over the golems (the swarm's glue and acid, and the
+    Foundry's own — a broken module). On pause, pointing at a golem opens its card; at a bug, the enemy's."""
     import copy
     import battle as BT
     import swarm_status as ST
     import swarm1 as W
-    sc, count, ng = BT.build("Матка")
+    fd = battle_field()
+    sc = copy.deepcopy(fd["sc"])
     H.HOVER.clear()
     H.KIT["cell"] = FU.cell
+    gp = fd["gpos"]
     qx, qy = BT.X0 + 15.6 * BT.CW, BT.Y0 + 8.4 * BT.CH
-    qtop = ST.top_of(W.queen(0.0, "attack", k=0.92), qy)
-    lx, ly = BT.X0 + 2.5 * BT.CW, BT.Y0 + 6.8 * BT.CH
-    ltop = ST.top_of(BT.LH.GH.build(BT.LH.ZODCHIY, "idle", 1.05), ly)
+    if "qtop" not in _FIELD:
+        _FIELD["qtop"] = ST.top_of(W.queen(0.0, "attack", k=0.92), qy)
+    qtop = _FIELD["qtop"]
+    lx, ly, lspr = fd["lead"]
+    ltop = ST.top_of(lspr, ly)
     SU.meter(sc, lx - 40, ltop - 12, lx + 40, 7, 10, 7, "#d08a3a")
     H.glyph(sc, "лидер", lx - 58, ltop - 14, 2)
     SU.meter(sc, qx - 46, qtop - 12, qx + 46, 7, 10, 8, "#c04a3a")
     H.glyph(sc, "лидер", qx - 64, qtop - 14, 2)
-    FU.wing(sc, 0, 0, WW, 34)
-    letters(sc, f"Литейщик {ng - 1}/{ng}", 14, 9, "text", 16, col=(240, 200, 150))
-    x0, x1, y0, y1 = 150, 520, 10, 25                       # the tug: hot iron from the left, the swarm from the right
-    share = 0.42
-    mid = x0 + (x1 - x0) * share
-    X, Y = sc.xx, sc.yy
-    m = (X >= x0) & (X < x1) & (Y >= y0) & (Y < y1)
-    t = np.clip((Y - y0) / (y1 - y0), 0, 1)[..., None]
-    left = m & (X < mid)
-    right = m & (X >= mid)
-    sc.rgb[left] = (hexc("#ffb050") * (1 - t) + hexc("#7a2a0a") * t)[left]
-    sc.rgb[right] = (hexc("#b4f47a") * (1 - t) + hexc("#2a6224") * t)[right]
-    for x in range(x0 + 8, int(mid) - 4, 12):
-        FU.rivet(sc, x, (y0 + y1) // 2)
-    o, _, _ = SU.edges(m)
-    sc.rgb[o] = SU.OUTL
-    FU.sparks(sc, mid, (y0 + y1) / 2, 8, seed=2)
-    letters(sc, f"рой {count - 1}", 530, 9, "text", 16, col=(170, 240, 120))
-    letters(sc, "ход 5", 728, 13, "title", 8, col=MUTED, outline=False, align="right")
-    for cx, t_, on, key in ((770, "II", False, "Пробел"), (840, "×2", True, "Tab"), (910, "»", False, "End")):
-        FU.cap_button(sc, cx, 17, 11, t_, "brass" if on else "steel")
-        kw = SU.text_width(key, "title", 8) + 14
-        H.keycap(sc, int(cx - kw / 2), 36, key)
+    bx, by, bspr = gp[("Горн", 6, 2)]                                  # the Forge whose module broke
+    mark_broken(sc, bx - 58, by - 46)
+    if pops is None:
+        pops = [("canister", "Картечь", ("Орудие", 3, 2), 1.0, 0.0, 1.0),
+                ("intercept", "Перехват", ("Страж", 5, 6), 1.0, 0.0, 1.0)]
+    for key, nm, who, k, rise, heat in pops:
+        x, y, spr = gp[who]
+        module_pop(sc, key, nm, x, ST.top_of(spr, y), k, rise, heat)
+    battle_wing(sc, share, mode != "run", t, fd["ng"], fd["count"])
+    name = "foundry_battle.png"
+    if mode == "pause":                                                # the Guard: its card by it
+        gx, gy, gspr = gp[("Страж", 5, 6)]
+        golem_tip(sc, gx + 40, gy - 10, "Страж", "голем · 6", (("tower", "II", "normal"), ("intercept", "I", "normal"),
+                  ("plates", "I", "normal")),
+                  ["{здоровье:71/100} {броня:4 −1} {скорость:1}", "{урон:1–6 +3} {дроб} {дальность:1}",
+                   "{атака} {свой} {радиус:1} → {перехват:1}", "разъедена: {броня:−1} до конца боя"], side="right", w=280)
+        H.cursor(sc, int(gx) + 4, int(gy) - 60)
+        name = "foundry_battle_pause.png"
+    elif mode == "enemy":                                              # a spitter: the enemy's card, in our iron
+        sx_, sy_ = 566, 452
+        x0, y0, w = 590, 300, 270
+        rows_ = ["{каждые:2} → {яд} {клей:1} {дальность:3}", "{через:1}", "минус: {атака} → {урон:−}"]
+        yb = H.fx_rows(sc, x0 + 12, y0 + 46, w - 24, rows_, draw=False) + 8
+        FU.cell(sc, x0, y0, x0 + w, yb, "broken")
+        H.icon(sc, "spitter", x0 + 8, y0 + 6, 2)
+        letters(sc, "Паук-плевун", x0 + 46, y0 + 9, "text", 16, col=(190, 240, 130))
+        letters(sc, "рой · рабочая", x0 + 46, y0 + 25, "text", 16, col=MUTED)
+        H.fx_rows(sc, x0 + 12, y0 + 46, w - 24, rows_)
+        H.cursor(sc, sx_ - 2, sy_ - 14)
+        name = "foundry_battle_enemy.png"
+    if ret:
+        return sc
     img = sc.image(S)
-    img.save(out("foundry_battle.png"))
-    print("foundry_battle.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
-SCREENS = {"workshop": workshop, "camp": camp, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
+def battle():
+    for mode in ("run", "pause", "enemy"):
+        battle_view(mode)
+
+
+SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
