@@ -637,13 +637,20 @@ def slipway(sc, frame, mods, core, ncell, rect, new_key=None, variant=None, role
             H.HOVER.append(("ядро", bx + 8, by + 18, 16, 16))
             letters(sc, MOD_NAME[key], bx + 30, by + 17, "text", 16, col=INK)
             callout(sc, pt, (ex, by + BH // 2), lane=lane)
+        elif st == "incoming" and variant == "drag":                  # dragged: the free cell waits for it, lit
+            FU.cell(sc, bx, by, bx + bw, by + BH, "new")
+            letters(sc, lab.upper(), bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
+            letters(sc, "сюда", bx + bw // 2, by + 17, "text", 16, col=(170, 220, 250), align="center")
+            callout(sc, pt, (ex, by + BH // 2), col=hexc("#9ad8ff"), lane=lane, dash=True)
+            sc.glow(pt[0], pt[1], 9, hexc("#9ad8ff"), 0.6)
+            hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
         elif st == "incoming":
             FU.cell(sc, bx, by, bx + bw, by + BH, "hover" if variant is None else "new")
             letters(sc, lab.upper(), bx + 8, by + 4, "title", 8, col=(150, 200, 230), outline=False)
             mod_icon(sc, key, bx + 8, by + 18)
             letters(sc, MOD_NAME[key], bx + 28, by + 17, "text", 16, col=(255, 210, 150))
             callout(sc, pt, (ex, by + BH // 2), col=HOTC, lane=lane)
-            hot = (pt, bx + bw - 30, by + 28)
+            hot = (pt, bx + bw - 30, by + 28, bx, by, "r")
         elif st == "broken":
             part_box(sc, bx, by, key, lab, lv, state="broken", w=bw, h=BH)
             callout(sc, pt, (ex, by + BH // 2), col=RED_, lane=lane)
@@ -697,7 +704,7 @@ def panel_tabs(sc, cur, broken=1, anim=None):
     sc.rgb[84, 710:946] = hexc("#8a6a34")
 
 
-def loot_panel(sc, new_key):
+def loot_panel(sc, new_key, drag=False):
     H.fx_line(sc, 720, 90, "{выбор:1 из 3}", dim=True)
     for j, (key, kind, st, nm, who, lines) in enumerate(OFFERS):
         y0 = 114 + j * 114
@@ -705,8 +712,8 @@ def loot_panel(sc, new_key):
         FU.cell(sc, 716, y0, 940, y0 + 106, "hi" if on_hook else st)
         if on_hook:
             FU.socket(sc, 724, y0 + 10, 776, y0 + 62)
-            letters(sc, "на", 750, y0 + 20, "text", 16, col=BRASS, align="center")
-            letters(sc, "крюке", 750, y0 + 38, "text", 16, col=BRASS, align="center")
+            letters(sc, "в" if drag else "на", 750, y0 + 20, "text", 16, col=BRASS, align="center")
+            letters(sc, "руке" if drag else "крюке", 750, y0 + 38, "text", 16, col=BRASS, align="center")
         else:
             FU.cell(sc, 724, y0 + 10, 776, y0 + 62, "locked")
             if isinstance(key, tuple):
@@ -803,7 +810,7 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
         FU.steam(sc, 430, 150, 14, seed=4)
     else:
         hot = slipway(sc, frame, mods, core, ncell, (186, 62, 690, 408), new_key=new_key, variant=variant,
-                      role=role, broken=state == "broken", body=body, anim=a_)
+                      role=role, broken=state == "broken", body=body, anim=a_, crane=variant != "drag")
     # under the drawing: the frame's own and its cells
     passive = {"Страж": "Заслон: {радиус:1} → {цель:1}", "Мудрец": "Питание: {свой} {радиус:1} → {через:−1}",
                "Горн": "Жар горна: {каждые:1} → {огонь} {радиус:1}", "Орудие": "Наводка: {дальность} → {урон} без потерь",
@@ -822,7 +829,7 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
     elif panel == "repair":
         repair_panel(sc)
     else:
-        loot_panel(sc, new_key)
+        loot_panel(sc, new_key, drag=variant == "drag")
     FU.sill(sc, 468)
     action(sc, 12, 478, 174, 526, "Автосборка", "steel")
     action(sc, 178, 478, 356, 526, "Починить · 2", "hot", heated=panel == "repair")
@@ -834,13 +841,108 @@ def workshop(variant=None, frame="Орудие", new_key="long", name=None, pane
         return sc
     if panel == "repair":
         H.cursor(sc, 201, 506)
+    elif variant == "drag":
+        drag_over(sc, new_key, hot, frame, a_.get("at", (446, 300)), a_.get("glow", 1.0))
     elif variant is None and hot:
         H.cursor(sc, hot[1], hot[2])
+    if variant == "drag":
+        name = name or "foundry_drag.png"
     name = name or {"loot": "foundry_workshop.png", "rack": "foundry_workshop_rack.png",
                     "repair": "foundry_workshop_repair.png"}[panel]
     img = sc.image(S)
     img.save(out(name))
     print(name, img.size)
+
+
+def drag_over(sc, key, hot, frame, at, glow=1.0):
+    """A module carried with the mouse: the bays it can't go to (other hulls) go dark under a red cross, its tag
+    says why; the cell it can take is lit cold blue, a dotted line runs to it from the module; the module itself
+    rides the cursor, lifted, its shadow under it."""
+    for i, (fr, *_r) in enumerate(ARMY):                              # the rack: only its own hull takes it
+        if fr == frame:
+            continue
+        y = 52 + i * 92
+        sc.rgb[y + 2:y + 84, 12:166] *= 0.42
+        for d in range(-2, 3):                                        # the cross, thick, rust red
+            for t in np.linspace(0, 1, 120):
+                x_, y_ = int(30 + t * 56), int(y + 20 + t * 52)
+                sc.rgb[y_ + d, x_ - 1:x_ + 2] = hexc("#c84a3a")
+                sc.rgb[int(y + 72 - t * 52) + d, x_ - 1:x_ + 2] = hexc("#c84a3a")
+        FU.tag(sc, 20, y + 58, 164, y + 80, "другой корпус", "rust")
+    if hot is not None and len(hot) > 4:                              # the cell that takes it: a dotted line to it
+        tx, ty = hot[3], hot[4] + 21
+        sc.glow(tx + 75, ty, 46, hexc("#9ad8ff"), 0.5 * glow)
+        x0, y0 = at[0] + 40, at[1] + 20
+        n = int(np.hypot(tx - x0, ty - y0) / 6)
+        for k in range(n):
+            if k % 2 == 0:
+                x_ = int(x0 + (tx - x0) * k / n)
+                y_ = int(y0 + (ty - y0) * k / n)
+                sc.rgb[y_ - 1:y_ + 2, x_ - 1:x_ + 2] = SU.OUTL
+                sc.rgb[y_:y_ + 2, x_:x_ + 2] = hexc("#cfeeff")
+    cx, cy = at                                                       # the module in hand
+    sh = (sc.xx >= cx + 6) & (sc.xx < cx + 50) & (sc.yy >= cy + 8) & (sc.yy < cy + 52)
+    sc.rgb[sh] *= 0.5
+    sc.glow(cx + 22, cy + 22, 30, hexc("#ffb060"), 0.3)
+    FU.cell(sc, cx, cy, cx + 44, cy + 44, "hover")
+    mod_icon(sc, key, cx + 6, cy + 6, 2)
+    H.cursor(sc, cx + 26, cy + 28)
+
+
+def states():
+    """The Foundry's controls and cells in every state, on one sheet: a control at rest, under the mouse, pressed,
+    and shut (its metal dull, why — under it); the cells' rims; the panels when there is nothing in them."""
+    sc = screen(97)
+    FU.wing(sc, 0, 0, WW, 44)
+    title_center(sc, "СОСТОЯНИЯ", "wrench")
+    FU.plate(sc, 12, 52, 948, 266, seed=81)
+    heading(sc, "КНОПКИ", 26, 62)
+    cols = ("обычная", "под мышью", "нажата", "недоступна")
+    for i, c in enumerate(cols):
+        letters(sc, c, 124 + i * 232, 86, "text", 16, col=MUTED, align="center")
+    for i in range(4):
+        x0 = 24 + i * 232
+        heated, an = i == 1, ({"press": 1.0} if i == 2 else None)
+        before = sc.rgb.copy()
+        action(sc, x0, 106, x0 + 200, 138, "Автосборка", "dull" if i == 3 else "steel", heated=heated, anim=an)
+        action(sc, x0, 146, x0 + 200, 178, "Починить · 2", "hot", heated=heated, anim={"turn": 0.5} if i == 2 else None)
+        action(sc, x0, 190, x0 + 214, 236, "В БОЙ", "hot" if i < 3 else "dull", big=True, heated=i in (1, 2),
+               anim={"angle": 1.0, "glow": 1.0} if i == 2 else None)
+        if i == 3:                                                    # shut: the metal of the controls dulled, and why
+            new_ = np.abs(sc.rgb - before).max(axis=2) > 1
+            new_[:142, :] = False
+            sc.rgb[new_] *= 0.55
+            H.fx_line(sc, x0 + 6, 240, "не хватает {металл:2}")
+    FU.plate(sc, 12, 272, 948, 372, seed=82)
+    heading(sc, "ЯЧЕЙКИ", 26, 282)
+    cells = [("normal", "обычная"), ("hi", "выбрана"), ("hover", "под мышью"), ("new", "новое"), ("broken", "сломано"),
+             ("rare", "редкое"), ("trophy", "трофей"), ("locked", "закрыто"), ("locked", "пусто")]
+    for i, (st, what) in enumerate(cells):
+        x0 = 24 + i * 102
+        FU.cell(sc, x0, 306, x0 + 94, 344, st)
+        if what == "пусто":
+            for k in range(x0 + 10, x0 + 84, 6):                      # an empty place: a dashed outline in it
+                sc.rgb[316, k:k + 3] = hexc("#4a4a52")
+                sc.rgb[334, k:k + 3] = hexc("#4a4a52")
+        letters(sc, what, x0 + 47, 348, "text", 16, col=MUTED, align="center")
+    FU.plate(sc, 12, 378, 948, 532, seed=83)
+    heading(sc, "ПУСТО", 26, 388)
+    empties = [("ДОБЫЧА", "добычи нет — враг ушёл", "или пропуск → {металл:+4}"),
+               ("СТОЙКА", "стойка пуста", "детали — из добычи и трофеев"),
+               ("РЕМОНТ", "всё цело", "{ремонт} не нужен")]
+    for i, (tab_, ln1, ln2) in enumerate(empties):
+        x0 = 24 + i * 308
+        FU.tab(sc, x0, 414, x0 + 90, 440, tab_, active=True)
+        FU.cell(sc, x0, 440, x0 + 296, 522, "locked")
+        for k in range(x0 + 10, x0 + 286, 6):
+            sc.rgb[450, k:k + 3] = hexc("#3a3a42")
+            sc.rgb[512, k:k + 3] = hexc("#3a3a42")
+        letters(sc, ln1, x0 + 148, 458, "text", 16, col=PALE, align="center")
+        w_, _ = H.fx_line(sc, 0, 0, ln2, draw=False)
+        H.fx_line(sc, int(x0 + 148 - w_ / 2), 482, ln2, dim=True)
+    img = sc.image(S)
+    img.save(out("foundry_states.png"))
+    print("foundry_states.png", img.size)
 
 
 def GP_part(frame, slot):
@@ -1279,7 +1381,8 @@ def card(frame="Орудие", hover="mortar", anim=None, ret=False):
     the right its passport — leadership, core, last battle; body; blow; what its class can and can't."""
     sc = screen(13)
     FU.wing(sc, 0, 0, WW, 44)
-    title(sc, frame.upper(), "стрелок · голем")
+    title_center(sc, frame.upper(), "wrench")
+    letters(sc, "стрелок · голем", 16, 13, "text", 16, col=MUTED)
     toolbar(sc)
     mods = {"mortar": 1, "canister": 1, "long": 1}
     ncell, core = 4, "cast"
@@ -1391,8 +1494,8 @@ def leaders_pick(anim=None, ret=False):
     import frames as F
     sc = screen(17)
     FU.wing(sc, 0, 0, WW, 44)
-    w = title(sc, "ЛИДЕР")
-    letters(sc, "КТО ПОВЕДЁТ КУЗНЮ", 16 + w + 30, 8, "title", 24, col=(255, 170, 80), col2=(120, 40, 10))
+    title_center(sc, "ЛИДЕР", "hammer")
+    letters(sc, "кто поведёт кузню", 16, 13, "text", 16, col=(255, 170, 80))
     toolbar(sc)
     for i, (nm, epi, kind, k, army, rule) in enumerate(PICK):
         x0, sel = 14 + i * 236, i == 0
@@ -1661,8 +1764,23 @@ def stamp(sc, x, y, text, col="#e0503a"):
         sc.rgb[sy, sx] = hexc("#14243a")
 
 
-def aftermath(anim=None, ret=False):
-    """Victory: what broke and what it cost, what the battle paid, who did what."""
+def num_disc(sc, cx, cy, n, on=True):
+    """A step's number on a work order: a brass disc struck with the digit, like a tool check."""
+    X, Y = sc.xx - cx, sc.yy - cy
+    d = np.hypot(X, Y)
+    m = d <= 12.5
+    t = np.clip((Y + 12) / 24, 0, 1)[..., None]
+    a_, b_ = (hexc("#f0c878"), hexc("#8a6024")) if on else (hexc("#a8aab4"), hexc("#4a4a52"))
+    sc.rgb[m] = (a_ * (1 - t) + b_ * t)[m]
+    sc.rgb[m & (d > 11.2)] = SU.OUTL
+    sc.occ[m] = True
+    letters(sc, str(n), cx + 1, cy - 8, "title", 16, col=(52, 32, 12) if on else (30, 30, 36), outline=False,
+            shadow=False, align="center")
+
+
+def aftermath(anim=None, ret=False, variant=None):
+    """Victory: what broke and what it cost, what the battle paid (a trophy, if the enemy was a machine), who did
+    what; and what's next, as a work order — repair, the find, the workshop — with the purse after it."""
     import frames as F
     from swarm_effects import lit
     sc = screen(19)
@@ -1703,8 +1821,16 @@ def aftermath(anim=None, ret=False):
     letters(sc, "41", 392, 150, "title", 24, col=(255, 140, 110), col2=(170, 50, 40))
     letters(sc, "врагов", 470, 156, "text", 16, col=MUTED)
     FU.cell(sc, 350, 192, 630, 258, "trophy")
-    letters(sc, "трофей: нет — враг живой", 364, 202, "text", 16, col=MUTED)
-    H.fx_line(sc, 364, 226, "{машина} → {модуль} · {металл}", dim=True)
+    if variant == "trophy":                                          # a machine beaten: its part, ours to keep or melt
+        sc.glow(386, 225, 26, hexc("#e0b860"), 0.35)
+        FU.cell(sc, 358, 200, 410, 250, "normal")
+        mod_icon(sc, "dome", 368, 209, 2)
+        letters(sc, "Щит-купол", 420, 200, "text", 16, col=GOLD)
+        letters(sc, "трофей", 604, 200, "text", 16, col=MUTED, align="right")
+        H.fx_line(sc, 420, 226, "в ящик · или {металл:+5}")
+    else:
+        letters(sc, "трофей: нет — враг живой", 364, 202, "text", 16, col=MUTED)
+        H.fx_line(sc, 364, 226, "{машина} → {модуль} · {металл}", dim=True)
     heading(sc, "КТО ЧТО", 354, 272)
     for j, (fr, kills, dmg_) in enumerate((("Страж", 6, 31), ("Мудрец", 12, 40), ("Орудие", 17, 12), ("Механик", 0, 3))):
         y = 298 + j * 40
@@ -1719,18 +1845,43 @@ def aftermath(anim=None, ret=False):
     # what next
     FU.plate(sc, 650, 52, 948, 462, seed=33)
     heading(sc, "ДАЛЬШЕ", 664, 64)
-    H.fx_line(sc, 664, 96, "{выбор:1 из 3} → {модуль}")
-    H.fx_line(sc, 664, 128, "{металл} → {ремонт} · голем · переплавка", dim=True)
-    lead = leader_sprite("zodchiy", 1.9)
-    sc.blit(lead, int(800 - lead.ox), int(420 - lead.oy))
-    FU.sparks(sc, 740, 420, 10, seed=8)
+    letters(sc, "наряд в мастерскую", 934, 68, "text", 16, col=MUTED, align="right")
+    # the work order: its steps in the order the workshop takes them
+    y = 94
+    FU.cell(sc, 660, y, 940, y + 92, "broken")                        # 1 — the repair
+    num_disc(sc, 678, y + 16, 1)
+    letters(sc, "РЕМОНТ", 696, y + 9, "title", 16, col=(240, 160, 130), col2=(110, 40, 30))
+    FU.cell(sc, 670, y + 34, 716, y + 80, "locked")
+    mod_icon(sc, "overload", 677, y + 41, 2)
+    letters(sc, "Мудрец · Перегрузка", 726, y + 36, "text", 16, col=INK)
+    H.fx_line(sc, 726, y + 58, "{модуль:II} ⇒ {модуль:I} · {металл:2}")
+    y += 100
+    FU.cell(sc, 660, y, 940, y + 104, "new")                          # 2 — the find: three crates, shut
+    num_disc(sc, 678, y + 16, 2)
+    letters(sc, "НАХОДКА", 696, y + 9, "title", 16, col=(170, 220, 250), col2=(30, 70, 110))
+    H.fx_line(sc, 830, y + 8, "{выбор:1 из 3}")
+    for j in range(3):
+        bx = 674 + j * 88
+        FU.cell(sc, bx, y + 36, bx + 78, y + 94, "locked")
+        for k in range(y + 46, y + 92, 8):                            # the crate's boards
+            sc.rgb[k, bx + 6:bx + 72] = sc.rgb[k, bx + 6:bx + 72] * 0.7 + hexc("#4a3a24") * 0.3
+        letters(sc, "?", bx + 39, y + 50, "title", 24, col=(150, 200, 230), col2=(30, 70, 110), align="center")
+    y += 112
+    FU.cell(sc, 660, y, 940, y + 84, "normal")                        # 3 — the workshop: what else can be done
+    num_disc(sc, 678, y + 16, 3, on=False)
+    letters(sc, "МАСТЕРСКАЯ", 696, y + 9, "title", 16, col=INK, col2=(60, 60, 70))
+    letters(sc, "голем · деталь · переплавка", 672, y + 36, "text", 16, col=MUTED)
+    H.fx_line(sc, 672, y + 56, "или пропуск → {металл:+4}", dim=True)
+    y += 92
+    H.fx_line(sc, 664, y + 4, "{металл:20} → после ремонта {металл:18}")
     FU.sill(sc, 468)
     action(sc, 650, 474, 948, 530, "В МАСТЕРСКУЮ", "hot", big=True)
     if ret:
         return sc
+    name = "foundry_aftermath_trophy.png" if variant == "trophy" else "foundry_aftermath.png"
     img = sc.image(S)
-    img.save(out("foundry_aftermath.png"))
-    print("foundry_aftermath.png", img.size)
+    img.save(out(name))
+    print(name, img.size)
 
 
 # ---------------------------------------------------------------- the battle, seen from the Foundry
@@ -2021,7 +2172,9 @@ def battle():
 
 
 SCREENS = {"workshop": workshop, "camp": camp, "leadercard": leader_card, "rack": workshop_rack, "repair": workshop_repair, "smelt": smelt, "slipways": slipways, "new": new_golem, "card": card, "leader": leaders_pick, "aftermath": aftermath, "battle": battle, "glossary": glossary,
-           "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True)}
+           "confirm": confirm_smelt, "alt": lambda: leader_card(alt=True),
+           "drag": lambda: workshop("drag"), "trophy": lambda: aftermath(variant="trophy"),
+           "states": states}
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
