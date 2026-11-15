@@ -960,6 +960,21 @@ def cursor(sc, x, y):
                 sc.rgb[y + j, x + i] = hexc("#0a060e") if ch == "o" else hexc("#f4ecd8")
 
 
+def battle_wing(sc, count, ng, paused=False, share=0.6, turn=5):
+    """The battle's one thin wing: the swarm against the Foundry, the speed, the turn small by it."""
+    UI.wing(sc, 0, 0, WW, 34)
+    letters(sc, f"рой {count - 1}", 16, 8, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
+    tug(sc, 144, 10, 520, 25, share)
+    letters(sc, f"Литейщик: {ng - 1} из {ng}", 530, 9, "text", 16, col=(214, 196, 150))
+    letters(sc, f"ход {turn}", 728, 9, "text", 16, col=MUTED, align="right")
+    for x0, x1, t, on, key in ((736, 784, "II", paused, "Пробел"), (790, 838, "×2", not paused, "Tab"),
+                               (844, 952, "в конец »", False, "End")):
+        UI.button(sc, x0, 6, x1, 28, "amber" if on else "chitin")
+        letters(sc, t, (x0 + x1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
+        kw = UI.text_width(key, "text", 16) + 12
+        keycap(sc, int((x0 + x1) / 2 - kw / 2), 31, key)
+
+
 def battle_hud(ret=False, pops=True):
     """The battle runs itself: the interface is one thin wing — the sides' tug of war, the speed. Everything else is
     on the field: the leader's health over the leader, an ability's icon popping up when it fires, states over the
@@ -989,18 +1004,7 @@ def battle_hud(ret=False, pops=True):
             sc.glow(px_ + 16, py_ + 16, 22, hexc("#f0c060"), 0.45)
             icon(sc, "clutch", px_, py_, 2)
             letters(sc, "Кладка", px_ + 16, py_ + 34, "text", 16, col=GOLD, align="center", jitter=1, seed=5)
-        # the wing: the swarm against the Foundry, the speed, the turn small by it
-        UI.wing(sc, 0, 0, WW, 34)
-        letters(sc, f"рой {count - 1}", 16, 8, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
-        tug(sc, 144, 10, 520, 25, 0.6)
-        letters(sc, f"Литейщик: {ng - 1} из {ng}", 530, 9, "text", 16, col=(214, 196, 150))
-        letters(sc, "ход 5", 728, 9, "text", 16, col=MUTED, align="right")
-        for x0, x1, t, on, key in ((736, 784, "II", paused, "Пробел"), (790, 838, "×2", not paused, "Tab"),
-                                   (844, 952, "в конец »", False, "End")):
-            UI.button(sc, x0, 6, x1, 28, "amber" if on else "chitin")
-            letters(sc, t, (x0 + x1) / 2, 9, "text", 16, col=DARK if on else INK, outline=not on, align="center")
-            kw = UI.text_width(key, "text", 16) + 12
-            keycap(sc, int((x0 + x1) / 2 - kw / 2), 31, key)
+        battle_wing(sc, count, ng, paused)
         name = "swarm_battle_hud.png"
         if ret:
             return sc
