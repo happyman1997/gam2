@@ -259,7 +259,7 @@ def lit_dim(spr):
     return s2
 
 
-def brood(variant=None, leader_name="Матка", ret=False):
+def brood(variant=None, leader_name="Матка", ret=False, anim=None):
     """The brood: everything has hatched and the swarm is over its limit. The auto-selection has already eaten
     the extra — those whose traits killed least — so the swarm fits and «В БОЙ» is open from the start; the player
     only corrects it: a click on a group eats one more, a right click gives one back. Each creature is a gem in
@@ -272,7 +272,7 @@ def brood(variant=None, leader_name="Матка", ret=False):
     UI.drips(sc, 40, 920, 44, "#b06818", n=7, seed=3)
     title(sc, "НАША СУДЬБА", seed=5)
     icon(sc, "biomass", 700, 6, 2)
-    letters(sc, "34", 740, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    letters(sc, str((anim or {}).get("bio", 34)), 740, 12, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
     if top_line:                                       # the leader's own rule, by the purse
         letters(sc, top_line, 680, 12, "text", 16, col=B.POOL_COL[leader_name], align="right")
     help_button(sc)
@@ -283,6 +283,9 @@ def brood(variant=None, leader_name="Матка", ret=False):
     for g in groups:
         g[8] = 0
     groups[0][8] = over
+    for k_, n_ in ((anim or {}).get("eat") or {}).items():     # the player's corrections on top of it
+        groups[k_][8] += n_
+        over += B.pts(groups[k_]) * n_
     # the limit: an abdomen of segments, all within it now
     UI.plate(sc, 12, 50, 948, 94)
     fx_line(sc, 24, 60, "{предел}")
@@ -294,7 +297,7 @@ def brood(variant=None, leader_name="Матка", ret=False):
     GX0, GY0, GCW, GCH = 12, 100, 224, 78
     for k_, (traits, soldier, chim, hue, name, count, new, badge, eat) in enumerate(groups):
         x0, y0 = GX0 + (k_ % 3) * (GCW + 8), GY0 + (k_ // 3) * (GCH + 6)
-        hov = variant is None and k_ == 2                 # the mouse over the wasps
+        hov = (k_ == anim.get("hover")) if anim else (variant is None and k_ == 2)   # the mouse over the wasps
         mk = marks.get(k_)
         UI.cell(sc, x0, y0, x0 + GCW, y0 + GCH, "hover" if hov else (mk[1] if mk else
                 ("eat" if eat else ("new" if new else "normal"))))
@@ -355,7 +358,7 @@ def brood(variant=None, leader_name="Матка", ret=False):
         fx_line(sc, 930 - wc, y0 + 42, f"{{биомасса:{cost}}}")
     act_button(sc, 710, 482, 948, 534, "В БОЙ")
     key_on(sc, 236, 486, "R")
-    if variant is None:                                  # over a group: what the mouse's buttons do
+    if variant is None and not anim:                     # over a group: what the mouse's buttons do
         hx, hy = hover_at
         tip_box(sc, hx + 30, hy + 74, 236, ["{лкм} → {съедена:+1}", "{пкм} → {съедена:−1}", "Shift {лкм} → вся группа"])
         cursor(sc, hx + 150, hy + 40)

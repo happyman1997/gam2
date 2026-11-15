@@ -140,10 +140,61 @@ def battle_end():
     print("\nswarm_battle_end_anim.gif", len(frames))
 
 
+def brood_eat():
+    """The swarm's own correction, its main gesture (as dragging a module is the Foundry's): the mouse comes to the
+    wasps' group, a left click — the last wasp's scale goes amber and is bitten, crumbs fly, the limit's
+    centipede marks one more scale, the purse ticks up with a «+1»; a while later a right click gives it back."""
+    import swarm_ui as U
+    s0 = SH.brood("plain", ret=True, anim={"hover": 2, "bio": 34})
+    s1 = SH.brood("plain", ret=True, anim={"hover": 2, "bio": 35, "eat": {2: 1}})
+    x0, y0 = 12 + 2 * 232, 100                                           # the wasps' cell
+    gx, gy = x0 + 88 + 2 * 14, y0 + 62                                   # its last scale
+    hx, hy = x0 + 150, y0 + 40                                           # where the mouse rests
+    start = (330, 330)
+    images = []
+
+    def frame(base, cur, press=False, gem=None, crumbs=0.0, pop=None):
+        sc = copy.deepcopy(base)
+        if gem:
+            U.gem(sc, gx, gy, 5.5, 7.0, "eat", bite=gem == "bite")
+        if crumbs:
+            rnd = np.random.RandomState(3)
+            for k in range(7):
+                a = rnd.uniform(-2.6, -0.5)
+                r = 4 + crumbs * rnd.uniform(10, 18)
+                px_, py_ = int(gx + 3 + np.cos(a) * r), int(gy - 4 + np.sin(a) * r + crumbs * crumbs * 8)
+                sc.rgb[py_:py_ + 2, px_:px_ + 2] = (255, 230, 150) if k % 2 else (200, 140, 40)
+        if pop is not None:                                              # «+1» / «−1» rising off the purse
+            t, txt = pop
+            SH.letters(sc, txt, 770, int(30 - t * 10), "title", 16, col=(200, 250, 130), col2=(70, 150, 50))
+        SH.cursor(sc, int(cur[0]) + (1 if press else 0), int(cur[1]) + (1 if press else 0))
+        return sc.image(2)
+
+    for i in range(12):                                                  # the mouse comes over
+        t = out_back(i / 11) if i < 11 else 1.0
+        images.append(frame(s0, (start[0] + (hx - start[0]) * t, start[1] + (hy - start[1]) * t)))
+    images.append(frame(s0, (hx, hy), press=True))
+    images.append(frame(s0, (hx, hy), press=True, gem="amber"))
+    images.append(frame(s0, (hx, hy), gem="amber"))
+    for i in range(6):                                                   # bitten: crumbs fly, the purse ticks up
+        images.append(frame(s1, (hx, hy), crumbs=(i + 1) / 6, pop=(i / 10, "+1")))
+    for i in range(6, 12):
+        images.append(frame(s1, (hx, hy), pop=(i / 10, "+1") if i < 10 else None))
+    images += [images[-1]] * 6
+    images.append(frame(s1, (hx, hy), press=True))                      # a right click: it is given back
+    for i in range(6):
+        images.append(frame(s0, (hx, hy), pop=(i / 10, "−1")))
+    images += [frame(s0, (hx, hy))] * 8
+    U.WOBBLE[0] = 0.0
+    crop = [im.crop((0, 0, 1640, 400)) for im in images]
+    pxfx.save_gif(crop, out("swarm_brood_eat.gif"), FPS, half=True)
+    print("swarm_brood_eat.gif", len(crop))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "all"
     fns = {"settings": settings, "development": development, "defeat": defeat, "pause": pause, "artifacts": artifacts,
-           "moments": moments, "battle_end": battle_end}
+           "moments": moments, "battle_end": battle_end, "brood_eat": brood_eat}
     for k, fn in fns.items():
         if what in ("all", k):
             fn()
