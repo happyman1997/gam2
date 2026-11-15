@@ -396,8 +396,144 @@ def heading(sc, text, x, y, col=(240, 196, 110), seed=0):
 
 
 # ---------------------------------------------------------------- the camp: the swarm picks a mutation itself
-def camp(variant=None):
+CAMP_BY = {   # the camp by leader: who is in the swarm (traits, soldier, name, count[, chimera]), the leader's offer
+    "Матка": (None, ("m_nest", "Малое гнездо", "мутация Матки", "nest")),
+    "Разум улья": ([((), True, "муравей-солдат", 2), ((), False, "муравей", 12), (("firefly",), False, "светлячок", 3),
+                    (("scythes",), False, "богомол", 2), (("wings",), False, "оса", 2)],
+                   ("m_psi_gland", "Пси-железа", "мутация Разума", "psi_gland")),
+    "Пожиратель": ([((), True, "муравей-солдат", 3), ((), False, "муравей", 17), (("jumper",), False, "кузнечик", 3),
+                    (("horn",), True, "жук-солдат", 1), (("stinger",), False, "скорпион", 2)],
+                   ("m_table", "За столом", "мутация Пожирателя", "table")),
+    "Чума": ([((), False, "муравей", 18), (("stinger",), False, "скорпион", 3), (("acid",), False, "бочонок", 3),
+              (("acid",), False, "бочонок с рукой", 1, "hand"), (("wings",), False, "оса с червём", 1, "worm")],
+             ("m_parasitoid", "Паразитоид", "мутация Чумы", "parasitoid")),
+}
+EVO_BY = {   # the evolution by leader: the forms in the swarm (form, name, count, evolutions taken[, chimera, mark]),
+             # which is open, the biomass, a line by the purse
+    "Матка": (None, None, 39, None),
+    "Разум улья": ([(None, "муравей", 12, ("phalanx",), None, "m_psi_gland"), ("firefly", "светлячок", 3, ()),
+                    ("scythes", "богомол", 2, ("saws",), None, "m_psi_dread"), ("wings", "оса", 2, ("syringe",))],
+                   1, 39, None),
+    "Пожиратель": ([(None, "муравей", 17, ("formic",)), ("jumper", "кузнечик", 3, ()), ("horn", "жук", 1, ("forked",)),
+                    ("stinger", "скорпион", 2, ("vise",))], 1, 62, "из пасти: +12"),
+    "Чума": ([(None, "муравей", 18, ()), ("acid", "бочонок", 4, ("scent",), "hand", "hand"),
+              ("wings", "оса", 2, ("tough",), "worm", "worm"), ("firefly", "светлячок", 1, ("hood",)),
+              ("stinger", "скорпион", 3, ())], 1, 39, None),
+}
+
+
+def vessel(sc, name, ex, ey, hot=False):
+    """What an offer in the camp hatched from, each leader's own: the Queen's egg in its wax cell, the Mind's thought
+    bubble, the Devourer's maw, the Plague's torn puffball. About 56×70, centred on (ex, ey)."""
+    X, Y = sc.xx - ex, sc.yy - ey
+    if name == "Матка":
+        hx = lambda r: hexmask(sc, ex, ey, r)
+        sc.rgb[hx(36)] = UI.OUTL
+        ring = hx(35) & ~hx(27)
+        sc.rgb[ring] = hexc("#8a5a14")
+        sc.rgb[ring & (X + Y * 1.2 < -6)] = hexc("#c08a2c")
+        sc.rgb[hx(27)] = hexc("#2a1606")
+        egg = (X / 18.0) ** 2 + ((Y - 2) / 24.0) ** 2 <= 1
+        sc.rgb[egg] = hexc("#b8d07a" if hot else "#8aa258")
+        sc.rgb[egg & (X < -4) & (Y < -6)] = hexc("#e8f8b8")
+        eo, _, _ = UI.edges(egg)
+        sc.rgb[eo] = UI.OUTL
+        for t in range(8):                                                # the crack it came out of
+            sc.rgb[int(ey - 16 + (2 if t % 2 else -1)), int(ex - 14 + t * 4):int(ex - 12 + t * 4)] = UI.OUTL
+    elif name == "Разум улья":
+        import swarm_abilities as SA
+        d = np.hypot(X, Y)
+        if hot:
+            sc.glow(ex, ey, 44, hexc("#b070ff"), 0.3)
+        inner = d <= 31
+        t = np.clip(d / 32.0, 0, 1)[..., None]
+        sc.rgb[inner] = (hexc("#3a1866") * (1 - t) + hexc("#0e0618") * t)[inner]
+        SA.ring(sc, ex, ey + 8, 20, 9, SA.PHERO, 0.4)
+        sc.rgb[(d > 31) & (d <= 33)] = hexc("#8a5ad0")
+        sc.rgb[(d > 32) & (d <= 33)] = hexc("#d0b0ff")
+        sc.rgb[(d > 26) & (d <= 28) & (X < -8) & (Y < -8)] = hexc("#e8d8ff")
+    elif name == "Пожиратель":
+        d = np.hypot(X, Y / 1.08)
+        a = np.arctan2(Y, X)
+        if hot:
+            sc.glow(ex, ey, 44, hexc("#ff4a30"), 0.25)
+        sc.rgb[d <= 35 + np.sin(a * 7)] = UI.OUTL
+        flesh = d <= 33 + np.sin(a * 7)
+        sc.rgb[flesh] = hexc("#7a1a14")
+        sc.rgb[flesh & (X + Y < -10)] = hexc("#b03a2a")
+        inner = d <= 25
+        sc.rgb[inner] = hexc("#1a0404")
+        for j in range(12):                                               # the teeth
+            a0 = j * 2 * np.pi / 12 + 0.2
+            for k in range(7):
+                q = k / 6
+                r = 27 - q * 7
+                w = 2.5 * (1 - q)
+                for e in np.linspace(-w, w, 4):
+                    xx = int(ex + np.cos(a0) * r - np.sin(a0) * e)
+                    yy = int(ey + (np.sin(a0) * r + np.cos(a0) * e) * 1.08)
+                    sc.rgb[yy, xx] = hexc("#ece2c8") if e < 0 else hexc("#b8a888")
+    else:
+        if hot:
+            sc.glow(ex, ey, 44, hexc("#9ae030"), 0.25)
+        outer = (X / 30.0) ** 2 + (Y / 36.0) ** 2 <= 1
+        sc.rgb[outer] = UI.OUTL
+        sac = (X / 28.0) ** 2 + (Y / 34.0) ** 2 <= 1
+        sc.rgb[sac] = hexc("#8e8462")
+        sc.rgb[sac & (X + Y < -8)] = hexc("#bcb28c")
+        sc.rgb[sac & (X + Y > 16)] = hexc("#5e563e")
+        a = np.arctan2(Y, X)
+        tri = np.abs(((a * 9 / (2 * np.pi)) % 1.0) - 0.5) * 2
+        hole = (X / 22.0) ** 2 + ((Y - 4) / 26.0) ** 2 <= (1 + 0.16 * tri) ** 2
+        sc.rgb[hole & sac] = UI.OUTL
+        inner = (X / 20.0) ** 2 + ((Y - 4) / 24.0) ** 2 <= (1 + 0.16 * tri) ** 2
+        t = np.clip((Y + 20) / 50.0, 0, 1)[..., None]
+        sc.rgb[inner] = (hexc("#0e1608") * (1 - t) + hexc("#4a7a1a" if hot else "#2a4010") * t)[inner]
+        rnd = np.random.RandomState(int(ex + ey))
+        for _ in range(8):
+            wx, wy = ex + rnd.randint(-26, 26), ey + rnd.randint(-32, 32)
+            if sac[wy - ey + ey, wx] and not inner[wy, wx]:
+                sc.rgb[wy, wx] = hexc("#6a8a2a")
+    sc.occ[(np.abs(X) < 38) & (np.abs(Y) < 40)] = True
+
+
+def bed(sc, name, cx, by, w=40):
+    """What a creature stands on in a leader's camp and evolution: the Queen's comb, a psi ring, gnawed bones,
+    a patch of fungus."""
+    X, Y = sc.xx - cx, sc.yy - by
+    if name == "Матка":
+        m = (np.abs(X) <= w) & (Y >= -2) & (Y <= 4) & (np.abs(X) + Y * 3 <= w + 6)
+        sc.rgb[m] = hexc("#5a3608")
+        for x in range(-w + 4, w - 2, 8):
+            sc.rgb[by - 1:by + 3, cx + x] = hexc("#a0701e")
+        sc.rgb[by - 2, cx - w:cx + w] = hexc("#c08a2c")
+    elif name == "Разум улья":
+        import swarm_abilities as SA
+        SA.ring(sc, cx, by, w, w * 0.22, SA.PHERO, 0.7)
+        SA.ring(sc, cx, by, w * 0.6, w * 0.13, SA.PHERO, 0.4)
+    elif name == "Пожиратель":
+        for (dx, dy, ang) in ((-w * 0.7, 2, 0.2), (w * 0.5, 3, -0.3), (-w * 0.1, 4, 0.05)):
+            bx, by_ = cx + dx, by + dy
+            for k in range(-7, 8):
+                sc.rgb[int(by_ + np.sin(ang) * k), int(bx + np.cos(ang) * k)] = hexc("#d8ccb0")
+            for e in (-8, 8):
+                xx, yy = int(bx + np.cos(ang) * e), int(by_ + np.sin(ang) * e)
+                sc.rgb[yy - 1:yy + 2, xx - 1:xx + 2] = hexc("#ece2c8")
+    else:
+        for (dx, r) in ((-w * 0.8, 6), (-w * 0.55, 4), (w * 0.6, 7), (w * 0.85, 4)):
+            fungus(sc, int(cx + dx), int(by + 2), r)
+
+
+def dress_screen(sc, name, x=560):
+    """A swarm screen made the leader's: its signs on the wing, the edge in its colour."""
+    beam_marks(sc, name, x=x)
+    _rim(sc, LEADER_COL[name], y0=46)
+
+
+def camp(variant=None, leader_name="Матка", ret=False):
     import swarm_screens as SS
+    who_, own = CAMP_BY[leader_name]
+    who_ = who_ or SS.CAMP_WHO
     sc = frame_screen(73)
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=5)
@@ -406,10 +542,13 @@ def camp(variant=None):
     # who
     UI.plate(sc, 12, 52, 286, 446, antennae=True)
     heading(sc, "КТО", 26, 64, seed=1)
-    for i, (traits, soldier, name, n) in enumerate(SS.CAMP_WHO):
+    for i, row in enumerate(who_):
+        traits, soldier, name, n = row[:4]
+        chim = row[4] if len(row) > 4 else None
         y0 = 90 + i * 58
         UI.cell(sc, 20, y0, 278, y0 + 52, "hi" if i == 0 else "normal")
-        put(sc, W.build(traits, 0.03, "idle", soldier, k=1.1 if soldier else 1.4, genes=W.genes_for(70 + i)), 62, y0 + 46, 12)
+        put(sc, W.build(traits, 0.03, "idle", soldier, k=1.1 if soldier else 1.4, chimera=chim, genes=W.genes_for(70 + i)),
+            62, y0 + 46, 12)
         letters(sc, name, 110, y0 + 9, "text", 16, col=GOLD if i == 0 else INK, jitter=1, seed=i)
         letters(sc, f"×{n}", 110, y0 + 28, "text", 16, col=MUTED)
     # what fell out: three random offers, one of them or nothing
@@ -418,33 +557,25 @@ def camp(variant=None):
     fx_line(sc, 310, 84, "{выбор:1 из 3}", dim=True)
     offers = [("horn", "Рог", "деталь", ["{начало} → {урон:+2} {дроб}"], (236, 224, 196)),
               ("m_spinner", "Прядильные железы", "общая мутация", FX["spinner"][:2], (206, 206, 222)),
-              ("m_nest", "Малое гнездо", "мутация Матки", FX["nest"], (240, 200, 90))]
+              (own[0], own[1], own[2], FX[own[3]], EPITHET[leader_name][1])]
     X, Y = sc.xx, sc.yy
     for k_, (key, name, kind, what, kcol) in enumerate(offers):
         y0 = 110 + k_ * 108
         UI.cell(sc, 306, y0, 642, y0 + 100, "hi" if k_ == 0 else ("hover" if k_ == 1 else "normal"))
-        ex, ey = 346, y0 + 50                                   # each offer hatched from its own egg
-        egg = ((X - ex) / 26) ** 2 + ((Y - ey) / 34) ** 2 <= 1
-        sc.rgb[egg] = hexc("#2e3a22")
-        sc.rgb[egg & (Y < ey - 6)] = hexc("#46582e")
-        sc.rgb[egg & (((X - ex + 8) / 6) ** 2 + ((Y - ey + 18) / 8) ** 2 <= 1)] = hexc("#7a9a48")
-        eo, _, _ = UI.edges(egg)
-        sc.rgb[eo] = UI.OUTL
-        for t in range(9):                                     # the crack it came out of
-            cx_, cy_ = ex - 16 + t * 4, ey - 26 + (3 if t % 2 else -1)
-            sc.rgb[int(cy_):int(cy_) + 2, int(cx_):int(cx_) + 2] = UI.OUTL
-        sc.occ[egg] = True
-        sc.light[egg] = 0
+        ex, ey = 346, y0 + 50                                   # each offer hatched from the leader's own vessel
+        vessel(sc, leader_name, ex, ey, hot=k_ == 0)
         icon(sc, key, ex - 16, ey - 12, 2)
         letters(sc, name, 386, y0 + 10, "text", 16, col=GOLD if k_ == 0 else INK, jitter=1, seed=k_)
         letters(sc, kind, 386, y0 + 26, "text", 16, col=kcol)
         fx_rows(sc, 386, y0 + 46, 244, what[:1], dim=bool(k_))
     # what it becomes
     UI.plate(sc, 662, 52, 948, 446, antennae=True)
-    UI.engrave(sc, bug((), "idle", 4.2, 70, soldier=True), 820, 330, col="#2a2234", k=0.9)
+    UI.engrave(sc, leader(leader_name, "idle", 2.4 if leader_name == "Матка" else 3.2), 806, 420, col="#2a2234", k=0.9)
     heading(sc, "КАКИМ СТАНЕТ", 676, 64, seed=3)
-    put(sc, W.build((), 0.03, "idle", True, k=3.0, genes=W.genes_for(70)), 724, 262, 30)
-    put(sc, W.build(("ant", "horn"), 0.03, "idle", True, k=3.0, genes=W.genes_for(70)), 878, 262, 30)
+    for bx in (724, 878):
+        bed(sc, leader_name, bx, 262, 40)
+    put(sc, W.build((), 0.03, "idle", True, k=3.0, genes=W.genes_for(70)), 724, 262, 0)
+    put(sc, W.build(("ant", "horn"), 0.03, "idle", True, k=3.0, genes=W.genes_for(70)), 878, 262, 0)
     letters(sc, "сейчас", 724, 272, "text", 16, col=MUTED, align="center")
     letters(sc, "с рогом", 878, 272, "text", 16, col=GOLD, align="center")
     UI.silk(sc, (764, 196), (830, 196), sag=-6, col="#e8c050")
@@ -465,10 +596,14 @@ def camp(variant=None):
     UI.creature(sc, bug(("wings",), "idle", 1.0, 72), 930, 470)
     UI.creature(sc, clutch(0.9), 640, 448)
     UI.cobweb(sc, 2, 448, 28, quad=(1, 1))
-    name = "swarm_camp.png"
+    if leader_name != "Матка":
+        dress_screen(sc, leader_name)
+    name = "swarm_camp.png" if leader_name == "Матка" else f"swarm_camp_{LEADER_EN[leader_name]}.png"
     if variant == "confirm":                     # «Отказаться» loses all three: asked first
-        confirm(sc, "ОТКАЗАТЬСЯ?", ["{@horn} {@m_spinner} {@m_nest} → ✕"], "Отказаться")
+        confirm(sc, "ОТКАЗАТЬСЯ?", ["{@horn} {@m_spinner} {@" + own[0] + "} → ✕"], "Отказаться")
         name = "swarm_confirm.png"
+    if ret:
+        return sc
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out(name))
@@ -476,34 +611,48 @@ def camp(variant=None):
 
 
 # ---------------------------------------------------------------- the evolution of a form
-def evolution(variant=None):
+def evolution(variant=None, leader_name="Матка", ret=False):
     import swarm_screens as SS
     import swarm_evo as EV
+    forms_, chosen, bio, purse_line = EVO_BY[leader_name]
+    forms_ = forms_ or SS.FORMS_IN_SWARM
+    chosen = SS.CHOSEN if chosen is None else chosen
     sc = frame_screen(71)
     ALT[0] = variant == "alt"
-    bio = 20 if variant == "poor" else 39
+    bio = 20 if variant == "poor" else bio
     UI.wing(sc, 0, 0, WW, 44)
     UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=8)
     title(sc, "ЭВОЛЮЦИЯ", seed=23)
     help_button(sc, alt=ALT[0])
     icon(sc, "biomass", 700, 8, 2)
     letters(sc, str(bio), 740, 10, "title", 16, col=(170, 240, 120), col2=(70, 150, 50), jitter=1)
+    if purse_line:                                       # the leader's own rule, by the purse
+        letters(sc, purse_line, 690, 12, "text", 16, col=EPITHET[leader_name][1], align="right")
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
     heading(sc, "ФОРМЫ В РОЕ", 26, 64, seed=4)
-    for i, (form, name, n, taken) in enumerate(SS.FORMS_IN_SWARM):
+    for i, row in enumerate(forms_):
+        form, name, n, taken = row[:4]
+        chim = row[4] if len(row) > 4 else None
+        mark = row[5] if len(row) > 5 else None
         y0 = 90 + i * 58
-        UI.cell(sc, 20, y0, 292, y0 + 52, "hi" if i == SS.CHOSEN else "normal")
-        put(sc, W.build(() if form is None else (form,), 0.0, "idle", False, k=1.35, genes=W.genes_for(60 + i), evo=taken), 62, y0 + 46, 12)
-        letters(sc, name, 108, y0 + 8, "text", 16, col=GOLD if i == SS.CHOSEN else INK, jitter=1, seed=i)
+        UI.cell(sc, 20, y0, 292, y0 + 52, "hi" if i == chosen else "normal")
+        put(sc, W.build(() if form is None else (form,), 0.0, "idle", False, k=1.35, chimera=chim, genes=W.genes_for(60 + i),
+                        evo=taken), 62, y0 + 46, 12)
+        if mark:                                         # the leader's mark on the form: psi, an alien trait
+            icon(sc, mark, 24, y0 + 4)
+        letters(sc, name, 108, y0 + 8, "text", 16, col=GOLD if i == chosen else INK, jitter=1, seed=i)
         letters(sc, f"×{n}", 110, y0 + 28, "text", 16, col=MUTED)
         for k_ in range(3):                                  # three slots: an evolution's icon, or empty
             if k_ < len(taken):
                 icon(sc, "evo_" + taken[k_], 214 + k_ * 22, y0 + 26)
             else:
                 cond_plate(sc, 214 + k_ * 22, y0 + 26, 230 + k_ * 22, y0 + 42)
-    form, name, n, taken = SS.FORMS_IN_SWARM[SS.CHOSEN]
+    form, name, n, taken = forms_[chosen][:4]
     UI.plate(sc, 310, 52, 948, 446, antennae=True)
-    UI.engrave(sc, bug((form,), "idle", 5.0, 3), 640, 470, col="#2a2234", k=0.9)
+    if leader_name == "Матка":
+        UI.engrave(sc, bug((form,), "idle", 5.0, 3), 640, 470, col="#2a2234", k=0.9)
+    else:
+        UI.engrave(sc, leader(leader_name, "idle", 4.0), 640, 470, col="#2a2234", k=0.9)
     heading(sc, f"{name.upper()} ×{n}", 326, 64, seed=5)
     # the price of each next evolution: the paid one struck out, the one now marked, the next one dim
     cx_ = 326 + glyph(sc, "биомасса", 326, 82, 2) + 8
@@ -531,7 +680,10 @@ def evolution(variant=None):
         else:
             fx_line(sc, x0 + 50, 136, f"{{биомасса:{nxt}}}")
         fx_rows(sc, x0 + 12, 170, 180, EV.EVO_FX[key], lh=28)
-        put(sc, W.build((form,), -0.08, "idle", False, k=3.2, genes=W.genes_for(3), evo=(key,)), x0 + 104, 380, 34)
+        if leader_name != "Матка":
+            bed(sc, leader_name, x0 + 104, 380, 50)
+        put(sc, W.build((form,), -0.08, "idle", False, k=3.2, genes=W.genes_for(3), evo=(key,)), x0 + 104, 380,
+            34 if leader_name == "Матка" else 0)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
     key_on(sc, 300, 470, "Esc")
@@ -544,8 +696,14 @@ def evolution(variant=None):
     UI.silk(sc, (700, 44), (700, 62), sag=0)
     UI.creature(sc, bug(("ant",), "attack", 0.85, 75, rare="spinner"), 706, 76, shadow=False)
     UI.cobweb(sc, 958, 448, 30, quad=(-1, 1))
+    if leader_name != "Матка":
+        dress_screen(sc, leader_name, x=480)
     name = "swarm_alt_words.png" if ALT[0] else ("swarm_tip_disabled.png" if variant == "poor" else "swarm_evolution_screen.png")
+    if leader_name != "Матка":
+        name = f"swarm_evolution_{LEADER_EN[leader_name]}.png"
     ALT[0] = False
+    if ret:
+        return sc
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out(name))
@@ -2585,7 +2743,9 @@ def hints():
     camp("confirm")
 
 
-SCREENS = {"brood": brood, "brood_leaders": lambda: [brood("plain", n) for n in ("Разум улья", "Пожиратель", "Чума")], "camp": camp, "evolution": evolution, "finds": finds, "pools": pools,
+SCREENS = {"brood": brood, "brood_leaders": lambda: [brood("plain", n) for n in ("Разум улья", "Пожиратель", "Чума")], "camp": camp, "evolution": evolution,
+           "camp_leaders": lambda: [camp(None, n) for n in ("Разум улья", "Пожиратель", "Чума")],
+           "evolution_leaders": lambda: [evolution(None, n) for n in ("Разум улья", "Пожиратель", "Чума")], "finds": finds, "pools": pools,
            "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": lambda: [development(n) for n in ("Матка", "Разум улья", "Пожиратель", "Чума")],
            "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif,
            "glossary": glossary_screen, "hints": hints, "roles": roles}
