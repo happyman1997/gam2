@@ -1151,39 +1151,265 @@ def leaders_pick():
 
 
 # ---------------------------------------------------------------- the leader grows: choose its development
-def development():
+DEV_NOW = {   # what the leader has now, on the left of its development
+    "Матка": ["{личинка:×2} {каждые:3}", "{размер:6}", "{гибель_своя} {радиус:2} → {яйцо}", "минус: {скорость:1}"],
+    "Разум улья": ["{пси} {дальность:3}", "{захват} {каждые:6}", "{помутнение} {радиус:2}", "минус: {мягкое}"],
+    "Пожиратель": ["{рост} {тело:2}", "{начало} {размер:5}", "{гибель_своя} {радиус:1} → {лечение}", "минус: {голод:3}"],
+    "Чума": ["{пробой} → {заражение}", "{заражение} {личинка:×2}", "{начало} → {рабочая} {тыл}", "минус: {огонь}"],
+}
+DEV_K = {"Матка": 1.0, "Разум улья": 1.9, "Пожиратель": 1.5, "Чума": 1.7}   # the leader's size in a pod; ×1.2 on the left
+DEV_SW = {"Матка": 40, "Разум улья": 30, "Пожиратель": 40, "Чума": 32}
+
+
+def pod_matka(sc, cx, cy, hot, frame):
+    """A queen cell hanging from the ceiling comb: a long wax cup, pitted, lit from the left, its mouth open
+    below; royal jelly glowing inside."""
+    X, Y = sc.xx - cx, sc.yy - cy
+    sc.rgb[52:cy - 100, cx - 6:cx + 7] = hexc("#6a4210")                 # its wax stalk
+    sc.rgb[52:cy - 100, cx - 6] = hexc("#a0701e")
+    outer = (X / 96.0) ** 2 + (Y / 118.0) ** 2 <= 1
+    inner = outer & ((X / 86.0) ** 2 + ((Y - 40) / 66.0) ** 2 <= 1)
+    if hot:
+        sc.glow(cx, cy, 130, hexc("#f0b040"), 0.25 + 0.06 * np.sin(frame * 0.5))
+    sc.rgb[outer] = UI.OUTL
+    wax = (X / 93.0) ** 2 + (Y / 115.0) ** 2 <= 1
+    lit = np.clip(0.55 - X / 160.0 - Y / 300.0, 0, 1)
+    ramp = [hexc(c) for c in ("#4a2c06", "#74480e", "#9a6a1e", "#c09038")]
+    lv = np.clip((lit * 4 + (BAYER[sc.yy % 4, sc.xx % 4] - 0.5) * 0.6).astype(int), 0, 3)
+    for i, c in enumerate(ramp):
+        sc.rgb[wax & (lv == i)] = c
+    rnd = np.random.RandomState(cx)
+    for j in range(-6, 7):                                                # the pits of a queen cell, worked by hand
+        for i in range(-5, 6):
+            px_ = int(cx + i * 16 + (8 if j % 2 else 0) + rnd.randint(-4, 5))
+            py_ = int(cy + j * 15 + rnd.randint(-3, 4))
+            w_, h_ = rnd.randint(3, 7), rnd.randint(2, 4)
+            if 0 <= px_ < sc.w and 0 <= py_ < sc.h and wax[py_, px_] and not inner[py_, px_] and rnd.rand() < 0.8:
+                pit = wax & ~inner & (((sc.xx - px_) / (w_ / 2.0)) ** 2 + ((sc.yy - py_) / (h_ / 2.0)) ** 2 <= 1)
+                sc.rgb[pit] = sc.rgb[pit] * 0.55
+                sc.rgb[pit & (sc.yy == py_ + h_ // 2)] = np.minimum(255, sc.rgb[pit & (sc.yy == py_ + h_ // 2)] * 2.2)
+    t = np.clip((Y + 20) / 120.0, 0, 1)[..., None]
+    jelly = hexc("#2a1404") * (1 - t) + hexc("#a06414" if hot else "#6a3e0c") * t
+    sc.rgb[inner] = jelly[inner]
+    sc.rgb[inner & ~(((X / 84.0) ** 2 + ((Y - 40) / 64.0) ** 2) <= 1)] = UI.OUTL
+    lip = outer & ~inner & ((X / 92.0) ** 2 + ((Y - 40) / 72.0) ** 2 <= 1)          # the gnawed lip of its mouth
+    sc.rgb[lip & (Y < 40)] = hexc("#f0c868")
+    if hot:
+        for k in range(4):                                                # royal jelly drops rising
+            yy = int(cy + 96 - ((frame * 3 + k * 37) % 110))
+            xx = int(cx - 40 + k * 26)
+            if inner[yy, xx]:
+                sc.rgb[yy - 1:yy + 2, xx - 1:xx + 2] = hexc("#f8d070")
+    return inner
+
+
+def pod_razum(sc, cx, cy, hot, frame):
+    """A thought bubble: a thin glowing membrane, a highlight arc on it, rings of psi inside."""
+    import swarm_abilities as SA
+    X, Y = sc.xx - cx, sc.yy - cy
+    d = np.hypot(X, Y)
+    r = 94
+    if hot:
+        sc.glow(cx, cy, 130, hexc("#b070ff"), 0.3)
+    inner = d <= r - 3
+    t = np.clip(d / r, 0, 1)[..., None]
+    sc.rgb[inner] = (hexc("#3a1866" if hot else "#24103e") * (1 - t) + hexc("#0e0618") * t)[inner]
+    ph = (frame % 24) / 24.0
+    for rr in (0.35, 0.6, 0.85):
+        q = (rr + ph * 0.25) % 1.0
+        SA.ring(sc, cx, cy + 20, q * r * 0.95, q * r * 0.5, SA.PHERO, 0.25 + 0.35 * (1 - q))
+    sc.rgb[(d > r - 3) & (d <= r)] = hexc("#8a5ad0")
+    sc.rgb[(d > r - 2) & (d <= r - 1)] = hexc("#d0b0ff" if hot else "#a080e0")
+    arc = (d > r - 9) & (d <= r - 6) & (X < -20) & (Y < -20) & (np.abs(X - Y * 0.0) > 0)
+    sc.rgb[arc & (X / (np.abs(Y) + 1) > -2.2) & (X / (np.abs(Y) + 1) < -0.45)] = hexc("#e8d8ff")
+    return inner
+
+
+def pod_pozh(sc, cx, cy, hot, frame):
+    """A maw: a ring of lips and raw flesh, teeth all round pointing in, the gullet dark inside."""
+    X, Y = sc.xx - cx, sc.yy - cy
+    d = np.hypot(X, Y / 1.08)
+    a = np.arctan2(Y, X)
+    if hot:
+        sc.glow(cx, cy, 130, hexc("#ff4a30"), 0.25)
+    lips = d <= 100 + 3 * np.sin(a * 7)
+    sc.rgb[lips] = UI.OUTL
+    flesh = d <= 97 + 3 * np.sin(a * 7)
+    lit = np.clip(0.5 - X / 200.0 - Y / 200.0, 0, 1)
+    ramp = [hexc(c) for c in ("#3a0808", "#6a1410", "#9a2a1e", "#c24a34")]
+    lv = np.clip((lit * 4 + (BAYER[sc.yy % 4, sc.xx % 4] - 0.5) * 0.6).astype(int), 0, 3)
+    for i, c in enumerate(ramp):
+        sc.rgb[flesh & (lv == i)] = c
+    for k in range(5):                                                    # folds of the lips
+        rr = 86 + k * 2
+        fold = (np.abs(d - rr) < 0.6) & (np.sin(a * 11 + k) > 0.3)
+        sc.rgb[fold & flesh] = hexc("#4a0c0a")
+    inner = d <= 78
+    t = np.clip(d / 78.0, 0, 1)[..., None]
+    sc.rgb[inner] = (hexc("#120202") * (1 - t) + hexc("#5a0e0c" if hot else "#3a0808") * t)[inner]
+    for j in range(18):                                                   # the teeth
+        a0 = j * 2 * np.pi / 18 + 0.1
+        bx, by = cx + np.cos(a0) * 80, cy + np.sin(a0) * 80 * 1.08
+        tx, ty = cx + np.cos(a0) * (62 + (j % 3) * 3), cy + np.sin(a0) * (62 + (j % 3) * 3) * 1.08
+        for k in range(14):
+            q = k / 13
+            px_, py_ = bx + (tx - bx) * q, by + (ty - by) * q
+            w = 4.5 * (1 - q)
+            nx, ny = -np.sin(a0), np.cos(a0)
+            for e in np.linspace(-w, w, max(2, int(w * 2) + 1)):
+                xx, yy = int(px_ + nx * e), int(py_ + ny * e)
+                sc.rgb[yy, xx] = hexc("#ece2c8") if e < 0 else hexc("#b8a888")
+    if hot:
+        for j in (5, 7, 9):                                               # blood running off the lower teeth
+            a0 = j * 2 * np.pi / 18 + 0.1
+            x, y = int(cx + np.cos(a0) * 64), int(cy + np.sin(a0) * 66)
+            L = 4 + (frame * 2 + j * 5) % 12
+            sc.rgb[y:y + L, x:x + 2] = hexc("#b01a14")
+            sc.rgb[y + L:y + L + 2, x - 1:x + 3] = hexc("#d02a1e")
+    return inner
+
+
+def pod_kuk(sc, cx, cy, hot, frame):
+    """A puffball grown out of a dead host: a warty pale sac on a stalk, torn open in front, sick light and
+    spores inside; puffs of spores off the hot one."""
+    X, Y = sc.xx - cx, sc.yy - cy
+    if hot:
+        sc.glow(cx, cy, 130, hexc("#9ae030"), 0.25)
+    a_ = np.arctan2(Y, X)
+    bump = 1 + 0.03 * np.sin(a_ * 5 + 1.0)
+    outer = ((X / 94.0) ** 2 + (Y / 112.0) ** 2 <= bump ** 2) & (Y <= 118)
+    sc.rgb[outer] = UI.OUTL
+    sac = ((X / 91.0) ** 2 + (Y / 109.0) ** 2 <= bump ** 2) & (Y <= 115)
+    lit = np.clip(0.6 - X / 170.0 - Y / 200.0, 0, 1)
+    ramp = [hexc(c) for c in ("#3e3628", "#62583e", "#8e8462", "#bcb28c")]
+    lv = np.clip((lit * 4 + (BAYER[sc.yy % 4, sc.xx % 4] - 0.5) * 0.6).astype(int), 0, 3)
+    for i, c in enumerate(ramp):
+        sc.rgb[sac & (lv == i)] = c
+    sc.rgb[sac & (Y > 100)] = hexc("#2e2a1e")                             # sitting in the floor
+    rnd = np.random.RandomState(cx)
+    for _ in range(40):                                                   # warts and sick spots
+        wx, wy = cx + rnd.randint(-86, 86), cy + rnd.randint(-104, 100)
+        if sac[wy, wx]:
+            if rnd.rand() < 0.4:
+                sc.rgb[wy - 1:wy + 2, wx - 2:wx + 2] = hexc("#6a8a2a")
+            else:
+                sc.rgb[wy - 1:wy + 2, wx - 1:wx + 2] = hexc("#2e2a1e")
+                sc.rgb[wy - 1, wx - 1] = hexc("#d8d0aa")
+    tri = np.abs(((a_ * 11 / (2 * np.pi)) % 1.0) - 0.5) * 2                # the torn flaps round the opening
+    rr = 1 + 0.14 * tri
+    tear = (X / 72.0) ** 2 + ((Y - 14) / 80.0) ** 2 <= rr ** 2
+    sc.rgb[tear & sac] = UI.OUTL
+    inner = (X / 69.0) ** 2 + ((Y - 14) / 77.0) ** 2 <= rr ** 2
+    flap = tear & sac & ~((X / 76.0) ** 2 + ((Y - 14) / 84.0) ** 2 <= (rr - 0.04) ** 2)
+    sc.rgb[flap] = hexc("#d8d0aa")
+    t = np.clip((Y + 70) / 160.0, 0, 1)[..., None]
+    sc.rgb[inner] = (hexc("#0e1608") * (1 - t) + hexc("#4a7a1a" if hot else "#2a4010") * t)[inner]
+    for k in range(-3, 4):                                                # its roots in the floor
+        x, y = cx + k * 24, cy + 116
+        for _ in range(26):
+            x += rnd.choice((-1, 0, 1)) + (1 if k > 0 else -1 if k < 0 else 0) * (rnd.rand() < 0.5)
+            y += 1 if rnd.rand() < 0.3 else 0
+            sc.rgb[min(y, 299), x] = hexc("#d8d0b0") * 0.7 + sc.rgb[min(y, 299), x] * 0.3
+    for _ in range(30):
+        px_, py_ = cx + rnd.randint(-60, 60), cy + rnd.randint(-70, 80)
+        if inner[py_, px_]:
+            sc.rgb[py_, px_] = hexc("#c8f070")
+    if hot:
+        for k in range(16):                                               # a puff of spores rising off it
+            q = ((frame * 0.04 + k / 16.0) % 1.0)
+            px_ = int(cx + np.sin(k * 2.3) * (20 + 50 * q))
+            py_ = int(cy - 114 - q * 40)
+            if py_ > 50:
+                sc.rgb[py_:py_ + 2, px_:px_ + 2] = hexc("#c8f070") * (1 - 0.6 * q) + sc.rgb[py_, px_] * 0.6 * q
+    return inner
+
+
+POD = {"Матка": pod_matka, "Разум улья": pod_razum, "Пожиратель": pod_pozh, "Чума": pod_kuk}
+
+
+def dev_links(sc, name, pods, src):
+    """What joins the leader to its growths: the Queen's comb ceiling, the Mind's threads, the Devourer's gullet,
+    the Plague's mycelium."""
+    import swarm_abilities as SA
+    if name == "Матка":
+        m = (sc.xx >= 304) & (sc.xx < 956) & (sc.yy >= 46) & (sc.yy < 62)
+        sc.rgb[m] = hexc("#5a3608")
+        UI.comb(sc, m, 304, 44, hexc("#a0701e"), 0.9, R=7)
+        sc.rgb[61:63, 304:956] = UI.OUTL
+    elif name == "Разум улья":
+        for (cx, cy, _) in pods:
+            SA.thread(sc, src, (cx - 90, cy + 10), sag=-24, k=0.8)
+    elif name == "Пожиратель":
+        pts = [(304, 292)] + [(cx, 292 - (8 if j % 2 else 0)) for j, (cx, cy, _) in enumerate(pods)] + [(948, 292)]
+        thick(sc, pts, 7, hexc("#7a1a14"), hexc("#b03a2a"))
+        for x in range(312, 948, 18):
+            sc.rgb[288:297, x] = hexc("#4a0c0a")
+    else:
+        rnd = np.random.RandomState(5)
+        for (cx, cy, _) in pods:
+            for k in range(3):
+                x, y = 300, 294 - k * 3
+                while x < cx - 8:
+                    x += 1
+                    y += rnd.choice((-1, 0, 0, 1))
+                    y = min(298, max(286, y))
+                    sc.rgb[y, x] = hexc("#d8d0b0") * 0.7 + sc.rgb[y, x] * 0.3
+
+
+def development(name="Разум улья", hot=1, frame=0, ret=False):
+    """The leader grows, after a boss — in its own chamber, the growths it may take grown around it: the Queen's
+    in queen cells hanging from the comb, the Mind's in thought bubbles on its threads, the Devourer's in maws
+    along its gullet, the Plague's in puffballs out of the floor. Each its look, what it changes and which
+    mutations come more often; one is under the mouse, lit; «Прорасти» takes it."""
     import swarm_leaders as SL
     sc = frame_screen(47)
     UI.wing(sc, 0, 0, WW, 44)
-    UI.drips(sc, 60, 900, 44, "#b06818", n=6, seed=19)
     title(sc, "РАЗВИТИЕ", seed=37)
+    beam_marks(sc, name, x=600)
     help_button(sc)
+    letters(sc, name, 300, 6, "text", 16, col=hexc(LEADER_COL[name]), jitter=1, seed=4)
+    letters(sc, "после босса · 1 из 2", 300, 24, "text", 16, col=MUTED)
+    # the chamber: the leader's material, dimmed, over the whole scene
+    FILL[name](sc, 304, 46, 956, 456)
+    sc.rgb[46:456, 304:956] *= 0.42
+    # the leader now, in its well
     UI.plate(sc, 12, 52, 300, 446, antennae=True)
-    heading(sc, "СЕЙЧАС", 26, 64, seed=9)
-    icon(sc, "razum", 26, 90, 2)
-    letters(sc, "Разум улья", 64, 94, "text", 16, col=INK, jitter=1, seed=4)
-    put(sc, SL.build("Разум улья", "idle", 2.1), 156, 276, 34)
-    fx_rows(sc, 26, 300, 260, ["{пси} {дальность:3}", "{захват} {каждые:6}", "{помутнение} {радиус:2}",
-                               "минус: {мягкое}"], lh=28)
-    for j, (key, name, look) in enumerate(SL.DEV["Разум улья"]):
-        x0 = 312 + j * 214
-        UI.cell(sc, x0, 52, x0 + 206, 446, "hi" if j == 1 else "normal")
-        put(sc, SL.build("Разум улья", "idle", 1.9, dev=key), x0 + 103, 272, 30)
-        letters(sc, name, x0 + 14, 300, "text", 16, col=GOLD if j == 1 else INK, jitter=1, seed=j)
-        fx_line(sc, x0 + 14, 330, DEV_FX["Разум улья"][key])
-        fx_line(sc, x0 + 14, 372, "{мутация} чаще:", dim=True)    # its branch of the pool comes more often
-        for k_, mk in enumerate(DEV_BRANCH["Разум улья"][key]):
-            icon(sc, "m_" + mk, x0 + 14 + k_ * 40, 396, 2)
+    FILL[name](sc, 22, 62, 290, 296)
+    sc.rgb[62:296, 22:290] *= 0.85
+    put(sc, SL.build(name, "idle", DEV_K[name] * 1.2), 156, 276, DEV_SW[name])
+    heading(sc, "СЕЙЧАС", 26, 66, seed=9)
+    fx_rows(sc, 26, 306, 260, DEV_NOW[name], lh=30)
+    pods = [(312 + j * 214 + 103, 168, key) for j, (key, _n, _l) in enumerate(SL.DEV[name])]
+    dev_links(sc, name, pods, (240, 170))
+    for j, (key, nm, _look) in enumerate(SL.DEV[name]):
+        cx, cy, _ = pods[j]
+        POD[name](sc, cx, cy, j == hot, frame)
+        put(sc, SL.build(name, "idle", DEV_K[name], dev=key), cx + 2, cy + 64, DEV_SW[name])
+        x0 = cx - 103
+        UI.cell(sc, x0, 300, x0 + 206, 446, "hi" if j == hot else "normal")
+        rows = wrap(nm, 182)                                          # a long name (and translations) takes two lines
+        dy = 8 * (len(rows) > 1)
+        for r_, row in enumerate(rows[:2]):
+            letters(sc, row, x0 + 12, 304 - dy // 2 + r_ * 18, "text", 16, col=GOLD if j == hot else INK, jitter=1, seed=j)
+        fx_line(sc, x0 + 12, 338 + dy, DEV_FX[name][key])
+        fx_line(sc, x0 + 12, 376 + dy // 2, "{мутация} чаще:", dim=True)    # its branch of the pool comes more often
+        for k_, mk in enumerate(DEV_BRANCH[name][key]):
+            icon(sc, "m_" + mk, x0 + 12 + k_ * 40, 402, 2)
+    _rim(sc, LEADER_COL[name], y0=46)
     UI.button(sc, 12, 470, 300, 520, "chitin")
     letters(sc, "Позже", 156, 486, "title", 16, col=INK, align="center")
     key_on(sc, 300, 470, "Esc")
+    letters(sc, "выбор навсегда", 480, 486, "text", 16, col=MUTED, align="center")
     act_button(sc, 690, 466, 948, 524, "ПРОРАСТИ")
-    UI.creature(sc, bug((), "idle", 1.0, 190), 540, 54)
-    UI.cobweb(sc, 2, 448, 30, quad=(1, 1))
+    hx = pods[hot][0]
+    cursor(sc, hx + 30, 220)
+    if ret:
+        return sc
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
-    img.save(out("swarm_development_screen.png"))
-    print("swarm_development_screen.png", img.size)
+    fn = "swarm_development_screen.png" if name == "Разум улья" else f"swarm_development_{LEADER_EN[name]}.png"
+    img.save(out(fn))
+    print(fn, img.size)
 
 
 # ---------------------------------------------------------------- the creature's card: who it is, what it can, where it came from
@@ -1409,7 +1635,10 @@ DEV_FX = {   # a leader's growth, as what it changes (fxg.py); «⇒» is «was 
 
 
 DEV_BRANCH = {   # the branch of the leader's pool each growth strengthens: its mutations come more often
+    "Матка": {"often": ["nest", "vivi"], "larva": ["nurse", "bud"], "size": ["dominant", "heir"]},
     "Разум улья": {"two": ["psi_leash", "psi_last"], "every": ["psi_gland"], "strike": ["psi_reson", "psi_dread"]},
+    "Пожиратель": {"bigger": ["devblood", "fattened"], "every_kill": ["sated", "hungry"], "heal": ["table", "frenzy"]},
+    "Чума": {"three": ["bloodeggs", "mutagen"], "venom": ["parasitoid", "spores"], "two": ["call", "bodyguard"]},
 }
 
 
@@ -1514,129 +1743,169 @@ def leader_comb(sc, x0, y, rows, key, hover):
     return pos, y + r * 1.5 * (len(rows) - 1) + 34
 
 
+def _box(sc, x0, y0, x1, y1):
+    m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+    t = np.clip((sc.yy - y0) / max(1, y1 - y0), 0, 1)[..., None]
+    rx = lambda x: int(x0 + (x - 24) * (x1 - x0) / 270.0)            # laid out for the card's well (24..294 × 68..294)
+    ry = lambda y: int(y1 - (294 - y))
+    return m, t, rx, ry
+
+
+def fill_matka(sc, x0, y0, x1, y1):
+    """Her brood chamber: amber wax comb, honey in some cells, eggs heaped at the foot."""
+    m, t, rx, ry = _box(sc, x0, y0, x1, y1)
+    sc.rgb[m] = (hexc("#3a2008") * (1 - t) + hexc("#1a0e04") * t)[m]
+    R = 11
+    dx, dy = R * 1.5, R * np.sqrt(3)
+    rnd = np.random.RandomState(4)
+    for i in range(int((x1 - x0) / dx) + 2):                             # honey in some of the cells
+        for j in range(int((y1 - y0) / dy) + 2):
+            cx, cy = x0 + i * dx, y0 + j * dy + (dy / 2 if i % 2 else 0)
+            if rnd.rand() < 0.22:
+                hx = np.maximum(np.abs(sc.xx - cx) * 0.866 + np.abs(sc.yy - cy) * 0.5, np.abs(sc.yy - cy))
+                c = m & (hx <= R * 0.8)
+                sc.rgb[c] = hexc("#7a4a0c")
+                sc.rgb[c & (sc.yy < cy - 2) & (sc.xx < cx)] = hexc("#a8661a")
+    UI.comb(sc, m, x0, y0, hexc("#9a6a1c"), 0.85, R=R)
+    for (ex, ey) in ((50, 286), (62, 282), (74, 288), (240, 286), (254, 282), (266, 288), (56, 274), (258, 274)):
+        ex, ey = rx(ex), ry(ey)
+        e = ((sc.xx - ex) / 6.0) ** 2 + ((sc.yy - ey) / 8.0) ** 2 <= 1
+        sc.rgb[e & m] = hexc("#cfe89a")
+        sc.rgb[e & m & (sc.xx < ex - 1) & (sc.yy < ey - 2)] = hexc("#f0ffd0")
+
+
+def fill_razum(sc, x0, y0, x1, y1):
+    """Violet dark, rings of psi spreading from the middle, thought threads crossing."""
+    import swarm_abilities as SA
+    m, t, rx, ry = _box(sc, x0, y0, x1, y1)
+    cx, cy, k = (x0 + x1) // 2, int(y0 + (y1 - y0) * 0.58), (x1 - x0) / 270.0
+    d = np.clip(np.hypot(sc.xx - cx, sc.yy - cy) / (160.0 * k), 0, 1)[..., None]
+    sc.rgb[m] = (hexc("#2a1048") * (1 - d) + hexc("#0c0612") * d)[m]
+    keep = sc.rgb.copy()
+    for r in (40, 70, 100):
+        SA.ring(sc, cx, cy, r * k, r * k * 0.55, SA.PHERO, 0.5)
+    for a in np.linspace(0, 2 * np.pi, 7, endpoint=False):
+        SA.thread(sc, (cx, cy), (int(cx + np.cos(a) * 130 * k), int(cy + np.sin(a) * 90 * k)), sag=-10, k=0.4)
+    sc.rgb[~m] = keep[~m]
+
+
+def fill_pozh(sc, x0, y0, x1, y1):
+    """Raw red meat veined through, gnawed bones lying in it."""
+    m, t, rx, ry = _box(sc, x0, y0, x1, y1)
+    sc.rgb[m] = (hexc("#3a0a0c") * (1 - t) + hexc("#180406") * t)[m]
+    rnd = np.random.RandomState(21)
+    for _ in range(int(9 * (x1 - x0) / 270)):                            # veins running through the meat
+        x, y = rnd.randint(x0, x1), rnd.randint(y0, y0 + 120)
+        for k in range(rnd.randint(30, 80)):
+            x += rnd.choice((-1, 0, 1)); y += 1 if rnd.rand() < 0.6 else 0
+            if x0 <= x < x1 and y0 <= y < y1:
+                sc.rgb[y, x] = hexc("#5a1414")
+    for (bx, by, ang) in ((50, 280, 0.3), (250, 276, -0.4), (90, 290, -0.1), (220, 290, 0.2), (40, 250, 1.2)):
+        bx, by = rx(bx), ry(by)
+        for k in range(-9, 10):
+            xx, yy = int(bx + np.cos(ang) * k), int(by + np.sin(ang) * k)
+            sc.rgb[yy:yy + 2, xx] = hexc("#d8ccb0")
+        for ex in (-10, 10):
+            xx, yy = int(bx + np.cos(ang) * ex), int(by + np.sin(ang) * ex)
+            sc.rgb[yy - 1:yy + 3, xx - 1:xx + 2] = hexc("#ece2c8")
+
+
+def fungus(sc, fx, fy, r):
+    """A fungus cap on its stem: dark under, lit on top, pale spots."""
+    cap = (((sc.xx - fx) / r) ** 2 + ((sc.yy - fy) / (r * 0.6)) ** 2 <= 1) & (sc.yy <= fy)
+    sc.rgb[cap] = hexc("#5a7a2a")
+    sc.rgb[cap & (sc.yy < fy - r * 0.3)] = hexc("#86b040")
+    sc.rgb[cap & (sc.yy < fy - r * 0.45) & (sc.xx < fx - r * 0.2)] = hexc("#b8e070")
+    for k in range(3):
+        sc.rgb[fy - int(r * 0.35), int(fx + (k - 1) * r * 0.45)] = hexc("#e8f8c0")
+    sc.rgb[fy:fy + 5, fx - max(1, r // 6):fx + max(2, r // 6 + 1)] = hexc("#bea98a")
+
+
+def fill_kuk(sc, x0, y0, x1, y1):
+    """Sick green mist, clouds of spores, fungus caps growing up from the foot."""
+    m, t, rx, ry = _box(sc, x0, y0, x1, y1)
+    n = value_noise(sc.w, sc.h, 22, 5)
+    base = hexc("#0e160a") * (1 - t) + hexc("#1a2a0e") * t
+    sc.rgb[m] = (base * (0.8 + 0.5 * n[..., None]))[m]
+    keep = sc.rgb.copy()
+    for (gx, gy, r) in ((80, 120, 50), (230, 160, 60), (150, 250, 70)):          # clouds of spores
+        sc.glow(rx(gx), ry(gy), r * (x1 - x0) / 270.0, hexc("#88b040"), 0.18)
+    sc.rgb[~m] = keep[~m]
+    rnd = np.random.RandomState(9)
+    for _ in range(int(90 * (x1 - x0) * (y1 - y0) / 61000)):
+        px_, py_ = rnd.randint(x0 + 2, x1 - 2), rnd.randint(y0 + 2, y1 - 2)
+        sc.rgb[py_, px_] = hexc("#c8f070" if rnd.rand() < 0.3 else "#7a9a40")
+    for (fx, fy, r) in ((40, 292, 14), (62, 294, 8), (78, 293, 5), (262, 292, 16), (238, 294, 9), (222, 294, 5),
+                        (150, 296, 6), (30, 250, 7), (284, 240, 8)):
+        fungus(sc, rx(fx), ry(fy) - 2, r)
+
+
+FILL = {"Матка": fill_matka, "Разум улья": fill_razum, "Пожиратель": fill_pozh, "Чума": fill_kuk}
+LEADER_COL = {"Матка": "#d0a030", "Разум улья": "#ac80ec", "Пожиратель": "#d0402e", "Чума": "#76a040"}
+
+
 def _portrait(sc, spec, fill):
     """Refill the portrait's well with the leader's own material, then the leader back in it."""
-    x0, y0, x1, y1 = 24, 68, 294, 294
-    fill(sc, x0, y0, x1, y1)
+    fill(sc, 24, 68, 294, 294)
     put(sc, spec["sprite"], 159 + spec.get("dx", 0), 268, spec.get("sw", 40))
 
 
-def _rim(sc, col):
-    """The card's plate edged in the leader's colour."""
+def _rim(sc, col, y0=50):
+    """The plate edged in the leader's colour."""
     c = hexc(col)
     for k in (0, 1):
-        sc.rgb[50 + k, 6:WW - 6] = c * (0.9 - 0.3 * k)
+        sc.rgb[y0 + k, 6:WW - 6] = c * (0.9 - 0.3 * k)
         sc.rgb[HH - 7 - k, 6:WW - 6] = c * (0.9 - 0.3 * k)
-        sc.rgb[50:HH - 6, 6 + k] = c * (0.9 - 0.3 * k)
-        sc.rgb[50:HH - 6, WW - 7 - k] = c * (0.9 - 0.3 * k)
+        sc.rgb[y0:HH - 6, 6 + k] = c * (0.9 - 0.3 * k)
+        sc.rgb[y0:HH - 6, WW - 7 - k] = c * (0.9 - 0.3 * k)
+
+
+def beam_marks(sc, name, x=560):
+    """The leader's own signs on the beam."""
+    if name == "Матка":
+        UI.drips(sc, 320, 760, 46, "#e0a830", n=8, seed=11, Lmax=20)
+        for j in range(3):
+            icon(sc, "clutch", x + j * 40, 10, 1)
+    elif name == "Разум улья":
+        import swarm_abilities as SA
+        for j in range(2):
+            SA.sigil(sc, x + 40 + j * 90, 22, 8)
+    elif name == "Пожиратель":
+        UI.drips(sc, 300, 760, 44, "#8a1a14", n=8, seed=13, Lmax=18)
+        icon(sc, "pozh", x + 30, 8, 2)
+        icon(sc, "m_table", x + 80, 12, 1)
+    else:
+        for dx, y in ((0, 12), (30, 24), (60, 10), (100, 22), (140, 14)):
+            sc.rgb[y - 1:y + 2, x + dx - 1:x + dx + 2] = hexc("#a8d060")
+        icon(sc, "kuk", x + 170, 8, 2)
 
 
 def dress_matka(sc, spec):
-    """The Queen: her brood chamber — a well of amber wax comb, eggs heaped at its foot; honey running off the
-    beam; a clutch either side of her name."""
-    def fill(sc, x0, y0, x1, y1):
-        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
-        t = np.clip((sc.yy - y0) / (y1 - y0), 0, 1)[..., None]
-        sc.rgb[m] = (hexc("#3a2008") * (1 - t) + hexc("#1a0e04") * t)[m]
-        R = 11
-        dx, dy = R * 1.5, R * np.sqrt(3)
-        rnd = np.random.RandomState(4)
-        for i in range(int((x1 - x0) / dx) + 2):                         # honey in some of the cells
-            for j in range(int((y1 - y0) / dy) + 2):
-                cx, cy = x0 + i * dx, y0 + j * dy + (dy / 2 if i % 2 else 0)
-                if rnd.rand() < 0.22:
-                    hx = np.maximum(np.abs(sc.xx - cx) * 0.866 + np.abs(sc.yy - cy) * 0.5, np.abs(sc.yy - cy))
-                    c = m & (hx <= R * 0.8)
-                    sc.rgb[c] = hexc("#7a4a0c")
-                    sc.rgb[c & (sc.yy < cy - 2) & (sc.xx < cx)] = hexc("#a8661a")
-        UI.comb(sc, m, x0, y0, hexc("#9a6a1c"), 0.85, R=R)
-        for (ex, ey) in ((50, 286), (62, 282), (74, 288), (240, 286), (254, 282), (266, 288), (56, 274), (258, 274)):
-            e = ((sc.xx - ex) / 6.0) ** 2 + ((sc.yy - ey) / 8.0) ** 2 <= 1
-            sc.rgb[e & m] = hexc("#cfe89a")
-            sc.rgb[e & m & (sc.xx < ex - 1) & (sc.yy < ey - 2)] = hexc("#f0ffd0")
-    _portrait(sc, spec, fill)
-    UI.drips(sc, 320, 760, 46, "#e0a830", n=8, seed=11, Lmax=20)
-    for x in (560, 600, 640):
-        icon(sc, "clutch", x, 10, 1)
-    _rim(sc, "#d0a030")
+    """The Queen: her brood chamber in the well; honey off the beam; a clutch either side of her name."""
+    _portrait(sc, spec, fill_matka)
+    beam_marks(sc, "Матка")
+    _rim(sc, LEADER_COL["Матка"])
 
 
 def dress_razum(sc, spec):
-    """The Hive Mind: a well of violet dark, rings of psi spreading out from behind it, thought threads crossing;
-    sigils on the beam."""
-    import swarm_abilities as SA
-    def fill(sc, x0, y0, x1, y1):
-        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
-        d = np.hypot(sc.xx - 159, sc.yy - 200) / 160.0
-        sc.rgb[m] = (hexc("#2a1048") * (1 - np.clip(d, 0, 1)[..., None]) + hexc("#0c0612") * np.clip(d, 0, 1)[..., None])[m]
-        for r in (40, 70, 100):
-            SA.ring(sc, 159, 200, r, r * 0.55, SA.PHERO, 0.5)
-        for a in np.linspace(0, 2 * np.pi, 7, endpoint=False):
-            SA.thread(sc, (159, 200), (int(159 + np.cos(a) * 130), int(200 + np.sin(a) * 90)), sag=-10, k=0.4)
-    _portrait(sc, spec, fill)
-    for x in (600, 690):
-        SA.sigil(sc, x, 22, 8)
-    _rim(sc, "#ac80ec")
+    """The Hive Mind: violet dark and psi in the well; sigils on the beam."""
+    _portrait(sc, spec, fill_razum)
+    beam_marks(sc, "Разум улья")
+    _rim(sc, LEADER_COL["Разум улья"])
 
 
 def dress_pozh(sc, spec):
-    """The Devourer: a well of raw red, gnawed bones lying in it; blood running off the beam; his jaws and his
-    table either side of his name."""
-    def fill(sc, x0, y0, x1, y1):
-        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
-        t = np.clip((sc.yy - y0) / (y1 - y0), 0, 1)[..., None]
-        sc.rgb[m] = (hexc("#3a0a0c") * (1 - t) + hexc("#180406") * t)[m]
-        rnd = np.random.RandomState(21)
-        for _ in range(9):                                                # veins running through the meat
-            x, y = rnd.randint(x0, x1), rnd.randint(y0, y0 + 120)
-            for k in range(rnd.randint(30, 80)):
-                x += rnd.choice((-1, 0, 1)); y += 1 if rnd.rand() < 0.6 else 0
-                if x0 <= x < x1 and y0 <= y < y1:
-                    sc.rgb[y, x] = hexc("#5a1414")
-        for (bx, by, ang) in ((50, 280, 0.3), (250, 276, -0.4), (90, 290, -0.1), (220, 290, 0.2), (40, 250, 1.2)):
-            for k in range(-9, 10):
-                xx, yy = int(bx + np.cos(ang) * k), int(by + np.sin(ang) * k)
-                sc.rgb[yy:yy + 2, xx] = hexc("#d8ccb0")
-            for ex in (-10, 10):
-                xx, yy = int(bx + np.cos(ang) * ex), int(by + np.sin(ang) * ex)
-                sc.rgb[yy - 1:yy + 3, xx - 1:xx + 2] = hexc("#ece2c8")
-    _portrait(sc, spec, fill)
-    UI.drips(sc, 300, 760, 44, "#8a1a14", n=8, seed=13, Lmax=18)
-    icon(sc, "pozh", 590, 8, 2)
-    icon(sc, "m_table", 640, 12, 1)
-    _rim(sc, "#d0402e")
+    """The Devourer: raw meat and bones in the well; blood off the beam; his jaws and his table by his name."""
+    _portrait(sc, spec, fill_pozh)
+    beam_marks(sc, "Пожиратель")
+    _rim(sc, LEADER_COL["Пожиратель"])
 
 
 def dress_kuk(sc, spec):
-    """The Plague: a well of sick green mist, spores drifting, fungus caps growing up its foot; spores on the
-    beam."""
-    def fill(sc, x0, y0, x1, y1):
-        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
-        t = np.clip((sc.yy - y0) / (y1 - y0), 0, 1)[..., None]
-        n = value_noise(sc.w, sc.h, 22, 5)
-        base = hexc("#0e160a") * (1 - t) + hexc("#1a2a0e") * t
-        sc.rgb[m] = (base * (0.8 + 0.5 * n[..., None]))[m]
-        for (gx, gy, r) in ((80, 120, 50), (230, 160, 60), (150, 250, 70)):      # clouds of spores
-            sc.glow(gx, gy, r, hexc("#88b040"), 0.18)
-        rnd = np.random.RandomState(9)
-        for _ in range(90):
-            px_, py_ = rnd.randint(x0 + 2, x1 - 2), rnd.randint(y0 + 2, y1 - 2)
-            sc.rgb[py_, px_] = hexc("#c8f070" if rnd.rand() < 0.3 else "#7a9a40")
-        for (fx, fy, r) in ((40, 292, 14), (62, 294, 8), (78, 293, 5), (262, 292, 16), (238, 294, 9), (222, 294, 5),
-                            (150, 296, 6), (30, 250, 7), (284, 240, 8)):
-            cap = (((sc.xx - fx) / r) ** 2 + ((sc.yy - fy) / (r * 0.6)) ** 2 <= 1) & (sc.yy <= fy)
-            sc.rgb[cap] = hexc("#5a7a2a")
-            sc.rgb[cap & (sc.yy < fy - r * 0.3)] = hexc("#86b040")
-            sc.rgb[cap & (sc.yy < fy - r * 0.45) & (sc.xx < fx - r * 0.2)] = hexc("#b8e070")
-            for k in range(3):
-                ox = int(fx + (k - 1) * r * 0.45)
-                sc.rgb[fy - int(r * 0.35), ox] = hexc("#e8f8c0")
-            sc.rgb[fy:fy + 5, fx - max(1, r // 6):fx + max(2, r // 6 + 1)] = hexc("#bea98a")
-    _portrait(sc, spec, fill)
-    for x, y in ((560, 12), (590, 24), (620, 10), (660, 22), (700, 14)):
-        sc.rgb[y - 1:y + 2, x - 1:x + 2] = hexc("#a8d060")
-    icon(sc, "kuk", 730, 8, 2)
-    _rim(sc, "#76a040")
+    """The Plague: sick mist, spores and fungus in the well; spores on the beam."""
+    _portrait(sc, spec, fill_kuk)
+    beam_marks(sc, "Чума")
+    _rim(sc, LEADER_COL["Чума"])
 
 
 CARD_DRESS = {"МАТКА": dress_matka, "РАЗУМ УЛЬЯ": dress_razum, "ПОЖИРАТЕЛЬ": dress_pozh, "ЧУМА": dress_kuk}
@@ -2312,7 +2581,7 @@ def hints():
 
 
 SCREENS = {"brood": brood, "brood_leaders": lambda: [brood("plain", n) for n in ("Разум улья", "Пожиратель", "Чума")], "camp": camp, "evolution": evolution, "finds": finds, "pools": pools,
-           "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": development,
+           "flocks": flocks, "battle": battle_hud, "aftermath": aftermath, "leader": leaders_pick, "development": lambda: [development(n) for n in ("Матка", "Разум улья", "Пожиратель", "Чума")],
            "card": cards, "field": leaders_field, "mutation": mutation_card, "hover": button_gif,
            "glossary": glossary_screen, "hints": hints, "roles": roles}
 
