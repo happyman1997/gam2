@@ -259,7 +259,7 @@ def lit_dim(spr):
     return s2
 
 
-def brood(variant=None, leader_name="Матка"):
+def brood(variant=None, leader_name="Матка", ret=False):
     """The brood: everything has hatched and the swarm is over its limit. The auto-selection has already eaten
     the extra — those whose traits killed least — so the swarm fits and «В БОЙ» is open from the start; the player
     only corrects it: a click on a group eats one more, a right click gives one back. Each creature is a gem in
@@ -367,6 +367,8 @@ def brood(variant=None, leader_name="Матка"):
     UI.creature(sc, bug(("wings",), "idle", 0.95, 43), 930, 104)
     UI.cobweb(sc, 2, 480, 26, quad=(1, 1))
     brood_leader_overlay(sc, leader_name, marks, (GX0, GY0, GCW, GCH))
+    if ret:
+        return sc
     name = "brood.png" if leader_name == "Матка" else f"brood_{LEADER_EN[leader_name]}.png"
     if variant == "tip":                         # the mouse over a group's newborn
         point_at(sc, "потомок", 0)
@@ -797,7 +799,7 @@ def cursor(sc, x, y):
                 sc.rgb[y + j, x + i] = hexc("#0a060e") if ch == "o" else hexc("#f4ecd8")
 
 
-def battle_hud(ret=False):
+def battle_hud(ret=False, pops=True):
     """The battle runs itself: the interface is one thin wing — the sides' tug of war, the speed. Everything else is
     on the field: the leader's health over the leader, an ability's icon popping up when it fires, states over the
     units. On pause, pointing at anyone opens their card."""
@@ -822,9 +824,10 @@ def battle_hud(ret=False):
         UI.meter(sc, lx - 40, ltop - 12, lx + 40, 7, 10, 6, "#d08a3a")
         glyph(sc, "лидер", lx - 58, ltop - 14, 2)
         px_, py_ = qx - 104, qtop - 34
-        sc.glow(px_ + 16, py_ + 16, 22, hexc("#f0c060"), 0.45)
-        icon(sc, "clutch", px_, py_, 2)
-        letters(sc, "Кладка", px_ + 16, py_ + 34, "text", 16, col=GOLD, align="center", jitter=1, seed=5)
+        if pops:
+            sc.glow(px_ + 16, py_ + 16, 22, hexc("#f0c060"), 0.45)
+            icon(sc, "clutch", px_, py_, 2)
+            letters(sc, "Кладка", px_ + 16, py_ + 34, "text", 16, col=GOLD, align="center", jitter=1, seed=5)
         # the wing: the swarm against the Foundry, the speed, the turn small by it
         UI.wing(sc, 0, 0, WW, 34)
         letters(sc, f"рой {count - 1}", 16, 8, "title", 16, col=(170, 240, 120), col2=(70, 150, 50))
