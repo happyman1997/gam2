@@ -336,12 +336,20 @@ def defeat(name="Матка", ret=False, anim=None):
     body = flip_dead(SL.build(name, "idle", k_))
     bottom = np.nonzero(body.a.any(axis=1))[0].max()
     sc.blit(body, int(171 - body.ox), int(390 - bottom), emit=False)
-    for j, (dx, dy, tr) in enumerate(((-110, 4, ()), (-70, 14, ("wings",)), (96, 8, ("stinger",)), (120, 18, ()),
-                                       (-30, 22, ("horn",)))):
-        b = flip_dead(SH.bug(tr, "idle", 0.75, 400 + j))
-        sc.blit(b, int(171 + dx - b.ox), int(372 + dy - b.oy), emit=False)
     sc.rgb[396:404, 22:320] = hexc("#1a1418")
     dark_nest(sc, (X >= 22) & (X < 320) & (Y >= 88) & (Y < 404), 0.6)
+    for j, (dx, tr) in enumerate(((-118, ()), (-78, ("wings",)), (92, ("stinger",)), (128, ()), (-36, ("horn",)))):
+        b = flip_dead(SH.bug(tr, "idle", 1.35, 400 + j), 0.3)               # its dead brood on the floor round it
+        bottom = np.nonzero(b.a.any(axis=1))[0].max()
+        bx, by = int(171 + dx - b.ox), int(395 - bottom)
+        rim = np.zeros((b.h + 2, b.w + 2), bool)                          # a cold pale rim, so they read in the dark
+        for oy, ox in ((0, 1), (2, 1), (1, 0), (1, 2)):
+            rim[oy:oy + b.h, ox:ox + b.w] |= b.a
+        rim[1:-1, 1:-1] &= ~b.a
+        ys, xs = np.nonzero(rim)
+        ok = (by + ys - 1 >= 0) & (by + ys - 1 < sc.h) & (bx + xs - 1 >= 0) & (bx + xs - 1 < sc.w)
+        sc.rgb[by + ys[ok] - 1, bx + xs[ok] - 1] = hexc("#5a5866")
+        sc.blit(b, bx, by, emit=False)
     lv = SH.larva("idle", 0.7)                                           # the last larva, still twitching
     lx, ly = 250 + (1 if (fr_ // 3) % 4 == 0 else 0), 392
     sc.blit(lv, int(lx - lv.ox), int(ly - lv.oy - (1 if (fr_ // 3) % 4 == 1 else 0)), emit=False)

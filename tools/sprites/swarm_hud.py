@@ -112,15 +112,15 @@ def glyph(sc, key, x, y, z=2):
     return a_.shape[1] * z
 
 
-def help_button(sc, on=False, alt=False):
+def help_button(sc, on=False, alt=False, dx=0):
     """The wing's right end, the same on every screen: the Alt key (lit while held — every line of glyphs read
-    out in words), two empty sockets kept for buttons to come, and «?» — the glossary (F1)."""
-    keycap(sc, 790, 14, "Alt", lit=alt)
-    for sx in (832, 872):                                   # kept for buttons to come
+    out in words), two empty sockets kept for buttons to come, and «?» — the glossary (F1). dx: a wider canvas."""
+    keycap(sc, 790 + dx, 14, "Alt", lit=alt)
+    for sx in (832 + dx, 872 + dx):                         # kept for buttons to come
         cond_plate(sc, sx, 10, sx + 32, 34)
-    UI.button(sc, 912, 8, 950, 36, "amber" if on else "chitin")
-    letters(sc, "?", 931, 14, "title", 16, col=DARK if on else INK, outline=not on, align="center")
-    keycap(sc, 900, 28, "F1")
+    UI.button(sc, 912 + dx, 8, 950 + dx, 36, "amber" if on else "chitin")
+    letters(sc, "?", 931 + dx, 14, "title", 16, col=DARK if on else INK, outline=not on, align="center")
+    keycap(sc, 900 + dx, 28, "F1")
 
 
 SILENT_KEYS = {"Enter", "Esc"}   # work on every screen, but are not written on the buttons
@@ -1288,32 +1288,43 @@ def bug_card(sc, cx, y0, name, sel, seed):
     sc.glow(cx, y0 + 398, 26, hexc("#9ae030"), 0.3 if sel else 0.15)
 
 
-def leaders_pick():
-    sc = frame_screen(41)
+def leaders_pick(W=WW, H=HH, ret=False):
+    """The leader's choice; on a bigger canvas the four cards spread out and stand in the middle, the buttons keep
+    to their ends."""
+    if W == WW and H == HH:
+        sc = frame_screen(41)
+    else:
+        UI.WOBBLE[0] = 1.3
+        HOVER.clear()
+        sc = UI.nest(W, H, 41)
+    dw, dh = W - WW, H - HH
     X, Y = sc.xx, sc.yy
-    fog = np.clip((Y - 300) / 240, 0, 1)[..., None] * 0.22    # acid haze rising from the floor
+    fog = np.clip((Y - 300 - dh) / 240, 0, 1)[..., None] * 0.22    # acid haze rising from the floor
     sc.rgb[:] = sc.rgb * (1 - fog) + np.array((60, 110, 20), float) * fog
     rnd = np.random.RandomState(7)
     for _ in range(40):                                          # bubbles
-        bx, by, br = rnd.randint(10, 950), rnd.randint(300, 470), rnd.choice((1, 1, 2, 3))
+        bx, by, br = rnd.randint(10, W - 10), rnd.randint(300 + dh, 470 + dh), rnd.choice((1, 1, 2, 3))
         ring = (np.abs(np.hypot(X - bx, Y - by) - br) < 0.7)
         sc.rgb[ring] = sc.rgb[ring] * 0.4 + np.array(ACID, float) * 0.6
-    UI.wing(sc, 0, 0, WW, 44)
-    UI.drips(sc, 60, 900, 44, "#7ab020", n=8, seed=18)
+    UI.wing(sc, 0, 0, W, 44)
+    UI.drips(sc, 60, W - 60, 44, "#7ab020", n=8, seed=18)
     w = letters(sc, "ЛИДЕР", 16, 6, "title", 24, col=(236, 216, 170), col2=(150, 96, 60), jitter=1, drips=6, hairs=9, seed=35)
     epithet(sc, "КТО СОЖРЕТ ИХ ВСЕХ", 16 + w + 44, 10, ACID, seed=36, px=24)
-    help_button(sc)
+    help_button(sc, dx=dw)
     names = ["Матка", "Разум улья", "Пожиратель", "Чума"]
     for i, name in enumerate(names):
-        bug_card(sc, 132 + i * 232, 60, name, i == 0, seed=40 + i)
-    UI.button(sc, 12, 470, 300, 520, "chitin")
-    letters(sc, "Назад", 156, 486, "title", 16, col=INK, align="center")
-    key_on(sc, 300, 470, "Esc")
-    UI.button(sc, 326, 470, 634, 520, "chitin")
-    letters(sc, "ПОЛНОЕ ОПИСАНИЕ", 480, 486, "title", 16, col=ACID2, align="center")
-    UI.button(sc, 660, 466, 948, 524, "acid")
-    letters(sc, "В ПОХОД", 804, 486, "title", 16, col=ACID2, col2=(110, 170, 40), align="center", jitter=1, hairs=4)
-    UI.cobweb(sc, 958, 46, 34, quad=(-1, 1))
+        bug_card(sc, int(W / 2 + (i - 1.5) * (232 + dw // 4)), 60 + dh // 2, name, i == 0, seed=40 + i)
+    UI.button(sc, 12, H - 70, 300, H - 20, "chitin")
+    letters(sc, "Назад", 156, H - 54, "title", 16, col=INK, align="center")
+    key_on(sc, 300, H - 70, "Esc")
+    UI.button(sc, W // 2 - 154, H - 70, W // 2 + 154, H - 20, "chitin")
+    letters(sc, "ПОЛНОЕ ОПИСАНИЕ", W // 2, H - 54, "title", 16, col=ACID2, align="center")
+    UI.button(sc, W - 300, H - 74, W - 12, H - 16, "acid")
+    letters(sc, "В ПОХОД", W - 156, H - 54, "title", 16, col=ACID2, col2=(110, 170, 40), align="center", jitter=1, hairs=4)
+    UI.cobweb(sc, W - 2, 46, 34, quad=(-1, 1))
+    if ret:
+        UI.WOBBLE[0] = 0.0
+        return sc
     img = sc.image(S)
     UI.WOBBLE[0] = 0.0
     img.save(out("swarm_leader_pick.png"))
@@ -1484,13 +1495,18 @@ def pod_kuk(sc, cx, cy, hot, frame):
         px_, py_ = cx + rnd.randint(-60, 60), cy + rnd.randint(-70, 80)
         if inner[py_, px_]:
             sc.rgb[py_, px_] = hexc("#c8f070")
-    if hot:
-        for k in range(16):                                               # a puff of spores rising off it
-            q = ((frame / 24.0 + k / 16.0) % 1.0)
-            px_ = int(cx + np.sin(k * 2.3) * (20 + 50 * q))
-            py_ = int(cy - 114 - q * 40)
+    if hot:                                                               # a puff of spores out of the tear, rising
+        sc.glow(cx, cy - 10, 60, hexc("#c8f070"), 0.18)
+        for k in range(22):
+            q = ((frame / 24.0 + k / 22.0) % 1.0)
+            px_ = int(cx + np.sin(k * 2.3) * (8 + 64 * q))
+            py_ = int(cy + 6 - q * 140)
             if py_ > 50:
-                sc.rgb[py_:py_ + 2, px_:px_ + 2] = hexc("#c8f070") * (1 - 0.6 * q) + sc.rgb[py_, px_] * 0.6 * q
+                sz = 3 if q < 0.45 else 2
+                c = hexc("#e8ffa0") * (1 - 0.5 * q) + sc.rgb[py_, px_] * 0.5 * q
+                sc.rgb[py_ - 1:py_ + sz + 1, px_:px_ + sz] = UI.OUTL
+                sc.rgb[py_:py_ + sz, px_ - 1:px_ + sz + 1] = UI.OUTL
+                sc.rgb[py_:py_ + sz, px_:px_ + sz] = c
     return inner
 
 

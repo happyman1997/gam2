@@ -99,7 +99,7 @@ def sheet():
     print("swarm_wide_brood.png")
 
 
-def plates_layout(name, cols, W, H, split=600, foot_wing=True, leader=None):
+def plates_layout(name, cols, W, H, split=600, foot_wing=True, leader=None, rim=None):
     """Any swarm screen of plates side by side: the wing the full width, the plates pinned to their edges, the one
     marked «grow» taking the extra width (its content centred), every plate taking the extra height (content at
     its top); the foot the full width, its left buttons pinned left and its right ones right. A «chamber» grows
@@ -125,7 +125,7 @@ def plates_layout(name, cols, W, H, split=600, foot_wing=True, leader=None):
             UI.plate(sc, nx0, y0, nx1, y1 + dh)
             ix0, iy0, ix1, iy1 = x0 + 5, y0 + 5, x1 - 5, y1 - 5
         ox = nx0 + (dw // 2 if mode in ("grow", "chamber") else 0) + (ix0 - x0)
-        sink = dh // 2 if mode in ("grow", "chamber") else 0
+        sink = dh // 2 if mode == "chamber" else 0                       # a growing plate: headings stay in line
         if mode == "chamber" and leader == "Матка":                       # her cells hang from the ceiling: pinned up
             sink = 0
         oy = sink + iy0
@@ -149,8 +149,72 @@ def plates_layout(name, cols, W, H, split=600, foot_wing=True, leader=None):
         UI.wing(sc, 0, sy + 2, W, H)
     paste(sc, src, 0, 468, split, 540, 0, sy + 2)
     paste(sc, src, split, 466, 960, 540, W - (960 - split), sy)
+    if rim:                                                               # a leader's screen: its edge, the full size
+        rim_at(sc, rim, W, H, 46)
     UI.WOBBLE[0] = 0.0
     return sc
+
+
+def rim_at(sc, col, W, H, y0):
+    """The leader's (or the form's) coloured edge round a screen of any size (swarm_hud._rim)."""
+    c = hexc(col)
+    for k in (0, 1):
+        sc.rgb[y0 + k, 6:W - 6] = c * (0.9 - 0.3 * k)
+        sc.rgb[H - 7 - k, 6:W - 6] = c * (0.9 - 0.3 * k)
+        sc.rgb[y0:H - 6, 6 + k] = c * (0.9 - 0.3 * k)
+        sc.rgb[y0:H - 6, W - 7 - k] = c * (0.9 - 0.3 * k)
+
+
+def card_layout(name, W, H, rim=None, left=440):
+    """A full card (swarm_hud.big_card) on a bigger canvas: one plate the whole size; the portrait and its facts
+    pinned left and top, «Закрыть» to the bottom left; the numbers and attacks in the middle; the abilities
+    pinned right — only what was drawn on the plate is lifted onto the bigger one."""
+    src = load(name)
+    UI.WOBBLE[0] = 1.3
+    dw, dh = W - 960, H - 540
+    sc = UI.nest(W, H, 13)
+    beam(sc, src, W, left)
+    bare = Scene(960, 540)
+    UI.plate(bare, 6, 50, 954, 534)
+    UI.plate(sc, 6, 50, W - 6, H - 6)
+
+    def lift(x0, y0, x1, y1, dx, dy):
+        part, base_ = src[y0:y1, x0:x1], bare.rgb[y0:y1, x0:x1]
+        m = np.abs(part - base_).max(axis=-1) > 10
+        m = m | np.roll(m, 1, 0) | np.roll(m, -1, 0) | np.roll(m, 1, 1) | np.roll(m, -1, 1)
+        dst = sc.rgb[y0 + dy:y1 + dy, x0 + dx:x1 + dx]
+        dst[m] = part[m]
+    lift(10, 54, 310, 470, 0, 0)                                          # the portrait and its facts
+    lift(10, 470, 310, 530, 0, dh)                                        # «Закрыть»
+    lift(310, 54, 624, 530, dw // 2, 0)                                   # the numbers, the attacks
+    lift(624, 54, 950, 530, dw, 0)                                        # the abilities
+    if rim:
+        rim_at(sc, rim, W, H, 50)
+    UI.WOBBLE[0] = 0.0
+    return sc
+
+
+def screens_sheet2():
+    """The rest at 1280×720: the hive (the Devourer's), the evolution (the Plague's), the leader's choice, a card."""
+    import swarm_form_cards as FC
+    k = 0.5
+    cw, ch = int(1280 * k), int(720 * k)
+    canvas = Image.new("RGB", (cw * 2 + 48, ch * 2 + 48), (20, 18, 22))
+    camp = [(12, 52, 286, 446, "pin_l"), (296, 52, 652, 446, "grow"), (662, 52, 948, 446, "pin_r")]
+    evo = [(12, 52, 300, 446, "pin_l"), (310, 52, 948, 446, "grow")]
+    lays = [plates_layout("swarm_camp_pozh.png", camp, 1280, 720, 600, False, None, SH.LEADER_COL["Пожиратель"]),
+            plates_layout("swarm_evolution_kuk.png", evo, 1280, 720, 600, False, None, SH.LEADER_COL["Чума"]),
+            SH.leaders_pick(1280, 720, ret=True),
+            card_layout("swarm_card_wasp.png", 1280, 720, FC.FORM["wings"][2])]
+    for i, sc in enumerate(lays):
+        im = Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8)).resize((cw, ch), Image.BOX)
+        canvas.paste(im, (16 + (i % 2) * (cw + 16), 16 + (i // 2) * (ch + 16)))
+    canvas = canvas.resize((canvas.width * 2, canvas.height * 2), Image.NEAREST)
+    canvas.save(out("swarm_wide_screens2.png"))
+    print("swarm_wide_screens2.png", canvas.size)
+    big = card_layout("swarm_card_leader.png", 1280, 720, SH.LEADER_COL["Матка"])
+    Image.fromarray(np.clip(big.rgb, 0, 255).astype(np.uint8)).resize((2560, 1440), Image.NEAREST).save(out("swarm_wide_card.png"))
+    print("swarm_wide_card.png")
 
 
 SCREENS = [   # file, its plates (x0, y0, x1, y1, how it grows), where the foot splits, a foot wing, the leader
@@ -230,3 +294,4 @@ if __name__ == "__main__":
     sheet()
     battle_sheet()
     screens_sheet()
+    screens_sheet2()
