@@ -1,0 +1,1626 @@
+{
+ "name": "Рой",
+ "scale": "art px (960×540 screen); draw ×2 nearest",
+ "pieces": {
+  "plate": {
+   "file": "plate.png",
+   "size": [
+    256,
+    256
+   ],
+   "slice": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "tile_x": [
+    78,
+    126
+   ],
+   "tile_y": [
+    94,
+    110
+   ],
+   "mode": "9-slice",
+   "note": "the sheen under the top edge runs the whole width here (on the screens — its left 60%)"
+  },
+  "plate_spiracle": {
+   "file": "plate_spiracle.png",
+   "size": [
+    3,
+    3
+   ],
+   "place": "x = 2 and x = w − 5; y = 21 + 34·k while y < h − 14"
+  },
+  "plate_spine_left": {
+   "file": "plate_spine_left.png",
+   "size": [
+    4,
+    2
+   ],
+   "place": "off the left edge, its tip outward: x = −3, y = 29 + 46·k (plates taller than 60)"
+  },
+  "plate_spine_right": {
+   "file": "plate_spine_right.png",
+   "size": [
+    4,
+    2
+   ],
+   "place": "x = w − 1, y = 29 + 46·k"
+  },
+  "plate_antenna_left": {
+   "file": "plate_antenna_left.png",
+   "size": [
+    32,
+    16
+   ],
+   "anchor": "its root at (28, 14) on the plate's top edge, 16 px in from the left"
+  },
+  "plate_antenna_right": {
+   "file": "plate_antenna_right.png",
+   "size": [
+    32,
+    16
+   ],
+   "anchor": "root at (3, 14), 16 px in from the right"
+  },
+  "cell_normal_8": {
+   "file": "cell_normal_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_hi_8": {
+   "file": "cell_hi_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_new_8": {
+   "file": "cell_new_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_eat_8": {
+   "file": "cell_eat_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_locked_8": {
+   "file": "cell_locked_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_mut_8": {
+   "file": "cell_mut_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_find_8": {
+   "file": "cell_find_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_hover_8": {
+   "file": "cell_hover_8.png",
+   "size": [
+    104,
+    58
+   ],
+   "slice": [
+    40,
+    18,
+    40,
+    28
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    18,
+    22
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 8: cells under 56 px tall"
+  },
+  "cell_normal_12": {
+   "file": "cell_normal_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_hi_12": {
+   "file": "cell_hi_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_new_12": {
+   "file": "cell_new_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_eat_12": {
+   "file": "cell_eat_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_locked_12": {
+   "file": "cell_locked_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_mut_12": {
+   "file": "cell_mut_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_find_12": {
+   "file": "cell_find_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_hover_12": {
+   "file": "cell_hover_12.png",
+   "size": [
+    104,
+    86
+   ],
+   "slice": [
+    40,
+    20,
+    40,
+    40
+   ],
+   "tile_x": [
+    48,
+    56
+   ],
+   "tile_y": [
+    20,
+    24
+   ],
+   "mode": "9-slice",
+   "pad": 4,
+   "use": "chamfer 12: cells 56 px tall and over"
+  },
+  "cell_mark_hi": {
+   "file": "cell_mark_hi.png",
+   "size": [
+    11,
+    17
+   ],
+   "place": "its tip on the cell's left edge, middle"
+  },
+  "cell_mark_new": {
+   "file": "cell_mark_new.png",
+   "size": [
+    8,
+    10
+   ],
+   "place": "top right: x = w − 14, y = 5"
+  },
+  "cell_mark_eat": {
+   "file": "cell_mark_eat.png",
+   "size": [
+    35,
+    6
+   ],
+   "place": "bottom right: x = w − 60, y = h − 9"
+  },
+  "cell_mark_mut": {
+   "file": "cell_mark_mut.png",
+   "size": [
+    8,
+    8
+   ],
+   "place": "top right: x = w − 14, y = 6"
+  },
+  "cell_mark_find": {
+   "file": "cell_mark_find.png",
+   "size": [
+    12,
+    12
+   ],
+   "place": "top right: x = w − 18, y = 5"
+  },
+  "wing_960": {
+   "file": "wing_960.png",
+   "size": [
+    960,
+    44
+   ],
+   "use": "drawn whole across a 960-wide canvas"
+  },
+  "wing_battle_960": {
+   "file": "wing_battle_960.png",
+   "size": [
+    960,
+    34
+   ],
+   "use": "drawn whole across a 960-wide canvas"
+  },
+  "foot_960": {
+   "file": "foot_960.png",
+   "size": [
+    960,
+    72
+   ],
+   "use": "drawn whole across a 960-wide canvas"
+  },
+  "wing_1280": {
+   "file": "wing_1280.png",
+   "size": [
+    1280,
+    44
+   ],
+   "use": "drawn whole across a 1280-wide canvas"
+  },
+  "wing_battle_1280": {
+   "file": "wing_battle_1280.png",
+   "size": [
+    1280,
+    34
+   ],
+   "use": "drawn whole across a 1280-wide canvas"
+  },
+  "foot_1280": {
+   "file": "foot_1280.png",
+   "size": [
+    1280,
+    72
+   ],
+   "use": "drawn whole across a 1280-wide canvas"
+  },
+  "button_acid_22": {
+   "file": "button_acid_22.png",
+   "size": [
+    228,
+    30
+   ],
+   "slice": [
+    44,
+    0,
+    44,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    30
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 6,
+    "colour": "#ecff8c",
+    "edge": "#6eaa28",
+    "kind": "title",
+    "hairs": 4
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_acid_30": {
+   "file": "button_acid_30.png",
+   "size": [
+    228,
+    38
+   ],
+   "slice": [
+    55,
+    0,
+    55,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    38
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 10,
+    "colour": "#ecff8c",
+    "edge": "#6eaa28",
+    "kind": "title",
+    "hairs": 4
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_acid_42": {
+   "file": "button_acid_42.png",
+   "size": [
+    228,
+    50
+   ],
+   "slice": [
+    70,
+    0,
+    70,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    50
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 16,
+    "colour": "#ecff8c",
+    "edge": "#6eaa28",
+    "kind": "title",
+    "hairs": 4
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_acid_56": {
+   "file": "button_acid_56.png",
+   "size": [
+    228,
+    64
+   ],
+   "slice": [
+    88,
+    0,
+    88,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    64
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 23,
+    "colour": "#ecff8c",
+    "edge": "#6eaa28",
+    "kind": "title",
+    "hairs": 4
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_chitin_22": {
+   "file": "button_chitin_22.png",
+   "size": [
+    228,
+    30
+   ],
+   "slice": [
+    44,
+    0,
+    44,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    30
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 6,
+    "colour": "#ecdcc4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_chitin_30": {
+   "file": "button_chitin_30.png",
+   "size": [
+    228,
+    38
+   ],
+   "slice": [
+    55,
+    0,
+    55,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    38
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 10,
+    "colour": "#ecdcc4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_chitin_42": {
+   "file": "button_chitin_42.png",
+   "size": [
+    228,
+    50
+   ],
+   "slice": [
+    70,
+    0,
+    70,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    50
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 16,
+    "colour": "#ecdcc4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_chitin_56": {
+   "file": "button_chitin_56.png",
+   "size": [
+    228,
+    64
+   ],
+   "slice": [
+    88,
+    0,
+    88,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    64
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 23,
+    "colour": "#ecdcc4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_blood_22": {
+   "file": "button_blood_22.png",
+   "size": [
+    228,
+    30
+   ],
+   "slice": [
+    44,
+    0,
+    44,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    30
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 6,
+    "colour": "#ffc8b4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_blood_30": {
+   "file": "button_blood_30.png",
+   "size": [
+    228,
+    38
+   ],
+   "slice": [
+    55,
+    0,
+    55,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    38
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 10,
+    "colour": "#ffc8b4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_blood_42": {
+   "file": "button_blood_42.png",
+   "size": [
+    228,
+    50
+   ],
+   "slice": [
+    70,
+    0,
+    70,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    50
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 16,
+    "colour": "#ffc8b4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_blood_56": {
+   "file": "button_blood_56.png",
+   "size": [
+    228,
+    64
+   ],
+   "slice": [
+    88,
+    0,
+    88,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    64
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 23,
+    "colour": "#ffc8b4",
+    "kind": "text"
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_amber_22": {
+   "file": "button_amber_22.png",
+   "size": [
+    228,
+    30
+   ],
+   "slice": [
+    44,
+    0,
+    44,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    30
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 6,
+    "colour": "#281608",
+    "kind": "text",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_amber_30": {
+   "file": "button_amber_30.png",
+   "size": [
+    228,
+    38
+   ],
+   "slice": [
+    55,
+    0,
+    55,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    38
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 10,
+    "colour": "#281608",
+    "kind": "text",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_amber_42": {
+   "file": "button_amber_42.png",
+   "size": [
+    228,
+    50
+   ],
+   "slice": [
+    70,
+    0,
+    70,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    50
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 16,
+    "colour": "#281608",
+    "kind": "text",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_amber_56": {
+   "file": "button_amber_56.png",
+   "size": [
+    228,
+    64
+   ],
+   "slice": [
+    88,
+    0,
+    88,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    64
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 23,
+    "colour": "#281608",
+    "kind": "text",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_dim_22": {
+   "file": "button_dim_22.png",
+   "size": [
+    228,
+    30
+   ],
+   "slice": [
+    44,
+    0,
+    44,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    30
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 6,
+    "colour": "#786c84",
+    "kind": "title",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_dim_30": {
+   "file": "button_dim_30.png",
+   "size": [
+    228,
+    38
+   ],
+   "slice": [
+    55,
+    0,
+    55,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    38
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 10,
+    "colour": "#786c84",
+    "kind": "title",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_dim_42": {
+   "file": "button_dim_42.png",
+   "size": [
+    228,
+    50
+   ],
+   "slice": [
+    70,
+    0,
+    70,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    50
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 16,
+    "colour": "#786c84",
+    "kind": "title",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "button_dim_56": {
+   "file": "button_dim_56.png",
+   "size": [
+    228,
+    64
+   ],
+   "slice": [
+    88,
+    0,
+    88,
+    0
+   ],
+   "tile_x": [
+    110,
+    116
+   ],
+   "tile_y": [
+    0,
+    64
+   ],
+   "mode": "3-slice",
+   "pad": [
+    14,
+    4
+   ],
+   "text": {
+    "align": "center",
+    "px": 16,
+    "y": 23,
+    "colour": "#786c84",
+    "kind": "title",
+    "outline": false
+   },
+   "note": "chitin's iridescence drifts along the whole width on the screens; here its middle repeats"
+  },
+  "groove": {
+   "file": "groove.png",
+   "size": [
+    200,
+    16
+   ],
+   "slice": [
+    8,
+    0,
+    8,
+    0
+   ],
+   "tile_x": [
+    60,
+    84
+   ],
+   "tile_y": [
+    0,
+    16
+   ],
+   "mode": "3-slice",
+   "note": "the drop rides at y = 8 (its middle); notches at y = 8, labels 12 px under"
+  },
+  "groove_notch": {
+   "file": "groove_notch.png",
+   "size": [
+    14,
+    14
+   ],
+   "pivot": [
+    7,
+    7
+   ]
+  },
+  "groove_drop": {
+   "file": "groove_drop.png",
+   "size": [
+    20,
+    24
+   ],
+   "pivot": [
+    10,
+    12
+   ]
+  },
+  "groove_ichor": {
+   "file": "groove_ichor.png",
+   "size": [
+    4,
+    7
+   ],
+   "slice": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "tile_x": [
+    0,
+    4
+   ],
+   "tile_y": [
+    0,
+    7
+   ],
+   "mode": "3-slice",
+   "anchor": "inside the groove (y 5..11), from its left end to the drop; a pale bubble every 13 px"
+  },
+  "lantern_on": {
+   "file": "lantern_on.png",
+   "size": [
+    44,
+    44
+   ],
+   "pivot": [
+    22,
+    22
+   ]
+  },
+  "lantern_off": {
+   "file": "lantern_off.png",
+   "size": [
+    44,
+    44
+   ],
+   "pivot": [
+    22,
+    22
+   ]
+  },
+  "mandible_left": {
+   "file": "mandible_left.png",
+   "size": [
+    22,
+    32
+   ],
+   "anchor": "left of the window, the list's middle at y = 16"
+  },
+  "mandible_right": {
+   "file": "mandible_right.png",
+   "size": [
+    22,
+    32
+   ],
+   "anchor": "right of the window"
+  },
+  "settings_icons": {
+   "file": "settings_icons.png",
+   "size": [
+    64,
+    16
+   ],
+   "cells": [
+    "screen",
+    "sound",
+    "game",
+    "keys"
+   ],
+   "cell": 16,
+   "z": 2
+  },
+  "scale_ok": {
+   "file": "scale_ok.png",
+   "size": [
+    17,
+    23
+   ],
+   "pivot": [
+    8,
+    11
+   ],
+   "note": "drawn at a = 6.2, b = 10 (16 px tall bar); the engine redraws it at other sizes"
+  },
+  "scale_over": {
+   "file": "scale_over.png",
+   "size": [
+    17,
+    23
+   ],
+   "pivot": [
+    8,
+    11
+   ],
+   "note": "drawn at a = 6.2, b = 10 (16 px tall bar); the engine redraws it at other sizes"
+  },
+  "scale_eat": {
+   "file": "scale_eat.png",
+   "size": [
+    17,
+    23
+   ],
+   "pivot": [
+    8,
+    11
+   ],
+   "note": "drawn at a = 6.2, b = 10 (16 px tall bar); the engine redraws it at other sizes"
+  },
+  "scale_dim": {
+   "file": "scale_dim.png",
+   "size": [
+    17,
+    23
+   ],
+   "pivot": [
+    8,
+    11
+   ],
+   "note": "drawn at a = 6.2, b = 10 (16 px tall bar); the engine redraws it at other sizes"
+  },
+  "scale_violet": {
+   "file": "scale_violet.png",
+   "size": [
+    17,
+    23
+   ],
+   "pivot": [
+    8,
+    11
+   ],
+   "note": "drawn at a = 6.2, b = 10 (16 px tall bar); the engine redraws it at other sizes"
+  },
+  "centipede_head": {
+   "file": "centipede_head.png",
+   "size": [
+    20,
+    44
+   ],
+   "anchor": "the bar's left end at x = 2, its top at y = 12"
+  },
+  "centipede_tail": {
+   "file": "centipede_tail.png",
+   "size": [
+    20,
+    44
+   ],
+   "anchor": "the bar's right end at x = 160"
+  },
+  "limit_pin": {
+   "file": "limit_pin.png",
+   "size": [
+    6,
+    44
+   ],
+   "anchor": "at the limit, over the scales"
+  },
+  "artifact_cell_empty": {
+   "file": "artifact_cell_empty.png",
+   "size": [
+    32,
+    32
+   ],
+   "pivot": [
+    16,
+    16
+   ],
+   "note": "an empty open cell"
+  },
+  "artifact_cell_normal": {
+   "file": "artifact_cell_normal.png",
+   "size": [
+    32,
+    32
+   ],
+   "pivot": [
+    16,
+    16
+   ],
+   "note": "the artifact's icon at (8, 8), ×1, under the amber (×0.8 + #e8a030 ×0.2)"
+  },
+  "artifact_cell_awake": {
+   "file": "artifact_cell_awake.png",
+   "size": [
+    32,
+    32
+   ],
+   "pivot": [
+    16,
+    16
+   ],
+   "note": "the artifact's icon at (8, 8), ×1, under the amber (×0.8 + #e8a030 ×0.2)"
+  },
+  "artifact_cell_fire": {
+   "file": "artifact_cell_fire.png",
+   "size": [
+    32,
+    32
+   ],
+   "pivot": [
+    16,
+    16
+   ],
+   "note": "the artifact's icon at (8, 8), ×1, under the amber (×0.8 + #e8a030 ×0.2)"
+  },
+  "artifacts": {
+   "file": "../foundry/artifacts.png",
+   "note": "the same atlas as the Foundry's"
+  },
+  "crown": {
+   "file": "crown.png",
+   "size": [
+    26,
+    20
+   ],
+   "note": "the leader's ability box: cell_hi_8 grown to 216×48, the crown at (8, 4), the ability's icon at (8, 20), name at (36, 4), line at (36, 24)"
+  },
+  "end_plate_win": {
+   "file": "end_plate_win.png",
+   "size": [
+    420,
+    100
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 24,
+    "y": 38
+   },
+   "note": "across the dimmed field; two wasps beating their wings either side (win), two dead (lose)"
+  },
+  "end_plate_lose": {
+   "file": "end_plate_lose.png",
+   "size": [
+    420,
+    100
+   ],
+   "text": {
+    "align": "center",
+    "kind": "title",
+    "px": 24,
+    "y": 38
+   },
+   "note": "across the dimmed field; two wasps beating their wings either side (win), two dead (lose)"
+  },
+  "damage_numbers": {
+   "kind": "spec",
+   "font": "title",
+   "drips": 3,
+   "jitter": 1,
+   "rise": "out_back over 4 frames, then 0.8 px/frame up, fade the last 5",
+   "styles": {
+    "hit": {
+     "px": 16,
+     "colour": "#d6fa6e",
+     "edge": "#326014"
+    },
+    "crit": {
+     "px": 24,
+     "colour": "#f6ffce",
+     "edge": "#609618"
+    },
+    "hurt": {
+     "px": 16,
+     "colour": "#f0a046",
+     "edge": "#64280a"
+    },
+    "poison": {
+     "px": 16,
+     "colour": "#96e63c",
+     "edge": "#1e460a"
+    },
+    "psi": {
+     "px": 16,
+     "colour": "#cea0ff",
+     "edge": "#461e78"
+    },
+    "miss": {
+     "px": 16,
+     "colour": "#aaa6a0",
+     "edge": "#323034"
+    },
+    "heal": {
+     "px": 16,
+     "colour": "#c4faa0",
+     "edge": "#286e28"
+    }
+   }
+  }
+ },
+ "slicing": "9-slice: corners as they are, edges and middle repeat tile_x / tile_y of the source, cut at the far end; 3-slice: the same along x only. pad — transparent margin kept for halos.",
+ "glyphs": {
+  "file": "../foundry/glyphs.json",
+  "note": "the effect lines' glyphs are the same for both classes",
+  "z": 2
+ },
+ "icons": {
+  "swarm": "../../swarm_icons.png",
+  "index": "../../swarm_icons.json",
+  "cell": 16
+ },
+ "fonts": {
+  "title": {
+   "file": "tools/sprites/fonts/PressStart2P-Regular.ttf",
+   "px": [
+    16,
+    24
+   ],
+   "license": "OFL 1.1 (в репо)",
+   "swarm": "jitter 1 px, drips and bristles (swarm_ui.letters)"
+  },
+  "text": {
+   "file": "tools/sprites/fonts/unifont-18.0.01.otf",
+   "px": [
+    16
+   ],
+   "license": "SIL OFL 1.1 (или GPL-2+ с исключением для шрифтов); OFL-Unifont.txt, LICENSE-Unifont.txt"
+  }
+ },
+ "colours": {
+  "ink": "#ecdcc4",
+  "muted": "#aa9cb4",
+  "gold": "#f0be5a",
+  "pale": "#786c84",
+  "acid": "#b0f446",
+  "outline": "#100c10",
+  "wax": [
+   "#3a2410",
+   "#5e3c16",
+   "#8a5a1e",
+   "#b8822e"
+  ],
+  "ichor": [
+   "#3a6a10",
+   "#6aa020",
+   "#a8e040",
+   "#e0ff90"
+  ]
+ },
+ "background": {
+  "nest": "swarm_ui.nest: dark wax comb, R = 13 hexagons, tunnels; drawn per screen, not sliced"
+ }
+}

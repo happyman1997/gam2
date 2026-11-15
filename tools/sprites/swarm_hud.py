@@ -1175,7 +1175,7 @@ def pod_matka(sc, cx, cy, hot, frame):
     outer = (X / 96.0) ** 2 + (Y / 118.0) ** 2 <= 1
     inner = outer & ((X / 86.0) ** 2 + ((Y - 40) / 66.0) ** 2 <= 1)
     if hot:
-        sc.glow(cx, cy, 130, hexc("#f0b040"), 0.25 + 0.06 * np.sin(frame * 0.5))
+        sc.glow(cx, cy, 130, hexc("#f0b040"), 0.25 + 0.06 * np.sin(frame * 2 * np.pi / 12))
     sc.rgb[outer] = UI.OUTL
     wax = (X / 93.0) ** 2 + (Y / 115.0) ** 2 <= 1
     lit = np.clip(0.55 - X / 160.0 - Y / 300.0, 0, 1)
@@ -1201,7 +1201,7 @@ def pod_matka(sc, cx, cy, hot, frame):
     sc.rgb[lip & (Y < 40)] = hexc("#f0c868")
     if hot:
         for k in range(4):                                                # royal jelly drops rising
-            yy = int(cy + 96 - ((frame * 3 + k * 37) % 110))
+            yy = int(cy + 96 - ((frame / 24.0 + k / 4.0) % 1.0) * 110)
             xx = int(cx - 40 + k * 26)
             if inner[yy, xx]:
                 sc.rgb[yy - 1:yy + 2, xx - 1:xx + 2] = hexc("#f8d070")
@@ -1321,7 +1321,7 @@ def pod_kuk(sc, cx, cy, hot, frame):
             sc.rgb[py_, px_] = hexc("#c8f070")
     if hot:
         for k in range(16):                                               # a puff of spores rising off it
-            q = ((frame * 0.04 + k / 16.0) % 1.0)
+            q = ((frame / 24.0 + k / 16.0) % 1.0)
             px_ = int(cx + np.sin(k * 2.3) * (20 + 50 * q))
             py_ = int(cy - 114 - q * 40)
             if py_ > 50:
