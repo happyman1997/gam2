@@ -19,6 +19,7 @@ from swarm_ui import letters, scribble, INK, MUTED, GOLD, BIO, RED, GREEN, DARK,
 from swarm_mut import FX
 import icons as IC
 from paths import out
+from noise import value_noise
 
 S = 2
 WW, HH = 960, 540
@@ -1513,6 +1514,134 @@ def leader_comb(sc, x0, y, rows, key, hover):
     return pos, y + r * 1.5 * (len(rows) - 1) + 34
 
 
+def _portrait(sc, spec, fill):
+    """Refill the portrait's well with the leader's own material, then the leader back in it."""
+    x0, y0, x1, y1 = 24, 68, 294, 294
+    fill(sc, x0, y0, x1, y1)
+    put(sc, spec["sprite"], 159 + spec.get("dx", 0), 268, spec.get("sw", 40))
+
+
+def _rim(sc, col):
+    """The card's plate edged in the leader's colour."""
+    c = hexc(col)
+    for k in (0, 1):
+        sc.rgb[50 + k, 6:WW - 6] = c * (0.9 - 0.3 * k)
+        sc.rgb[HH - 7 - k, 6:WW - 6] = c * (0.9 - 0.3 * k)
+        sc.rgb[50:HH - 6, 6 + k] = c * (0.9 - 0.3 * k)
+        sc.rgb[50:HH - 6, WW - 7 - k] = c * (0.9 - 0.3 * k)
+
+
+def dress_matka(sc, spec):
+    """The Queen: her brood chamber — a well of amber wax comb, eggs heaped at its foot; honey running off the
+    beam; a clutch either side of her name."""
+    def fill(sc, x0, y0, x1, y1):
+        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+        t = np.clip((sc.yy - y0) / (y1 - y0), 0, 1)[..., None]
+        sc.rgb[m] = (hexc("#3a2008") * (1 - t) + hexc("#1a0e04") * t)[m]
+        R = 11
+        dx, dy = R * 1.5, R * np.sqrt(3)
+        rnd = np.random.RandomState(4)
+        for i in range(int((x1 - x0) / dx) + 2):                         # honey in some of the cells
+            for j in range(int((y1 - y0) / dy) + 2):
+                cx, cy = x0 + i * dx, y0 + j * dy + (dy / 2 if i % 2 else 0)
+                if rnd.rand() < 0.22:
+                    hx = np.maximum(np.abs(sc.xx - cx) * 0.866 + np.abs(sc.yy - cy) * 0.5, np.abs(sc.yy - cy))
+                    c = m & (hx <= R * 0.8)
+                    sc.rgb[c] = hexc("#7a4a0c")
+                    sc.rgb[c & (sc.yy < cy - 2) & (sc.xx < cx)] = hexc("#a8661a")
+        UI.comb(sc, m, x0, y0, hexc("#9a6a1c"), 0.85, R=R)
+        for (ex, ey) in ((50, 286), (62, 282), (74, 288), (240, 286), (254, 282), (266, 288), (56, 274), (258, 274)):
+            e = ((sc.xx - ex) / 6.0) ** 2 + ((sc.yy - ey) / 8.0) ** 2 <= 1
+            sc.rgb[e & m] = hexc("#cfe89a")
+            sc.rgb[e & m & (sc.xx < ex - 1) & (sc.yy < ey - 2)] = hexc("#f0ffd0")
+    _portrait(sc, spec, fill)
+    UI.drips(sc, 320, 760, 46, "#e0a830", n=8, seed=11, Lmax=20)
+    for x in (560, 600, 640):
+        icon(sc, "clutch", x, 10, 1)
+    _rim(sc, "#d0a030")
+
+
+def dress_razum(sc, spec):
+    """The Hive Mind: a well of violet dark, rings of psi spreading out from behind it, thought threads crossing;
+    sigils on the beam."""
+    import swarm_abilities as SA
+    def fill(sc, x0, y0, x1, y1):
+        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+        d = np.hypot(sc.xx - 159, sc.yy - 200) / 160.0
+        sc.rgb[m] = (hexc("#2a1048") * (1 - np.clip(d, 0, 1)[..., None]) + hexc("#0c0612") * np.clip(d, 0, 1)[..., None])[m]
+        for r in (40, 70, 100):
+            SA.ring(sc, 159, 200, r, r * 0.55, SA.PHERO, 0.5)
+        for a in np.linspace(0, 2 * np.pi, 7, endpoint=False):
+            SA.thread(sc, (159, 200), (int(159 + np.cos(a) * 130), int(200 + np.sin(a) * 90)), sag=-10, k=0.4)
+    _portrait(sc, spec, fill)
+    for x in (600, 690):
+        SA.sigil(sc, x, 22, 8)
+    _rim(sc, "#ac80ec")
+
+
+def dress_pozh(sc, spec):
+    """The Devourer: a well of raw red, gnawed bones lying in it; blood running off the beam; his jaws and his
+    table either side of his name."""
+    def fill(sc, x0, y0, x1, y1):
+        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+        t = np.clip((sc.yy - y0) / (y1 - y0), 0, 1)[..., None]
+        sc.rgb[m] = (hexc("#3a0a0c") * (1 - t) + hexc("#180406") * t)[m]
+        rnd = np.random.RandomState(21)
+        for _ in range(9):                                                # veins running through the meat
+            x, y = rnd.randint(x0, x1), rnd.randint(y0, y0 + 120)
+            for k in range(rnd.randint(30, 80)):
+                x += rnd.choice((-1, 0, 1)); y += 1 if rnd.rand() < 0.6 else 0
+                if x0 <= x < x1 and y0 <= y < y1:
+                    sc.rgb[y, x] = hexc("#5a1414")
+        for (bx, by, ang) in ((50, 280, 0.3), (250, 276, -0.4), (90, 290, -0.1), (220, 290, 0.2), (40, 250, 1.2)):
+            for k in range(-9, 10):
+                xx, yy = int(bx + np.cos(ang) * k), int(by + np.sin(ang) * k)
+                sc.rgb[yy:yy + 2, xx] = hexc("#d8ccb0")
+            for ex in (-10, 10):
+                xx, yy = int(bx + np.cos(ang) * ex), int(by + np.sin(ang) * ex)
+                sc.rgb[yy - 1:yy + 3, xx - 1:xx + 2] = hexc("#ece2c8")
+    _portrait(sc, spec, fill)
+    UI.drips(sc, 300, 760, 44, "#8a1a14", n=8, seed=13, Lmax=18)
+    icon(sc, "pozh", 590, 8, 2)
+    icon(sc, "m_table", 640, 12, 1)
+    _rim(sc, "#d0402e")
+
+
+def dress_kuk(sc, spec):
+    """The Plague: a well of sick green mist, spores drifting, fungus caps growing up its foot; spores on the
+    beam."""
+    def fill(sc, x0, y0, x1, y1):
+        m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+        t = np.clip((sc.yy - y0) / (y1 - y0), 0, 1)[..., None]
+        n = value_noise(sc.w, sc.h, 22, 5)
+        base = hexc("#0e160a") * (1 - t) + hexc("#1a2a0e") * t
+        sc.rgb[m] = (base * (0.8 + 0.5 * n[..., None]))[m]
+        for (gx, gy, r) in ((80, 120, 50), (230, 160, 60), (150, 250, 70)):      # clouds of spores
+            sc.glow(gx, gy, r, hexc("#88b040"), 0.18)
+        rnd = np.random.RandomState(9)
+        for _ in range(90):
+            px_, py_ = rnd.randint(x0 + 2, x1 - 2), rnd.randint(y0 + 2, y1 - 2)
+            sc.rgb[py_, px_] = hexc("#c8f070" if rnd.rand() < 0.3 else "#7a9a40")
+        for (fx, fy, r) in ((40, 292, 14), (62, 294, 8), (78, 293, 5), (262, 292, 16), (238, 294, 9), (222, 294, 5),
+                            (150, 296, 6), (30, 250, 7), (284, 240, 8)):
+            cap = (((sc.xx - fx) / r) ** 2 + ((sc.yy - fy) / (r * 0.6)) ** 2 <= 1) & (sc.yy <= fy)
+            sc.rgb[cap] = hexc("#5a7a2a")
+            sc.rgb[cap & (sc.yy < fy - r * 0.3)] = hexc("#86b040")
+            sc.rgb[cap & (sc.yy < fy - r * 0.45) & (sc.xx < fx - r * 0.2)] = hexc("#b8e070")
+            for k in range(3):
+                ox = int(fx + (k - 1) * r * 0.45)
+                sc.rgb[fy - int(r * 0.35), ox] = hexc("#e8f8c0")
+            sc.rgb[fy:fy + 5, fx - max(1, r // 6):fx + max(2, r // 6 + 1)] = hexc("#bea98a")
+    _portrait(sc, spec, fill)
+    for x, y in ((560, 12), (590, 24), (620, 10), (660, 22), (700, 14)):
+        sc.rgb[y - 1:y + 2, x - 1:x + 2] = hexc("#a8d060")
+    icon(sc, "kuk", 730, 8, 2)
+    _rim(sc, "#76a040")
+
+
+CARD_DRESS = {"МАТКА": dress_matka, "РАЗУМ УЛЬЯ": dress_razum, "ПОЖИРАТЕЛЬ": dress_pozh, "ЧУМА": dress_kuk}
+
+
 def big_card(spec, name, save=True):
     """A creature's card as big as the screen, as in Conquest of Elysium: the creature large on the left with where
     it came from; the numbers in a column; every attack in a column of its own — damage, type, reach, what it does
@@ -1649,6 +1778,8 @@ def big_card(spec, name, save=True):
         letters(sc, nm, tx0 + 12, ty0 + 8, "text", 16, col=col)
         fx_rows(sc, tx0 + 12, ty0 + 28, x1 - tx0 - 24, rows)
         cursor(sc, int(hx) - 30, int(hy) + 10)
+    if spec.get("title") in CARD_DRESS:
+        CARD_DRESS[spec["title"]](sc, spec)
     if not save:
         return sc
     img = sc.image(S)
