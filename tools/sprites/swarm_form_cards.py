@@ -5,7 +5,8 @@ beetle in bark with its galleries, a barrel over an acid pool, a woodlouse under
 tall grass, a mantis in leaves with an orchid, a firefly in a dark glade among other lights, a spitter in its web.
 The card's edge takes the form's colour, its icon sits on the wing.
 
-The numbers are the simulation's (sim/src/data.rs: swarm()), the abilities and weaknesses the concept's.
+The numbers are the simulation's (sim/src/data.rs: swarm()), the abilities and weaknesses the concept's —
+the spitter's too, since it is in the simulation (its sticky spit: Ability::Spit).
 
     python3 tools/sprites/swarm_form_cards.py   -> out/swarm_card_<form>.png, out/swarm_cards_forms.png
 """
@@ -304,6 +305,8 @@ FX_MORE = {   # the forms' abilities in terms (fxg.py), for the tooltip
     "Серпы": ["{атака} → {руб} ×2 за ход", "{всегда} → {инициатива:+2}"],
     "Одиночка": ["Стая → ✕"],
     "Вспышка": ["{каждые:3} → {радиус:1} враги {мимо}"],
+    "Липкий плевок": ["{каждые:2} → {дальность:3} {клей:1} {яд:1–4}", "{машина} → {клей:1}, {яд:✕}"],
+    "Слабый укус": ["вплотную → {урон:½} {дроб}", "между плевками не стреляет"],
     "Светится": ["{всегда} → стрелки бьют его первым"],
 }
 
@@ -316,6 +319,9 @@ def worker(hp, armor="0 {хитин}", speed="3"):
 def soldier(hp, armor="2 {хитин}", speed="2"):
     return [("здоровье", str(hp)), ("броня", armor), ("скорость", speed), ("боевой дух", "9"), ("размер", "2"),
             ("предел роя", "3")]
+
+
+SPITTER_HP = 12         # sim/src/data.rs SWARM_HP, the spitter's worker
 
 
 SPECS = [   # form, seed, caste, how big, stats, attacks, its own abilities, armour class, how many, killed
@@ -337,6 +343,9 @@ SPECS = [   # form, seed, caste, how big, stats, attacks, its own abilities, arm
      [("scythes", "форма", "Серпы", "", GOLD), ("fear", "слабость", "Одиночка", "", RED)], "хитин", 2, 7),
     ("firefly", 95, "рабочая", 4.4, worker(8), [("firefly", "Укус", "1–4", "{кол}", "1", "")],
      [("firefly", "форма", "Вспышка", "", GOLD), ("fear", "слабость", "Светится", "", RED)], "хитин", 3, 2),
+    ("spitter", 97, "рабочая", 4.0, worker(SPITTER_HP), [("spitter", "Плевок", "—", "{яд}", "3", "{каждые:2} → {клей:1} {яд:1–4}"),
+                                                         ("spitter", "Укус", "1–3", "{дроб}", "1", "")],
+     [("spitter", "форма", "Липкий плевок", "", GOLD), ("fear", "слабость", "Слабый укус", "", RED)], "хитин", 3, 5),
 ]
 
 
@@ -350,7 +359,8 @@ def card(form, seed, caste, k, stats, attacks, own, armor, n, killed, save=True)
                 stats=stats, attacks=attacks,
                 below=("ПОТОМКАМ", [("ant" if form is None else form, nm if form is None else
                                      {"wings": "Крылья", "acid": "Кислотная железа", "horn": "Рог", "carapace": "Панцирь",
-                                      "jumper": "Прыгучие ноги", "scythes": "Серпы", "firefly": "Светящееся брюшко"}[form],
+                                      "jumper": "Прыгучие ноги", "scythes": "Серпы", "firefly": "Светящееся брюшко",
+                                      "spitter": "Клейкие железы"}[form],
                                      "{наследие}", GOLD)]),
                 abilities=abilities, hover=None)
     sc = SH.big_card(spec, None, save=False)

@@ -261,9 +261,10 @@ pub enum Form {
     Grasshopper,
     Mantis,
     Firefly,
+    Spitter,
 }
 
-pub const FORMS: [Form; 9] = [
+pub const FORMS: [Form; 10] = [
     Form::Ant,
     Form::Wasp,
     Form::Scorpion,
@@ -273,6 +274,7 @@ pub const FORMS: [Form; 9] = [
     Form::Grasshopper,
     Form::Mantis,
     Form::Firefly,
+    Form::Spitter,
 ];
 
 impl Form {
@@ -287,15 +289,16 @@ impl Form {
             Form::Grasshopper => "Кузнечик",
             Form::Mantis => "Богомол",
             Form::Firefly => "Светляк",
+            Form::Spitter => "Паук-плевун",
         }
     }
 }
 
 /// Health of each form by caste (see the `swarm` tool for what each is worth).
-pub const SWARM_HP: [[i32; 9]; 2] = [
-    // Ant Wasp Scorp Barrel Beetle Isopod Grass Mantis Firefly
-    [8, 8, 8, 11, 8, 8, 8, 7, 8],
-    [14, 11, 14, 19, 12, 11, 14, 11, 14],
+pub const SWARM_HP: [[i32; 10]; 2] = [
+    // Ant Wasp Scorp Barrel Beetle Isopod Grass Mantis Firefly Spitter
+    [8, 8, 8, 11, 8, 8, 8, 7, 8, 12],
+    [14, 11, 14, 19, 12, 11, 14, 11, 14, 15],
 ];
 
 pub fn swarm(c: Caste, f: Form) -> Template {
@@ -353,6 +356,11 @@ pub fn swarm(c: Caste, f: Form) -> Template {
             t.traits.push(Trait::Glow);
             t.bonus -= 1;
             t.abilities.push(Ability::Flash { every: 3 });
+        }
+        Form::Spitter => {
+            t.range = 3;
+            t.traits.push(Trait::Spitter);
+            t.abilities.push(Ability::Spit { every: 2, die: if big { 6 } else { 4 } });
         }
     }
     t

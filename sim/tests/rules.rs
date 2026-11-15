@@ -86,3 +86,32 @@ fn caster_spell_and_short_circuit() {
     }
     assert!(bt.units[m].silenced_until > 0, "acid shorts the windings");
 }
+
+#[test]
+fn spit_glues_and_poisons_but_not_machines() {
+    // a spitter three cells from a worker and from a Guard: on round 2 it spits at one of them
+    let mut bt = Battle::new(5).with_log();
+    let sp = bt.place(1, swarm(Caste::Worker, Form::Spitter), 12, 5);
+    let w = bt.place(0, rabochaya(), 9, 5);
+    for _ in 0..2 {
+        bt.step();
+    }
+    let log = bt.log.clone().unwrap();
+    let glued = log.iter().find_map(|e| if let Event::Glue { t } = e { Some(*t) } else { None });
+    assert_eq!(glued, Some(w), "the spit lands on the worker within range");
+    let (x0, y0) = (bt.units[w].x, bt.units[w].y);
+    bt.step(); // round 3: glued — it cannot walk toward the spider
+    assert_eq!((bt.units[w].x, bt.units[w].y), (x0, y0));
+    assert!(bt.units[w].poison > 0 || bt.units[w].hp < bt.units[w].t.hp, "the poison takes hold");
+    let _ = sp;
+    // a machine: glued all the same, no poison
+    let mut bt = Battle::new(5).with_log();
+    bt.place(1, swarm(Caste::Worker, Form::Spitter), 14, 5);
+    let g = bt.place(0, strazh(), 9, 4);
+    for _ in 0..2 {
+        bt.step();
+    }
+    let log = bt.log.clone().unwrap();
+    assert!(log.iter().any(|e| matches!(e, Event::Glue { t } if *t == g)), "the glue holds a machine too");
+    assert_eq!(bt.units[g].poison, 0, "poison does nothing to a machine");
+}

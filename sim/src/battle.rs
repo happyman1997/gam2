@@ -118,6 +118,8 @@ pub struct Unit {
     pub silenced_until: u32,
     /// Hits twice as hard in this round (Перегрузка).
     pub overloaded: u32,
+    /// Glued to its cell: cannot walk up to and including this round (Плевок паука).
+    pub glued_until: u32,
 }
 
 impl Unit {
@@ -145,6 +147,7 @@ pub enum Event {
     Summon { u: usize },
     Mark { t: usize },
     Blind { t: usize },
+    Glue { t: usize },
 }
 
 #[derive(Clone, Debug)]
@@ -360,6 +363,7 @@ impl Battle {
             curled: false,
             silenced_until: 0,
             overloaded: 0,
+            glued_until: 0,
         });
         id
     }
@@ -517,7 +521,7 @@ impl Battle {
         }
         for step in 1..=3u32 {
             for i in 0..self.units.len() {
-                if !self.units[i].present() || self.units[i].t.speed < step {
+                if !self.units[i].present() || self.units[i].t.speed < step || self.units[i].glued_until >= self.round {
                     continue;
                 }
                 if self.units[i].t.has(Trait::Flyer) && !self.units[i].fleeing {
@@ -772,6 +776,16 @@ impl Battle {
                         return;
                     }
                 }
+                Ability::Spit { every, die } if round % every == 0 => {
+                    if let Some(tj) = self.ranged_target(i, self.units[i].t.range) {
+                        self.units[tj].glued_until = round + 1;
+                        if !self.units[tj].t.has(Trait::PoisonImmune) {
+                            self.units[tj].poison += self.rng.die(die) as i32;
+                        }
+                        self.ev(Event::Glue { t: tj });
+                        return;
+                    }
+                }
                 Ability::Brood { every, n } if round % every == 0 => {
                     let (side, x, y) = (self.units[i].side, self.units[i].x, self.units[i].y);
                     for _ in 0..n {
@@ -865,6 +879,9 @@ impl Battle {
                     hits.push(Hit { attacker: i, target: adj[0], raw, dmg: Dmg::Blunt, probivnoy, melee: true, ..Default::default() });
                 }
                 return;
+            }
+            if self.units[i].t.has(Trait::Spitter) {
+                return; // between its spits the spider does not shoot
             }
             let Some(j) = self.ranged_target(i, range) else { return };
             let mut raw = self.rng.damage(die, bonus);

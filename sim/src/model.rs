@@ -152,6 +152,8 @@ pub enum Trait {
     Infects,
     /// Cuckoo: in the first round one allied worker appears in the enemy's rear («Подкидыш»).
     Changeling,
+    /// Spitter: no shot between its spits; whoever reaches it gets only a weak bite («слабый укус»).
+    Spitter,
 }
 
 /// Abilities with a condition.
@@ -174,6 +176,9 @@ pub enum Ability {
     Intercept,
     /// Every `every` rounds, instead of attacking: adjacent enemies miss next round (Светляк).
     Flash { every: u32 },
+    /// Every `every` rounds, instead of attacking: sticky poison on an enemy within its range — glued to its
+    /// cell next round (it can hit, it can't walk; machines too) and `1–die` poison (not machines) (Паук-плевун).
+    Spit { every: u32, die: u32 },
     /// Every `every` rounds: `n` larvae (workers) hatch next to it; they act from the next round (Матка).
     Brood { every: u32, n: u32 },
     /// Every `every` rounds: marks the most dangerous enemy; allies who reach it hit it first, +1 (Разум улья).
