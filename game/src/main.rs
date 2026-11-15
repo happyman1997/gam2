@@ -1,0 +1,117 @@
+//! gam2, the tech demo: one battle — the Inventor's start against the Devourer's — run by the simulation and played
+//! back with the game's pixel art at 960×540, scaled by a whole factor.
+//!
+//!   cargo run -p game --release                       a window (Space pause, Tab speed, End to the end, R new battle)
+//!   cargo run -p game --release -- --shot 120 a.png   frame 120 to a PNG (×2), no window needed
+//!   cargo run -p game --release -- --strip out.png    a strip of frames across the battle, for a look
+//!   cargo run -p game --release -- --frames dir 2     every 2nd frame of the battle to dir/0000.png…
+
+mod assets;
+mod gfx;
+mod playback;
+mod render;
+#[cfg(feature = "window")]
+mod window;
+
+use std::path::Path;
+
+pub struct Demo {
+    pub assets: assets::Assets,
+    pub rec: playback::Record,
+    pub sparks: (Vec<playback::Number>, Vec<playback::Effect>),
+    pub view: render::View,
+}
+
+impl Demo {
+    pub fn new(seed: u64) -> Result<Self, String> {
+        let assets = assets::Assets::load()?;
+        let rec = playback::record(seed);
+        let sparks = rec.sparks();
+        Ok(Demo { assets, rec, sparks, view: render::View { frame: 0.0, speed: 1, paused: false } })
+    }
+
+    pub fn restart(&mut self, seed: u64) {
+        self.rec = playback::record(seed);
+        self.sparks = self.rec.sparks();
+        self.view.frame = 0.0;
+    }
+
+    /// One tick of 1/24 s.
+    pub fn tick(&mut self) {
+        if !self.view.paused {
+            self.view.frame = (self.view.frame + self.view.speed as f32).min((self.rec.frames() + 24) as f32);
+        }
+    }
+
+    pub fn draw(&self, cv: &mut gfx::Image) {
+        render::draw(cv, &self.assets, &self.rec, &self.sparks, &self.view);
+    }
+}
+
+fn scaled(cv: &gfx::Image, k: i32) -> gfx::Image {
+    let mut out = gfx::Image::new(cv.w * k, cv.h * k);
+    for y in 0..out.h {
+        for x in 0..out.w {
+            out.px[(y * out.w + x) as usize] = cv.get(x / k, y / k);
+        }
+    }
+    out
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let seed = args.iter().position(|a| a == "--seed").and_then(|i| args.get(i + 1)).and_then(|s| s.parse().ok()).unwrap_or(7);
+    let mut demo = match Demo::new(seed) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("не загрузились ресурсы: {e}");
+            std::process::exit(1);
+        }
+    };
+    if let Some(i) = args.iter().position(|a| a == "--shot") {
+        let f: f32 = args.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+        let path = args.get(i + 2).cloned().unwrap_or_else(|| "shot.png".into());
+        demo.view.frame = if f < 0.0 { (demo.rec.frames() + 24) as f32 } else { f };
+        let mut cv = gfx::Image::new(render::W, render::H);
+        demo.draw(&mut cv);
+        scaled(&cv, 2).save(Path::new(&path)).expect("save");
+        println!("{path}: frame {} of {}, rounds {}, winner {:?}", demo.view.frame, demo.rec.frames(), demo.rec.rounds.len(), demo.rec.outcome.winner);
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--strip") {
+        let path = args.get(i + 1).cloned().unwrap_or_else(|| "strip.png".into());
+        let total = demo.rec.frames() + 24;
+        let picks: Vec<i32> = (0..6).map(|k| k * (total - 1) / 5).collect();
+        let mut strip = gfx::Image::new(render::W * 2, render::H * 3);
+        for (n, &fr) in picks.iter().enumerate() {
+            demo.view.frame = fr as f32;
+            let mut cv = gfx::Image::new(render::W, render::H);
+            demo.draw(&mut cv);
+            strip.blit(&cv, (n as i32 % 2) * render::W, (n as i32 / 2) * render::H, false, 1.0);
+        }
+        strip.save(Path::new(&path)).expect("save");
+        println!("{path}: frames {picks:?}, rounds {}, winner {:?}", demo.rec.rounds.len(), demo.rec.outcome.winner);
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--frames") {
+        // every `step`-th frame of the whole battle at ×1, for a GIF
+        let dir = args.get(i + 1).cloned().unwrap_or_else(|| "frames".into());
+        let step: i32 = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(2);
+        std::fs::create_dir_all(&dir).expect("dir");
+        let total = demo.rec.frames() + 24;
+        let mut n = 0;
+        for fr in (0..total).step_by(step as usize) {
+            demo.view.frame = fr as f32;
+            let mut cv = gfx::Image::new(render::W, render::H);
+            demo.draw(&mut cv);
+            cv.save(&Path::new(&dir).join(format!("{n:04}.png"))).expect("save");
+            n += 1;
+        }
+        println!("{dir}: {n} frames");
+        return;
+    }
+    #[cfg(feature = "window")]
+    window::run(demo, seed);
+    #[cfg(not(feature = "window"))]
+    eprintln!("собрано без окна: --shot N file.png или --strip file.png");
+}

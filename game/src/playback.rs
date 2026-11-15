@@ -1,0 +1,279 @@
+//! The battle as the game shows it: the simulation runs it round by round (sim: two armies and a seed in, events
+//! out), and the playback turns each round into frames — first everyone walks, then the blows land one after
+//! another, each with its effect and its number; the killed lie where they fell.
+
+use sim::data::{start_izobretatel, start_pozhiratel};
+use sim::model::Trait;
+use sim::{Battle, Event, Outcome};
+
+pub const FR: i32 = 30; // frames a round takes at ×1 (24 fps)
+pub const MOVE: i32 = 10; // of them, walking
+pub const CW: f32 = 50.0;
+pub const CH: f32 = 34.0;
+pub const X0: f32 = 30.0;
+pub const Y0: f32 = 46.0;
+
+#[derive(Clone)]
+pub struct UnitInfo {
+    pub name: String,
+    pub side: u8,
+    pub fp: i32,
+    pub max_hp: i32,
+    pub leader: bool,
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct State {
+    pub x: i32,
+    pub y: i32,
+    pub present: bool,
+    pub alive: bool,
+    pub hp: i32,
+    pub growth: u32,
+}
+
+pub struct Round {
+    pub before: Vec<State>,
+    pub after: Vec<State>,
+    pub events: Vec<Event>,
+}
+
+pub struct Record {
+    pub units: Vec<UnitInfo>,
+    pub rounds: Vec<Round>,
+    pub outcome: Outcome,
+    pub seed: u64,
+}
+
+fn states(bt: &Battle) -> Vec<State> {
+    bt.units
+        .iter()
+        .map(|u| State { x: u.x, y: u.y, present: u.on_field, alive: u.alive, hp: u.hp, growth: u.growth })
+        .collect()
+}
+
+fn infos(bt: &Battle) -> Vec<UnitInfo> {
+    bt.units
+        .iter()
+        .map(|u| UnitInfo {
+            name: u.t.name.to_string(),
+            side: u.side,
+            fp: u.fp(),
+            max_hp: u.t.hp,
+            // the Foundry's human leaders don't carry the Leader trait in the simulation yet; the game knows them
+            leader: u.t.has(Trait::Leader) || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
+        })
+        .collect()
+}
+
+/// The demo's battle: the Inventor's start (left) against the Devourer's (right).
+pub fn record(seed: u64) -> Record {
+    let mut bt = Battle::new(seed).with_log();
+    bt.add_armies(&start_izobretatel(), &start_pozhiratel());
+    let mut rounds = vec![];
+    let outcome = loop {
+        let before = states(&bt);
+        let n0 = bt.log.as_ref().map(|l| l.len()).unwrap_or(0);
+        let done = bt.step();
+        let mut before = before;
+        let after = states(&bt);
+        while before.len() < after.len() {
+            let mut s = after[before.len()]; // born this round: it appears where it hatched
+            s.present = false;
+            before.push(s);
+        }
+        let events = bt.log.as_ref().map(|l| l[n0..].to_vec()).unwrap_or_default();
+        rounds.push(Round { before, after, events });
+        if let Some(o) = done {
+            break o;
+        }
+    };
+    Record { units: infos(&bt), rounds, outcome, seed }
+}
+
+/// What a frame shows of one unit.
+pub struct Shown {
+    pub id: usize,
+    pub x: f32,
+    pub y: f32,
+    pub pose: Pose,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Pose {
+    Idle,
+    Attack,
+    Dead,
+}
+
+/// Something that happens at a moment in a round: a blow, a kill, a heal, a summon...
+pub struct Moment {
+    pub frame: i32,
+    pub ev: Event,
+}
+
+pub enum NumStyle {
+    Hit,
+    Crit,
+    Hurt,
+    Heal,
+    Poison,
+    Miss,
+}
+
+pub struct Number {
+    pub text: String,
+    pub style: NumStyle,
+    pub x: f32,
+    pub y: f32,
+    pub start: i32,
+}
+
+pub struct Effect {
+    pub name: &'static str,
+    pub x: f32,
+    pub y: f32,
+    pub start: i32,
+}
+
+impl Record {
+    pub fn frames(&self) -> i32 {
+        self.rounds.len() as i32 * FR
+    }
+
+    /// When each event of a round lands: the walk first, then the blows one after another.
+    pub fn moments(&self, r: usize) -> Vec<Moment> {
+        let evs: Vec<&Event> = self.rounds[r].events.iter().filter(|e| !matches!(e, Event::Round(_) | Event::Move { .. })).collect();
+        let n = evs.len().max(1) as i32;
+        let span = FR - MOVE - 4;
+        evs.into_iter()
+            .enumerate()
+            .map(|(k, e)| Moment { frame: r as i32 * FR + MOVE + 2 + span * k as i32 / n, ev: e.clone() })
+            .collect()
+    }
+
+    /// The ground point of a unit standing at (x, y) with footprint fp.
+    pub fn spot(x: i32, y: i32, fp: i32) -> (f32, f32) {
+        (X0 + (x as f32 + fp as f32 / 2.0) * CW, Y0 + (y as f32 + fp as f32 * 0.72) * CH)
+    }
+
+    /// Every unit as frame f shows it: where it stands (walking in the first part of a round), its pose; the
+    /// killed lie where they fell, the fled are gone.
+    pub fn shown(&self, f: i32) -> Vec<Shown> {
+        let f = f.clamp(0, self.frames() - 1);
+        let r = (f / FR) as usize;
+        let ph = f % FR;
+        let round = &self.rounds[r];
+        let ms = self.moments(r);
+        let mut out = vec![];
+        let t = (ph as f32 / MOVE as f32).min(1.0);
+        let e = 1.0 - (1.0 - t) * (1.0 - t);
+        for (id, info) in self.units.iter().enumerate() {
+            let (b, a) = (round.before[id], round.after[id]);
+            let killed_at = ms.iter().find(|m| matches!(m.ev, Event::Kill { t } if t == id)).map(|m| m.frame);
+            let born_at = ms.iter().find(|m| matches!(m.ev, Event::Summon { u } if u == id)).map(|m| m.frame);
+            if !b.alive && !a.alive {
+                let (x, y) = Self::spot(a.x, a.y, info.fp); // killed earlier: it lies where it fell
+                out.push(Shown { id, x, y, pose: Pose::Dead });
+                continue;
+            }
+            if !b.present && !a.present {
+                continue; // fled off the field
+            }
+            if let Some(bf) = born_at {
+                if f < bf {
+                    continue;
+                }
+            }
+            let (bx, by) = Self::spot(b.x, b.y, info.fp);
+            let (ax, ay) = Self::spot(a.x, a.y, info.fp);
+            let (x, y) = (bx + (ax - bx) * e, by + (ay - by) * e);
+            let dead = killed_at.map(|k| f >= k).unwrap_or(false) || (!a.alive && killed_at.is_none() && ph >= MOVE);
+            if !a.present && !dead && ph >= MOVE {
+                continue;
+            }
+            let attacking = ms.iter().any(|m| matches!(m.ev, Event::Hit { a: at, .. } if at == id) && (f - m.frame).abs() <= 4);
+            let pose = if dead { Pose::Dead } else if attacking { Pose::Attack } else { Pose::Idle };
+            out.push(Shown { id, x, y, pose });
+        }
+        out
+    }
+
+    /// The hp and growth of a unit as frame f shows them (after the round's blows once they have landed).
+    pub fn state_at(&self, id: usize, f: i32) -> State {
+        let f = f.clamp(0, self.frames() - 1);
+        let r = (f / FR) as usize;
+        if f % FR >= FR - 4 {
+            self.rounds[r].after[id]
+        } else {
+            self.rounds[r].before[id]
+        }
+    }
+
+    /// The numbers and effects of the whole battle, each with the frame it starts on.
+    pub fn sparks(&self) -> (Vec<Number>, Vec<Effect>) {
+        let mut nums = vec![];
+        let mut fx = vec![];
+        for r in 0..self.rounds.len() {
+            let after = &self.rounds[r].after;
+            let mut last_volley: Option<(usize, i32)> = None;
+            for m in self.moments(r) {
+                let at = |id: usize| {
+                    let s = after[id];
+                    Self::spot(s.x, s.y, self.units[id].fp)
+                };
+                match m.ev {
+                    Event::Hit { a, t, dmg } => {
+                        let (x, y) = at(t);
+                        let att = &self.units[a];
+                        let swarm_hits = att.side == 1;
+                        let style = if dmg <= 0 {
+                            NumStyle::Miss
+                        } else if swarm_hits && dmg >= 10 {
+                            NumStyle::Crit
+                        } else if swarm_hits {
+                            NumStyle::Hit
+                        } else {
+                            NumStyle::Hurt
+                        };
+                        let text = match style {
+                            NumStyle::Miss => "мимо".to_string(),
+                            NumStyle::Crit => format!("{dmg}!"),
+                            NumStyle::Hurt => format!("-{dmg}"),
+                            _ => format!("{dmg}"),
+                        };
+                        nums.push(Number { text, style, x, y: y - 40.0, start: m.frame });
+                        let name: &'static str = match att.name.as_str() {
+                            "Мудрец" | "Изобретатель" => "zap-hit",
+                            "Орудие" => {
+                                // a volley: one blast over the cell for all the hits it makes at once
+                                if last_volley.map(|(v, fr)| v == a && (m.frame - fr) < 6).unwrap_or(false) {
+                                    continue;
+                                }
+                                last_volley = Some((a, m.frame));
+                                "small-explosion"
+                            }
+                            _ => "hit-spark",
+                        };
+                        fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame });
+                    }
+                    Event::Heal { t, amount, .. } => {
+                        let (x, y) = at(t);
+                        nums.push(Number { text: format!("+{amount}"), style: NumStyle::Heal, x, y: y - 44.0, start: m.frame });
+                        fx.push(Effect { name: "heal", x, y, start: m.frame });
+                    }
+                    Event::Poison { t, dmg } | Event::Burn { t, dmg } => {
+                        let (x, y) = at(t);
+                        nums.push(Number { text: format!("{dmg}"), style: NumStyle::Poison, x: x + 10.0, y: y - 36.0, start: m.frame });
+                    }
+                    Event::Absorbed { t } => {
+                        let (x, y) = at(t);
+                        nums.push(Number { text: "мимо".into(), style: NumStyle::Miss, x, y: y - 40.0, start: m.frame });
+                    }
+                    _ => {}
+                }
+            }
+        }
+        (nums, fx)
+    }
+}

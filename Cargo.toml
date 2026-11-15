@@ -1,5 +1,5 @@
 [workspace]
-members = ["sim"]
+members = ["sim", "game"]
 resolver = "2"
 
 [profile.release]
