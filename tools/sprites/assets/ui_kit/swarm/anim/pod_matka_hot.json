@@ -1,0 +1,566 @@
+{
+ "frames": [
+  {
+   "filename": "pod_matka_hot 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 1",
+   "frame": {
+    "x": 280,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 2",
+   "frame": {
+    "x": 560,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 3",
+   "frame": {
+    "x": 840,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 4",
+   "frame": {
+    "x": 1120,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 5",
+   "frame": {
+    "x": 1400,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 6",
+   "frame": {
+    "x": 1680,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 7",
+   "frame": {
+    "x": 1960,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 8",
+   "frame": {
+    "x": 0,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 9",
+   "frame": {
+    "x": 280,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 10",
+   "frame": {
+    "x": 560,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 11",
+   "frame": {
+    "x": 840,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 12",
+   "frame": {
+    "x": 1120,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 13",
+   "frame": {
+    "x": 1400,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 14",
+   "frame": {
+    "x": 1680,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 15",
+   "frame": {
+    "x": 1960,
+    "y": 320,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 16",
+   "frame": {
+    "x": 0,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 17",
+   "frame": {
+    "x": 280,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 18",
+   "frame": {
+    "x": 560,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 19",
+   "frame": {
+    "x": 840,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 20",
+   "frame": {
+    "x": 1120,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 21",
+   "frame": {
+    "x": 1400,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 22",
+   "frame": {
+    "x": 1680,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  },
+  {
+   "filename": "pod_matka_hot 23",
+   "frame": {
+    "x": 1960,
+    "y": 640,
+    "w": 280,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 280,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 280,
+    "h": 320
+   },
+   "duration": 83
+  }
+ ],
+ "meta": {
+  "app": "gam2 tools/sprites",
+  "version": "1",
+  "image": "pod_matka_hot.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 2240,
+   "h": 960
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "pod_matka_hot",
+    "from": 0,
+    "to": 23,
+    "direction": "forward"
+   }
+  ],
+  "pixelfx": {
+   "id": "pod_matka_hot",
+   "fps": 12,
+   "loop": true,
+   "frames": 24,
+   "frameSize": [
+    280,
+    320
+   ],
+   "pivot": [
+    140,
+    160
+   ],
+   "columns": 8
+  }
+ }
+}

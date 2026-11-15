@@ -1,0 +1,170 @@
+{
+ "frames": [
+  {
+   "filename": "button_eaten 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 228,
+    "h": 70
+   },
+   "duration": 62
+  },
+  {
+   "filename": "button_eaten 1",
+   "frame": {
+    "x": 228,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 228,
+    "h": 70
+   },
+   "duration": 62
+  },
+  {
+   "filename": "button_eaten 2",
+   "frame": {
+    "x": 456,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 228,
+    "h": 70
+   },
+   "duration": 62
+  },
+  {
+   "filename": "button_eaten 3",
+   "frame": {
+    "x": 684,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 228,
+    "h": 70
+   },
+   "duration": 62
+  },
+  {
+   "filename": "button_eaten 4",
+   "frame": {
+    "x": 912,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 228,
+    "h": 70
+   },
+   "duration": 62
+  },
+  {
+   "filename": "button_eaten 5",
+   "frame": {
+    "x": 1140,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 228,
+    "h": 70
+   },
+   "sourceSize": {
+    "w": 228,
+    "h": 70
+   },
+   "duration": 62
+  }
+ ],
+ "meta": {
+  "app": "gam2 tools/sprites",
+  "version": "1",
+  "image": "button_eaten.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 1368,
+   "h": 70
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "button_eaten",
+    "from": 0,
+    "to": 5,
+    "direction": "forward"
+   }
+  ],
+  "pixelfx": {
+   "id": "button_eaten",
+   "fps": 16,
+   "loop": false,
+   "frames": 6,
+   "frameSize": [
+    228,
+    70
+   ],
+   "pivot": [
+    0,
+    0
+   ],
+   "columns": 6
+  }
+ }
+}

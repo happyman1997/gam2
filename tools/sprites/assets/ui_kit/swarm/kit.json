@@ -1569,6 +1569,386 @@
      "edge": "#286e28"
     }
    }
+  },
+  "niche_ant": {
+   "file": "niche_ant.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Муравей: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #b0703a"
+  },
+  "niche_wasp": {
+   "file": "niche_wasp.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Оса: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #e0c040"
+  },
+  "niche_scorpion": {
+   "file": "niche_scorpion.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Скорпион: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #d08a3a"
+  },
+  "niche_beetle": {
+   "file": "niche_beetle.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Жук: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #8aa040"
+  },
+  "niche_barrel": {
+   "file": "niche_barrel.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Бочонок: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #9ae030"
+  },
+  "niche_isopod": {
+   "file": "niche_isopod.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Мокрица: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #8a96a8"
+  },
+  "niche_grasshopper": {
+   "file": "niche_grasshopper.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Кузнечик: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #a8b040"
+  },
+  "niche_mantis": {
+   "file": "niche_mantis.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Богомол: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #e080b0"
+  },
+  "niche_firefly": {
+   "file": "niche_firefly.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Светлячок: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #e8f070"
+  },
+  "niche_spitter": {
+   "file": "niche_spitter.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "Паук-плевун: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; the card's edge #d8d0c0"
+  },
+  "material_matka_well": {
+   "file": "material_matka_well.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "the leader's card: its portrait well"
+  },
+  "material_matka_chamber": {
+   "file": "material_matka_chamber.png",
+   "size": [
+    652,
+    410
+   ],
+   "use": "the development's chamber, multiplied ×0.42"
+  },
+  "material_matka_chamber_1280": {
+   "file": "material_matka_chamber_1280.png",
+   "size": [
+    972,
+    590
+   ],
+   "use": "the same on the 1280×720 canvas"
+  },
+  "vessel_matka_rest": {
+   "file": "vessel_matka_rest.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "vessel_matka_hot": {
+   "file": "vessel_matka_hot.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "pod_matka_rest": {
+   "file": "pod_matka_rest.png",
+   "size": [
+    280,
+    320
+   ],
+   "pivot": [
+    140,
+    160
+   ],
+   "use": "the development: the leader with that growth inside, its base at (cx + 2, cy + 64)"
+  },
+  "bed_matka": {
+   "file": "bed_matka.png",
+   "size": [
+    120,
+    32
+   ],
+   "pivot": [
+    60,
+    20
+   ],
+   "use": "under a creature in the camp (w 40) and the evolution (w 50): its feet at the pivot"
+  },
+  "material_razum_well": {
+   "file": "material_razum_well.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "the leader's card: its portrait well"
+  },
+  "material_razum_chamber": {
+   "file": "material_razum_chamber.png",
+   "size": [
+    652,
+    410
+   ],
+   "use": "the development's chamber, multiplied ×0.42"
+  },
+  "material_razum_chamber_1280": {
+   "file": "material_razum_chamber_1280.png",
+   "size": [
+    972,
+    590
+   ],
+   "use": "the same on the 1280×720 canvas"
+  },
+  "vessel_razum_rest": {
+   "file": "vessel_razum_rest.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "vessel_razum_hot": {
+   "file": "vessel_razum_hot.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "pod_razum_rest": {
+   "file": "pod_razum_rest.png",
+   "size": [
+    280,
+    320
+   ],
+   "pivot": [
+    140,
+    160
+   ],
+   "use": "the development: the leader with that growth inside, its base at (cx + 2, cy + 64)"
+  },
+  "bed_razum": {
+   "file": "bed_razum.png",
+   "size": [
+    120,
+    32
+   ],
+   "pivot": [
+    60,
+    20
+   ],
+   "use": "under a creature in the camp (w 40) and the evolution (w 50): its feet at the pivot"
+  },
+  "material_pozh_well": {
+   "file": "material_pozh_well.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "the leader's card: its portrait well"
+  },
+  "material_pozh_chamber": {
+   "file": "material_pozh_chamber.png",
+   "size": [
+    652,
+    410
+   ],
+   "use": "the development's chamber, multiplied ×0.42"
+  },
+  "material_pozh_chamber_1280": {
+   "file": "material_pozh_chamber_1280.png",
+   "size": [
+    972,
+    590
+   ],
+   "use": "the same on the 1280×720 canvas"
+  },
+  "vessel_pozh_rest": {
+   "file": "vessel_pozh_rest.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "vessel_pozh_hot": {
+   "file": "vessel_pozh_hot.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "pod_pozh_rest": {
+   "file": "pod_pozh_rest.png",
+   "size": [
+    280,
+    320
+   ],
+   "pivot": [
+    140,
+    160
+   ],
+   "use": "the development: the leader with that growth inside, its base at (cx + 2, cy + 64)"
+  },
+  "bed_pozh": {
+   "file": "bed_pozh.png",
+   "size": [
+    120,
+    32
+   ],
+   "pivot": [
+    60,
+    20
+   ],
+   "use": "under a creature in the camp (w 40) and the evolution (w 50): its feet at the pivot"
+  },
+  "material_kuk_well": {
+   "file": "material_kuk_well.png",
+   "size": [
+    270,
+    226
+   ],
+   "use": "the leader's card: its portrait well"
+  },
+  "material_kuk_chamber": {
+   "file": "material_kuk_chamber.png",
+   "size": [
+    652,
+    410
+   ],
+   "use": "the development's chamber, multiplied ×0.42"
+  },
+  "material_kuk_chamber_1280": {
+   "file": "material_kuk_chamber_1280.png",
+   "size": [
+    972,
+    590
+   ],
+   "use": "the same on the 1280×720 canvas"
+  },
+  "vessel_kuk_rest": {
+   "file": "vessel_kuk_rest.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "vessel_kuk_hot": {
+   "file": "vessel_kuk_hot.png",
+   "size": [
+    92,
+    92
+   ],
+   "pivot": [
+    46,
+    46
+   ],
+   "use": "the camp: an offer's icon ×2 at its middle (−16, −12)"
+  },
+  "pod_kuk_rest": {
+   "file": "pod_kuk_rest.png",
+   "size": [
+    280,
+    320
+   ],
+   "pivot": [
+    140,
+    160
+   ],
+   "use": "the development: the leader with that growth inside, its base at (cx + 2, cy + 64)"
+  },
+  "bed_kuk": {
+   "file": "bed_kuk.png",
+   "size": [
+    120,
+    32
+   ],
+   "pivot": [
+    60,
+    20
+   ],
+   "use": "under a creature in the camp (w 40) and the evolution (w 50): its feet at the pivot"
+  },
+  "animations": {
+   "dir": "anim",
+   "sheets": [
+    "button_eaten",
+    "lantern_off",
+    "pod_matka_hot",
+    "pod_razum_hot",
+    "pod_pozh_hot",
+    "pod_kuk_hot"
+   ],
+   "note": "each a sheet and its JSON (frames, fps, loop, pivot), as tools/sprites/assets/ui_anim"
   }
  },
  "slicing": "9-slice: corners as they are, edges and middle repeat tile_x / tile_y of the source, cut at the far end; 3-slice: the same along x only. pad — transparent margin kept for halos.",

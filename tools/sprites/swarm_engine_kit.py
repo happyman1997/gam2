@@ -195,6 +195,85 @@ def run_pieces():
                                             for k, v in SM.NUM.items()})
 
 
+# ---------------------------------------------------------------- the screens' scenery: niches, materials, vessels
+LEADERS = ("Матка", "Разум улья", "Пожиратель", "Чума")
+
+
+def opaque(draw, w, h, crop=None):
+    """A piece with no transparency (a background): drawn on a scene, cropped."""
+    sc = Scene(*((crop[2], crop[3]) if crop else (w, h)))
+    draw(sc)
+    a = np.clip(sc.rgb, 0, 255).astype(np.uint8)
+    if crop:
+        a = a[crop[1]:crop[1] + h, crop[0]:crop[0] + w]
+    return Image.fromarray(a.copy(), "RGB").convert("RGBA")
+
+
+def scenery():
+    """What the newer screens are built of, beyond the frames: each form's niche for its card (270×226, the
+    portrait's well); each leader's material — for the card's well, the development's chamber and the chamber on
+    the 1280 canvas; the camp's vessels each offer hatches from, at rest and under the mouse; the development's
+    vessels a growth is shown in, at rest (the one under the mouse is an animation, below); the litter a creature
+    stands on in a leader's camp and evolution."""
+    import swarm_form_cards as FC
+    for form, (nm, hab, col) in FC.FORM.items():
+        save(f"niche_{FC.FORM_KEY[form]}", opaque(lambda sc, hab=hab: hab(sc, 24, 68, 294, 294), 270, 226, (24, 68, 300, 300)),
+             use=f"{nm}: the card's portrait well (24, 68); the creature over it, its base at y = 200 of the niche; "
+                 f"the card's edge {col}")
+    for name in LEADERS:
+        en = SH.LEADER_EN[name]
+        save(f"material_{en}_well", opaque(lambda sc, name=name: SH.FILL[name](sc, 24, 68, 294, 294), 270, 226,
+                                           (24, 68, 300, 300)), use="the leader's card: its portrait well")
+        save(f"material_{en}_chamber", opaque(lambda sc, name=name: SH.FILL[name](sc, 304, 46, 956, 456), 652, 410,
+                                              (304, 46, 960, 540)), use="the development's chamber, multiplied ×0.42")
+        save(f"material_{en}_chamber_1280", opaque(lambda sc, name=name: SH.FILL[name](sc, 304, 46, 1276, 636), 972, 590,
+                                                   (304, 46, 1280, 720)), use="the same on the 1280×720 canvas")
+        for hot in (False, True):
+            save(f"vessel_{en}_{'hot' if hot else 'rest'}", lift(lambda sc, name=name, hot=hot: SH.vessel(sc, name, 46, 46, hot), 92, 92),
+                 pivot=[46, 46], use="the camp: an offer's icon ×2 at its middle (−16, −12)")
+        save(f"pod_{en}_rest", lift(lambda sc, name=name: SH.POD[name](sc, 140, 160, False, 0), 280, 320), pivot=[140, 160],
+             use="the development: the leader with that growth inside, its base at (cx + 2, cy + 64)")
+        save(f"bed_{en}", lift(lambda sc, name=name: SH.bed(sc, name, 60, 20, 50), 120, 32), pivot=[60, 20],
+             use="under a creature in the camp (w 40) and the evolution (w 50): its feet at the pivot")
+
+
+def anims():
+    """Frame animations for the engine (sprite sheets + Aseprite-style JSON, like the Foundry's ui_anim): the
+    button under the mouse being eaten through, step by step; the lantern clicked out; each leader's growth under
+    the mouse in the development, a loop of 24."""
+    import pxfx
+    adir = os.path.join(DST, "anim")
+    names = []
+    # the button eaten under the mouse: holes cut through to what is under (transparent here)
+    x0, y0, x1, y1 = 14, 14, 214, 56
+    frames = []
+    for nh, nc in [(0, 0)] + SH.EAT_STEPS:
+        def draw(sc, nh=nh, nc=nc):
+            under = sc.rgb.copy()
+            if nh:
+                sc.glow((x0 + x1) / 2, (y0 + y1) / 2, 110, hexc("#9ae030"), 0.15 + 0.06 * nh / 2)
+            UI.button(sc, x0, y0, x1, y1, "acid")
+            for parts in SH.eat_holes(x0, y0, x1, y1)[:nh]:
+                SH.bite_hole(sc, parts[:nc], under / 0.8, (x0, y0, x1, y1))
+        frames.append(lift(draw, 228, 70))
+    pxfx.save_sheet(frames, "button_eaten", 16, loop=False, out_dir=adir)
+    names.append("button_eaten")
+    # the lantern clicked: pressed, then its light going out
+    on, off = np.asarray(lift(lambda sc: M.lantern(sc, 22, 22, True), 44, 44)).astype(np.float32), \
+        np.asarray(lift(lambda sc: M.lantern(sc, 22, 22, False), 44, 44)).astype(np.float32)
+    seq = [on, on * np.array([0.8, 0.8, 0.8, 1.0])] + [on * (1 - t) + off * t for t in np.linspace(0.2, 1, 5)]
+    pxfx.save_sheet([Image.fromarray(np.clip(f, 0, 255).astype(np.uint8), "RGBA") for f in seq], "lantern_off", 24,
+                    loop=False, out_dir=adir)
+    names.append("lantern_off")
+    for name in LEADERS:
+        en = SH.LEADER_EN[name]
+        fr = [lift(lambda sc, name=name, i=i: SH.POD[name](sc, 140, 160, True, i), 280, 320) for i in range(24)]
+        pxfx.save_sheet(fr, f"pod_{en}_hot", 12, loop=True, pivot=(140, 160), out_dir=adir)
+        names.append(f"pod_{en}_hot")
+    PIECES["animations"] = dict(dir="anim", sheets=names,
+                                note="each a sheet and its JSON (frames, fps, loop, pivot), as tools/sprites/assets/ui_anim")
+
+
 def manifest():
     rel = lambda *p: os.path.join(*p)
     kit = dict(
@@ -295,6 +374,42 @@ def preview():
     print("swarm_engine_kit.png", canvas.size)
 
 
+def preview2():
+    """The second proof sheet: the niches, the materials, the vessels, the litter, the animations' first frames."""
+    from swarm_ui import letters
+    sc = UI.nest(960, 540, 6)
+    UI.wing(sc, 0, 0, 960, 44)
+    letters(sc, "НАБОР РОЯ: НИШИ, МАТЕРИАЛЫ, ВМЕСТИЛИЩА", 480, 12, "title", 16, col=(176, 244, 70), col2=(70, 150, 50),
+            align="center")
+    canvas = Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+    def put(im, x, y, k=1.0):
+        if k != 1.0:
+            im = im.resize((max(1, int(im.width * k)), max(1, int(im.height * k))), Image.BOX)
+        canvas.alpha_composite(im, (int(x), int(y)))
+
+    def src(name):
+        return Image.open(os.path.join(DST, PIECES[name]["file"])).convert("RGBA")
+
+    import swarm_form_cards as FC
+    for i, form in enumerate(FC.FORM):
+        put(src(f"niche_{FC.FORM_KEY[form]}"), 8 + (i % 5) * 140, 52 + (i // 5) * 112, 0.48)
+    for j, name in enumerate(LEADERS):
+        en = SH.LEADER_EN[name]
+        put(src(f"material_{en}_well"), 712 + (j % 2) * 122, 52 + (j // 2) * 112, 0.44)
+        put(src(f"vessel_{en}_rest"), 8 + j * 96, 288)
+        put(src(f"vessel_{en}_hot"), 8 + j * 96, 384)
+        put(src(f"pod_{en}_rest"), 360 + j * 110, 286, 0.4)
+        put(src(f"bed_{en}"), 356 + j * 110, 430, 0.9)
+    bt = Image.open(os.path.join(DST, "anim", "button_eaten.png")).convert("RGBA")
+    put(bt.crop((228 * 5, 0, 228 * 6, 70)), 812, 300, 0.6)
+    ln = Image.open(os.path.join(DST, "anim", "lantern_off.png")).convert("RGBA")
+    put(ln, 812, 380, 0.45)
+    canvas = canvas.convert("RGB").resize((1920, 1080), Image.NEAREST)
+    canvas.save(out("swarm_engine_kit2.png"))
+    print("swarm_engine_kit2.png", canvas.size)
+
+
 if __name__ == "__main__":
     UI.WOBBLE[0] = 0.0
     plates()
@@ -304,6 +419,9 @@ if __name__ == "__main__":
     controls()
     scales()
     run_pieces()
+    scenery()
+    anims()
     manifest()
     preview()
+    preview2()
     print(len(PIECES), "pieces ->", DST)

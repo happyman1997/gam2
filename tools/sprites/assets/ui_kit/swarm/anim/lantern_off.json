@@ -1,0 +1,192 @@
+{
+ "frames": [
+  {
+   "filename": "lantern_off 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lantern_off 1",
+   "frame": {
+    "x": 44,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lantern_off 2",
+   "frame": {
+    "x": 88,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lantern_off 3",
+   "frame": {
+    "x": 132,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lantern_off 4",
+   "frame": {
+    "x": 176,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lantern_off 5",
+   "frame": {
+    "x": 220,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  },
+  {
+   "filename": "lantern_off 6",
+   "frame": {
+    "x": 264,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 44,
+    "h": 44
+   },
+   "sourceSize": {
+    "w": 44,
+    "h": 44
+   },
+   "duration": 42
+  }
+ ],
+ "meta": {
+  "app": "gam2 tools/sprites",
+  "version": "1",
+  "image": "lantern_off.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 308,
+   "h": 44
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "lantern_off",
+    "from": 0,
+    "to": 6,
+    "direction": "forward"
+   }
+  ],
+  "pixelfx": {
+   "id": "lantern_off",
+   "fps": 24,
+   "loop": false,
+   "frames": 7,
+   "frameSize": [
+    44,
+    44
+   ],
+   "pivot": [
+    0,
+    0
+   ],
+   "columns": 7
+  }
+ }
+}

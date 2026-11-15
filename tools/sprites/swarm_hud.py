@@ -2393,6 +2393,36 @@ def mutation_card(key="nest"):
 
 
 # ---------------------------------------------------------------- a button under the mouse: the swarm takes a bite
+def eat_holes(x0, y0, x1, y1):
+    """Where a button under the mouse is eaten: each hole its circles, one more per step as the bite widens."""
+    cy = (y0 + y1) / 2
+    return [[(x0 + 22, y0 - 1, 4), (x0 + 28, y0 + 1, 4), (x0 + 34, y0 - 1, 3)],
+            [(x1 - 30, y1 + 1, 4), (x1 - 24, y1 - 1, 5), (x1 - 17, y1 + 1, 3)],
+            [(x0 + 8, cy + 2, 4), (x0 + 12, cy - 4, 3), (x0 + 16, cy + 6, 3)],
+            [(x1 - 46, y0 + 9, 3), (x1 - 41, y0 + 12, 3), (x1 - 44, y0 + 16, 2)],
+            [(x0 + 48, y1 - 7, 3), (x0 + 52, y1 - 3, 3)],
+            [(x1 - 9, cy - 5, 4), (x1 - 12, cy + 2, 3)]]
+
+
+EAT_STEPS = [(1, 1), (2, 2), (3, 2), (4, 3), (6, 3)]     # (holes open, circles in each), step by step
+
+
+def bite_hole(sc, parts, under, box):
+    """A bite-shaped hole: a few overlapping circles; what is under shows through (×0.8), the cut edge lit."""
+    x0, y0, x1, y1 = box
+    m = np.zeros(sc.yy.shape, bool)
+    for (bx, by, r) in parts:
+        m |= np.hypot(sc.xx - bx, sc.yy - by) <= r + 1
+    inside = (sc.xx >= x0 - 2) & (sc.xx <= x1 + 2) & (sc.yy >= y0 - 2) & (sc.yy <= y1 + 2)
+    m &= inside
+    sc.rgb[m] = under[m] * 0.8
+    ring = dilate(m, 1) & ~m & inside
+    sc.rgb[ring] = UI.OUTL
+    lit = dilate(m, 2) & ~dilate(m, 1) & inside
+    sc.rgb[lit] = np.minimum(255, sc.rgb[lit] * 1.3 + 25)
+    return m
+
+
 def button_gif():
     """The hover on a clickable button, the swarm's way: holes eat into it — bites out of the edges, then through
     the gem — as if something unseen were feeding on it; the mouse leaves and it is whole again."""
@@ -2402,28 +2432,12 @@ def button_gif():
     x0, y0, x1, y1 = 110, 40, 370, 86
     cy = (y0 + y1) / 2
 
-    def hole(sc, parts):
-        """A bite-shaped hole: a few overlapping circles; the background shows through, the cut edge lit."""
-        m = np.zeros(sc.yy.shape, bool)
-        for (bx, by, r) in parts:
-            m |= np.hypot(sc.xx - bx, sc.yy - by) <= r + 1
-        inside = (sc.xx >= x0 - 2) & (sc.xx <= x1 + 2) & (sc.yy >= y0 - 2) & (sc.yy <= y1 + 2)
-        m &= inside
-        sc.rgb[m] = bg.rgb[m] * 0.8
-        ring = dilate(m, 1) & ~m & inside
-        sc.rgb[ring] = UI.OUTL
-        lit = dilate(m, 2) & ~dilate(m, 1) & inside
-        sc.rgb[lit] = np.minimum(255, sc.rgb[lit] * 1.3 + 25)
+    H = eat_holes(x0, y0, x1, y1)
 
-    H = [  # each hole: its circles, one more per step as the bite widens
-        [(x0 + 22, y0 - 1, 4), (x0 + 28, y0 + 1, 4), (x0 + 34, y0 - 1, 3)],
-        [(x1 - 30, y1 + 1, 4), (x1 - 24, y1 - 1, 5), (x1 - 17, y1 + 1, 3)],
-        [(x0 + 8, cy + 2, 4), (x0 + 12, cy - 4, 3), (x0 + 16, cy + 6, 3)],
-        [(x1 - 46, y0 + 9, 3), (x1 - 41, y0 + 12, 3), (x1 - 44, y0 + 16, 2)],
-        [(x0 + 48, y1 - 7, 3), (x0 + 52, y1 - 3, 3)],
-        [(x1 - 9, cy - 5, 4), (x1 - 12, cy + 2, 3)],
-    ]
-    steps = [(1, 1), (2, 2), (3, 2), (4, 3), (6, 3)]           # (holes open, circles in each)
+    def hole(sc, parts):
+        bite_hole(sc, parts, bg.rgb, (x0, y0, x1, y1))
+
+    steps = EAT_STEPS
     seq = [(False, 0, 0, 0.0, 420)] + [(True, nh, nc, 0.15 + 0.06 * i, 60) for i, (nh, nc) in enumerate(steps)] + \
           [(True, 6, 3, 0.4, 700), (False, 0, 0, 0.0, 300)]
     frames, durs = [], []
