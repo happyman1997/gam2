@@ -191,10 +191,99 @@ def brood_eat():
     print("swarm_brood_eat.gif", len(crop))
 
 
+def _well_life(sc, name, i):
+    """What moves in a leader card's well, frame i of a loop of 24: honey running and eggs breathing for the
+    Queen, rings of psi spreading and pulses running out along the threads for the Mind, blood dripping and a
+    heartbeat for the Devourer, spores rising for the Plague."""
+    import swarm_abilities as SA
+    from kit import hexc
+    x0, y0, x1, y1 = 24, 68, 294, 294
+    t = i / 24.0
+    keep = sc.rgb.copy()
+    if name == "Матка":
+        for (dx, off) in ((60, 0.0), (200, 0.5)):                       # honey running down the comb
+            y = int(y0 + 4 + ((t + off) % 1.0) * (y1 - y0 - 30))
+            x = x0 + dx
+            sc.rgb[y - 6:y, x] = sc.rgb[y - 6:y, x] * 0.5 + hexc("#c08020") * 0.5
+            sc.rgb[y:y + 3, x - 1:x + 2] = hexc("#e8b040")
+            sc.rgb[y, x - 1] = hexc("#fff0b0")
+        br = 0.5 + 0.5 * np.sin(2 * np.pi * t)
+        for (ex, ey) in ((50, 286), (62, 282), (74, 288), (240, 286), (254, 282), (266, 288), (56, 274), (258, 274)):
+            sc.glow(ex, ey, 9, hexc("#e8ffa0"), 0.08 + 0.18 * br)
+    elif name == "Разум улья":
+        cx, cy = (x0 + x1) // 2, int(y0 + (y1 - y0) * 0.58)
+        for off in (0.0, 1 / 3, 2 / 3):                                  # rings spreading out
+            q = (t + off) % 1.0
+            r = 20 + 130 * q
+            SA.ring(sc, cx, cy, r, r * 0.55, SA.PHERO, 0.7 * (1 - q))
+        for j, a in enumerate(np.linspace(0, 2 * np.pi, 7, endpoint=False)):   # a pulse along each thread
+            q = (t + j / 7.0) % 1.0
+            ex, ey = cx + np.cos(a) * 130, cy + np.sin(a) * 90
+            px_, py_ = int(cx + (ex - cx) * q), int(cy + (ey - cy) * q - 10 * 4 * q * (1 - q) * -1)
+            sc.glow(px_, py_, 6, hexc("#d0a0ff"), 0.5)
+            sc.rgb[py_ - 1:py_ + 1, px_ - 1:px_ + 1] = hexc("#f4e8ff")
+    elif name == "Пожиратель":
+        beat = max(0.0, np.sin(2 * np.pi * 2 * t)) ** 3                  # two beats a loop
+        sc.glow(159, 200, 130, hexc("#ff3020"), 0.06 + 0.14 * beat)
+        for (dx, off) in ((50, 0.0), (150, 0.35), (230, 0.7)):           # blood dripping from the top
+            q = (t + off) % 1.0
+            x = x0 + dx
+            L = int(4 + 10 * min(1.0, q * 3))
+            sc.rgb[y0:y0 + L, x:x + 2] = hexc("#8a1a14")
+            if q > 0.33:
+                y = int(y0 + L + (q - 0.33) / 0.67 * (y1 - y0 - L - 20))
+                sc.rgb[y:y + 3, x:x + 2] = hexc("#b0241a")
+                sc.rgb[y, x] = hexc("#e05a4a")
+    else:
+        rnd = np.random.RandomState(9)
+        sc.glow(150, 250, 70, hexc("#88b040"), 0.1 + 0.06 * np.sin(2 * np.pi * t))
+        for k in range(30):                                              # spores rising
+            sx, off = rnd.randint(x0 + 6, x1 - 6), rnd.rand()
+            q = (t + off) % 1.0
+            y = int(y1 - 8 - q * (y1 - y0 - 16))
+            x = int(sx + 4 * np.sin(q * 2 * np.pi + k))
+            sc.rgb[y:y + 2, x:x + 2] = hexc("#d8ff80") if k % 3 else hexc("#a8d060")
+    m = (sc.xx >= x0) & (sc.xx < x1) & (sc.yy >= y0) & (sc.yy < y1)
+    sc.rgb[~m] = keep[~m]
+
+
+def leader_cards():
+    """The four leader cards alive: each one's well moving — loops of 24."""
+    import swarm_hud as H
+    keep = H.big_card
+    got = []
+
+    def grab(spec, name, save=True):
+        if spec.get("title") in H.CARD_DRESS:
+            got.append((spec, name))
+        return None
+    H.big_card = grab
+    try:
+        H.cards()
+    finally:
+        H.big_card = keep
+    for spec, name in got:
+        lead = {"МАТКА": "Матка", "РАЗУМ УЛЬЯ": "Разум улья", "ПОЖИРАТЕЛЬ": "Пожиратель", "ЧУМА": "Чума"}[spec["title"]]
+        base = keep(spec, name, save=False)
+        images = []
+        for i in range(24):
+            sc = copy.deepcopy(base)
+            SH.FILL[lead](sc, 24, 68, 294, 294)
+            _well_life(sc, lead, i)
+            SH.put(sc, spec["sprite"], 159 + spec.get("dx", 0), 268, spec.get("sw", 40))
+            images.append(sc.image(2).crop((0, 0, 760, 640)))
+            print(i, end=" ", flush=True)
+        UI.WOBBLE[0] = 0.0
+        fn = f"swarm_card_{SH.LEADER_EN[lead]}_anim.gif"
+        pxfx.save_gif(images, out(fn), 12)
+        print("\n" + fn, len(images))
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "all"
     fns = {"settings": settings, "development": development, "defeat": defeat, "pause": pause, "artifacts": artifacts,
-           "moments": moments, "battle_end": battle_end, "brood_eat": brood_eat}
+           "moments": moments, "battle_end": battle_end, "brood_eat": brood_eat,
+           "leader_cards": leader_cards}
     for k, fn in fns.items():
         if what in ("all", k):
             fn()
