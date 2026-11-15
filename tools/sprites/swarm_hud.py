@@ -797,7 +797,7 @@ def cursor(sc, x, y):
                 sc.rgb[y + j, x + i] = hexc("#0a060e") if ch == "o" else hexc("#f4ecd8")
 
 
-def battle_hud():
+def battle_hud(ret=False):
     """The battle runs itself: the interface is one thin wing — the sides' tug of war, the speed. Everything else is
     on the field: the leader's health over the leader, an ability's icon popping up when it fires, states over the
     units. On pause, pointing at anyone opens their card."""
@@ -838,6 +838,8 @@ def battle_hud():
             kw = UI.text_width(key, "text", 16) + 12
             keycap(sc, int((x0 + x1) / 2 - kw / 2), 31, key)
         name = "swarm_battle_hud.png"
+        if ret:
+            return sc
         if mode == "enemy":                         # the enemy has a card too: the Guard
             cx0, cy0, cx1 = int(gx - 330), int(gy - 40), int(gx - 50)
             rows_ = ["{здоровье:100} {броня:4} {скорость:1}", "{урон:1–6 +3} {дроб} {дальность:1}",

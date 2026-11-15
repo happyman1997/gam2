@@ -1529,6 +1529,82 @@ def review(keys, fname):
     print(fname, img.size)
 
 
+# ---------------------------------------------------------------- small icons for the interface itself (settings)
+UI = {}
+
+
+def ui(key):
+    def reg(f):
+        UI[key] = f
+        return f
+    return reg
+
+
+@ui("screen")
+def ui_eye():
+    """Экран: a bug's head side on, all compound eye — a dark red faceted dome catching the light."""
+    p = Pix()
+    p.fill(ell(7.0, 8.5, 6.4, 5.6), "chitin", inner=(2, 1))
+    p.fill(ell(8.0, 7.8, 5.0, 4.6), "crimson", inner=(3, 2))
+    for y in range(4, 13, 2):                                      # the facets
+        for x in range(4 + (y // 2) % 2, 13, 2):
+            if ((x - 8.0) / 4.4) ** 2 + ((y - 7.8) / 4.0) ** 2 <= 1:
+                p.px(x, y, "crimson", 1)
+    p.px(6, 5, "crimson", 4)
+    p.px(7, 4, "crimson", 4)
+    p.px(5, 6, "crimson", 3)
+    p.line([(2, 12), (1, 14)], "chitin", 3)                        # its jaw under it
+    antennae(p, 4, 4, long=3)
+    return p.done()
+
+
+@ui("sound")
+def ui_cricket():
+    """Звук: a cricket side on, its wing raised off its back to chirp, the chirp in arcs."""
+    p = Pix()
+    p.line([(5, 10), (2, 7), (1, 13)], "chitin", 2)                # its great hind leg
+    p.fill(ell(6.0, 10.5, 4.6, 2.0), "olive", inner=(3, 2))        # the body
+    p.fill(ell(10.5, 9.5, 1.8, 1.8), "olive", inner=(3, 2))        # the head
+    p.px(11, 9, "rust", 4)
+    antennae(p, 11, 8, ramp="olive", long=2)
+    p.fill(grid(lambda x, y: 2 <= x <= 8 and 3 + (x - 2) * 0.55 <= y <= 8 - (8 - x) * 0.15), "membrane", inner=(3, 2))
+    for x in (3, 5, 7):                                            # the file of ridges it chirps with
+        p.px(x, 6, "chitin", 2)
+    p.line([(4, 12), (4, 13)], "chitin", 2)
+    p.line([(7, 12), (8, 13)], "chitin", 2)
+    for x, ys in ((13, (3, 4, 5)), (15, (1, 2, 3, 4, 5, 6))):      # the chirp
+        for y in ys:
+            p.px(x, y, "acid", 3 if x == 13 else 2)
+    return p.done()
+
+
+@ui("game")
+def ui_comb():
+    """Игра: one cell of the comb, wax, an ant's head looking out of it."""
+    p = Pix()
+    hexm = grid(lambda x, y: abs(y - 7.5) <= 6.5 and abs(x - 7.5) * 0.9 + abs(y - 7.5) * 0.5 <= 6.2)
+    p.fill(hexm, "amber", inner=(3, 2))
+    inner = grid(lambda x, y: abs(y - 7.5) <= 4.2 and abs(x - 7.5) * 0.9 + abs(y - 7.5) * 0.5 <= 4.0)
+    p.fill(inner, "chitin", inner=(1, 1), rim=1)
+    p.fill(ell(7.5, 8.5, 2.4, 2.0), "rust", inner=(3, 2))
+    p.px(6, 8, "acid", 4)
+    p.px(9, 8, "acid", 4)
+    p.line([(6, 6), (5, 4)], "rust", 3)
+    p.line([(9, 6), (10, 4)], "rust", 3)
+    return p.done()
+
+
+@ui("keys")
+def ui_key():
+    """Клавиши: a key of the keyboard grown over with chitin, a mandible's bite out of its corner."""
+    p = Pix()
+    p.fill(grid(lambda x, y: 1 <= x <= 14 and 3 <= y <= 13 and not (x >= 12 and y <= 5)), "chitin", inner=(2, 2), rim=3,
+           shade=1)
+    p.fill(grid(lambda x, y: 3 <= x <= 11 and 4 <= y <= 10), "elytra", inner=(3, 3), rim=4, shade=2)
+    p.line([(5, 6), (5, 9), (8, 9)], "chitin", 1)
+    return p.done()
+
+
 def atlas():
     """The swarm's icon atlas from the drawn icons — the same cells and keys as before (assets/swarm_icons.png,
     .json), so every swarm screen gets the new icons."""
