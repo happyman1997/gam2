@@ -116,11 +116,17 @@ fn meter(cv: &mut Image, a: &Assets, cx: i32, y: i32, lit: i32, gem: &str) {
 }
 
 pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec<Effect>), view: &View) {
+    draw_field(cv, a, rec, sparks, view);
+    draw_hud(cv, a, rec, view);
+}
+
+/// The field: the ground, the units, their health, the effects and numbers; dimmed at the end.
+pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec<Effect>), view: &View) {
     let total = rec.frames();
     let f = (view.frame as i32).min(total - 1);
     cv.blit(&a.ground, 0, 0, false, 1.0);
     // the units, in depth order; small ones sharing a cell spread over its four places
-    let mut shown = rec.shown(f);
+    let mut shown = rec.shown(view.frame.min((total - 1) as f32));
     let mut seen: std::collections::HashMap<(i32, i32, u8, bool), usize> = Default::default();
     let mut placed = vec![];
     shown.sort_by_key(|s| s.id);
@@ -172,6 +178,17 @@ pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec
     for n in &sparks.0 {
         number(cv, a, n, f);
     }
+    let end = view.frame as i32 - (total - 1);
+    if end > 0 {
+        cv.dim(0, 0, W, H, 1.0 - 0.5 * (end as f32 / 12.0).min(1.0));
+    }
+}
+
+/// The interface over the field: the wing (the tug of war, the counts, the turn, the speed buttons with their keys)
+/// and at the end the plate.
+pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
+    let total = rec.frames();
+    let f = (view.frame as i32).min(total - 1);
     // the wing: the swarm against the Foundry, the turn, the speed
     cv.blit(&a.ui["wing_battle_960"].img, 0, 0, false, 1.0);
     let alive = |side: u8| rec.units.iter().enumerate().filter(|(i, u)| u.side == side && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count();
@@ -208,11 +225,10 @@ pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec
     button(cv, a, 736, 784, view.paused, "II", "Пробел");
     button(cv, a, 790, 838, !view.paused, &format!("×{}", view.speed), "Tab");
     button(cv, a, 844, 952, false, "в конец »", "End");
-    // the end: the field dims, the plate across it
+    // the end: the plate across the dimmed field
     let end = view.frame as i32 - (total - 1);
     if end > 0 {
         let k = (end as f32 / 12.0).min(1.0);
-        cv.dim(0, 34, W, H - 34, 1.0 - 0.5 * k);
         let win = rec.outcome.winner == Some(1);
         let p = &a.ui[if win { "end_plate_win" } else { "end_plate_lose" }];
         let dy = ((1.0 - k) * -40.0) as i32;

@@ -16,6 +16,11 @@ impl Image {
         Image { w, h, px: vec![[0, 0, 0, 255]; (w * h) as usize] }
     }
 
+    /// A clear image, to draw a layer on (the interface over a zoomed field).
+    pub fn clear(w: i32, h: i32) -> Self {
+        Image { w, h, px: vec![[0, 0, 0, 0]; (w * h) as usize] }
+    }
+
     pub fn load(path: &Path) -> Result<Self, String> {
         let file = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let mut dec = png::Decoder::new(file);
@@ -62,9 +67,19 @@ impl Image {
             return;
         }
         let d = &mut self.px[(y * self.w + x) as usize];
-        for k in 0..3 {
-            d[k] = (d[k] as f32 * (1.0 - a) + c[k] as f32 * a).round() as u8;
+        if d[3] == 255 {
+            for k in 0..3 {
+                d[k] = (d[k] as f32 * (1.0 - a) + c[k] as f32 * a).round() as u8;
+            }
+            return;
         }
+        // over a clear or see-through pixel: the colours weighed by their coverage
+        let da = d[3] as f32 / 255.0;
+        let oa = a + da * (1.0 - a);
+        for k in 0..3 {
+            d[k] = ((c[k] as f32 * a + d[k] as f32 * da * (1.0 - a)) / oa).round() as u8;
+        }
+        d[3] = (oa * 255.0).round() as u8;
     }
 
     /// `src` with its top-left at (x, y); mirrored left-right if asked; faded by `alpha`.

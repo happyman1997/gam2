@@ -6,6 +6,8 @@
 //!   cargo run -p game --release -- --strip out.png    a strip of frames across the battle, for a look
 //!   cargo run -p game --release -- --frames dir 2     every 2nd frame of the battle to dir/0000.png…
 //!   cargo run -p game --release -- --cues cues.json   the battle's sounds with their frames
+//!   cargo run -p game --release -- --video sound.json 48 53 | ffmpeg -f rawvideo -pix_fmt rgb24 -s 1920x1080 -r 60 -i - …
+//!                                                     battles 48 and 53 as a 60 fps video with a camera (see video.rs)
 
 mod assets;
 #[cfg(feature = "audio")]
@@ -13,6 +15,7 @@ mod audio;
 mod gfx;
 mod playback;
 mod render;
+mod video;
 #[cfg(feature = "window")]
 mod window;
 
@@ -142,6 +145,12 @@ fn main() {
         let v: Vec<serde_json::Value> = demo.cues.iter().map(|c| serde_json::json!({"frame": c.frame, "name": c.name, "gain": c.gain, "x": c.x})).collect();
         std::fs::write(&path, serde_json::to_string(&v).unwrap()).expect("write");
         println!("{path}: {} cues", v.len());
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--video") {
+        let path = args.get(i + 1).cloned().unwrap_or_else(|| "sound.json".into());
+        let seeds: Vec<u64> = args[i + 2..].iter().map_while(|s| s.parse().ok()).collect();
+        video::run(&mut demo, if seeds.is_empty() { &[48, 53] } else { &seeds }, &path);
         return;
     }
     if let Some(i) = args.iter().position(|a| a == "--frames") {

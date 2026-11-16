@@ -164,16 +164,17 @@ impl Record {
         (X0 + (x as f32 + fp as f32 / 2.0) * CW, Y0 + (y as f32 + fp as f32 * 0.72) * CH)
     }
 
-    /// Every unit as frame f shows it: where it stands (walking in the first part of a round), its pose; the
-    /// killed lie where they fell, the fled are gone.
-    pub fn shown(&self, f: i32) -> Vec<Shown> {
-        let f = f.clamp(0, self.frames() - 1);
+    /// Every unit as frame `ff` shows it: where it stands (walking in the first part of a round, between frames
+    /// too, for a smooth video), its pose; the killed lie where they fell, the fled are gone.
+    pub fn shown(&self, ff: f32) -> Vec<Shown> {
+        let f = (ff as i32).clamp(0, self.frames() - 1);
         let r = (f / FR) as usize;
         let ph = f % FR;
         let round = &self.rounds[r];
         let ms = self.moments(r);
         let mut out = vec![];
-        let t = (ph as f32 / MOVE as f32).min(1.0);
+        let walked = if ff as i32 == f { ff - (r as i32 * FR) as f32 } else { ph as f32 };
+        let t = (walked / MOVE as f32).clamp(0.0, 1.0);
         let e = 1.0 - (1.0 - t) * (1.0 - t);
         for (id, info) in self.units.iter().enumerate() {
             let (b, a) = (round.before[id], round.after[id]);
