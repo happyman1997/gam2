@@ -2,14 +2,15 @@
 //! game sound has a few variants; one is picked at random and played a touch higher or lower, panned to where it
 //! happens on the field, so a hundred bites don't sound like one.
 
-use kira::sound::static_sound::StaticSoundData;
-use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Panning, PlaybackRate};
+use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
+use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Panning, PlaybackRate, Tween};
 use std::collections::HashMap;
 
 pub struct Audio {
     mgr: AudioManager<DefaultBackend>,
     sounds: HashMap<String, Vec<StaticSoundData>>,
     seed: u64,
+    bed: Option<StaticSoundHandle>,
 }
 
 impl Audio {
@@ -30,7 +31,7 @@ impl Audio {
             }
         }
         let mgr = AudioManager::<DefaultBackend>::new(AudioManagerSettings::default()).ok()?;
-        Some(Audio { mgr, sounds, seed: 0x2545_f491_4f6c_dd1d })
+        Some(Audio { mgr, sounds, seed: 0x2545_f491_4f6c_dd1d, bed: None })
     }
 
     fn rand(&mut self) -> f32 {
@@ -38,6 +39,23 @@ impl Audio {
         self.seed ^= self.seed >> 7;
         self.seed ^= self.seed << 17;
         (self.seed % 10_000) as f32 / 10_000.0
+    }
+
+    /// The swarm's chirring under the battle, looped, while the swarm lives; off when it is gone or the battle is over.
+    pub fn bed(&mut self, on: bool) {
+        match (on, self.bed.is_some()) {
+            (true, false) => {
+                if let Some(v) = self.sounds.get("swarm_bed") {
+                    self.bed = self.mgr.play(v[0].loop_region(..)).ok();
+                }
+            }
+            (false, true) => {
+                if let Some(mut h) = self.bed.take() {
+                    h.stop(Tween::default());
+                }
+            }
+            _ => {}
+        }
     }
 
     /// `gain` in dB on top of the sound's own level; `x` — where on the 960-wide field, for the panning.
@@ -66,7 +84,8 @@ mod tests {
                 assert!(d.is_ok(), "{name}: {f}");
             }
         }
-        for name in ["hit_metal", "hit_flesh", "zap", "blast", "squish", "break", "heal", "miss", "step", "click", "toggle", "win", "lose"] {
+        for name in ["bite", "hit_metal", "hit_flesh", "zap", "blast", "squish", "bug_cry", "break", "heal", "miss", "step",
+                     "swarm_bed", "click", "toggle", "win", "lose"] {
             assert!(m.get(name).is_some(), "missing {name}");
         }
     }

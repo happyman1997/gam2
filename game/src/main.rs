@@ -63,6 +63,8 @@ impl Demo {
         let now = self.view.frame as i32;
         #[cfg(feature = "audio")]
         if let Some(a) = &mut self.audio {
+            let swarm_alive = self.rec.units.iter().enumerate().any(|(i, u)| u.side == 1 && self.rec.state_at(i, now).alive);
+            a.bed(swarm_alive && now < self.rec.frames());
             let mut played: Vec<&str> = vec![];
             for c in self.cues.iter().filter(|c| c.frame > before && c.frame <= now) {
                 if played.contains(&c.name) || played.len() >= 4 {

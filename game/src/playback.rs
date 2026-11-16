@@ -217,9 +217,11 @@ impl Record {
         }
     }
 
-    /// The sounds of the whole battle, each with its frame: blows by who strikes whom (chitin on metal, a golem's
-    /// blow on a body, a discharge, the mortar's blast — once a volley), the killed (a wet squish for a creature,
-    /// crunching metal for a golem), a heal, a miss; the golems' steps when they walk; the jingle at the end.
+    /// The sounds of the whole battle, each with its frame: blows by who strikes whom (a creature's jaws and the
+    /// golem ringing under them, a golem's blow crunching a body, a discharge, the mortar's blast — once a volley),
+    /// the killed (a wet squish and a squeal for a creature, a mechanical blast for a golem), a heal (steam), a miss;
+    /// the golems' heavy steps when they walk; the jingle at the end. The swarm's chirring under it all is a loop
+    /// (audio.rs), not a cue.
     pub fn cues(&self) -> Vec<Cue> {
         let mut out = vec![];
         for r in 0..self.rounds.len() {
@@ -249,15 +251,22 @@ impl Record {
                                     last_volley = Some((a, m.frame));
                                     "blast"
                                 }
-                                _ if att.side == 1 => "hit_metal",
+                                _ if att.side == 1 => "bite",
                                 _ => "hit_flesh",
                             }
                         };
                         out.push(Cue { frame: m.frame, name, gain: 0.0, x: at(t) });
+                        if name == "bite" && !self.units[t].leader {
+                            // the jaws land on metal: the golem rings
+                            out.push(Cue { frame: m.frame + 1, name: "hit_metal", gain: 0.0, x: at(t) });
+                        }
                     }
                     Event::Kill { t } => {
                         let name = if self.units[t].side == 1 { "squish" } else { "break" };
                         out.push(Cue { frame: m.frame, name, gain: 0.0, x: at(t) });
+                        if self.units[t].side == 1 {
+                            out.push(Cue { frame: m.frame + 2, name: "bug_cry", gain: 0.0, x: at(t) });
+                        }
                     }
                     Event::Heal { t, .. } => out.push(Cue { frame: m.frame, name: "heal", gain: 0.0, x: at(t) }),
                     Event::Absorbed { t } => out.push(Cue { frame: m.frame, name: "miss", gain: 0.0, x: at(t) }),

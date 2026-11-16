@@ -1,15 +1,29 @@
 {
+ "bite": [
+  "sfx/bite_0.ogg",
+  "sfx/bite_1.ogg",
+  "sfx/bite_2.ogg",
+  "sfx/bite_3.ogg",
+  "sfx/bite_4.ogg",
+  "sfx/bite_5.ogg",
+  "sfx/bite_6.ogg"
+ ],
  "hit_metal": [
   "sfx/hit_metal_0.ogg",
   "sfx/hit_metal_1.ogg",
   "sfx/hit_metal_2.ogg",
   "sfx/hit_metal_3.ogg",
-  "sfx/hit_metal_4.ogg"
+  "sfx/hit_metal_4.ogg",
+  "sfx/hit_metal_5.ogg",
+  "sfx/hit_metal_6.ogg"
  ],
  "hit_flesh": [
   "sfx/hit_flesh_0.ogg",
   "sfx/hit_flesh_1.ogg",
-  "sfx/hit_flesh_2.ogg"
+  "sfx/hit_flesh_2.ogg",
+  "sfx/hit_flesh_3.ogg",
+  "sfx/hit_flesh_4.ogg",
+  "sfx/hit_flesh_5.ogg"
  ],
  "zap": [
   "sfx/zap_0.ogg",
@@ -18,20 +32,48 @@
  ],
  "blast": [
   "sfx/blast_0.ogg",
-  "sfx/blast_1.ogg"
+  "sfx/blast_1.ogg",
+  "sfx/blast_2.ogg"
  ],
  "squish": [
   "sfx/squish_0.ogg",
-  "sfx/squish_1.ogg"
+  "sfx/squish_1.ogg",
+  "sfx/squish_2.ogg",
+  "sfx/squish_3.ogg",
+  "sfx/squish_4.ogg",
+  "sfx/squish_5.ogg",
+  "sfx/squish_6.ogg",
+  "sfx/squish_7.ogg",
+  "sfx/squish_8.ogg",
+  "sfx/squish_9.ogg",
+  "sfx/squish_10.ogg"
+ ],
+ "bug_cry": [
+  "sfx/bug_cry_0.ogg",
+  "sfx/bug_cry_1.ogg",
+  "sfx/bug_cry_2.ogg",
+  "sfx/bug_cry_3.ogg",
+  "sfx/bug_cry_4.ogg",
+  "sfx/bug_cry_5.ogg",
+  "sfx/bug_cry_6.ogg",
+  "sfx/bug_cry_7.ogg",
+  "sfx/bug_cry_8.ogg",
+  "sfx/bug_cry_9.ogg",
+  "sfx/bug_cry_10.ogg",
+  "sfx/bug_cry_11.ogg",
+  "sfx/bug_cry_12.ogg",
+  "sfx/bug_cry_13.ogg"
  ],
  "break": [
   "sfx/break_0.ogg",
   "sfx/break_1.ogg",
-  "sfx/break_2.ogg"
+  "sfx/break_2.ogg",
+  "sfx/break_3.ogg"
  ],
  "heal": [
   "sfx/heal_0.ogg",
-  "sfx/heal_1.ogg"
+  "sfx/heal_1.ogg",
+  "sfx/heal_2.ogg"
  ],
  "miss": [
   "sfx/miss_0.ogg",
@@ -43,7 +85,11 @@
   "sfx/step_1.ogg",
   "sfx/step_2.ogg",
   "sfx/step_3.ogg",
-  "sfx/step_4.ogg"
+  "sfx/step_4.ogg",
+  "sfx/step_5.ogg"
+ ],
+ "swarm_bed": [
+  "sfx/swarm_bed_0.ogg"
  ],
  "click": [
   "sfx/click_0.ogg",
