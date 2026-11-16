@@ -27,12 +27,9 @@ SRC = {   # source: (author, page, [archive or file urls])
     "rpg": ("Kenney", PAGE + "50-rpg-sound-effects", [OGA + "RPGsounds_Kenney.zip"]),
     "scifi": ("Kenney", PAGE + "sci-fi-sounds", [OGA + "sci-fi_sounds.zip"]),
     "interface": ("Kenney", PAGE + "interface-sounds", [OGA + "kenney_interfaceSounds.zip"]),
-    "digital": ("Kenney", PAGE + "63-digital-sound-effects-lasers-phasers-space-etc", [OGA + "Digital_SFX_Set.zip"]),
-    "jingles": ("Kenney", PAGE + "85-short-music-jingles", [OGA + "jingleSounds_Kenney.zip"]),
     "creature": ("rubberduck", PAGE + "80-cc0-creature-sfx", [OGA + "80-CC0-creature-SFX_0.zip"]),
     "creature2": ("rubberduck", PAGE + "80-cc0-creture-sfx-2", [OGA + "80-CC0-creature-sfx-2.zip"]),
     "bfh": ("rubberduck", PAGE + "75-cc0-breaking-falling-hit-sfx", [OGA + "sfx_breaking_and_falling.zip"]),
-    "insect": ("fvcalderan", PAGE + "insect-sounds", [OGA + "insect.zip"]),
     "crunchybite": ("fvcalderan", PAGE + "crunchy-bite", [OGA + "crunchybite.ogg"]),
     "crunches": ("StarNinjas", PAGE + "7-eating-crunches", [OGA + "crunch_-_tito.zip"]),
     "squish": ("EZduzziteh", PAGE + "squish-sounds-effects",
@@ -43,10 +40,14 @@ SRC = {   # source: (author, page, [archive or file urls])
     "metal": ("BMacZero", PAGE + "metal-impact-sounds", [OGA + f for f in ("clink1_0.wav", "clink2.wav", "clink3.wav",
                                                                           "thud2.wav", "thud3.wav")]),
     "spark": ("BMacZero", PAGE + "electricity-sound-effects-0", [OGA + "spark.wav"]),
+    "elec": ("faxcorp", PAGE + "electricity-game-sound-pack",
+             [OGA + f for f in ("hit.wav", "crackleelectricityloop.wav", "snaploop.wav", "death_1.wav")]),
+    "sfx100v2": ("rubberduck", PAGE + "100-cc0-sfx-2", [OGA + "sfx_100_v2.zip"]),
+    "fanfare": ("Zane Little Music", PAGE + "hyper-ultra-fanfare", [OGA + "sboe.mp3"]),
+    "gameover": ("KLY", PAGE + "kl-peach-game-over-iii", [OGA + "KL%20Peach%20Game%20Over%20III.mp3"]),
     "chunky": ("Joth", PAGE + "chunky-explosion", [OGA + "Chunky%20Explosion.mp3"]),
     "mechexp": ("Spring Spring", PAGE + "mechanical-explosion", [OGA + "mechanical_explosion.wav"]),
     "steam": ("bart", PAGE + "steam-release-sounds", [OGA + "steam_hisses.zip"]),
-    "metalsteps": ("Thimras", PAGE + "metal-footsteps-on-concrete", [OGA + "metal_steps.ogg"]),
     "cicada": ("syncopika", PAGE + "cicada-sounds", [OGA + "082526-cicadasounds.ogg"]),
 }
 
@@ -57,7 +58,10 @@ def k(src, files, **opt):
 
 # the game's sound: (what it is for, [(source, file, options)], gain dB). Options: "split": n — the n-th piece of a file of
 # several sounds; "cut": (start, length) — a stretch of a long file; "rate": tone (0.8 = lower and slower, heavier);
-# "lowpass": Hz above which the shrill top is cut; "len": seconds kept, the end faded out
+# "lowpass": Hz above which the shrill top is cut; "len": seconds kept, the end faded out; "layer": (source, file,
+# seconds, dB, lowpass Hz) — a second sound mixed under it
+THUNDER = ("sfx100v2", "sfx100v2_thunder_01.ogg", 0.7, -9, 700)  # a layer: the first 0.7 s of a thunder, −9 dB, below 700 Hz
+
 SOUNDS = {
     "bite": ("укус особи: хитиновые жвалы", k("crunchybite", ["crunchybite.ogg"]) +
              k("crunches", [f"crunch.{i}.ogg" for i in (1, 2, 3, 5)]) + k("creature", ["eat_01.ogg"]), -10),
@@ -66,7 +70,13 @@ SOUNDS = {
                   k("scifi", ["Audio/impactMetal_000.ogg"], lowpass=5000), -12),
     "hit_flesh": ("голем бьёт особь: хруст", [("breakcrunch", "imp_3.mp3", {"split": i}) for i in range(5)] +
                   k("rpg", ["OGG/chop.ogg"]), -8),
-    "zap": ("разряд Мудреца и Изобретателя", k("spark", ["spark.wav"], lowpass=3500) + k("digital", ["zap1.mp3", "zap2.mp3"]), -9),
+    # a discharge: the crack of a real spark and under it the low clap of thunder, so it has weight
+    "zap": ("разряд Мудреца и Изобретателя: треск молнии", [
+        ("elec", "hit.wav", {"len": 0.6, "layer": THUNDER}),
+        ("elec", "crackleelectricityloop.wav", {"cut": (0.0, 0.35), "layer": THUNDER}),
+        ("elec", "snaploop.wav", {"cut": (0.6, 0.4), "layer": THUNDER}),
+        ("elec", "death_1.wav", {"len": 0.55, "layer": THUNDER}),
+        ("spark", "spark.wav", {"layer": THUNDER})], -8),
     "blast": ("залп Мортиры", k("chunky", ["Chunky Explosion.mp3"]) +
               k("scifi", ["Audio/lowFrequency_explosion_000.ogg", "Audio/lowFrequency_explosion_001.ogg"]), -4),
     "squish": ("гибель особи: мокрый шлепок", k("squish", ["squish_01_0.mp3", "squish_02.mp3", "squish_03.mp3",
@@ -86,8 +96,8 @@ SOUNDS = {
     "swarm_bed": ("стрекот роя фоном, пока рой жив (петля)", [("cicada", "082526-cicadasounds.ogg", {"cut": (2.0, 6.0)})], -24),
     "click": ("кнопка", k("interface", [f"Audio/click_00{i}.ogg" for i in (1, 2, 3)]), -8),
     "toggle": ("переключатель: пауза, скорость", k("interface", [f"Audio/switch_00{i}.ogg" for i in (2, 3, 4)], lowpass=4000), -8),
-    "win": ("победа", k("jingles", ["OGG/jingles_NES/jingles_NES12.ogg"]), -6),
-    "lose": ("поражение", k("jingles", ["OGG/jingles_NES/jingles_NES11.ogg"]), -6),
+    "win": ("победа: напористая минорная фанфара", k("fanfare", ["sboe.mp3"]), -6),
+    "lose": ("поражение: короткая нисходящая тема", k("gameover", ["KL Peach Game Over III.mp3"]), -6),
 }
 
 
@@ -142,7 +152,12 @@ def convert(src, dst, gain, opt):
         cut = ["-ss", f"{max(0.0, a - 0.01):.3f}", "-to", f"{b + 0.05:.3f}"]
     elif "cut" in opt:
         cut = ["-ss", str(opt["cut"][0]), "-t", str(opt["cut"][1])]
-    af = "silenceremove=start_periods=1:start_threshold=-50dB" if "cut" not in opt else "afade=t=in:d=0.3,afade=t=out:st=5.6:d=0.4"
+    if "cut" in opt:                                    # a stretch of a long file: faded in and out so it does not click
+        n = opt["cut"][1]
+        fi, fo = (0.3, 0.4) if n > 2 else (0.005, n * 0.35)
+        af = f"afade=t=in:d={fi},afade=t=out:st={n - fo:.3f}:d={fo:.3f}"
+    else:
+        af = "silenceremove=start_periods=1:start_threshold=-50dB"
     if "rate" in opt:                                   # lower (or higher) and slower, as a heavier body would sound
         af += f",asetrate={int(44100 * opt['rate'])},aresample=44100"
     if "lowpass" in opt:                                # the shrill top cut off
@@ -150,6 +165,19 @@ def convert(src, dst, gain, opt):
     if "len" in opt:                                    # only the blow itself, the tail faded out
         af += f",atrim=0:{opt['len']},afade=t=out:st={opt['len'] * 0.5:.3f}:d={opt['len'] * 0.5:.3f}"
     subprocess.run(["ffmpeg", "-v", "error", "-y"] + cut + ["-i", src, "-ac", "1", "-ar", "44100", "-af", af, tmp], check=True)
+    if "layer" in opt:
+        lsrc, lrel, ln, ldb, llp = opt["layer"]
+        low = dst + ".layer.wav"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", find(lsrc, lrel), "-ac", "1", "-ar", "44100", "-af",
+                        f"silenceremove=start_periods=1:start_threshold=-50dB,atrim=0:{ln},lowpass=f={llp},"
+                        f"afade=t=out:st={ln * 0.4:.3f}:d={ln * 0.6:.3f}", low], check=True)
+        both = dst + ".both.wav"
+        g_main, g_low = -1.0 - peak_db(tmp), -1.0 - peak_db(low) + ldb
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-i", low, "-filter_complex",
+                        f"[0]volume={g_main:.2f}dB[a];[1]volume={g_low:.2f}dB[b];[a][b]amix=inputs=2:normalize=0:duration=longest",
+                        both], check=True)
+        os.replace(both, tmp)
+        os.remove(low)
     g = -1.0 - peak_db(tmp) + gain
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", f"volume={g:.2f}dB", "-c:a", "libvorbis", "-q:a", "4", dst],
                    check=True)
@@ -178,6 +206,10 @@ def main():
                 part += f", срез выше {opt['lowpass']} Гц"
             if "len" in opt:
                 part += f", первые {opt['len']} с"
+            if "layer" in opt:
+                la, lp, _lu = SRC[opt["layer"][0]]
+                authors.setdefault(la, set()).add(lp)
+                part += f"; под ним {la}: `{opt['layer'][1]}` (первые {opt['layer'][2]} с, ниже {opt['layer'][4]} Гц)"
             rows.append(f"| `{out}` | {what} | {author}: `{rel}`{part} | [{page.split('/')[-1]}]({page}) |")
         manifest[name] = outs
     json.dump(manifest, open(os.path.join(DST, "sfx.json"), "w"), ensure_ascii=False, indent=1)
@@ -187,7 +219,7 @@ def main():
                 "коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; "
                 "лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney "
                 "выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — "
-                "тон ниже, срез высоких, укорочено, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
+                "тон ниже, срез высоких, укорочено, подмешан второй звук, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
         for a, pages in sorted(authors.items()):
             f.write(f"- {a} — " + ", ".join(f"[{p.split('/')[-1]}]({p})" for p in sorted(pages)) + "\n")
         f.write("\n## Файлы\n\n| Файл | Для чего | Откуда | Страница |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")

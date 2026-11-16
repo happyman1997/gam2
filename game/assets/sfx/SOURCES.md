@@ -1,19 +1,22 @@
 # Откуда звуки
 
-Все звуки — под CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/): можно в коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — тон ниже, срез высоких, укорочено, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).
+Все звуки — под CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/): можно в коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — тон ниже, срез высоких, укорочено, подмешан второй звук, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).
 
 ## Авторы
 
 - BMacZero — [electricity-sound-effects-0](https://opengameart.org/content/electricity-sound-effects-0), [metal-impact-sounds](https://opengameart.org/content/metal-impact-sounds)
 - EZduzziteh — [squish-sounds-effects](https://opengameart.org/content/squish-sounds-effects)
 - Joth — [chunky-explosion](https://opengameart.org/content/chunky-explosion)
-- Kenney — [50-rpg-sound-effects](https://opengameart.org/content/50-rpg-sound-effects), [63-digital-sound-effects-lasers-phasers-space-etc](https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc), [85-short-music-jingles](https://opengameart.org/content/85-short-music-jingles), [interface-sounds](https://opengameart.org/content/interface-sounds), [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds)
+- KLY — [kl-peach-game-over-iii](https://opengameart.org/content/kl-peach-game-over-iii)
+- Kenney — [50-rpg-sound-effects](https://opengameart.org/content/50-rpg-sound-effects), [interface-sounds](https://opengameart.org/content/interface-sounds), [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds)
 - Spring Spring — [mechanical-explosion](https://opengameart.org/content/mechanical-explosion)
 - StarNinjas — [7-eating-crunches](https://opengameart.org/content/7-eating-crunches)
+- Zane Little Music — [hyper-ultra-fanfare](https://opengameart.org/content/hyper-ultra-fanfare)
 - bart — [steam-release-sounds](https://opengameart.org/content/steam-release-sounds)
+- faxcorp — [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack)
 - fvcalderan — [crunchy-bite](https://opengameart.org/content/crunchy-bite)
 - qubodup — [5-break-crunch-impacts](https://opengameart.org/content/5-break-crunch-impacts), [8-wet-squish-slurp-impacts](https://opengameart.org/content/8-wet-squish-slurp-impacts)
-- rubberduck — [75-cc0-breaking-falling-hit-sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx), [80-cc0-creature-sfx](https://opengameart.org/content/80-cc0-creature-sfx), [80-cc0-creture-sfx-2](https://opengameart.org/content/80-cc0-creture-sfx-2)
+- rubberduck — [100-cc0-sfx-2](https://opengameart.org/content/100-cc0-sfx-2), [75-cc0-breaking-falling-hit-sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx), [80-cc0-creature-sfx](https://opengameart.org/content/80-cc0-creature-sfx), [80-cc0-creture-sfx-2](https://opengameart.org/content/80-cc0-creture-sfx-2)
 - syncopika — [cicada-sounds](https://opengameart.org/content/cicada-sounds)
 
 ## Файлы
@@ -38,9 +41,11 @@
 | `hit_flesh_3.ogg` | голем бьёт особь: хруст | qubodup: `imp_3.mp3` (кусок 4) | [5-break-crunch-impacts](https://opengameart.org/content/5-break-crunch-impacts) |
 | `hit_flesh_4.ogg` | голем бьёт особь: хруст | qubodup: `imp_3.mp3` (кусок 5) | [5-break-crunch-impacts](https://opengameart.org/content/5-break-crunch-impacts) |
 | `hit_flesh_5.ogg` | голем бьёт особь: хруст | Kenney: `OGG/chop.ogg` | [50-rpg-sound-effects](https://opengameart.org/content/50-rpg-sound-effects) |
-| `zap_0.ogg` | разряд Мудреца и Изобретателя | BMacZero: `spark.wav`, срез выше 3500 Гц | [electricity-sound-effects-0](https://opengameart.org/content/electricity-sound-effects-0) |
-| `zap_1.ogg` | разряд Мудреца и Изобретателя | Kenney: `zap1.mp3` | [63-digital-sound-effects-lasers-phasers-space-etc](https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc) |
-| `zap_2.ogg` | разряд Мудреца и Изобретателя | Kenney: `zap2.mp3` | [63-digital-sound-effects-lasers-phasers-space-etc](https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc) |
+| `zap_0.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `hit.wav`, первые 0.6 с; под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_1.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `crackleelectricityloop.wav` (0.0–0.35 с); под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_2.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `snaploop.wav` (0.6–1.0 с); под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_3.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `death_1.wav`, первые 0.55 с; под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_4.ogg` | разряд Мудреца и Изобретателя: треск молнии | BMacZero: `spark.wav`; под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-sound-effects-0](https://opengameart.org/content/electricity-sound-effects-0) |
 | `blast_0.ogg` | залп Мортиры | Joth: `Chunky Explosion.mp3` | [chunky-explosion](https://opengameart.org/content/chunky-explosion) |
 | `blast_1.ogg` | залп Мортиры | Kenney: `Audio/lowFrequency_explosion_000.ogg` | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
 | `blast_2.ogg` | залп Мортиры | Kenney: `Audio/lowFrequency_explosion_001.ogg` | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
@@ -84,5 +89,5 @@
 | `toggle_0.ogg` | переключатель: пауза, скорость | Kenney: `Audio/switch_002.ogg`, срез выше 4000 Гц | [interface-sounds](https://opengameart.org/content/interface-sounds) |
 | `toggle_1.ogg` | переключатель: пауза, скорость | Kenney: `Audio/switch_003.ogg`, срез выше 4000 Гц | [interface-sounds](https://opengameart.org/content/interface-sounds) |
 | `toggle_2.ogg` | переключатель: пауза, скорость | Kenney: `Audio/switch_004.ogg`, срез выше 4000 Гц | [interface-sounds](https://opengameart.org/content/interface-sounds) |
-| `win_0.ogg` | победа | Kenney: `OGG/jingles_NES/jingles_NES12.ogg` | [85-short-music-jingles](https://opengameart.org/content/85-short-music-jingles) |
-| `lose_0.ogg` | поражение | Kenney: `OGG/jingles_NES/jingles_NES11.ogg` | [85-short-music-jingles](https://opengameart.org/content/85-short-music-jingles) |
+| `win_0.ogg` | победа: напористая минорная фанфара | Zane Little Music: `sboe.mp3` | [hyper-ultra-fanfare](https://opengameart.org/content/hyper-ultra-fanfare) |
+| `lose_0.ogg` | поражение: короткая нисходящая тема | KLY: `KL Peach Game Over III.mp3` | [kl-peach-game-over-iii](https://opengameart.org/content/kl-peach-game-over-iii) |

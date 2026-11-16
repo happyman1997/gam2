@@ -151,6 +151,8 @@ pub struct Effect {
     pub x: f32,
     pub y: f32,
     pub start: i32,
+    /// A bolt: from whom to whom (drawn from the attacker's emit point to the target's body, not a sheet).
+    pub link: Option<(usize, usize)>,
 }
 
 impl Record {
@@ -338,7 +340,10 @@ impl Record {
                         };
                         nums.push(Number { text, style, x, y, start: m.frame, t, k: 0, value, end: i32::MAX });
                         let name: &'static str = match att.name.as_str() {
-                            "Мудрец" | "Изобретатель" => "zap-hit",
+                            "Мудрец" | "Изобретатель" => {
+                                fx.push(Effect { name: "bolt", x, y, start: m.frame, link: Some((a, t)) });
+                                "zap-hit"
+                            }
                             "Орудие" => {
                                 // a volley: one blast over the cell for all the hits it makes at once
                                 if last_volley.map(|(v, fr)| v == a && (m.frame - fr) < 6).unwrap_or(false) {
@@ -349,12 +354,12 @@ impl Record {
                             }
                             _ => "hit-spark",
                         };
-                        fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame });
+                        fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame, link: None });
                     }
                     Event::Heal { t, amount, .. } => {
                         let (x, y) = at(t);
                         nums.push(Number { text: format!("+{amount}"), style: NumStyle::Heal, x, y, start: m.frame, t, k: 0, value: amount, end: i32::MAX });
-                        fx.push(Effect { name: "heal", x, y, start: m.frame });
+                        fx.push(Effect { name: "heal", x, y, start: m.frame, link: None });
                     }
                     Event::Poison { t, dmg } | Event::Burn { t, dmg } => {
                         let (x, y) = at(t);

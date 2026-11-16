@@ -26,7 +26,9 @@
  "zap": [
   "sfx/zap_0.ogg",
   "sfx/zap_1.ogg",
-  "sfx/zap_2.ogg"
+  "sfx/zap_2.ogg",
+  "sfx/zap_3.ogg",
+  "sfx/zap_4.ogg"
  ],
  "blast": [
   "sfx/blast_0.ogg",

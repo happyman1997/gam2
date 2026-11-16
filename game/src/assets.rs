@@ -10,6 +10,8 @@ pub struct Sprite {
     /// The point on the ground the body stands on.
     pub ox: i32,
     pub oy: i32,
+    /// Where a bolt leaves the body, from the ground point (the Sage's staff ball, the Inventor's arc).
+    pub emit: Option<(i32, i32)>,
 }
 
 pub struct Fx {
@@ -57,7 +59,8 @@ impl Assets {
         let img = |f: &Value| Image::load(&root.join(f.as_str().unwrap_or("")));
         let mut sprites = HashMap::new();
         for (k, v) in m["sprites"].as_object().ok_or("no sprites")? {
-            sprites.insert(k.clone(), Sprite { img: img(&v["file"])?, ox: i(&v["ox"]), oy: i(&v["oy"]) });
+            let emit = v["emit"].as_array().map(|e| (i(&e[0]), i(&e[1])));
+            sprites.insert(k.clone(), Sprite { img: img(&v["file"])?, ox: i(&v["ox"]), oy: i(&v["oy"]), emit });
         }
         let mut fx = HashMap::new();
         for (k, v) in m["fx"].as_object().ok_or("no fx")? {

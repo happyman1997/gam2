@@ -84,7 +84,140 @@ fn number(cv: &mut Image, a: &Assets, rec: &Record, n: &Number, f: i32) {
     a.fonts[font].draw(cv, &n.text, nx as i32, (ny + dy) as i32, col, Some(edge), Align::Center, fade);
 }
 
+/// A bolt of lightning from the attacker to the target, drawn as pixels: it runs out from the staff ball (or the
+/// arc's end) in three frames, crackles for four — redrawn every frame, the way lightning flickers — and fades in
+/// two. A white core, a blue rim, a dim glow; two short forks.
+fn bolt(cv: &mut Image, a: &Assets, rec: &Record, shown: &[crate::playback::Shown], e: &Effect, f: i32) {
+    let Some((src, tgt)) = e.link else { return };
+    let k = f - (e.start - 3);
+    if !(0..8).contains(&k) {
+        return;
+    }
+    let (Some(s), Some(t)) = (shown.iter().find(|s| s.id == src), shown.iter().find(|s| s.id == tgt)) else { return };
+    let spr = a.sprites.get(&sprite_name(rec, src, Pose::Attack, f));
+    let (mut ex, ey) = spr.and_then(|p| p.emit).unwrap_or((0, -30));
+    if rec.units[src].side == 1 {
+        ex = -ex;
+    }
+    let body = a.sprites.get(&sprite_name(rec, tgt, Pose::Idle, f)).map(|p| p.oy).unwrap_or(20);
+    let from = (s.x + ex as f32, s.y + ey as f32);
+    let to = (t.x, t.y - body as f32 * 0.45);
+    let reach = ((k + 1) as f32 / 3.0).min(1.0);
+    let fade = if k <= 6 { 1.0 } else { 0.55 };
+    // the same bolt while it runs out, a new one each frame after
+    let seed = (e.start as u32).wrapping_mul(2654435761) ^ (src as u32 * 97 + tgt as u32 * 13) ^ if k < 3 { 0 } else { k as u32 * 7919 };
+    let mut rnd = seed | 1;
+    let mut next = move || {
+        rnd ^= rnd << 13;
+        rnd ^= rnd >> 17;
+        rnd ^= rnd << 5;
+        (rnd % 2001) as f32 / 1000.0 - 1.0
+    };
+    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+    let len = dx.hypot(dy).max(1.0);
+    let (px, py) = (-dy / len, dx / len);
+    // midpoint displacement: each half bends less than the whole, so the kinks are big and small, never even
+    let mut pts = vec![(from.0, from.1, 0.0f32), (to.0, to.1, 1.0f32)];
+    let mut amp = (len * 0.12).clamp(3.0, 12.0);
+    while pts.len() < 65 && len / (pts.len() as f32) > 5.0 {
+        let mut nx = vec![pts[0]];
+        for w in pts.windows(2) {
+            let off = next() * amp;
+            nx.push(((w[0].0 + w[1].0) / 2.0 + px * off, (w[0].1 + w[1].1) / 2.0 + py * off, (w[0].2 + w[1].2) / 2.0));
+            nx.push(w[1]);
+        }
+        pts = nx;
+        amp = (amp * 0.62).max(1.6); // the small kinks stay sharp: lightning is jagged all the way down
+    }
+    let n = pts.len() - 1;
+    let mut core: Vec<(i32, i32)> = vec![];
+    for w in pts.windows(2) {
+        if w[0].2 >= reach {
+            break;
+        }
+        let (mut x1, mut y1) = (w[1].0, w[1].1);
+        if w[1].2 > reach {
+            let q = (reach - w[0].2) / (w[1].2 - w[0].2);
+            x1 = w[0].0 + (w[1].0 - w[0].0) * q;
+            y1 = w[0].1 + (w[1].1 - w[0].1) * q;
+        }
+        line(&mut core, w[0].0, w[0].1, x1, y1);
+    }
+    let mut forks: Vec<(i32, i32)> = vec![];
+    if reach >= 1.0 {
+        for _ in 0..2 {
+            let j = 1 + ((next() + 1.0) * 0.5 * (n - 2).max(1) as f32) as usize;
+            let (bx, by, _) = pts[j.min(pts.len() - 2)];
+            let ang = dy.atan2(dx) + next().signum() * (0.45 + 0.4 * next().abs());
+            let l = 6.0 + 8.0 * next().abs();
+            let mid = (bx + ang.cos() * l * 0.5 + next() * 2.0, by + ang.sin() * l * 0.5 + next() * 2.0);
+            line(&mut forks, bx, by, mid.0, mid.1);
+            line(&mut forks, mid.0, mid.1, bx + ang.cos() * l, by + ang.sin() * l);
+        }
+    }
+    // rims around the core: one pixel of bright blue, then a dim glow — each pixel painted once
+    let mut level: std::collections::HashMap<(i32, i32), u8> = Default::default();
+    let glow: i32 = if fade < 1.0 { 0 } else { 2 };
+    for &(x, y) in &core {
+        for oy in -glow..=glow {
+            for ox in -glow..=glow {
+                let d = ox.abs() + oy.abs();
+                if d > glow {
+                    continue;
+                }
+                let l = (3 - d.min(2)) as u8; // 3 core, 2 rim, 1 glow
+                let v = level.entry((x + ox, y + oy)).or_insert(0);
+                *v = (*v).max(if d == 0 { 3 } else { l.min(2) });
+            }
+        }
+    }
+    for &(x, y) in &forks {
+        let v = level.entry((x, y)).or_insert(0);
+        *v = (*v).max(2);
+    }
+    for (&(x, y), &l) in &level {
+        let (c, al) = match l {
+            3 => ([236, 250, 255, 255], 1.0),
+            2 => ([140, 214, 255, 255], 0.9),
+            _ => ([60, 120, 240, 255], 0.4),
+        };
+        cv.blend_px(x, y, c, al * fade);
+    }
+    // the ball it leaves flares
+    if k < 7 {
+        for (ox, oy) in [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)] {
+            cv.blend_px(from.0 as i32 + ox, from.1 as i32 + oy, [236, 250, 255, 255], if ox == 0 && oy == 0 { 1.0 } else { 0.7 });
+        }
+    }
+}
+
+/// The pixels of a line (Bresenham), appended.
+fn line(out: &mut Vec<(i32, i32)>, x0: f32, y0: f32, x1: f32, y1: f32) {
+    let (mut x, mut y, x1, y1) = (x0.round() as i32, y0.round() as i32, x1.round() as i32, y1.round() as i32);
+    let (dx, dy) = ((x1 - x).abs(), -(y1 - y).abs());
+    let (sx, sy) = (if x < x1 { 1 } else { -1 }, if y < y1 { 1 } else { -1 });
+    let mut err = dx + dy;
+    loop {
+        out.push((x, y));
+        if x == x1 && y == y1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
+}
+
 fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
+    if e.link.is_some() {
+        return; // a bolt, drawn by bolt()
+    }
     let fx = &a.fx[e.name];
     let per = 24.0 / fx.fps; // game frames per effect frame
     let k = ((f - e.start) as f32 / per.max(0.01)) as i32;
@@ -177,6 +310,9 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             let lit = ((st.hp.max(0) * 10 + info.max_hp - 1) / info.max_hp.max(1)).clamp(0, 10);
             meter(cv, a, s.x as i32, s.y as i32 - top - 10, lit, if info.side == 1 { "scale_over" } else { "scale_eat" });
         }
+    }
+    for e in &sparks.1 {
+        bolt(cv, a, rec, &shown, e, f);
     }
     for e in &sparks.1 {
         effect(cv, a, e, f);

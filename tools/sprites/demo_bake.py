@@ -26,8 +26,12 @@ DST = os.path.join(HERE, "..", "..", "game", "assets")
 MANIFEST = {"sprites": {}, "fx": {}, "fonts": {}, "ui": {}}
 
 
-def save_sprite(name, spr):
-    """A kit Sprite as an RGBA PNG cropped to what it covers; the pivot moved with the crop."""
+INVENTOR_ARC_END = (23, -16)   # px from his ground point: the far end of the arc his attack pose draws
+
+
+def save_sprite(name, spr, emit=None):
+    """A kit Sprite as an RGBA PNG cropped to what it covers; the pivot moved with the crop; `emit` — where a bolt
+    leaves it, in px from the ground point (the same after the crop)."""
     ys, xs = np.nonzero(spr.a)
     y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
     rgba = np.zeros((y1 - y0, x1 - x0, 4), np.uint8)
@@ -37,6 +41,8 @@ def save_sprite(name, spr):
     Image.fromarray(rgba, "RGBA").save(os.path.join(DST, "sprites", name + ".png"))
     MANIFEST["sprites"][name] = dict(file=f"sprites/{name}.png", w=int(x1 - x0), h=int(y1 - y0),
                                      ox=int(spr.ox - x0), oy=int(spr.oy - y0))
+    if emit is not None:
+        MANIFEST["sprites"][name]["emit"] = [int(round(emit[0])), int(round(emit[1]))]
 
 
 def units():
@@ -44,9 +50,16 @@ def units():
     variants each (idle, attack, dead), the Devourer at each growth step (idle, attack, dead)."""
     for name, k in (("Мудрец", BT.GK[4]), ("Орудие", BT.GK[4]), ("Механик", BT.GK[4] * 0.88)):
         for pose in ("idle", "attack", "broken"):
+            if name == "Мудрец" and pose == "attack":
+                # the Sage casts; the game draws the bolt from the ball of the staff to the target (emit)
+                _, info = LH.GH.creature_parts(LH.GH.SAGE, LH.GH.SAGE["poses"]["cast"], fx=False)
+                save_sprite(f"{name}_{pose}", F.build(name, "cast", k=k), emit=F.to_screen(info["n"]["tip"], k))
+                continue
             save_sprite(f"{name}_{pose}", F.build(name, pose, k=k))
     for pose in ("idle", "attack", "broken"):
-        save_sprite(f"Изобретатель_{pose}", LH.GH.build(LH.INVENTOR, pose, 1.05))
+        # the Inventor's arc leaves his gauntlet forward; the game's bolt goes on from its end to the target
+        save_sprite(f"Изобретатель_{pose}", LH.GH.build(LH.INVENTOR, pose, 1.05),
+                    emit=INVENTOR_ARC_END if pose == "attack" else None)
     for name, traits, soldier in (("Муравей (рабочая)", (), False), ("Муравей (солдат)", (), True),
                                   ("Кузнечик (рабочая)", ("jumper",), False)):
         for v in range(4):

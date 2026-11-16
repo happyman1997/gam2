@@ -12,7 +12,7 @@ use std::io::Write;
 pub const OW: i32 = W * 2;
 pub const OH: i32 = H * 2;
 const FPS: f32 = 60.0;
-const HOLD: f32 = 48.0; // game frames the end plate stays before the next battle
+const HOLD: f32 = 96.0; // game frames the end plate stays before the next battle (the jingle plays out)
 const FADE: f32 = 12.0; // game frames of the fade from and to black around a battle
 const WING: f32 = 68.0; // video rows the interface's wing covers (34 px of art at 2×)
 

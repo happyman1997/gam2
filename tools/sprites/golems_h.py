@@ -387,6 +387,10 @@ def sage_fx(fx, A, info, S, ft):
     tip, T = info["n"]["tip"], info["f"]["target"]
     near = ft < 0.5
     ground = A.get("ground", True)
+    if not A.get("bolt", True):          # the cast alone: the game draws the bolt itself, to where the target stands
+        fx.ell(tip, (2.4, 2.4, 2.4), ENERGY)
+        fx.ell(info["f"]["palm"] + info["f"]["d"] * 1.6, (0.9, 0.9, 0.9), ENERGY)
+        return
     if near:
         fx.ell(tip, (2.4, 2.4, 2.4), ENERGY)                                                # the ball flares
         rnd = np.random.RandomState(23)
@@ -439,6 +443,8 @@ SAGE = dict(
     bands=dict(low="attack", level="attack_level", high="attack_high"),
     strike=lambda info: info["f"]["target"],
 )
+# the Discharge without its bolt, for a game that draws the bolt to the target: the hand level, the ball aflare
+SAGE["poses"]["cast"] = dict(SAGE["poses"]["attack_level"], bolt=False)
 
 
 # ---------------------------------------------------------------- Горн: a stocky furnace with a tall chimney
