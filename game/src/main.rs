@@ -42,7 +42,7 @@ impl Demo {
             rec,
             sparks,
             cues,
-            view: render::View { frame: 0.0, speed: 1, paused: false },
+            view: render::View { frame: 0.0, speed: 1, paused: false, hover: None },
             #[cfg(feature = "audio")]
             audio: None,
         })
@@ -106,7 +106,7 @@ fn scaled(cv: &gfx::Image, k: i32) -> gfx::Image {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let seed = args.iter().position(|a| a == "--seed").and_then(|i| args.get(i + 1)).and_then(|s| s.parse().ok()).unwrap_or(7);
+    let seed = args.iter().position(|a| a == "--seed").and_then(|i| args.get(i + 1)).and_then(|s| s.parse().ok()).unwrap_or(48);
     let mut demo = match Demo::new(seed) {
         Ok(d) => d,
         Err(e) => {

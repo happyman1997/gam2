@@ -109,6 +109,31 @@ impl Image {
         }
     }
 
+    /// `src` darkened by `mul` and drained of colour by `grey` (0..1): a body that is dead, under the living.
+    pub fn blit_shade(&mut self, src: &Image, x: i32, y: i32, flip: bool, mul: f32, grey: f32) {
+        for j in 0..src.h {
+            for i in 0..src.w {
+                let si = if flip { src.w - 1 - i } else { i };
+                let c = src.get(si, j);
+                if c[3] == 0 {
+                    continue;
+                }
+                let l = (c[0] as f32 * 0.3 + c[1] as f32 * 0.59 + c[2] as f32 * 0.11) * (1.0 - 0.15 * grey);
+                let s = |v: u8| ((v as f32 * (1.0 - grey) + l * grey) * mul).clamp(0.0, 255.0) as u8;
+                self.blend_px(x + i, y + j, [s(c[0]), s(c[1]), s(c[2]), c[3]], 1.0);
+            }
+        }
+    }
+
+    /// Every covered pixel of the image lifted toward white by `k` (a button under the cursor).
+    pub fn lighten(&mut self, k: f32) {
+        for p in self.px.iter_mut().filter(|p| p[3] > 0) {
+            for c in p.iter_mut().take(3) {
+                *c = (*c as f32 + (255.0 - *c as f32) * k) as u8;
+            }
+        }
+    }
+
     /// A coverage mask (a font glyph) in one colour.
     #[allow(clippy::too_many_arguments)]
     pub fn mask(&mut self, src: &Image, sx: i32, sy: i32, sw: i32, sh: i32, x: i32, y: i32, col: [u8; 3], alpha: f32) {

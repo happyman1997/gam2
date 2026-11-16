@@ -1,5 +1,7 @@
 //! The window: winit for the window and the keys, pixels to put the 960×540 frame on screen at a whole factor
-//! (pixels scales by the largest whole multiple that fits and letterboxes the rest). The demo ticks at 24 fps.
+//! (pixels scales by the largest whole multiple that fits and letterboxes the rest). The battle ticks at 24 fps (its
+//! sounds and blows), but the picture is drawn at the screen's own rate, the walks between the ticks, so it moves
+//! smoothly on a 60 or 144 Hz screen.
 
 use crate::{gfx, render, Demo};
 use pixels::{Pixels, SurfaceTexture};
@@ -51,19 +53,20 @@ impl App {
         self.demo.ui_sound("click");
     }
 
+    /// The button under the cursor, if any.
+    fn under_cursor(&self) -> Option<render::Button> {
+        let px = self.pixels.as_ref()?;
+        let (x, y) = px.window_pos_to_pixel(self.cursor).ok()?;
+        render::button_at(&self.demo.rec, &self.demo.view, x as i32, y as i32)
+    }
+
     fn click(&mut self) {
-        let Some(px) = &self.pixels else { return };
-        let Ok((x, y)) = px.window_pos_to_pixel(self.cursor) else { return };
-        let (x, y) = (x as i32, y as i32);
-        if !(6..=28).contains(&y) {
-            return;
-        }
-        if (736..784).contains(&x) {
-            self.pause();
-        } else if (790..838).contains(&x) {
-            self.speed_up();
-        } else if (844..952).contains(&x) {
-            self.skip_to_end();
+        match self.under_cursor() {
+            Some(render::Button::Pause) => self.pause(),
+            Some(render::Button::Speed) => self.speed_up(),
+            Some(render::Button::ToEnd) => self.skip_to_end(),
+            Some(render::Button::NewBattle) => self.new_battle(),
+            None => {}
         }
     }
 }
@@ -94,7 +97,10 @@ impl ApplicationHandler for App {
                     let _ = p.resize_surface(s.width.max(1), s.height.max(1));
                 }
             }
-            WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x as f32, position.y as f32),
+            WindowEvent::CursorMoved { position, .. } => {
+                self.cursor = (position.x as f32, position.y as f32);
+                self.demo.view.hover = self.under_cursor();
+            }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => match event.logical_key {
                 Key::Named(NamedKey::Escape) => el.exit(),
@@ -110,7 +116,15 @@ impl ApplicationHandler for App {
                     self.demo.tick();
                     self.next += TICK;
                 }
+                // between two ticks: the picture runs ahead by the part of a tick already gone, so a walk is smooth
+                let tick = self.demo.view.frame;
+                let end = (self.demo.rec.frames() + 24) as f32;
+                if !self.demo.view.paused && tick < end {
+                    let part = 1.0 - (self.next.saturating_duration_since(now).as_secs_f32() / TICK.as_secs_f32()).clamp(0.0, 1.0);
+                    self.demo.view.frame = (tick + part * self.demo.view.speed as f32).min(end);
+                }
                 self.demo.draw(&mut self.canvas);
+                self.demo.view.frame = tick;
                 if let Some(p) = &mut self.pixels {
                     for (dst, src) in p.frame_mut().chunks_exact_mut(4).zip(self.canvas.px.iter()) {
                         dst.copy_from_slice(src);
@@ -125,7 +139,8 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
-        el.set_control_flow(ControlFlow::WaitUntil(self.next));
+        // draw as often as the screen shows (pixels waits for its refresh), not only on a tick
+        el.set_control_flow(ControlFlow::Poll);
         if let Some(w) = &self.window {
             w.request_redraw();
         }

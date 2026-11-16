@@ -227,6 +227,9 @@ def inventor_fx(fx, A, info, S, ft):
     """Шокер: an arc from the prongs to the target."""
     gun = info["n"]
     near = ft < 0.5
+    if not A.get("bolt", True):          # the prongs aflare alone: the game draws the arc to where the target stands
+        fx.ell(gun["muzzle"], (1.1, 1.1, 1.1), ENERGY)
+        return
     if near:
         fx.ell(gun["muzzle"], (1.1, 1.1, 1.1), ENERGY)
         zigzag(fx, gun["muzzle"], gun["target"], n=7, amp=1.0, seed=5, r=0.3)
@@ -265,6 +268,8 @@ INVENTOR = dict(
     bands=dict(low="attack_low", level="attack", high="attack_high"),
 )
 INVENTOR["poses"]["broken"] = dict(GH.broken_pose(INVENTOR), lean=-0.3, hand_n=(3.4, -8.6, 2.2), hand_f=(2.2, -8.8, -2.2))
+# the shocker raised, the prongs aflare, no arc: for a game that draws the arc to the target itself
+INVENTOR["poses"]["cast"] = dict(INVENTOR["poses"]["attack"], bolt=False)
 
 
 

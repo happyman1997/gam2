@@ -26,9 +26,6 @@ DST = os.path.join(HERE, "..", "..", "game", "assets")
 MANIFEST = {"sprites": {}, "fx": {}, "fonts": {}, "ui": {}}
 
 
-INVENTOR_ARC_END = (23, -16)   # px from his ground point: the far end of the arc his attack pose draws
-
-
 def save_sprite(name, spr, emit=None):
     """A kit Sprite as an RGBA PNG cropped to what it covers; the pivot moved with the crop; `emit` — where a bolt
     leaves it, in px from the ground point (the same after the crop)."""
@@ -57,9 +54,13 @@ def units():
                 continue
             save_sprite(f"{name}_{pose}", F.build(name, pose, k=k))
     for pose in ("idle", "attack", "broken"):
-        # the Inventor's arc leaves his gauntlet forward; the game's bolt goes on from its end to the target
-        save_sprite(f"Изобретатель_{pose}", LH.GH.build(LH.INVENTOR, pose, 1.05),
-                    emit=INVENTOR_ARC_END if pose == "attack" else None)
+        if pose == "attack":
+            # the Inventor raises the shocker; the game draws the arc from its prongs to the target (emit)
+            _, info = LH.GH.creature_parts(LH.INVENTOR, LH.INVENTOR["poses"]["cast"], fx=False)
+            save_sprite("Изобретатель_attack", LH.GH.build(LH.INVENTOR, "cast", 1.05),
+                        emit=F.to_screen(info["n"]["muzzle"], 1.05))
+            continue
+        save_sprite(f"Изобретатель_{pose}", LH.GH.build(LH.INVENTOR, pose, 1.05))
     for name, traits, soldier in (("Муравей (рабочая)", (), False), ("Муравей (солдат)", (), True),
                                   ("Кузнечик (рабочая)", ("jumper",), False)):
         for v in range(4):

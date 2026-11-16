@@ -296,7 +296,22 @@ impl Record {
         let end = if self.outcome.winner == Some(1) { "win" } else { "lose" };
         out.push(Cue { frame: self.frames() + 2, name: end, gain: 0.0, x: 480.0 });
         out.sort_by_key(|c| c.frame);
-        out
+        // a volley that kills five at once: two deaths are heard, the rest would only be a wall of noise; a second
+        // blow of a kind within a third of a second comes a little quieter
+        let cap = |n: &str| match n {
+            "squish" | "death_rattle" | "break" | "miss" | "blast" | "shot" => 2,
+            "bite" | "hit_metal" | "hit_flesh" | "zap" => 3,
+            _ => usize::MAX,
+        };
+        let mut kept: Vec<Cue> = vec![];
+        for c in out {
+            let near = kept.iter().rev().take_while(|k| c.frame - k.frame < 8).filter(|k| k.name == c.name).count();
+            if near >= cap(c.name) {
+                continue;
+            }
+            kept.push(Cue { gain: c.gain - 3.0 * near as f32, ..c });
+        }
+        kept
     }
 
     /// The numbers and effects of the whole battle, each with the frame it starts on.
@@ -338,6 +353,8 @@ impl Record {
                             }
                             _ => (dmg.max(0), style),
                         };
+                        // a sum never shows more than the unit had: three shells into one ant are not "−86"
+                        let value = value.min(self.units[t].max_hp.max(1));
                         let text = match style {
                             NumStyle::Miss => "мимо".to_string(),
                             NumStyle::Crit => format!("{value}!"),

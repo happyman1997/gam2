@@ -4,7 +4,7 @@ licence checked to be CC0 before it is listed here (CC-BY, CC-BY-SA, GPL and OGA
 
 Downloads the sources into tools/audio/cache, takes the files each sound of the game is made from (cutting a file
 of several sounds at its silences, or a stretch out of a long recording), trims the silence before them, brings them
-to one loudness (peak at −1 dBFS, then the sound's own gain), writes mono OGG Vorbis 44.1 kHz into game/assets/sfx
+to the loudness the sound should have (A-weighted, the loudest 150 ms; never over −1 dBFS), writes mono OGG Vorbis 44.1 kHz into game/assets/sfx
 with sfx.json (the game's sound → its variants) and SOURCES.md (each file: what for, whose, which page, licence).
 
     python3 tools/audio/sfx_build.py
@@ -59,7 +59,8 @@ def k(src, files, **opt):
     return [(src, f, opt) for f in files]
 
 
-# the game's sound: (what it is for, [(source, file, options)], gain dB). Options: "split": n — the n-th piece of a file of
+# the game's sound: (what it is for, [(source, file, options)], loudness dB(A) — how loud it feels: the loudest 150 ms,
+# A-weighted; every variant brought to it, so they do not jump about). Options: "split": n — the n-th piece of a file of
 # several sounds; "cut": (start, length) — a stretch of a long file; "rate": tone (0.8 = lower and slower, heavier);
 # "lowpass": Hz above which the shrill top is cut; "len": seconds kept, the end faded out; "layers": sounds mixed with
 # it ({src, rel, db against it, len, af — their own filters}); "punch": squeezed and driven, so a blow sounds fat
@@ -76,46 +77,46 @@ PUNCH = "acompressor=threshold=-20dB:ratio=5:attack=1:release=90:makeup=8dB,bass
 
 SOUNDS = {
     "bite": ("укус особи: хитиновые жвалы", k("crunchybite", ["crunchybite.ogg"]) +
-             k("crunches", [f"crunch.{i}.ogg" for i in (1, 2, 3, 5)]) + k("creature", ["eat_01.ogg"]), -10),
+             k("crunches", [f"crunch.{i}.ogg" for i in (1, 2, 3, 5)]) + k("creature", ["eat_01.ogg"]), -30),
     "hit_metal": ("укус приходится по голему: звон металла", k("metal", ["clink1_0.wav", "clink2.wav", "clink3.wav"], lowpass=5000) +
                   k("bfh", [f"bfh1_metal_hit_0{i}.ogg" for i in (2, 4)], lowpass=5000) +
-                  k("scifi", ["Audio/impactMetal_000.ogg"], lowpass=5000), -12),
+                  k("scifi", ["Audio/impactMetal_000.ogg"], lowpass=5000), -31),
     "hit_flesh": ("голем бьёт особь: хруст", [("breakcrunch", "imp_3.mp3", {"split": i}) for i in range(5)] +
-                  k("rpg", ["OGG/chop.ogg"]), -8),
+                  k("rpg", ["OGG/chop.ogg"]), -27),
     # a discharge: a snap, the crackle of a real spark, the low clap of thunder; squeezed and driven so it bites
     "zap": ("разряд Мудреца и Изобретателя: щелчок, треск искры, раскат", [
         ("elec", "hit.wav", {"len": 0.7, "layers": [CRACK, THUNDER], "punch": True}),
         ("elec", "crackleelectricityloop.wav", {"cut": (0.0, 0.4), "layers": [CRACK, THUNDER], "punch": True}),
         ("elec", "snaploop.wav", {"cut": (0.6, 0.45), "layers": [CRACK, THUNDER], "punch": True}),
         ("elec", "death_1.wav", {"len": 0.6, "layers": [CRACK, THUNDER], "punch": True}),
-        ("spark", "spark.wav", {"layers": [CRACK, THUNDER], "punch": True})], -6),
+        ("spark", "spark.wav", {"layers": [CRACK, THUNDER], "punch": True})], -25),
     # the Mortar fires: a crack of the charge and the barrel's boom; the shell lands: a blast with a hard edge and
     # the ground shaking under it
     "shot": ("выстрел Мортиры: хлопок заряда и низкий бас ствола",
              k("bangs", ["cannon_01.ogg", "cannon_04.ogg", "cannon_05.ogg"], len=0.9, layers=[BOOM], punch=True) +
-             k("gunshots", ["22 Magnum.wav"], len=0.8, layers=[BOOM], punch=True), -5),
+             k("gunshots", ["22 Magnum.wav"], len=0.8, layers=[BOOM], punch=True), -25),
     "blast": ("разрыв снаряда Мортиры", k("scifi", [f"Audio/explosionCrunch_00{i}.ogg" for i in (0, 1, 3)],
                                         len=1.4, layers=[SNAP, SUB], punch=True) +
-              k("explosions", ["explosion3.ogg"], len=1.4, layers=[SNAP, SUB], punch=True), -3),
+              k("explosions", ["explosion3.ogg"], len=1.4, layers=[SNAP, SUB], punch=True), -22),
     "squish": ("гибель особи: мокрый шлепок", k("squish", ["squish_01_0.mp3", "squish_02.mp3", "squish_03.mp3",
                                                          "squish_04.mp3", "squish_06.mp3"]) +
-               [("wetsquish", "im.mp3", {"split": i}) for i in range(5)], -9),
+               [("wetsquish", "im.mp3", {"split": i}) for i in range(5)], -27),
     "death_rattle": ("хрип гибнущей особи: низкий, без писка", k("creature", ["hurt_04.ogg", "hurt_05.ogg", "grunt_02.ogg"]) +
                      k("creature2", ["grunt_06.ogg", "grunt_08.ogg", "monster_09.ogg", "monster_12.ogg"]) +
-                     [("creature2", "die_03.ogg", {"lowpass": 3500})], -14),
+                     [("creature2", "die_03.ogg", {"lowpass": 3500})], -31),
     "break": ("голем сломан: механический взрыв, падает железо", k("mechexp", ["mechanical_explosion.wav"]) +
-              k("bfh", [f"bfh1_metal_falling_0{i}.ogg" for i in (1, 2)], lowpass=5000), -6),
+              k("bfh", [f"bfh1_metal_falling_0{i}.ogg" for i in (1, 2)], lowpass=5000), -23),
     "heal": ("ремонт Механика: глухой выдох пара", k("steam", [f"steam hisses - Marker #{i}.wav" for i in (1, 2, 3)],
-                                                    rate=0.8, lowpass=1600, len=1.0), -12),
-    "miss": ("промах: свист", k("rpg", [f"OGG/drawKnife{i}.ogg" for i in (1, 2, 3)], lowpass=4000), -12),
+                                                    rate=0.8, lowpass=1600, len=1.0), -27),
+    "miss": ("промах: свист", k("rpg", [f"OGG/drawKnife{i}.ogg" for i in (1, 2, 3)], lowpass=4000), -32),
     "step": ("тяжёлый шаг голема: глухой удар металла", k("metal", ["thud2.wav", "thud3.wav"], rate=0.8, lowpass=1800, len=0.35) +
              k("bfh", ["bfh1_hit_02.ogg", "bfh1_hit_07.ogg"], lowpass=2000, len=0.35) +
-             k("rpg", ["OGG/footstep02.ogg", "OGG/footstep04.ogg"], rate=0.65, lowpass=1500, len=0.35), -10),
-    "swarm_bed": ("стрекот роя фоном, пока рой жив (петля)", [("cicada", "082526-cicadasounds.ogg", {"cut": (2.0, 6.0)})], -24),
-    "click": ("кнопка", k("interface", [f"Audio/click_00{i}.ogg" for i in (1, 2, 3)]), -8),
-    "toggle": ("переключатель: пауза, скорость", k("interface", [f"Audio/switch_00{i}.ogg" for i in (2, 3, 4)], lowpass=4000), -8),
-    "win": ("победа: напористая минорная фанфара", k("fanfare", ["sboe.mp3"]), -6),
-    "lose": ("поражение: короткая нисходящая тема", k("gameover", ["KL Peach Game Over III.mp3"]), -6),
+             k("rpg", ["OGG/footstep02.ogg", "OGG/footstep04.ogg"], rate=0.65, lowpass=1500, len=0.35), -32),
+    "swarm_bed": ("стрекот роя фоном, пока рой жив (петля)", [("cicada", "082526-cicadasounds.ogg", {"cut": (2.0, 6.0)})], -47),
+    "click": ("кнопка", k("interface", [f"Audio/click_00{i}.ogg" for i in (1, 2, 3)]), -36),
+    "toggle": ("переключатель: пауза, скорость", k("interface", [f"Audio/switch_00{i}.ogg" for i in (2, 3, 4)], lowpass=4000), -33),
+    "win": ("победа: напористая минорная фанфара", k("fanfare", ["sboe.mp3"]), -20),
+    "lose": ("поражение: короткая нисходящая тема", k("gameover", ["KL Peach Game Over III.mp3"]), -21),
 }
 
 
@@ -149,6 +150,20 @@ def peak_db(path):
                          capture_output=True, text=True).stderr
     m = re.search(r"max_volume: (-?[\d.]+) dB", out)
     return float(m.group(1)) if m else 0.0
+
+
+def loudness(path):
+    """How loud a sound feels: dB(A) of its loudest 150 ms (A-weighted, so a deep boom is not taken for a loud one)."""
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "quiet", "-i", path, "-ac", "1", "-ar", "44100", "-f", "f32le", "-"],
+                         capture_output=True, check=True).stdout
+    x = np.frombuffer(raw, np.float32).astype(np.float64)
+    f = np.fft.rfftfreq(len(x), 1 / 44100) + 1e-9
+    f2 = f ** 2
+    a = (12194 ** 2 * f2 ** 2) / ((f2 + 20.6 ** 2) * np.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2)) * (f2 + 12194 ** 2))
+    y = np.fft.irfft(np.fft.rfft(x) * a, len(x))
+    w = min(len(y), int(0.15 * 44100))
+    return 10 * np.log10(np.convolve(y ** 2, np.ones(w) / w, "valid").max() + 1e-12)
 
 
 def segments(path):
@@ -206,7 +221,7 @@ def convert(src, dst, gain, opt):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", f"volume={-6.0 - peak_db(tmp):.2f}dB,{PUNCH}", fat],
                        check=True)
         os.replace(fat, tmp)
-    g = -1.0 - peak_db(tmp) + gain
+    g = min(gain - loudness(tmp), -1.0 - peak_db(tmp))   # as loud as the sound should feel, never over −1 dBFS
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", f"volume={g:.2f}dB", "-c:a", "libvorbis", "-q:a", "4", dst],
                    check=True)
     os.remove(tmp)
@@ -249,7 +264,7 @@ def main():
                 "коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; "
                 "лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney "
                 "выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — "
-                "тон ниже, срез высоких, укорочено, подмешаны другие звуки, сжато для плотности, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
+                "тон ниже, срез высоких, укорочено, подмешаны другие звуки, сжато для плотности, громкость выровнена по слышимой (A-взвешенной) громкости, пик не выше −1 dBFS, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
         for a, pages in sorted(authors.items()):
             f.write(f"- {a} — " + ", ".join(f"[{p.split('/')[-1]}]({p})" for p in sorted(pages)) + "\n")
         f.write("\n## Файлы\n\n| Файл | Для чего | Откуда | Страница |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")
