@@ -3,3 +3,4 @@ tools/sprites/out/
 /target
 .venv/
 tools/balance/cache/
+tools/audio/cache/

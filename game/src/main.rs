@@ -5,8 +5,11 @@
 //!   cargo run -p game --release -- --shot 120 a.png   frame 120 to a PNG (×2), no window needed
 //!   cargo run -p game --release -- --strip out.png    a strip of frames across the battle, for a look
 //!   cargo run -p game --release -- --frames dir 2     every 2nd frame of the battle to dir/0000.png…
+//!   cargo run -p game --release -- --cues cues.json   the battle's sounds with their frames
 
 mod assets;
+#[cfg(feature = "audio")]
+mod audio;
 mod gfx;
 mod playback;
 mod render;
@@ -19,7 +22,10 @@ pub struct Demo {
     pub assets: assets::Assets,
     pub rec: playback::Record,
     pub sparks: (Vec<playback::Number>, Vec<playback::Effect>),
+    pub cues: Vec<playback::Cue>,
     pub view: render::View,
+    #[cfg(feature = "audio")]
+    pub audio: Option<audio::Audio>,
 }
 
 impl Demo {
@@ -27,19 +33,54 @@ impl Demo {
         let assets = assets::Assets::load()?;
         let rec = playback::record(seed);
         let sparks = rec.sparks();
-        Ok(Demo { assets, rec, sparks, view: render::View { frame: 0.0, speed: 1, paused: false } })
+        let cues = rec.cues();
+        Ok(Demo {
+            assets,
+            rec,
+            sparks,
+            cues,
+            view: render::View { frame: 0.0, speed: 1, paused: false },
+            #[cfg(feature = "audio")]
+            audio: None,
+        })
     }
 
     pub fn restart(&mut self, seed: u64) {
         self.rec = playback::record(seed);
         self.sparks = self.rec.sparks();
+        self.cues = self.rec.cues();
         self.view.frame = 0.0;
     }
 
-    /// One tick of 1/24 s.
+    /// One tick of 1/24 s; the sounds whose moment it passed are played (at most a few a tick, and one of a kind,
+    /// so a fast-forwarded swarm stays a sound and not a wall of noise).
     pub fn tick(&mut self) {
-        if !self.view.paused {
-            self.view.frame = (self.view.frame + self.view.speed as f32).min((self.rec.frames() + 24) as f32);
+        if self.view.paused {
+            return;
+        }
+        let before = self.view.frame as i32;
+        self.view.frame = (self.view.frame + self.view.speed as f32).min((self.rec.frames() + 24) as f32);
+        let now = self.view.frame as i32;
+        #[cfg(feature = "audio")]
+        if let Some(a) = &mut self.audio {
+            let mut played: Vec<&str> = vec![];
+            for c in self.cues.iter().filter(|c| c.frame > before && c.frame <= now) {
+                if played.contains(&c.name) || played.len() >= 4 {
+                    continue;
+                }
+                a.play(c.name, c.gain, c.x);
+                played.push(c.name);
+            }
+        }
+        #[cfg(not(feature = "audio"))]
+        let _ = (before, now);
+    }
+
+    /// A sound of the interface (a button, a key).
+    pub fn ui_sound(&mut self, _name: &str) {
+        #[cfg(feature = "audio")]
+        if let Some(a) = &mut self.audio {
+            a.play(_name, 0.0, 480.0);
         }
     }
 
@@ -91,6 +132,14 @@ fn main() {
         }
         strip.save(Path::new(&path)).expect("save");
         println!("{path}: frames {picks:?}, rounds {}, winner {:?}", demo.rec.rounds.len(), demo.rec.outcome.winner);
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--cues") {
+        // the battle's sounds with their frames (24 fps), as JSON — to mix a soundtrack for a video
+        let path = args.get(i + 1).cloned().unwrap_or_else(|| "cues.json".into());
+        let v: Vec<serde_json::Value> = demo.cues.iter().map(|c| serde_json::json!({"frame": c.frame, "name": c.name, "gain": c.gain, "x": c.x})).collect();
+        std::fs::write(&path, serde_json::to_string(&v).unwrap()).expect("write");
+        println!("{path}: {} cues", v.len());
         return;
     }
     if let Some(i) = args.iter().position(|a| a == "--frames") {

@@ -57,7 +57,11 @@
   его целым множителем. Поэтому тот же код снимает кадры без окна — так демо проверяется в облаке.
 - Спрайты, эффекты, шрифты и куски интерфейса запечены заранее (`tools/sprites/demo_bake.py` → `game/assets`):
   големы и особи собираются кодом на Python, перенос этих сборщиков в Rust — позже.
-- Звука пока нет.
+- Звук — `kira`: удары, разряды, залп, гибель, ремонт, промахи, шаги големов, кнопки, джингл победы или
+  поражения. Звуки — Kenney (CC0), обработаны `tools/audio/kenney_sfx.py` в `game/assets/sfx`. У каждого звука
+  несколько вариантов; играет случайный, чуть выше или ниже, со звуком слева или справа — по месту на поле; за
+  тик не больше четырёх звуков и не два одинаковых, чтобы на ускорении рой не превращался в шум. На Linux для
+  сборки нужны заголовки ALSA (`libasound2-dev`); без звука: `--no-default-features --features window`.
 
 ```
 cargo run -p game --release                         # окно: Пробел — пауза, Tab — скорость, End — в конец, R — новый бой, Esc — выход
@@ -65,7 +69,10 @@ cargo run -p game --release -- --seed 12            # другой бой
 cargo run -p game --release -- --shot 120 a.png     # кадр 120 в PNG (×2), без окна
 cargo run -p game --release -- --strip s.png        # шесть кадров через весь бой
 cargo run -p game --release -- --frames dir 2       # каждый второй кадр боя
+cargo run -p game --release -- --cues cues.json     # звуки боя с их кадрами
 cargo build -p game --release --no-default-features # сборка без окна
 ```
 
 ![Бой в техно-демо](images/demo_battle.gif)
+
+Видео со звуком (сведено из тех же кадров и звуков, что играет игра): [demo_battle.mp4](images/demo_battle.mp4)

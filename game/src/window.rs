@@ -32,15 +32,23 @@ impl App {
             _ => 1,
         };
         self.demo.view.paused = false;
+        self.demo.ui_sound("toggle");
     }
 
-    fn to_end(&mut self) {
+    fn skip_to_end(&mut self) {
         self.demo.view.frame = (self.demo.rec.frames() - 1) as f32;
+        self.demo.ui_sound("click");
+    }
+
+    fn pause(&mut self) {
+        self.demo.view.paused = !self.demo.view.paused;
+        self.demo.ui_sound("toggle");
     }
 
     fn new_battle(&mut self) {
         self.seed = self.seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407) >> 16;
         self.demo.restart(self.seed);
+        self.demo.ui_sound("click");
     }
 
     fn click(&mut self) {
@@ -51,11 +59,11 @@ impl App {
             return;
         }
         if (736..784).contains(&x) {
-            self.demo.view.paused = !self.demo.view.paused;
+            self.pause();
         } else if (790..838).contains(&x) {
             self.speed_up();
         } else if (844..952).contains(&x) {
-            self.to_end();
+            self.skip_to_end();
         }
     }
 }
@@ -90,9 +98,9 @@ impl ApplicationHandler for App {
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => match event.logical_key {
                 Key::Named(NamedKey::Escape) => el.exit(),
-                Key::Named(NamedKey::Space) => self.demo.view.paused = !self.demo.view.paused,
+                Key::Named(NamedKey::Space) => self.pause(),
                 Key::Named(NamedKey::Tab) => self.speed_up(),
-                Key::Named(NamedKey::End) => self.to_end(),
+                Key::Named(NamedKey::End) => self.skip_to_end(),
                 Key::Character(ref c) if c.as_str() == "r" || c.as_str() == "к" => self.new_battle(),
                 _ => {}
             },
@@ -124,7 +132,14 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn run(demo: Demo, seed: u64) {
+pub fn run(mut demo: Demo, seed: u64) {
+    #[cfg(feature = "audio")]
+    {
+        demo.audio = crate::audio::Audio::new();
+        if demo.audio.is_none() {
+            eprintln!("звук не включился: нет устройства или файлов в game/assets/sfx — играем без звука");
+        }
+    }
     let el = EventLoop::new().expect("event loop");
     let mut app = App {
         demo,

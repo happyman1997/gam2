@@ -1,0 +1,64 @@
+{
+ "hit_metal": [
+  "sfx/hit_metal_0.ogg",
+  "sfx/hit_metal_1.ogg",
+  "sfx/hit_metal_2.ogg",
+  "sfx/hit_metal_3.ogg",
+  "sfx/hit_metal_4.ogg"
+ ],
+ "hit_flesh": [
+  "sfx/hit_flesh_0.ogg",
+  "sfx/hit_flesh_1.ogg",
+  "sfx/hit_flesh_2.ogg"
+ ],
+ "zap": [
+  "sfx/zap_0.ogg",
+  "sfx/zap_1.ogg",
+  "sfx/zap_2.ogg"
+ ],
+ "blast": [
+  "sfx/blast_0.ogg",
+  "sfx/blast_1.ogg"
+ ],
+ "squish": [
+  "sfx/squish_0.ogg",
+  "sfx/squish_1.ogg"
+ ],
+ "break": [
+  "sfx/break_0.ogg",
+  "sfx/break_1.ogg",
+  "sfx/break_2.ogg"
+ ],
+ "heal": [
+  "sfx/heal_0.ogg",
+  "sfx/heal_1.ogg"
+ ],
+ "miss": [
+  "sfx/miss_0.ogg",
+  "sfx/miss_1.ogg",
+  "sfx/miss_2.ogg"
+ ],
+ "step": [
+  "sfx/step_0.ogg",
+  "sfx/step_1.ogg",
+  "sfx/step_2.ogg",
+  "sfx/step_3.ogg",
+  "sfx/step_4.ogg"
+ ],
+ "click": [
+  "sfx/click_0.ogg",
+  "sfx/click_1.ogg",
+  "sfx/click_2.ogg"
+ ],
+ "toggle": [
+  "sfx/toggle_0.ogg",
+  "sfx/toggle_1.ogg",
+  "sfx/toggle_2.ogg"
+ ],
+ "win": [
+  "sfx/win_0.ogg"
+ ],
+ "lose": [
+  "sfx/lose_0.ogg"
+ ]
+}

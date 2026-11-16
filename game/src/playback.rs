@@ -129,6 +129,13 @@ pub struct Number {
     pub start: i32,
 }
 
+pub struct Cue {
+    pub frame: i32,
+    pub name: &'static str,
+    pub gain: f32,
+    pub x: f32,
+}
+
 pub struct Effect {
     pub name: &'static str,
     pub x: f32,
@@ -208,6 +215,60 @@ impl Record {
         } else {
             self.rounds[r].before[id]
         }
+    }
+
+    /// The sounds of the whole battle, each with its frame: blows by who strikes whom (chitin on metal, a golem's
+    /// blow on a body, a discharge, the mortar's blast — once a volley), the killed (a wet squish for a creature,
+    /// crunching metal for a golem), a heal, a miss; the golems' steps when they walk; the jingle at the end.
+    pub fn cues(&self) -> Vec<Cue> {
+        let mut out = vec![];
+        for r in 0..self.rounds.len() {
+            let round = &self.rounds[r];
+            let walked = self.units.iter().enumerate().any(|(i, u)| {
+                u.side == 0 && round.before[i].alive && (round.before[i].x, round.before[i].y) != (round.after[i].x, round.after[i].y)
+            });
+            if walked {
+                out.push(Cue { frame: r as i32 * FR + 1, name: "step", gain: 0.0, x: 200.0 });
+                out.push(Cue { frame: r as i32 * FR + 6, name: "step", gain: -2.0, x: 220.0 });
+            }
+            let mut last_volley: Option<(usize, i32)> = None;
+            for m in self.moments(r) {
+                let at = |id: usize| Self::spot(round.after[id].x, round.after[id].y, self.units[id].fp).0;
+                match m.ev {
+                    Event::Hit { a, t, dmg } => {
+                        let att = &self.units[a];
+                        let name = if dmg <= 0 {
+                            "miss"
+                        } else {
+                            match att.name.as_str() {
+                                "Мудрец" | "Изобретатель" => "zap",
+                                "Орудие" => {
+                                    if last_volley.map(|(v, fr)| v == a && (m.frame - fr) < 6).unwrap_or(false) {
+                                        continue;
+                                    }
+                                    last_volley = Some((a, m.frame));
+                                    "blast"
+                                }
+                                _ if att.side == 1 => "hit_metal",
+                                _ => "hit_flesh",
+                            }
+                        };
+                        out.push(Cue { frame: m.frame, name, gain: 0.0, x: at(t) });
+                    }
+                    Event::Kill { t } => {
+                        let name = if self.units[t].side == 1 { "squish" } else { "break" };
+                        out.push(Cue { frame: m.frame, name, gain: 0.0, x: at(t) });
+                    }
+                    Event::Heal { t, .. } => out.push(Cue { frame: m.frame, name: "heal", gain: 0.0, x: at(t) }),
+                    Event::Absorbed { t } => out.push(Cue { frame: m.frame, name: "miss", gain: 0.0, x: at(t) }),
+                    _ => {}
+                }
+            }
+        }
+        let end = if self.outcome.winner == Some(1) { "win" } else { "lose" };
+        out.push(Cue { frame: self.frames() + 2, name: end, gain: 0.0, x: 480.0 });
+        out.sort_by_key(|c| c.frame);
+        out
     }
 
     /// The numbers and effects of the whole battle, each with the frame it starts on.
