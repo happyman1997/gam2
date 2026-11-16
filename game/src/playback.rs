@@ -112,6 +112,7 @@ pub struct Moment {
     pub ev: Event,
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum NumStyle {
     Hit,
     Crit,
@@ -124,9 +125,18 @@ pub enum NumStyle {
 pub struct Number {
     pub text: String,
     pub style: NumStyle,
+    /// The ground point of the unit it is about (the drawing puts it over the head, clear of the body).
     pub x: f32,
     pub y: f32,
     pub start: i32,
+    /// The unit it is about.
+    pub t: usize,
+    /// Its place among the numbers over the same unit at the same time (0, 1, 2…): they stack, not cover each other.
+    pub k: i32,
+    /// The damage it shows (blows on one unit in quick succession add up into one number).
+    pub value: i32,
+    /// The frame it is gone by at the latest (when the next blow's sum takes its place).
+    pub end: i32,
 }
 
 pub struct Cue {
@@ -307,13 +317,26 @@ impl Record {
                         } else {
                             NumStyle::Hurt
                         };
+                        // blows on one unit in quick succession: one number that grows and pops again with each
+                        // (a second miss replaces the first)
+                        let kin = |p: NumStyle| p == style || matches!((p, style), (NumStyle::Hit, NumStyle::Crit) | (NumStyle::Crit, NumStyle::Hit));
+                        let prev = nums.iter().rposition(|n: &Number| n.t == t && n.end > m.frame && m.frame - n.start < 14 && kin(n.style));
+                        if let Some(j) = prev {
+                            nums[j].end = m.frame;
+                        }
+                        let (value, style) = match prev {
+                            Some(j) if style != NumStyle::Miss => {
+                                (nums[j].value + dmg, if nums[j].style == NumStyle::Crit { NumStyle::Crit } else { style })
+                            }
+                            _ => (dmg.max(0), style),
+                        };
                         let text = match style {
                             NumStyle::Miss => "мимо".to_string(),
-                            NumStyle::Crit => format!("{dmg}!"),
-                            NumStyle::Hurt => format!("-{dmg}"),
-                            _ => format!("{dmg}"),
+                            NumStyle::Crit => format!("{value}!"),
+                            NumStyle::Hurt => format!("-{value}"),
+                            _ => format!("{value}"),
                         };
-                        nums.push(Number { text, style, x, y: y - 40.0, start: m.frame });
+                        nums.push(Number { text, style, x, y, start: m.frame, t, k: 0, value, end: i32::MAX });
                         let name: &'static str = match att.name.as_str() {
                             "Мудрец" | "Изобретатель" => "zap-hit",
                             "Орудие" => {
@@ -330,20 +353,31 @@ impl Record {
                     }
                     Event::Heal { t, amount, .. } => {
                         let (x, y) = at(t);
-                        nums.push(Number { text: format!("+{amount}"), style: NumStyle::Heal, x, y: y - 44.0, start: m.frame });
+                        nums.push(Number { text: format!("+{amount}"), style: NumStyle::Heal, x, y, start: m.frame, t, k: 0, value: amount, end: i32::MAX });
                         fx.push(Effect { name: "heal", x, y, start: m.frame });
                     }
                     Event::Poison { t, dmg } | Event::Burn { t, dmg } => {
                         let (x, y) = at(t);
-                        nums.push(Number { text: format!("{dmg}"), style: NumStyle::Poison, x: x + 10.0, y: y - 36.0, start: m.frame });
+                        nums.push(Number { text: format!("{dmg}"), style: NumStyle::Poison, x, y, start: m.frame, t, k: 0, value: dmg, end: i32::MAX });
                     }
                     Event::Absorbed { t } => {
                         let (x, y) = at(t);
-                        nums.push(Number { text: "мимо".into(), style: NumStyle::Miss, x, y: y - 40.0, start: m.frame });
+                        if let Some(j) = nums.iter().rposition(|n: &Number| n.t == t && n.style == NumStyle::Miss && m.frame - n.start < 14) {
+                            nums[j].end = m.frame;
+                        }
+                        nums.push(Number { text: "мимо".into(), style: NumStyle::Miss, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
                     }
                     _ => {}
                 }
             }
+        }
+        // numbers over one unit close in time take the next place up
+        for i in 0..nums.len() {
+            let busy = (0..i)
+                .filter(|&j| nums[j].t == nums[i].t && nums[i].start - nums[j].start < 14 && nums[j].end > nums[i].start)
+                .map(|j| nums[j].k)
+                .collect::<Vec<_>>();
+            nums[i].k = (0..).find(|k| !busy.contains(k)).unwrap_or(0);
         }
         (nums, fx)
     }

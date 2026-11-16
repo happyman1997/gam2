@@ -56,16 +56,22 @@ fn sprite_name(rec: &Record, id: usize, pose: Pose, f: i32) -> String {
 
 const SLOTS: [(f32, f32); 4] = [(-11.0, -6.0), (11.0, -7.0), (-10.0, 8.0), (12.0, 7.0)];
 
-fn number(cv: &mut Image, a: &Assets, n: &Number, f: i32) {
+fn number(cv: &mut Image, a: &Assets, rec: &Record, n: &Number, f: i32) {
     let age = f - n.start;
     let life = if matches!(n.style, NumStyle::Crit) { 22 } else { 16 };
-    if age < 0 || age >= life {
+    if age < 0 || age >= life || f >= n.end {
         return;
     }
+    // over the head (and over a leader's health), not on the body: the blow and who took it stay in sight
+    let info = &rec.units[n.t];
+    let head = a.sprites.get(&sprite_name(rec, n.t, Pose::Idle, n.start)).map(|s| s.oy).unwrap_or(40);
+    let over = if info.leader { 22 } else { 3 };
+    let tall = if matches!(n.style, NumStyle::Crit) { 24 } else { 16 };
+    let (nx, ny) = (n.x, n.y - (head + over + tall) as f32 - n.k as f32 * 20.0); // a second number one line higher
     let t = (age as f32 / 4.0).min(1.0);
     let c1 = 1.70158;
     let pop = 1.0 + (c1 + 1.0) * (t - 1.0).powi(3) + c1 * (t - 1.0).powi(2); // out_back
-    let dy = -6.0 * pop - (age - 8).max(0) as f32 * 0.8 + (1.0 - pop) * 6.0;
+    let dy = -6.0 * pop - (age - 8).max(0) as f32 * 0.5 + (1.0 - pop) * 6.0;
     let fade = if age < life - 5 { 1.0 } else { (life - age) as f32 / 5.0 };
     let (font, col, edge) = match n.style {
         NumStyle::Hit => ("title16", [214, 250, 110], [50, 96, 20]),
@@ -75,7 +81,7 @@ fn number(cv: &mut Image, a: &Assets, n: &Number, f: i32) {
         NumStyle::Poison => ("title16", [150, 230, 60], [30, 70, 10]),
         NumStyle::Miss => ("text16", [170, 166, 160], [50, 48, 52]),
     };
-    a.fonts[font].draw(cv, &n.text, n.x as i32, (n.y + dy) as i32, col, Some(edge), Align::Center, fade);
+    a.fonts[font].draw(cv, &n.text, nx as i32, (ny + dy) as i32, col, Some(edge), Align::Center, fade);
 }
 
 fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
@@ -176,7 +182,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         effect(cv, a, e, f);
     }
     for n in &sparks.0 {
-        number(cv, a, n, f);
+        number(cv, a, rec, n, f);
     }
     let end = view.frame as i32 - (total - 1);
     if end > 0 {
