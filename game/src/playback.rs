@@ -252,16 +252,22 @@ impl Record {
                 match m.ev {
                     Event::Hit { a, t, dmg } => {
                         let att = &self.units[a];
+                        if matches!(att.name.as_str(), "Мудрец" | "Изобретатель") {
+                            // the discharge sounds as the bolt leaves the staff (it flies three frames), hit or miss
+                            out.push(Cue { frame: m.frame - 3, name: "zap", gain: 0.0, x: (at(a) + at(t)) / 2.0 });
+                            continue;
+                        }
                         let name = if dmg <= 0 {
                             "miss"
                         } else {
                             match att.name.as_str() {
-                                "Мудрец" | "Изобретатель" => "zap",
                                 "Орудие" => {
                                     if last_volley.map(|(v, fr)| v == a && (m.frame - fr) < 6).unwrap_or(false) {
                                         continue;
                                     }
                                     last_volley = Some((a, m.frame));
+                                    // the barrel fires as the gun rears up, the shell bursts a moment later
+                                    out.push(Cue { frame: m.frame - 4, name: "shot", gain: 0.0, x: at(a) });
                                     "blast"
                                 }
                                 _ if att.side == 1 => "bite",

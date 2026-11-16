@@ -30,10 +30,17 @@
   "sfx/zap_3.ogg",
   "sfx/zap_4.ogg"
  ],
+ "shot": [
+  "sfx/shot_0.ogg",
+  "sfx/shot_1.ogg",
+  "sfx/shot_2.ogg",
+  "sfx/shot_3.ogg"
+ ],
  "blast": [
   "sfx/blast_0.ogg",
   "sfx/blast_1.ogg",
-  "sfx/blast_2.ogg"
+  "sfx/blast_2.ogg",
+  "sfx/blast_3.ogg"
  ],
  "squish": [
   "sfx/squish_0.ogg",

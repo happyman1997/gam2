@@ -1,22 +1,23 @@
 # Откуда звуки
 
-Все звуки — под CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/): можно в коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — тон ниже, срез высоких, укорочено, подмешан второй звук, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).
+Все звуки — под CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/): можно в коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — тон ниже, срез высоких, укорочено, подмешаны другие звуки, сжато для плотности, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).
 
 ## Авторы
 
 - BMacZero — [electricity-sound-effects-0](https://opengameart.org/content/electricity-sound-effects-0), [metal-impact-sounds](https://opengameart.org/content/metal-impact-sounds)
-- EZduzziteh — [squish-sounds-effects](https://opengameart.org/content/squish-sounds-effects)
-- Joth — [chunky-explosion](https://opengameart.org/content/chunky-explosion)
+- EZduzziteh — [explosions-4](https://opengameart.org/content/explosions-4), [squish-sounds-effects](https://opengameart.org/content/squish-sounds-effects)
 - KLY — [kl-peach-game-over-iii](https://opengameart.org/content/kl-peach-game-over-iii)
 - Kenney — [50-rpg-sound-effects](https://opengameart.org/content/50-rpg-sound-effects), [interface-sounds](https://opengameart.org/content/interface-sounds), [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds)
 - Spring Spring — [mechanical-explosion](https://opengameart.org/content/mechanical-explosion)
 - StarNinjas — [7-eating-crunches](https://opengameart.org/content/7-eating-crunches)
+- Thimras — [cannon-fire](https://opengameart.org/content/cannon-fire)
 - Zane Little Music — [hyper-ultra-fanfare](https://opengameart.org/content/hyper-ultra-fanfare)
 - bart — [steam-release-sounds](https://opengameart.org/content/steam-release-sounds)
 - faxcorp — [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack)
 - fvcalderan — [crunchy-bite](https://opengameart.org/content/crunchy-bite)
+- kurt — [gunshots](https://opengameart.org/content/gunshots)
 - qubodup — [5-break-crunch-impacts](https://opengameart.org/content/5-break-crunch-impacts), [8-wet-squish-slurp-impacts](https://opengameart.org/content/8-wet-squish-slurp-impacts)
-- rubberduck — [100-cc0-sfx-2](https://opengameart.org/content/100-cc0-sfx-2), [75-cc0-breaking-falling-hit-sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx), [80-cc0-creature-sfx](https://opengameart.org/content/80-cc0-creature-sfx), [80-cc0-creture-sfx-2](https://opengameart.org/content/80-cc0-creture-sfx-2)
+- rubberduck — [100-cc0-sfx-2](https://opengameart.org/content/100-cc0-sfx-2), [25-cc0-bang-firework-sfx](https://opengameart.org/content/25-cc0-bang-firework-sfx), [75-cc0-breaking-falling-hit-sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx), [80-cc0-creature-sfx](https://opengameart.org/content/80-cc0-creature-sfx), [80-cc0-creture-sfx-2](https://opengameart.org/content/80-cc0-creture-sfx-2)
 - syncopika — [cicada-sounds](https://opengameart.org/content/cicada-sounds)
 
 ## Файлы
@@ -41,14 +42,19 @@
 | `hit_flesh_3.ogg` | голем бьёт особь: хруст | qubodup: `imp_3.mp3` (кусок 4) | [5-break-crunch-impacts](https://opengameart.org/content/5-break-crunch-impacts) |
 | `hit_flesh_4.ogg` | голем бьёт особь: хруст | qubodup: `imp_3.mp3` (кусок 5) | [5-break-crunch-impacts](https://opengameart.org/content/5-break-crunch-impacts) |
 | `hit_flesh_5.ogg` | голем бьёт особь: хруст | Kenney: `OGG/chop.ogg` | [50-rpg-sound-effects](https://opengameart.org/content/50-rpg-sound-effects) |
-| `zap_0.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `hit.wav`, первые 0.6 с; под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
-| `zap_1.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `crackleelectricityloop.wav` (0.0–0.35 с); под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
-| `zap_2.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `snaploop.wav` (0.6–1.0 с); под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
-| `zap_3.ogg` | разряд Мудреца и Изобретателя: треск молнии | faxcorp: `death_1.wav`, первые 0.55 с; под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
-| `zap_4.ogg` | разряд Мудреца и Изобретателя: треск молнии | BMacZero: `spark.wav`; под ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.7 с, ниже 700 Гц) | [electricity-sound-effects-0](https://opengameart.org/content/electricity-sound-effects-0) |
-| `blast_0.ogg` | залп Мортиры | Joth: `Chunky Explosion.mp3` | [chunky-explosion](https://opengameart.org/content/chunky-explosion) |
-| `blast_1.ogg` | залп Мортиры | Kenney: `Audio/lowFrequency_explosion_000.ogg` | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
-| `blast_2.ogg` | залп Мортиры | Kenney: `Audio/lowFrequency_explosion_001.ogg` | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
+| `zap_0.ogg` | разряд Мудреца и Изобретателя: щелчок, треск искры, раскат | faxcorp: `hit.wav`, первые 0.7 с; с ним rubberduck: `shot_02.ogg` (первые 0.15 с, highpass); с ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.8 с, lowpass); сжато для плотности | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_1.ogg` | разряд Мудреца и Изобретателя: щелчок, треск искры, раскат | faxcorp: `crackleelectricityloop.wav` (0.0–0.4 с); с ним rubberduck: `shot_02.ogg` (первые 0.15 с, highpass); с ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.8 с, lowpass); сжато для плотности | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_2.ogg` | разряд Мудреца и Изобретателя: щелчок, треск искры, раскат | faxcorp: `snaploop.wav` (0.6–1.05 с); с ним rubberduck: `shot_02.ogg` (первые 0.15 с, highpass); с ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.8 с, lowpass); сжато для плотности | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_3.ogg` | разряд Мудреца и Изобретателя: щелчок, треск искры, раскат | faxcorp: `death_1.wav`, первые 0.6 с; с ним rubberduck: `shot_02.ogg` (первые 0.15 с, highpass); с ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.8 с, lowpass); сжато для плотности | [electricity-game-sound-pack](https://opengameart.org/content/electricity-game-sound-pack) |
+| `zap_4.ogg` | разряд Мудреца и Изобретателя: щелчок, треск искры, раскат | BMacZero: `spark.wav`; с ним rubberduck: `shot_02.ogg` (первые 0.15 с, highpass); с ним rubberduck: `sfx100v2_thunder_01.ogg` (первые 0.8 с, lowpass); сжато для плотности | [electricity-sound-effects-0](https://opengameart.org/content/electricity-sound-effects-0) |
+| `shot_0.ogg` | выстрел Мортиры: хлопок заряда и низкий бас ствола | rubberduck: `cannon_01.ogg`, первые 0.9 с; с ним Thimras: `cannon_fire.ogg` (первые 0.9 с, lowpass); сжато для плотности | [25-cc0-bang-firework-sfx](https://opengameart.org/content/25-cc0-bang-firework-sfx) |
+| `shot_1.ogg` | выстрел Мортиры: хлопок заряда и низкий бас ствола | rubberduck: `cannon_04.ogg`, первые 0.9 с; с ним Thimras: `cannon_fire.ogg` (первые 0.9 с, lowpass); сжато для плотности | [25-cc0-bang-firework-sfx](https://opengameart.org/content/25-cc0-bang-firework-sfx) |
+| `shot_2.ogg` | выстрел Мортиры: хлопок заряда и низкий бас ствола | rubberduck: `cannon_05.ogg`, первые 0.9 с; с ним Thimras: `cannon_fire.ogg` (первые 0.9 с, lowpass); сжато для плотности | [25-cc0-bang-firework-sfx](https://opengameart.org/content/25-cc0-bang-firework-sfx) |
+| `shot_3.ogg` | выстрел Мортиры: хлопок заряда и низкий бас ствола | kurt: `22 Magnum.wav`, первые 0.8 с; с ним Thimras: `cannon_fire.ogg` (первые 0.9 с, lowpass); сжато для плотности | [gunshots](https://opengameart.org/content/gunshots) |
+| `blast_0.ogg` | разрыв снаряда Мортиры | Kenney: `Audio/explosionCrunch_000.ogg`, первые 1.4 с; с ним rubberduck: `bang_05.ogg` (первые 0.25 с, highpass); с ним Kenney: `Audio/lowFrequency_explosion_000.ogg` (первые 1.2 с, lowpass); сжато для плотности | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
+| `blast_1.ogg` | разрыв снаряда Мортиры | Kenney: `Audio/explosionCrunch_001.ogg`, первые 1.4 с; с ним rubberduck: `bang_05.ogg` (первые 0.25 с, highpass); с ним Kenney: `Audio/lowFrequency_explosion_000.ogg` (первые 1.2 с, lowpass); сжато для плотности | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
+| `blast_2.ogg` | разрыв снаряда Мортиры | Kenney: `Audio/explosionCrunch_003.ogg`, первые 1.4 с; с ним rubberduck: `bang_05.ogg` (первые 0.25 с, highpass); с ним Kenney: `Audio/lowFrequency_explosion_000.ogg` (первые 1.2 с, lowpass); сжато для плотности | [sci-fi-sounds](https://opengameart.org/content/sci-fi-sounds) |
+| `blast_3.ogg` | разрыв снаряда Мортиры | EZduzziteh: `explosion3.ogg`, первые 1.4 с; с ним rubberduck: `bang_05.ogg` (первые 0.25 с, highpass); с ним Kenney: `Audio/lowFrequency_explosion_000.ogg` (первые 1.2 с, lowpass); сжато для плотности | [explosions-4](https://opengameart.org/content/explosions-4) |
 | `squish_0.ogg` | гибель особи: мокрый шлепок | EZduzziteh: `squish_01_0.mp3` | [squish-sounds-effects](https://opengameart.org/content/squish-sounds-effects) |
 | `squish_1.ogg` | гибель особи: мокрый шлепок | EZduzziteh: `squish_02.mp3` | [squish-sounds-effects](https://opengameart.org/content/squish-sounds-effects) |
 | `squish_2.ogg` | гибель особи: мокрый шлепок | EZduzziteh: `squish_03.mp3` | [squish-sounds-effects](https://opengameart.org/content/squish-sounds-effects) |

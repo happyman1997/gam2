@@ -43,9 +43,12 @@ SRC = {   # source: (author, page, [archive or file urls])
     "elec": ("faxcorp", PAGE + "electricity-game-sound-pack",
              [OGA + f for f in ("hit.wav", "crackleelectricityloop.wav", "snaploop.wav", "death_1.wav")]),
     "sfx100v2": ("rubberduck", PAGE + "100-cc0-sfx-2", [OGA + "sfx_100_v2.zip"]),
+    "bangs": ("rubberduck", PAGE + "25-cc0-bang-firework-sfx", [OGA + "25-CC0-bang-sfx.zip"]),
+    "cannon": ("Thimras", PAGE + "cannon-fire", [OGA + "cannon_fire.ogg"]),
+    "gunshots": ("kurt", PAGE + "gunshots", [OGA + "22%20Magnum.wav"]),
+    "explosions": ("EZduzziteh", PAGE + "explosions-4", [OGA + "explosion3.ogg"]),
     "fanfare": ("Zane Little Music", PAGE + "hyper-ultra-fanfare", [OGA + "sboe.mp3"]),
     "gameover": ("KLY", PAGE + "kl-peach-game-over-iii", [OGA + "KL%20Peach%20Game%20Over%20III.mp3"]),
-    "chunky": ("Joth", PAGE + "chunky-explosion", [OGA + "Chunky%20Explosion.mp3"]),
     "mechexp": ("Spring Spring", PAGE + "mechanical-explosion", [OGA + "mechanical_explosion.wav"]),
     "steam": ("bart", PAGE + "steam-release-sounds", [OGA + "steam_hisses.zip"]),
     "cicada": ("syncopika", PAGE + "cicada-sounds", [OGA + "082526-cicadasounds.ogg"]),
@@ -58,9 +61,18 @@ def k(src, files, **opt):
 
 # the game's sound: (what it is for, [(source, file, options)], gain dB). Options: "split": n — the n-th piece of a file of
 # several sounds; "cut": (start, length) — a stretch of a long file; "rate": tone (0.8 = lower and slower, heavier);
-# "lowpass": Hz above which the shrill top is cut; "len": seconds kept, the end faded out; "layer": (source, file,
-# seconds, dB, lowpass Hz) — a second sound mixed under it
-THUNDER = ("sfx100v2", "sfx100v2_thunder_01.ogg", 0.7, -9, 700)  # a layer: the first 0.7 s of a thunder, −9 dB, below 700 Hz
+# "lowpass": Hz above which the shrill top is cut; "len": seconds kept, the end faded out; "layers": sounds mixed with
+# it ({src, rel, db against it, len, af — their own filters}); "punch": squeezed and driven, so a blow sounds fat
+def L(src, rel, db, ln, af):
+    return dict(src=src, rel=rel, db=db, len=ln, af=af)
+
+
+CRACK = L("bangs", "shot_02.ogg", -4, 0.15, "highpass=f=1500")              # the snap at the very start of a discharge
+THUNDER = L("sfx100v2", "sfx100v2_thunder_01.ogg", -4, 0.8, "lowpass=f=500,bass=g=4:f=80")   # the clap under it
+BOOM = L("cannon", "cannon_fire.ogg", -2, 0.9, "lowpass=f=400")              # the barrel's low boom under a shot
+SNAP = L("bangs", "bang_05.ogg", -6, 0.25, "highpass=f=800")                 # the first hard edge of a blast
+SUB = L("scifi", "Audio/lowFrequency_explosion_000.ogg", -4, 1.2, "lowpass=f=200")   # the ground shaking under it
+PUNCH = "acompressor=threshold=-20dB:ratio=5:attack=1:release=90:makeup=8dB,bass=g=3:f=90,asoftclip=type=tanh"
 
 SOUNDS = {
     "bite": ("укус особи: хитиновые жвалы", k("crunchybite", ["crunchybite.ogg"]) +
@@ -70,15 +82,21 @@ SOUNDS = {
                   k("scifi", ["Audio/impactMetal_000.ogg"], lowpass=5000), -12),
     "hit_flesh": ("голем бьёт особь: хруст", [("breakcrunch", "imp_3.mp3", {"split": i}) for i in range(5)] +
                   k("rpg", ["OGG/chop.ogg"]), -8),
-    # a discharge: the crack of a real spark and under it the low clap of thunder, so it has weight
-    "zap": ("разряд Мудреца и Изобретателя: треск молнии", [
-        ("elec", "hit.wav", {"len": 0.6, "layer": THUNDER}),
-        ("elec", "crackleelectricityloop.wav", {"cut": (0.0, 0.35), "layer": THUNDER}),
-        ("elec", "snaploop.wav", {"cut": (0.6, 0.4), "layer": THUNDER}),
-        ("elec", "death_1.wav", {"len": 0.55, "layer": THUNDER}),
-        ("spark", "spark.wav", {"layer": THUNDER})], -8),
-    "blast": ("залп Мортиры", k("chunky", ["Chunky Explosion.mp3"]) +
-              k("scifi", ["Audio/lowFrequency_explosion_000.ogg", "Audio/lowFrequency_explosion_001.ogg"]), -4),
+    # a discharge: a snap, the crackle of a real spark, the low clap of thunder; squeezed and driven so it bites
+    "zap": ("разряд Мудреца и Изобретателя: щелчок, треск искры, раскат", [
+        ("elec", "hit.wav", {"len": 0.7, "layers": [CRACK, THUNDER], "punch": True}),
+        ("elec", "crackleelectricityloop.wav", {"cut": (0.0, 0.4), "layers": [CRACK, THUNDER], "punch": True}),
+        ("elec", "snaploop.wav", {"cut": (0.6, 0.45), "layers": [CRACK, THUNDER], "punch": True}),
+        ("elec", "death_1.wav", {"len": 0.6, "layers": [CRACK, THUNDER], "punch": True}),
+        ("spark", "spark.wav", {"layers": [CRACK, THUNDER], "punch": True})], -6),
+    # the Mortar fires: a crack of the charge and the barrel's boom; the shell lands: a blast with a hard edge and
+    # the ground shaking under it
+    "shot": ("выстрел Мортиры: хлопок заряда и низкий бас ствола",
+             k("bangs", ["cannon_01.ogg", "cannon_04.ogg", "cannon_05.ogg"], len=0.9, layers=[BOOM], punch=True) +
+             k("gunshots", ["22 Magnum.wav"], len=0.8, layers=[BOOM], punch=True), -5),
+    "blast": ("разрыв снаряда Мортиры", k("scifi", [f"Audio/explosionCrunch_00{i}.ogg" for i in (0, 1, 3)],
+                                        len=1.4, layers=[SNAP, SUB], punch=True) +
+              k("explosions", ["explosion3.ogg"], len=1.4, layers=[SNAP, SUB], punch=True), -3),
     "squish": ("гибель особи: мокрый шлепок", k("squish", ["squish_01_0.mp3", "squish_02.mp3", "squish_03.mp3",
                                                          "squish_04.mp3", "squish_06.mp3"]) +
                [("wetsquish", "im.mp3", {"split": i}) for i in range(5)], -9),
@@ -165,19 +183,29 @@ def convert(src, dst, gain, opt):
     if "len" in opt:                                    # only the blow itself, the tail faded out
         af += f",atrim=0:{opt['len']},afade=t=out:st={opt['len'] * 0.5:.3f}:d={opt['len'] * 0.5:.3f}"
     subprocess.run(["ffmpeg", "-v", "error", "-y"] + cut + ["-i", src, "-ac", "1", "-ar", "44100", "-af", af, tmp], check=True)
-    if "layer" in opt:
-        lsrc, lrel, ln, ldb, llp = opt["layer"]
-        low = dst + ".layer.wav"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", find(lsrc, lrel), "-ac", "1", "-ar", "44100", "-af",
-                        f"silenceremove=start_periods=1:start_threshold=-50dB,atrim=0:{ln},lowpass=f={llp},"
-                        f"afade=t=out:st={ln * 0.4:.3f}:d={ln * 0.6:.3f}", low], check=True)
+    if opt.get("layers"):
+        ins, chain = ["-i", tmp], [f"[0]volume={-1.0 - peak_db(tmp):.2f}dB[m]"]
+        made = []
+        for j, ly in enumerate(opt["layers"]):
+            f = f"{dst}.layer{j}.wav"
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", find(ly["src"], ly["rel"]), "-ac", "1", "-ar", "44100", "-af",
+                            f"silenceremove=start_periods=1:start_threshold=-50dB,{ly['af']},atrim=0:{ly['len']},"
+                            f"afade=t=out:st={ly['len'] * 0.4:.3f}:d={ly['len'] * 0.6:.3f}", f], check=True)
+            ins += ["-i", f]
+            chain.append(f"[{j + 1}]volume={-1.0 - peak_db(f) + ly['db']:.2f}dB[l{j}]")
+            made.append(f)
+        n = len(made) + 1
+        chain.append("[m]" + "".join(f"[l{j}]" for j in range(len(made))) + f"amix=inputs={n}:normalize=0:duration=longest")
         both = dst + ".both.wav"
-        g_main, g_low = -1.0 - peak_db(tmp), -1.0 - peak_db(low) + ldb
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-i", low, "-filter_complex",
-                        f"[0]volume={g_main:.2f}dB[a];[1]volume={g_low:.2f}dB[b];[a][b]amix=inputs=2:normalize=0:duration=longest",
-                        both], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex", ";".join(chain), both], check=True)
         os.replace(both, tmp)
-        os.remove(low)
+        for f in made:
+            os.remove(f)
+    if opt.get("punch"):                                # squeezed and driven: the blow sounds fat, not thin
+        fat = dst + ".fat.wav"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", f"volume={-6.0 - peak_db(tmp):.2f}dB,{PUNCH}", fat],
+                       check=True)
+        os.replace(fat, tmp)
     g = -1.0 - peak_db(tmp) + gain
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", f"volume={g:.2f}dB", "-c:a", "libvorbis", "-q:a", "4", dst],
                    check=True)
@@ -206,10 +234,12 @@ def main():
                 part += f", срез выше {opt['lowpass']} Гц"
             if "len" in opt:
                 part += f", первые {opt['len']} с"
-            if "layer" in opt:
-                la, lp, _lu = SRC[opt["layer"][0]]
+            for ly in opt.get("layers", []):
+                la, lp, _lu = SRC[ly["src"]]
                 authors.setdefault(la, set()).add(lp)
-                part += f"; под ним {la}: `{opt['layer'][1]}` (первые {opt['layer'][2]} с, ниже {opt['layer'][4]} Гц)"
+                part += f"; с ним {la}: `{ly['rel']}` (первые {ly['len']} с, {ly['af'].split('=')[0]})"
+            if opt.get("punch"):
+                part += "; сжато для плотности"
             rows.append(f"| `{out}` | {what} | {author}: `{rel}`{part} | [{page.split('/')[-1]}]({page}) |")
         manifest[name] = outs
     json.dump(manifest, open(os.path.join(DST, "sfx.json"), "w"), ensure_ascii=False, indent=1)
@@ -219,7 +249,7 @@ def main():
                 "коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; "
                 "лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney "
                 "выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — "
-                "тон ниже, срез высоких, укорочено, подмешан второй звук, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
+                "тон ниже, срез высоких, укорочено, подмешаны другие звуки, сжато для плотности, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
         for a, pages in sorted(authors.items()):
             f.write(f"- {a} — " + ", ".join(f"[{p.split('/')[-1]}]({p})" for p in sorted(pages)) + "\n")
         f.write("\n## Файлы\n\n| Файл | Для чего | Откуда | Страница |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")
