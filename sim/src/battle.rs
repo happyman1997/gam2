@@ -621,6 +621,16 @@ impl Battle {
         if d <= reach {
             return;
         }
+        // a leader who stands at the back is no tank: he stays behind his army while it stands, steps out only to
+        // meet an enemy that has come within two cells, or when no one of his is left
+        if role(&self.units[i].t) == Role::LeaderBack && d > reach + 1 {
+            let guarded = (0..self.units.len()).any(|k| {
+                k != i && self.units[k].side == side && self.units[k].present() && !self.units[k].t.has(Trait::Leader)
+            });
+            if guarded {
+                return;
+            }
+        }
         let (tx, ty, tf) = {
             let t = &self.units[tj];
             (t.x, t.y, t.fp())

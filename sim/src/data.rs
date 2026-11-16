@@ -82,7 +82,8 @@ fn human_leader(name: &'static str, size: u32, hp: i32, die: u32, bonus: i32, dm
         range: 1,
         armor_type: ArmorType::Leather,
         golem: false,
-        traits: vec![Trait::FireResist75],
+        // a leader: placed at the back, kept there while his army stands, hunted first by flyers
+        traits: vec![Trait::FireResist75, Trait::Leader],
         abilities: vec![],
     }
 }

@@ -357,7 +357,8 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             let name = sprite_name(rec, id, s.pose, f);
             let top = a.sprites.get(&name).map(|sp| sp.oy).unwrap_or(40);
             let lit = ((st.hp.max(0) * 10 + info.max_hp - 1) / info.max_hp.max(1)).clamp(0, 10);
-            let (cx, cy) = (s.x as i32, s.y as i32 - top - 10);
+            // kept on the screen: a leader at the very edge still shows his crown and his health
+            let (cx, cy) = ((s.x as i32).clamp(66, W - 52), (s.y as i32 - top - 10).max(48));
             meter(cv, a, cx, cy, lit, if info.side == 1 { "scale_over" } else { "scale_eat" });
             bars.push((cx - 66, cy - 12, cx + 52, cy + 12));
         }

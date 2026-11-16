@@ -1,7 +1,7 @@
 """The demo's video: battles one after another at 1920×1080, 60 fps, the camera on the clash (the game draws the frames,
 `game --video`), and a soundtrack mixed from the same sounds the game plays, at the same moments.
 
-    python3 tools/video/demo_video.py                         # battles 48 and 53 -> docs/images/demo_battle.mp4
+    python3 tools/video/demo_video.py                         # battles 184 and 142 -> docs/images/demo_battle.mp4
     python3 tools/video/demo_video.py --seeds 7 12 --crf 16 --out /tmp/x.mp4
 
 Needs ffmpeg and numpy; builds the game first (cargo, release).
@@ -63,7 +63,7 @@ def mix(doc, seed=5):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seeds", type=int, nargs="+", default=[48, 53])
+    ap.add_argument("--seeds", type=int, nargs="+", default=[184, 142])
     ap.add_argument("--crf", type=int, default=23)
     ap.add_argument("--out", default=os.path.join(ROOT, "docs", "images", "demo_battle.mp4"))
     args = ap.parse_args()
