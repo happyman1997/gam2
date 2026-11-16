@@ -219,7 +219,7 @@ impl Record {
 
     /// The sounds of the whole battle, each with its frame: blows by who strikes whom (a creature's jaws and the
     /// golem ringing under them, a golem's blow crunching a body, a discharge, the mortar's blast — once a volley),
-    /// the killed (a wet squish and a squeal for a creature, a mechanical blast for a golem), a heal (steam), a miss;
+    /// the killed (a wet squish and a low rattle for a creature, a mechanical blast for a golem), a heal (steam), a miss;
     /// the golems' heavy steps when they walk; the jingle at the end. The swarm's chirring under it all is a loop
     /// (audio.rs), not a cue.
     pub fn cues(&self) -> Vec<Cue> {
@@ -265,7 +265,7 @@ impl Record {
                         let name = if self.units[t].side == 1 { "squish" } else { "break" };
                         out.push(Cue { frame: m.frame, name, gain: 0.0, x: at(t) });
                         if self.units[t].side == 1 {
-                            out.push(Cue { frame: m.frame + 2, name: "bug_cry", gain: 0.0, x: at(t) });
+                            out.push(Cue { frame: m.frame + 2, name: "death_rattle", gain: 0.0, x: at(t) });
                         }
                     }
                     Event::Heal { t, .. } => out.push(Cue { frame: m.frame, name: "heal", gain: 0.0, x: at(t) }),

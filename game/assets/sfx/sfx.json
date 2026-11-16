@@ -5,8 +5,7 @@
   "sfx/bite_2.ogg",
   "sfx/bite_3.ogg",
   "sfx/bite_4.ogg",
-  "sfx/bite_5.ogg",
-  "sfx/bite_6.ogg"
+  "sfx/bite_5.ogg"
  ],
  "hit_metal": [
   "sfx/hit_metal_0.ogg",
@@ -14,8 +13,7 @@
   "sfx/hit_metal_2.ogg",
   "sfx/hit_metal_3.ogg",
   "sfx/hit_metal_4.ogg",
-  "sfx/hit_metal_5.ogg",
-  "sfx/hit_metal_6.ogg"
+  "sfx/hit_metal_5.ogg"
  ],
  "hit_flesh": [
   "sfx/hit_flesh_0.ogg",
@@ -45,30 +43,22 @@
   "sfx/squish_6.ogg",
   "sfx/squish_7.ogg",
   "sfx/squish_8.ogg",
-  "sfx/squish_9.ogg",
-  "sfx/squish_10.ogg"
+  "sfx/squish_9.ogg"
  ],
- "bug_cry": [
-  "sfx/bug_cry_0.ogg",
-  "sfx/bug_cry_1.ogg",
-  "sfx/bug_cry_2.ogg",
-  "sfx/bug_cry_3.ogg",
-  "sfx/bug_cry_4.ogg",
-  "sfx/bug_cry_5.ogg",
-  "sfx/bug_cry_6.ogg",
-  "sfx/bug_cry_7.ogg",
-  "sfx/bug_cry_8.ogg",
-  "sfx/bug_cry_9.ogg",
-  "sfx/bug_cry_10.ogg",
-  "sfx/bug_cry_11.ogg",
-  "sfx/bug_cry_12.ogg",
-  "sfx/bug_cry_13.ogg"
+ "death_rattle": [
+  "sfx/death_rattle_0.ogg",
+  "sfx/death_rattle_1.ogg",
+  "sfx/death_rattle_2.ogg",
+  "sfx/death_rattle_3.ogg",
+  "sfx/death_rattle_4.ogg",
+  "sfx/death_rattle_5.ogg",
+  "sfx/death_rattle_6.ogg",
+  "sfx/death_rattle_7.ogg"
  ],
  "break": [
   "sfx/break_0.ogg",
   "sfx/break_1.ogg",
-  "sfx/break_2.ogg",
-  "sfx/break_3.ogg"
+  "sfx/break_2.ogg"
  ],
  "heal": [
   "sfx/heal_0.ogg",

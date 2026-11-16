@@ -40,7 +40,8 @@ SRC = {   # source: (author, page, [archive or file urls])
                                   "squish_06.mp3", "squishsplat_impact.mp3")]),
     "wetsquish": ("qubodup", PAGE + "8-wet-squish-slurp-impacts", [OGA + "im.mp3"]),
     "breakcrunch": ("qubodup", PAGE + "5-break-crunch-impacts", [OGA + "imp_3.mp3"]),
-    "metal": ("BMacZero", PAGE + "metal-impact-sounds", [OGA + f for f in ("clink1_0.wav", "clink2.wav", "clink3.wav")]),
+    "metal": ("BMacZero", PAGE + "metal-impact-sounds", [OGA + f for f in ("clink1_0.wav", "clink2.wav", "clink3.wav",
+                                                                          "thud2.wav", "thud3.wav")]),
     "spark": ("BMacZero", PAGE + "electricity-sound-effects-0", [OGA + "spark.wav"]),
     "chunky": ("Joth", PAGE + "chunky-explosion", [OGA + "Chunky%20Explosion.mp3"]),
     "mechexp": ("Spring Spring", PAGE + "mechanical-explosion", [OGA + "mechanical_explosion.wav"]),
@@ -50,34 +51,41 @@ SRC = {   # source: (author, page, [archive or file urls])
 }
 
 
-def k(src, files):
-    return [(src, f) for f in files]
+def k(src, files, **opt):
+    return [(src, f, opt) for f in files]
 
 
-SOUNDS = {   # the game's sound: (what it is for, [(source, file[, {"split": n} | {"cut": (start, length)}])], gain dB)
+# the game's sound: (what it is for, [(source, file, options)], gain dB). Options: "split": n — the n-th piece of a file of
+# several sounds; "cut": (start, length) — a stretch of a long file; "rate": tone (0.8 = lower and slower, heavier);
+# "lowpass": Hz above which the shrill top is cut; "len": seconds kept, the end faded out
+SOUNDS = {
     "bite": ("укус особи: хитиновые жвалы", k("crunchybite", ["crunchybite.ogg"]) +
-             k("crunches", [f"crunch.{i}.ogg" for i in (1, 2, 3, 5)]) + k("creature", ["eat_01.ogg", "eat_03.ogg"]), -10),
-    "hit_metal": ("укус приходится по голему: звон металла", k("metal", ["clink1_0.wav", "clink2.wav", "clink3.wav"]) +
-                  k("bfh", [f"bfh1_metal_hit_0{i}.ogg" for i in (1, 2, 4)]) + k("scifi", ["Audio/impactMetal_000.ogg"]), -12),
+             k("crunches", [f"crunch.{i}.ogg" for i in (1, 2, 3, 5)]) + k("creature", ["eat_01.ogg"]), -10),
+    "hit_metal": ("укус приходится по голему: звон металла", k("metal", ["clink1_0.wav", "clink2.wav", "clink3.wav"], lowpass=5000) +
+                  k("bfh", [f"bfh1_metal_hit_0{i}.ogg" for i in (2, 4)], lowpass=5000) +
+                  k("scifi", ["Audio/impactMetal_000.ogg"], lowpass=5000), -12),
     "hit_flesh": ("голем бьёт особь: хруст", [("breakcrunch", "imp_3.mp3", {"split": i}) for i in range(5)] +
                   k("rpg", ["OGG/chop.ogg"]), -8),
-    "zap": ("разряд Мудреца и Изобретателя", k("spark", ["spark.wav"]) + k("digital", ["zap1.mp3", "zap2.mp3"]), -9),
+    "zap": ("разряд Мудреца и Изобретателя", k("spark", ["spark.wav"], lowpass=3500) + k("digital", ["zap1.mp3", "zap2.mp3"]), -9),
     "blast": ("залп Мортиры", k("chunky", ["Chunky Explosion.mp3"]) +
               k("scifi", ["Audio/lowFrequency_explosion_000.ogg", "Audio/lowFrequency_explosion_001.ogg"]), -4),
     "squish": ("гибель особи: мокрый шлепок", k("squish", ["squish_01_0.mp3", "squish_02.mp3", "squish_03.mp3",
-                                                         "squish_04.mp3", "squish_05.mp3", "squish_06.mp3"]) +
+                                                         "squish_04.mp3", "squish_06.mp3"]) +
                [("wetsquish", "im.mp3", {"split": i}) for i in range(5)], -9),
-    "bug_cry": ("писк гибнущей особи, стрекот роя", k("insect", [f"insect{i}.ogg" for i in range(6)]) +
-                k("creature", ["bug_01.ogg", "bug_02.ogg", "bug_03.ogg", "bug_04.ogg"]) +
-                k("creature2", ["bug_05.ogg", "bug_07.ogg", "bug_08.ogg", "bug_10.ogg"]), -16),
+    "death_rattle": ("хрип гибнущей особи: низкий, без писка", k("creature", ["hurt_04.ogg", "hurt_05.ogg", "grunt_02.ogg"]) +
+                     k("creature2", ["grunt_06.ogg", "grunt_08.ogg", "monster_09.ogg", "monster_12.ogg"]) +
+                     [("creature2", "die_03.ogg", {"lowpass": 3500})], -14),
     "break": ("голем сломан: механический взрыв, падает железо", k("mechexp", ["mechanical_explosion.wav"]) +
-              k("bfh", [f"bfh1_metal_falling_0{i}.ogg" for i in (1, 2, 5)]), -6),
-    "heal": ("ремонт Механика: пар", k("steam", [f"steam hisses - Marker #{i}.wav" for i in (1, 2, 3)]), -16),
-    "miss": ("промах: свист", k("rpg", [f"OGG/drawKnife{i}.ogg" for i in (1, 2, 3)]), -12),
-    "step": ("тяжёлый шаг голема", [("metalsteps", "metal_steps.ogg", {"split": i}) for i in range(1, 7)], -14),
+              k("bfh", [f"bfh1_metal_falling_0{i}.ogg" for i in (1, 2)], lowpass=5000), -6),
+    "heal": ("ремонт Механика: глухой выдох пара", k("steam", [f"steam hisses - Marker #{i}.wav" for i in (1, 2, 3)],
+                                                    rate=0.8, lowpass=1600, len=1.0), -12),
+    "miss": ("промах: свист", k("rpg", [f"OGG/drawKnife{i}.ogg" for i in (1, 2, 3)], lowpass=4000), -12),
+    "step": ("тяжёлый шаг голема: глухой удар металла", k("metal", ["thud2.wav", "thud3.wav"], rate=0.8, lowpass=1800, len=0.35) +
+             k("bfh", ["bfh1_hit_02.ogg", "bfh1_hit_07.ogg"], lowpass=2000, len=0.35) +
+             k("rpg", ["OGG/footstep02.ogg", "OGG/footstep04.ogg"], rate=0.65, lowpass=1500, len=0.35), -10),
     "swarm_bed": ("стрекот роя фоном, пока рой жив (петля)", [("cicada", "082526-cicadasounds.ogg", {"cut": (2.0, 6.0)})], -24),
     "click": ("кнопка", k("interface", [f"Audio/click_00{i}.ogg" for i in (1, 2, 3)]), -8),
-    "toggle": ("переключатель: пауза, скорость", k("interface", [f"Audio/switch_00{i}.ogg" for i in (1, 2, 3)]), -8),
+    "toggle": ("переключатель: пауза, скорость", k("interface", [f"Audio/switch_00{i}.ogg" for i in (2, 3, 4)], lowpass=4000), -8),
     "win": ("победа", k("jingles", ["OGG/jingles_NES/jingles_NES12.ogg"]), -6),
     "lose": ("поражение", k("jingles", ["OGG/jingles_NES/jingles_NES11.ogg"]), -6),
 }
@@ -135,6 +143,12 @@ def convert(src, dst, gain, opt):
     elif "cut" in opt:
         cut = ["-ss", str(opt["cut"][0]), "-t", str(opt["cut"][1])]
     af = "silenceremove=start_periods=1:start_threshold=-50dB" if "cut" not in opt else "afade=t=in:d=0.3,afade=t=out:st=5.6:d=0.4"
+    if "rate" in opt:                                   # lower (or higher) and slower, as a heavier body would sound
+        af += f",asetrate={int(44100 * opt['rate'])},aresample=44100"
+    if "lowpass" in opt:                                # the shrill top cut off
+        af += f",lowpass=f={opt['lowpass']}"
+    if "len" in opt:                                    # only the blow itself, the tail faded out
+        af += f",atrim=0:{opt['len']},afade=t=out:st={opt['len'] * 0.5:.3f}:d={opt['len'] * 0.5:.3f}"
     subprocess.run(["ffmpeg", "-v", "error", "-y"] + cut + ["-i", src, "-ac", "1", "-ar", "44100", "-af", af, tmp], check=True)
     g = -1.0 - peak_db(tmp) + gain
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", f"volume={g:.2f}dB", "-c:a", "libvorbis", "-q:a", "4", dst],
@@ -151,14 +165,19 @@ def main():
     for name, (what, files, gain) in SOUNDS.items():
         outs = []
         for i, item in enumerate(files):
-            src, rel = item[0], item[1]
-            opt = item[2] if len(item) > 2 else {}
+            src, rel, opt = item[0], item[1], (item[2] if len(item) > 2 else {})
             out = f"{name}_{i}.ogg"
             convert(find(src, rel), os.path.join(DST, out), gain, opt)
             outs.append(f"sfx/{out}")
             author, page, _u = SRC[src]
             authors.setdefault(author, set()).add(page)
             part = f" (кусок {opt['split'] + 1})" if "split" in opt else (f" ({opt['cut'][0]}–{opt['cut'][0] + opt['cut'][1]} с)" if "cut" in opt else "")
+            if "rate" in opt:
+                part += f", тон ×{opt['rate']}"
+            if "lowpass" in opt:
+                part += f", срез выше {opt['lowpass']} Гц"
+            if "len" in opt:
+                part += f", первые {opt['len']} с"
             rows.append(f"| `{out}` | {what} | {author}: `{rel}`{part} | [{page.split('/')[-1]}]({page}) |")
         manifest[name] = outs
     json.dump(manifest, open(os.path.join(DST, "sfx.json"), "w"), ensure_ascii=False, indent=1)
@@ -167,8 +186,8 @@ def main():
         f.write("# Откуда звуки\n\nВсе звуки — под CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/): можно в "
                 "коммерческих проектах, указывать автора не обязательно, можно распространять. Источник — OpenGameArt; "
                 "лицензия каждой страницы проверена (CC0), страницы с CC-BY, CC-BY-SA, GPL не используются. Наборы Kenney "
-                "выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, пик −1 dBFS "
-                "плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
+                "выложил сам Kenney (пользователь `kenney`). Обработка: моно 44,1 кГц, тишина в начале срезана, где указано — "
+                "тон ниже, срез высоких, укорочено, пик −1 dBFS плюс поправка громкости звука, OGG Vorbis (`tools/audio/sfx_build.py`).\n\n## Авторы\n\n")
         for a, pages in sorted(authors.items()):
             f.write(f"- {a} — " + ", ".join(f"[{p.split('/')[-1]}]({p})" for p in sorted(pages)) + "\n")
         f.write("\n## Файлы\n\n| Файл | Для чего | Откуда | Страница |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")

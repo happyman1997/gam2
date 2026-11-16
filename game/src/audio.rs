@@ -84,7 +84,7 @@ mod tests {
                 assert!(d.is_ok(), "{name}: {f}");
             }
         }
-        for name in ["bite", "hit_metal", "hit_flesh", "zap", "blast", "squish", "bug_cry", "break", "heal", "miss", "step",
+        for name in ["bite", "hit_metal", "hit_flesh", "zap", "blast", "squish", "death_rattle", "break", "heal", "miss", "step",
                      "swarm_bed", "click", "toggle", "win", "lose"] {
             assert!(m.get(name).is_some(), "missing {name}");
         }
