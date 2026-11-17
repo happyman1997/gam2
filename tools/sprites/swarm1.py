@@ -357,6 +357,11 @@ def plan_grasshopper(m, mc, g, pose, soldier):
             knee = hip + (knee - hip) * L
             foot = np.array((hip[0] + (foot[0] - hip[0]) * L, foot[1] if pose == "idle" else hip[1] + (foot[1] - hip[1]) * L,
                              foot[2]))
+        if GAIT is not None:                    # walking: one hind leg shoves back along the ground, the other comes up
+            if (side > 0) == (GAIT == 0):
+                foot, knee = foot + (-1.8, 0.0, 0.0), knee + (-0.6, -1.0, 0.0)
+            else:
+                foot, knee = foot + (1.6, 1.2, 0.0), knee + (0.6, 0.8, 0.0)
         hind_legs.append((knee, foot, side))
         m.cyl(hip, knee, 2.3, mc, r1=1.1, seg=6)
         m.ell(knee, (1.1, 1.1, 1.1), M_BONE)

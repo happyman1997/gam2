@@ -176,6 +176,21 @@ fn animate(rec: &Record, ms: &[crate::playback::Moment], s: &crate::playback::Sh
     an
 }
 
+/// A body killed this round, drawn once more over the effects: where its sprite went, its flash, where it fell,
+/// how long ago.
+struct Dying {
+    sx: i32,
+    sy: i32,
+    flip: bool,
+    flash: f32,
+    x: f32,
+    y: f32,
+    golem: bool,
+    big: bool,
+    t: f32,
+    name: String,
+}
+
 /// The dust a body raises as it falls: a ring of specks thrown out low along the ground and settling; a golem
 /// throws dark grit and a few sparks.
 fn dust(cv: &mut Image, x: f32, y: f32, t: f32, golem: bool, big: bool, seed: usize) {
@@ -382,7 +397,10 @@ fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
     if f < e.start || k >= fx.frames {
         return;
     }
-    cv.blit_region(&fx.img, k * fx.w, 0, fx.w, fx.h, e.x as i32 - fx.pivot.0, e.y as i32 - fx.pivot.1, false, 1.0);
+    // the tail of an effect (an explosion's smoke) thins out, so what happens inside it is not hidden for long
+    let half = fx.frames as f32 * 0.45;
+    let alpha = if (k as f32) < half { 1.0 } else { 1.0 - 0.75 * (k as f32 - half) / (fx.frames as f32 - half) };
+    cv.blit_region(&fx.img, k * fx.w, 0, fx.w, fx.h, e.x as i32 - fx.pivot.0, e.y as i32 - fx.pivot.1, false, alpha);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -465,6 +483,9 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     }
     placed.sort_by(|p, q| (!p.3).cmp(&!q.3).then(p.0.partial_cmp(&q.0).unwrap()));
     let at = |id: usize| shown.iter().find(|o| o.id == id).map(|o| (o.x, o.y));
+    // a death is drawn again over the fire and smoke: the flash of the killed and the dust of its fall must show
+    // even inside a blast
+    let mut over: Vec<Dying> = vec![];
     for &(y, x, s, lying) in &placed {
         let info = &rec.units[s.id];
         let anim = animate(rec, &ms, s, ff, &at);
@@ -486,7 +507,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             cv.blit(&spr.img, sx, sy, flip, 1.0);
         }
         if let Some(k) = s.dead_at {
-            dust(cv, x, y, ff - k as f32 - 3.0, info.side == 0, big, s.id);
+            over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.side == 0, big, t: ff - k as f32, name });
         }
     }
     // the leaders' health, the crown by it
@@ -514,6 +535,14 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     }
     for e in &sparks.1 {
         effect(cv, a, e, f);
+    }
+    for d in &over {
+        if d.t < 3.0 {
+            if let Some(spr) = a.sprites.get(&d.name) {
+                cv.blit_tint(&spr.img, d.sx, d.sy, d.flip, [255, 250, 236], d.flash);
+            }
+        }
+        dust(cv, d.x, d.y, d.t - 3.0, d.golem, d.big, (d.x * 7.0 + d.y) as usize);
     }
     for n in &sparks.0 {
         number(cv, a, rec, n, f, &bars);
