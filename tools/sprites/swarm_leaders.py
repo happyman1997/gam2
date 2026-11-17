@@ -63,13 +63,21 @@ def eyes(m, hc, pts, r=0.42):
         m.ell(hc + np.array(p), (r, r, r), M_EYE)
 
 
+GAIT = None    # walking: which tripod (0 or 1) swings forward and up; None — standing
+
+
 def legs(m, mc, hips, knees, feet, width=1, claw=0.9, thick=None):
     """Pairs of legs given for the near side (z > 0); the far side is mirrored. thick: (thigh, shin) radii — solid
     tapered segments with a knob at the knee, for the heavy ones."""
     for side in (1, -1):
         band = 3 if side > 0 else 1
-        for h, k, f in zip(hips, knees, feet):
+        for i, (h, k, f) in enumerate(zip(hips, knees, feet)):
             h, k, f = (np.array((p[0], p[1], p[2] * side)) for p in (h, k, f))
+            if GAIT is not None:                 # a tripod gait, as the swarm's small ones walk
+                if (i + (side > 0)) % 2 == GAIT:
+                    f, k = f + (2.0, 1.8, 0.0), k + (0.8, 1.0, 0.0)
+                else:
+                    f = f + (-1.5, 0.0, 0.0)
             if thick:
                 m.cyl(h, k, thick[0], mc, r1=thick[0] * 0.75, seg=6)
                 m.ell(k, (thick[0] * 0.8,) * 3, mc)
@@ -501,12 +509,16 @@ def build(name, pose="idle", k=1.0, stage=0, hue=0.0, dev=None, host=None):
         stage = max(stage, 1)
     size = SIZE[name] + (stage if name == "Пожиратель" else 0) + (1 if (name == "Матка" and dev == "size") else 0)
     s = SCALE[size] * k
+    global GAIT
+    if pose.startswith("walk"):                  # "walk0" / "walk1": standing, one tripod of legs in the air
+        GAIT, pose = int(pose[-1]), "idle"
     if name == "Пожиратель":
         m = pozhiratel(pose, stage, hue)
     elif name == "личинка":
         m = larva(pose, hue, host)
     else:
         m = BUILD[name](pose, hue)
+    GAIT = None
     add_dev(m, name, dev, pose, hue)
     w, h, ox, oy = int(110 * s), int(70 * s), int(70 * s), int(56 * s)
     spr = W.rim_light(render(m.scaled(s), w, h, ox, oy, **W.STYLE1))

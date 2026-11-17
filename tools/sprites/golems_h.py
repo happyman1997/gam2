@@ -185,6 +185,26 @@ def creature_parts(S, A, P=None, fx=True):
     return G, info
 
 
+def walk_pose(S, i):
+    """One of four frames of a walk, from the idle pose: 0 — the near foot forward on the ground, 1 — passing, the far
+    foot up; 2 — the far foot forward, 3 — passing, the near foot up. The body dips on a step and rises in passing,
+    the free arms swing against the legs."""
+    A = dict(S["poses"]["idle"])
+    A.pop("fx", None)
+    (xn, yn, zn), (xf, yf, zf) = A["ank"]
+    stride, lift = S["LT"] * 0.42, S["LT"] * 0.3
+    fwd, up = ((1, 0), (0, -1), (-1, 0), (0, 1))[i]          # near foot forward(+)/back(-); which foot is up
+    A["ank"] = ((xn + fwd * stride, yn + (lift if up == 1 else 0.0), zn), (xf - fwd * stride, yf + (lift if up == -1 else 0.0), zf))
+    t = A.get("t", (0.0, 0.0, 0.0))
+    A["t"] = (t[0], t[1] + (-0.35 if fwd else 0.45) * S["LT"] * 0.08, t[2])
+    if not S.get("two_hand"):
+        for key, sgn in (("hand_n", -1), ("hand_f", 1)):
+            if key in A:
+                hx, hy, hz = A[key]
+                A[key] = (hx + sgn * fwd * stride * 0.45, hy, hz)
+    return A
+
+
 def broken_pose(S):
     """Slumped onto the knees, the body fallen forward, the arms hanging to the ground; smoke, no fire."""
     I = S["poses"]["idle"]

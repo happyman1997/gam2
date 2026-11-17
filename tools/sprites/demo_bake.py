@@ -43,8 +43,9 @@ def save_sprite(name, spr, emit=None):
 
 
 def units():
-    """The Inventor's golems and himself (idle, attack, broken), the Devourer's ants and grasshoppers in four
-    variants each (idle, attack, dead), the Devourer at each growth step (idle, attack, dead)."""
+    """The Inventor's golems and himself (idle, attack, broken, four frames of a walk), the Devourer's ants and
+    grasshoppers in four variants each (idle, attack, dead, two frames of a walk), the Devourer at each growth step
+    (idle, attack, dead, two frames of a walk)."""
     for name, k in (("Мудрец", BT.GK[4]), ("Орудие", BT.GK[4]), ("Механик", BT.GK[4] * 0.88)):
         for pose in ("idle", "attack", "broken"):
             if name == "Мудрец" and pose == "attack":
@@ -53,6 +54,14 @@ def units():
                 save_sprite(f"{name}_{pose}", F.build(name, "cast", k=k), emit=F.to_screen(info["n"]["tip"], k))
                 continue
             save_sprite(f"{name}_{pose}", F.build(name, pose, k=k))
+        # a walk of four frames: a step on the near foot, passing, a step on the far one, passing
+        S = LH.GH.BY_NAME[name]
+        for i in range(4):
+            S["poses"][f"walk{i}"] = LH.GH.walk_pose(S, i)
+            save_sprite(f"{name}_walk{i}", F.build(name, f"walk{i}", k=k))
+    for i in range(4):
+        LH.INVENTOR["poses"][f"walk{i}"] = LH.GH.walk_pose(LH.INVENTOR, i)
+        save_sprite(f"Изобретатель_walk{i}", LH.GH.build(LH.INVENTOR, f"walk{i}", 1.05))
     for pose in ("idle", "attack", "broken"):
         if pose == "attack":
             # the Inventor raises the shocker; the game draws the arc from its prongs to the target (emit)
@@ -66,11 +75,11 @@ def units():
         for v in range(4):
             seed = 700 + v * 13 + len(name)
             hue = (-0.12, -0.04, 0.05, 0.12)[v]
-            for pose in ("idle", "attack"):
+            for pose in ("idle", "attack", "walk0", "walk1"):          # walk: the two tripods of legs in turn
                 save_sprite(f"{name}_{v}_{pose}", W.build(traits, hue, pose, soldier, k=1.0, genes=W.genes_for(seed)))
             save_sprite(f"{name}_{v}_dead", flip_dead(W.build(traits, hue, "idle", soldier, k=1.0, genes=W.genes_for(seed)), 0.3))
     for stage in range(3):
-        for pose in ("idle", "attack"):
+        for pose in ("idle", "attack", "walk0", "walk1"):
             save_sprite(f"Пожиратель_{stage}_{pose}", SL.build("Пожиратель", pose, 1.0, stage=stage))
         save_sprite(f"Пожиратель_{stage}_dead", flip_dead(SL.build("Пожиратель", "idle", 1.0, stage=stage), 0.3))
 

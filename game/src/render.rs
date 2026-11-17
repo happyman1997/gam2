@@ -5,6 +5,7 @@
 use crate::assets::{Align, Assets, Font};
 use crate::gfx::Image;
 use crate::playback::{Effect, Number, NumStyle, Pose, Record, FR};
+use sim::Event;
 
 pub const W: i32 = 960;
 pub const H: i32 = 540;
@@ -52,26 +53,29 @@ fn sprite_name(rec: &Record, id: usize, pose: Pose, f: i32) -> String {
     match n {
         "Мудрец" | "Орудие" | "Механик" | "Изобретатель" => {
             let p = match pose {
-                Pose::Idle => "idle",
-                Pose::Attack => "attack",
-                Pose::Dead => "broken",
+                Pose::Idle => "idle".to_string(),
+                Pose::Attack => "attack".to_string(),
+                Pose::Dead => "broken".to_string(),
+                Pose::Walk(k) => format!("walk{}", (k / 2) % 4), // four frames, each held two counts
             };
             format!("{n}_{p}")
         }
         "Пожиратель" => {
             let st = rec.state_at(id, f).growth.min(2);
             let p = match pose {
-                Pose::Idle => "idle",
-                Pose::Attack => "attack",
-                Pose::Dead => "dead",
+                Pose::Idle => "idle".to_string(),
+                Pose::Attack => "attack".to_string(),
+                Pose::Dead => "dead".to_string(),
+                Pose::Walk(k) => format!("walk{}", (k / 2) % 2),
             };
             format!("Пожиратель_{st}_{p}")
         }
         _ => {
             let p = match pose {
-                Pose::Idle => "idle",
-                Pose::Attack => "attack",
-                Pose::Dead => "dead",
+                Pose::Idle => "idle".to_string(),
+                Pose::Attack => "attack".to_string(),
+                Pose::Dead => "dead".to_string(),
+                Pose::Walk(k) => format!("walk{}", k % 2), // the small ones scuttle: a frame every count
             };
             let base = if n.starts_with("Кузнечик") { "Кузнечик (рабочая)" } else if n.contains("солдат") { "Муравей (солдат)" } else { "Муравей (рабочая)" };
             format!("{base}_{}_{p}", id % 4)
@@ -80,6 +84,125 @@ fn sprite_name(rec: &Record, id: usize, pose: Pose, f: i32) -> String {
 }
 
 const SLOTS: [(f32, f32); 4] = [(-11.0, -6.0), (11.0, -7.0), (-10.0, 8.0), (12.0, 7.0)];
+
+/// How a unit moves on top of where it stands: the frame to draw, an offset, a flash.
+struct Anim {
+    pose: Pose,
+    dx: f32,
+    dy: f32,
+    flash: f32,
+}
+
+/// The life on top of the battle's record (frame `ff`, the round's moments `ms`):
+/// - standing, a body breathes: one pixel up and down, each at its own pace (a machine slower than a beast);
+/// - an attack is a swing: it draws back for a moment, lunges at the target as the blow lands and settles back;
+///   a shot or a discharge kicks the shooter back instead;
+/// - a hit target flashes white and is knocked a couple of pixels away from the blow, then steadies;
+/// - a killed one flashes and shudders for three frames before it falls (the fall itself: in the drawing loop).
+fn animate(rec: &Record, ms: &[crate::playback::Moment], s: &crate::playback::Shown, ff: f32, at: &dyn Fn(usize) -> Option<(f32, f32)>) -> Anim {
+    let info = &rec.units[s.id];
+    let mut an = Anim { pose: s.pose, dx: 0.0, dy: 0.0, flash: 0.0 };
+    let unit = |dx: f32, dy: f32| {
+        let l = dx.hypot(dy).max(0.001);
+        (dx / l, dy / l)
+    };
+    if let Some(k) = s.dead_at {
+        let rel = ff - k as f32;
+        if rel < 3.0 {
+            an.pose = Pose::Idle;
+            an.flash = 0.9 - rel * 0.2;
+            an.dx = if (rel as i32) % 2 == 0 { -1.0 } else { 1.0 };
+            return an;
+        }
+        // dropping to the ground: a little fall and a bounce
+        an.dy = [-4.0, -2.0, -0.0, -1.0, 0.0][((rel - 3.0) as usize).min(4)];
+        return an;
+    }
+    if s.pose == Pose::Dead {
+        return an;
+    }
+    if s.pose == Pose::Idle {
+        let slow = info.side == 0 || info.fp >= 2;
+        let period = if slow { 40.0 } else { 18.0 };
+        let phase = (s.id as f32 * 0.37).fract();
+        if ((ff / period) + phase).fract() >= 0.5 {
+            an.dy = -1.0;
+        }
+    }
+    let ranged = matches!(info.name.as_str(), "Мудрец" | "Орудие" | "Изобретатель");
+    // its own blow nearest in time
+    if let Some((m, t)) = ms
+        .iter()
+        .filter_map(|m| match m.ev {
+            Event::Hit { a, t, .. } if a == s.id => Some((m, t)),
+            _ => None,
+        })
+        .min_by(|p, q| (ff - p.0.frame as f32).abs().partial_cmp(&(ff - q.0.frame as f32).abs()).unwrap())
+    {
+        let rel = ff - m.frame as f32;
+        if let Some((tx, ty)) = at(t) {
+            let (ux, uy) = unit(tx - s.x, ty - s.y);
+            let push = if ranged {
+                if (0.0..4.0).contains(&rel) { -2.0 * (1.0 - rel / 4.0) } else { 0.0 }
+            } else if (-5.0..-2.0).contains(&rel) {
+                -1.5 // the wind-up
+            } else if (-2.0..0.0).contains(&rel) {
+                -1.5 + (rel + 2.0) / 2.0 * 6.0 // the lunge
+            } else if (0.0..5.0).contains(&rel) {
+                4.5 * (1.0 - rel / 5.0) // settling back
+            } else {
+                0.0
+            };
+            an.dx += ux * push;
+            an.dy += uy * push * 0.6;
+        }
+    }
+    // a blow it took
+    for m in ms {
+        if let Event::Hit { a, t, dmg } = m.ev {
+            let rel = ff - m.frame as f32;
+            if t != s.id || dmg <= 0 || !(0.0..5.0).contains(&rel) {
+                continue;
+            }
+            an.flash = an.flash.max([0.75, 0.35, 0.0, 0.0, 0.0][rel as usize]); // two frames: a blink, not a glow
+            if let Some((ax, ay)) = at(a) {
+                let (ux, uy) = unit(s.x - ax, s.y - ay);
+                let k = 2.5 * (1.0 - rel / 5.0) * if info.fp >= 2 { 0.5 } else { 1.0 };
+                an.dx += ux * k;
+                an.dy += uy * k * 0.6;
+            }
+        }
+    }
+    an
+}
+
+/// The dust a body raises as it falls: a ring of specks thrown out low along the ground and settling; a golem
+/// throws dark grit and a few sparks.
+fn dust(cv: &mut Image, x: f32, y: f32, t: f32, golem: bool, big: bool, seed: usize) {
+    if !(0.0..10.0).contains(&t) {
+        return;
+    }
+    let n = if big { 14 } else { 8 };
+    let fade = 1.0 - t / 10.0;
+    for i in 0..n {
+        let h = (seed as u32).wrapping_mul(2654435761).wrapping_add(i as u32 * 40503);
+        let ang = i as f32 / n as f32 * std::f32::consts::TAU + (h % 100) as f32 * 0.01;
+        let speed = 1.2 + ((h >> 8) % 100) as f32 * 0.008 + if big { 0.8 } else { 0.0 };
+        let d = speed * t.sqrt() * 3.2;
+        let px = x + ang.cos() * d * 1.7;
+        let py = y - 1.0 + ang.sin() * d * 0.55 - t * 0.25;
+        let col = if golem { [132, 124, 116, 255] } else { [176, 158, 134, 255] }; // lighter than the ground, so it shows
+        cv.blend_px(px as i32, py as i32, col, 0.9 * fade);
+        cv.blend_px(px as i32 + 1, py as i32, col, 0.6 * fade);
+        if big {
+            cv.blend_px(px as i32, py as i32 - 1, col, 0.6 * fade);
+            cv.blend_px(px as i32 + 1, py as i32 - 1, col, 0.4 * fade);
+        }
+        if golem && i % 3 == 0 && t < 5.0 {
+            cv.blend_px(px as i32, (py - 2.0 - t) as i32, [255, 176, 64, 255], 1.0 - t / 5.0);
+        }
+    }
+}
 
 fn number(cv: &mut Image, a: &Assets, rec: &Record, n: &Number, f: i32, bars: &[(i32, i32, i32, i32)]) {
     let age = f - n.start;
@@ -307,40 +430,63 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let total = rec.frames();
     let f = (view.frame as i32).min(total - 1);
     cv.blit(&a.ground, 0, 0, false, 1.0);
-    // the units, in depth order; small ones sharing a cell spread over its four places
-    let mut shown = rec.shown(view.frame.min((total - 1) as f32));
-    let mut seen: std::collections::HashMap<(i32, i32, u8, bool), usize> = Default::default();
+    // the units, in depth order; small ones sharing a cell spread over its four places — the living by their order
+    // in the cell, the dead each on a place of its own (so a corpse never shifts when the living come and go)
+    let ff = view.frame.min((total - 1) as f32);
+    let shown = rec.shown(ff);
+    let ms = rec.moments((f / FR) as usize);
     let mut placed = vec![];
-    shown.sort_by_key(|s| s.id);
     for s in &shown {
         let info = &rec.units[s.id];
-        let (mut x, mut y) = (s.x, s.y);
+        let pos = |s: &crate::playback::Shown| (s.x, s.y);
+        let (mut x, mut y) = pos(s);
+        let lying = s.pose == Pose::Dead && s.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
         if info.fp == 1 && !info.leader {
-            let key = ((s.x / 4.0) as i32, (s.y / 4.0) as i32, info.side, s.pose == Pose::Dead);
-            let k = seen.entry(key).or_insert(0);
-            let (dx, dy) = SLOTS[*k % 4];
-            *k += 1;
+            let rank = shown
+                .iter()
+                .filter(|o| o.id < s.id && o.cell == s.cell && rec.units[o.id].side == info.side && rec.units[o.id].fp == 1)
+                .filter(|o| !(o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true)))
+                .count();
+            let alive_slot = SLOTS[rank % 4];
+            let dead_slot = SLOTS[s.id % 4];
+            let (dx, dy) = if lying {
+                dead_slot
+            } else if let Some(k) = s.dead_at {
+                // the fall: from its place among the living to its own place on the ground
+                let u = ((ff - k as f32 - 3.0) / 3.0).clamp(0.0, 1.0);
+                (alive_slot.0 + (dead_slot.0 - alive_slot.0) * u, alive_slot.1 + (dead_slot.1 - alive_slot.1) * u)
+            } else {
+                alive_slot
+            };
             x += dx;
             y += dy;
         }
-        placed.push((y, x, s));
+        placed.push((y, x, s, lying));
     }
-    placed.sort_by(|p, q| (p.2.pose != Pose::Dead).cmp(&(q.2.pose != Pose::Dead)).then(p.0.partial_cmp(&q.0).unwrap()));
-    for (y, x, s) in &placed {
+    placed.sort_by(|p, q| (!p.3).cmp(&!q.3).then(p.0.partial_cmp(&q.0).unwrap()));
+    let at = |id: usize| shown.iter().find(|o| o.id == id).map(|o| (o.x, o.y));
+    for &(y, x, s, lying) in &placed {
         let info = &rec.units[s.id];
-        let name = sprite_name(rec, s.id, s.pose, f);
+        let anim = animate(rec, &ms, s, ff, &at);
+        let name = sprite_name(rec, s.id, anim.pose, f);
         let Some(spr) = a.sprites.get(&name) else { continue };
         let big = info.fp >= 2 || info.name.as_str() != "Муравей (рабочая)" && info.side == 0;
-        if s.pose != Pose::Dead {
-            cv.shadow(*x + 2.0, *y, if big { 40.0 } else { 14.0 }, if big { 7.0 } else { 3.0 });
+        if !lying && anim.pose != Pose::Dead {
+            cv.shadow(x + 2.0, y, if big { 40.0 } else { 14.0 }, if big { 7.0 } else { 3.0 });
         }
         let flip = info.side == 1;
         let ox = if flip { spr.img.w - 1 - spr.ox } else { spr.ox };
-        if s.pose == Pose::Dead {
+        let (sx, sy) = ((x + anim.dx).round() as i32 - ox, (y + anim.dy).round() as i32 - spr.oy);
+        if anim.pose == Pose::Dead {
             // the dead lie darker and greyer than the living, so a heap of them does not read as a living swarm
-            cv.blit_shade(&spr.img, *x as i32 - ox, *y as i32 - spr.oy, flip, 0.62, 0.55);
+            cv.blit_shade(&spr.img, sx, sy, flip, 0.62, 0.55);
+        } else if anim.flash > 0.0 {
+            cv.blit_tint(&spr.img, sx, sy, flip, [255, 250, 236], anim.flash);
         } else {
-            cv.blit(&spr.img, *x as i32 - ox, *y as i32 - spr.oy, flip, 1.0);
+            cv.blit(&spr.img, sx, sy, flip, 1.0);
+        }
+        if let Some(k) = s.dead_at {
+            dust(cv, x, y, ff - k as f32 - 3.0, info.side == 0, big, s.id);
         }
     }
     // the leaders' health, the crown by it

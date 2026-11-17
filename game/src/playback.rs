@@ -97,6 +97,10 @@ pub struct Shown {
     pub x: f32,
     pub y: f32,
     pub pose: Pose,
+    /// The cell it stands in at the end of the round (small ones share a cell, spread over its four places).
+    pub cell: (i32, i32),
+    /// The frame it was killed on, if that was this round (the fall is still playing).
+    pub dead_at: Option<i32>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -104,6 +108,8 @@ pub enum Pose {
     Idle,
     Attack,
     Dead,
+    /// Walking: a running step count; the drawing picks the frame of the walk from it.
+    Walk(u8),
 }
 
 /// Something that happens at a moment in a round: a blow, a kill, a heal, a summon...
@@ -194,7 +200,7 @@ impl Record {
             let born_at = ms.iter().find(|m| matches!(m.ev, Event::Summon { u } if u == id)).map(|m| m.frame);
             if !b.alive && !a.alive {
                 let (x, y) = Self::spot(a.x, a.y, info.fp); // killed earlier: it lies where it fell
-                out.push(Shown { id, x, y, pose: Pose::Dead });
+                out.push(Shown { id, x, y, pose: Pose::Dead, cell: (a.x, a.y), dead_at: None });
                 continue;
             }
             if !b.present && !a.present {
@@ -213,8 +219,17 @@ impl Record {
                 continue;
             }
             let attacking = ms.iter().any(|m| matches!(m.ev, Event::Hit { a: at, .. } if at == id) && (f - m.frame).abs() <= 4);
-            let pose = if dead { Pose::Dead } else if attacking { Pose::Attack } else { Pose::Idle };
-            out.push(Shown { id, x, y, pose });
+            let walking = (b.x, b.y) != (a.x, a.y) && walked < MOVE as f32;
+            let pose = if dead {
+                Pose::Dead
+            } else if attacking {
+                Pose::Attack
+            } else if walking {
+                Pose::Walk(((ff / 1.25) as i32).rem_euclid(8) as u8)
+            } else {
+                Pose::Idle
+            };
+            out.push(Shown { id, x, y, pose, cell: (a.x, a.y), dead_at: killed_at.filter(|_| dead) });
         }
         out
     }

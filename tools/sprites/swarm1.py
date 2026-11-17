@@ -94,6 +94,7 @@ def genes_for(seed):
 
 
 _FEET = []                                  # feet of the body being built (evolutions hook onto them)
+GAIT = None                                 # walking: which tripod (0 or 1) swings forward and up; None — standing
 
 
 def leg_pairs(m, mc, y0, xs, spread, length, lift, pose, skip=(), fore_lift=False):
@@ -108,6 +109,12 @@ def leg_pairs(m, mc, y0, xs, spread, length, lift, pose, skip=(), fore_lift=Fals
             if pose == "attack" and fore_lift and i == len(xs) - 1:
                 knee = np.array((x + 3.5, y0 + 4.0, 3.4 * side))
                 foot = np.array((x + 6.0, y0 + 2.2, 4.2 * side))
+            elif GAIT is not None:                   # a tripod gait: front and hind of one side with the middle of the other
+                if (i + (side > 0)) % 2 == GAIT:
+                    foot = foot + (1.6, 1.3, 0.0)
+                    knee = knee + (0.6, 0.7, 0.0)
+                else:
+                    foot = foot + (-1.2, 0.0, 0.0)
             m.limb([hip, knee], 1, mc, band=band)
             m.limb([knee, foot], 1, mc, band=band - 1 if side > 0 else 1)
             # a spine at the knee and a hooked claw at the foot
@@ -710,9 +717,16 @@ def rim_light(spr, col="#c0b0d0", k=0.65):
 
 def build(traits=(), hue=0.0, pose="idle", soldier=False, k=1.0, genes=None, chimera=None, evo=(), rare=None):
     """k multiplies the in-game scale (use >1 for close-up sheets)."""
+    global GAIT
     s = scale_for(size_of(traits, soldier)) * k
     w, h, ox, oy = int(64 * s), int(60 * s), int(30 * s), int(52 * s)
-    spr = rim_light(render(body(hue, traits, pose, soldier, genes, chimera, evo, rare).scaled(s), w, h, ox, oy, **STYLE1))
+    if pose.startswith("walk"):                  # "walk0" / "walk1": standing, but one tripod of legs in the air
+        GAIT, pose = int(pose[-1]), "idle"
+    try:
+        model = body(hue, traits, pose, soldier, genes, chimera, evo, rare)
+    finally:
+        GAIT = None
+    spr = rim_light(render(model.scaled(s), w, h, ox, oy, **STYLE1))
     spr.ox, spr.oy = ox, oy
     return spr
 
