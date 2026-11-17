@@ -701,7 +701,12 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
         let dy = ((1.0 - k) * -40.0) as i32;
         cv.blit(&p.img, W / 2 - p.img.w / 2, H / 2 - 60 + dy, false, k);
         let big = &a.fonts["title24"];
-        let (t, c, e) = if win { ("ПОБЕДА", ACID, ACID_EDGE) } else { ("ПОРАЖЕНИЕ", [176, 178, 186], [56, 58, 68]) };
+        // both armies gone at once, or the rounds run out: a draw, on the grey plate
+        let (t, c, e) = match rec.outcome.winner {
+            Some(1) => ("ПОБЕДА", ACID, ACID_EDGE),
+            Some(_) => ("ПОРАЖЕНИЕ", [176, 178, 186], [56, 58, 68]),
+            None => ("НИЧЬЯ", [176, 178, 186], [56, 58, 68]),
+        };
         big.draw(cv, t, W / 2, H / 2 - 30 + dy, c, Some(e), Align::Center, k);
         let sub = format!("ходов: {} · зерно {}", rec.rounds.len(), rec.seed);
         text.draw(cv, &sub, W / 2, H / 2 + 46 + dy, INK, Some([16, 12, 16]), Align::Center, k);

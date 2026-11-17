@@ -3,7 +3,8 @@
 //! gam2, the tech demo: one battle — the Inventor's start against the Devourer's — run by the simulation and played
 //! back with the game's pixel art at 960×540, scaled by a whole factor.
 //!
-//!   cargo run -p game --release                       a window (Space pause, Tab speed, End to the end, R new battle)
+//!   cargo run -p game --release                       full screen (Space pause, Tab speed, End to the end, R new battle,
+//!                                                     C camera, F11 or Alt+Enter a window, Esc quit)
 //!   cargo run -p game --release -- --shot 120 a.png   frame 120 to a PNG (×2), no window needed
 //!   cargo run -p game --release -- --strip out.png    a strip of frames across the battle, for a look
 //!   cargo run -p game --release -- --frames dir 2     every 2nd frame of the battle to dir/0000.png…
@@ -97,6 +98,31 @@ impl Demo {
     }
 }
 
+/// A fatal error, said where the player sees it: a shipped Windows build has no console, so a message box too —
+/// not a game that silently does not open.
+pub fn fatal(msg: &str) -> ! {
+    eprintln!("{msg}");
+    message_box(msg);
+    std::process::exit(1);
+}
+
+#[cfg(windows)]
+fn message_box(text: &str) {
+    #[link(name = "user32")]
+    extern "system" {
+        fn MessageBoxW(hwnd: *mut std::ffi::c_void, text: *const u16, caption: *const u16, kind: u32) -> i32;
+    }
+    let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+    let (t, c) = (wide(text), wide("gam2"));
+    // SAFETY: both strings are NUL-terminated UTF-16 that outlive the call; no owner window. 0x10: the error icon.
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), t.as_ptr(), c.as_ptr(), 0x10);
+    }
+}
+
+#[cfg(not(windows))]
+fn message_box(_text: &str) {}
+
 fn scaled(cv: &gfx::Image, k: i32) -> gfx::Image {
     let mut out = gfx::Image::new(cv.w * k, cv.h * k);
     for y in 0..out.h {
@@ -108,14 +134,14 @@ fn scaled(cv: &gfx::Image, k: i32) -> gfx::Image {
 }
 
 fn main() {
+    // a panic in a build without a console: the player gets its text in a box, to send to us
+    #[cfg(all(windows, not(debug_assertions)))]
+    std::panic::set_hook(Box::new(|info| message_box(&format!("Игра упала с ошибкой:\n\n{info}"))));
     let args: Vec<String> = std::env::args().collect();
     let seed = args.iter().position(|a| a == "--seed").and_then(|i| args.get(i + 1)).and_then(|s| s.parse().ok()).unwrap_or(184);
     let mut demo = match Demo::new(seed) {
         Ok(d) => d,
-        Err(e) => {
-            eprintln!("не загрузились ресурсы: {e}");
-            std::process::exit(1);
-        }
+        Err(e) => fatal(&format!("Не загрузились ресурсы игры (папка assets рядом с game.exe):\n{e}")),
     };
     if let Some(i) = args.iter().position(|a| a == "--shot") {
         let f: f32 = args.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
@@ -177,4 +203,101 @@ fn main() {
     window::run(demo, seed);
     #[cfg(not(feature = "window"))]
     eprintln!("собрано без окна: --shot N file.png или --strip file.png");
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{camera, gfx, playback, render};
+    use sim::data;
+
+    /// Every start army against every other on a few seeds: the playback, its sounds and numbers, the camera and
+    /// the drawing of a spread of frames go through without a panic.
+    #[test]
+    fn battles_play_back() {
+        // GAME_FUZZ=N plays N seeds of every pair and draws every 3rd frame (slow; for a hunt, not for CI)
+        let deep: u64 = std::env::var("GAME_FUZZ").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let assets = crate::assets::Assets::load().expect("assets");
+        let armies = [
+            data::start_otets(), data::start_izobretatel(), data::start_manyak(), data::start_zodchiy(),
+            data::start_matka(), data::start_razum(), data::start_pozhiratel(), data::start_kukushka(),
+        ];
+        let fr = camera::Frame::fit(1366, 768);
+        for (i, a) in armies.iter().enumerate() {
+            for (j, b) in armies.iter().enumerate() {
+                for seed in 0..deep.max(2) {
+                    let rec = playback::record_of(seed * 1000 + (i * 8 + j) as u64, a, b);
+                    let sparks = rec.sparks();
+                    let _ = rec.cues();
+                    let total = rec.frames() + 24;
+                    let mut cv = gfx::Image::new(render::W, render::H);
+                    let mut view = render::View { frame: 0.0, speed: 1, paused: false, hover: None };
+                    let n = if deep > 0 { total / 3 } else { 16 };
+                    for k in 0..n {
+                        let f = k as f32 * total as f32 / n as f32 + 0.37;
+                        view.frame = f;
+                        render::draw(&mut cv, &assets, &rec, &sparks, &view);
+                        let _ = camera::target(&rec, f.min((rec.frames() - 1) as f32), &fr);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod bench {
+    /// What a frame costs: the field, the interface, the camera's composing at 1080p, 1440p and 4K
+    /// (`cargo test --release -p game frame_cost -- --ignored --nocapture`); COMPOSE_DUMP=dir also writes the composed
+    /// pictures, to compare a change of compose against.
+    #[test]
+    #[ignore]
+    fn frame_cost() {
+        use crate::{camera, gfx, render};
+        use std::time::Instant;
+        let demo = crate::Demo::new(184).unwrap();
+        let mut field = gfx::Image::new(render::W, render::H);
+        let (mut tf, mut th) = (0.0, 0.0);
+        for k in 0..30 {
+            let v = render::View { frame: 300.0 + k as f32, speed: 1, paused: false, hover: None };
+            let t = Instant::now();
+            render::draw_field(&mut field, &demo.assets, &demo.rec, &demo.sparks, &v);
+            tf += t.elapsed().as_secs_f64();
+            let t = Instant::now();
+            let mut hud = gfx::Image::clear(render::W, render::H);
+            render::draw_hud(&mut hud, &demo.assets, &demo.rec, &v);
+            th += t.elapsed().as_secs_f64();
+        }
+        println!("field {:.1} ms, hud {:.1} ms", tf * 1000.0 / 30.0, th * 1000.0 / 30.0);
+        let hud = gfx::Image::clear(render::W, render::H);
+        for (w, h) in [(1920, 1080), (2560, 1440), (3840, 2160)] {
+            let fr = camera::Frame::fit(w, h);
+            let mut buf = vec![0u8; (w * h * 4) as usize];
+            let cam = camera::target(&demo.rec, 300.0, &fr);
+            let t = Instant::now();
+            for _ in 0..30 {
+                camera::compose(&field, &hud, cam, 1.0, &mut buf, &fr, 4);
+            }
+            println!("compose {w}x{h}: {:.1} ms", t.elapsed().as_secs_f64() * 1000.0 / 30.0);
+        }
+        // the composed pictures, to compare a rewrite of compose against (COMPOSE_DUMP=dir)
+        if let Some(dir) = std::env::var_os("COMPOSE_DUMP") {
+            let mut hud = gfx::Image::clear(render::W, render::H);
+            let v = render::View { frame: 300.0, speed: 1, paused: false, hover: None };
+            render::draw_hud(&mut hud, &demo.assets, &demo.rec, &v);
+            let mut n = 0;
+            for (w, h) in [(1920, 1080), (2560, 1440), (1366, 768), (1000, 700)] {
+                let fr = camera::Frame::fit(w, h);
+                for f in [0.0, 150.0, 300.0, 333.3] {
+                    let mut cam = camera::target(&demo.rec, f, &fr);
+                    cam.cx += 0.37;
+                    for (ch, light) in [(4usize, 1.0f32), (3, 0.6)] {
+                        let mut buf = vec![0u8; (w * h) as usize * ch];
+                        camera::compose(&field, &hud, cam, light, &mut buf, &fr, ch);
+                        std::fs::write(std::path::Path::new(&dir).join(format!("{n}.raw")), &buf).unwrap();
+                        n += 1;
+                    }
+                }
+            }
+        }
+    }
 }

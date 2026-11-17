@@ -192,6 +192,24 @@ pub enum Ability {
     Fireball { every: u32, die: u32, bonus: i32, range: u32 },
 }
 
+impl Ability {
+    /// How many rounds between its uses, for those used every so often.
+    pub fn every(&self) -> Option<u32> {
+        match *self {
+            Ability::Volley { every, .. }
+            | Ability::Repair { every, .. }
+            | Ability::Bolt { every, .. }
+            | Ability::Flash { every }
+            | Ability::Spit { every, .. }
+            | Ability::Brood { every, .. }
+            | Ability::Mark { every }
+            | Ability::Overload { every }
+            | Ability::Fireball { every, .. } => Some(every),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Template {
     pub name: std::borrow::Cow<'static, str>,

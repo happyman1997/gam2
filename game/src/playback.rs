@@ -3,7 +3,7 @@
 //! another, each with its effect and its number; the killed lie where they fell.
 
 use sim::data::{start_izobretatel, start_pozhiratel};
-use sim::model::Trait;
+use sim::model::{Template, Trait};
 use sim::{Battle, Event, Outcome};
 
 pub const FR: i32 = 30; // frames a round takes at ×1 (24 fps)
@@ -73,8 +73,13 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
 
 /// The demo's battle: the Inventor's start (left) against the Devourer's (right).
 pub fn record(seed: u64) -> Record {
+    record_of(seed, &start_izobretatel(), &start_pozhiratel())
+}
+
+/// A battle of army `a` (left) against army `b` (right), round by round.
+pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
     let mut bt = Battle::new(seed).with_log();
-    bt.add_armies(&start_izobretatel(), &start_pozhiratel());
+    bt.add_armies(a, b);
     let mut rounds = vec![];
     let outcome = loop {
         let before = states(&bt);
@@ -93,6 +98,11 @@ pub fn record(seed: u64) -> Record {
             break o;
         }
     };
+    // the rounds before a unit was summoned don't know it: there it is not on the field yet
+    for r in &mut rounds {
+        r.before.resize(bt.units.len(), State::default());
+        r.after.resize(bt.units.len(), State::default());
+    }
     let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![] };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
@@ -212,13 +222,13 @@ impl Record {
             let (b, a) = (round.before[id], round.after[id]);
             let killed_at = ms.iter().find(|m| matches!(m.ev, Event::Kill { t } if t == id)).map(|m| m.frame);
             let born_at = ms.iter().find(|m| matches!(m.ev, Event::Summon { u } if u == id)).map(|m| m.frame);
+            if !b.present && !a.present {
+                continue; // fled off the field, or not summoned yet
+            }
             if !b.alive && !a.alive {
                 let (x, y) = Self::spot(a.x, a.y, info.fp); // killed earlier: it lies where it fell
                 out.push(Shown { id, x, y, pose: Pose::Dead, cell: (a.x, a.y), dead_at: None });
                 continue;
-            }
-            if !b.present && !a.present {
-                continue; // fled off the field
             }
             if let Some(bf) = born_at {
                 if f < bf {

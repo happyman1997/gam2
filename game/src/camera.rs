@@ -114,38 +114,78 @@ pub fn follow(cam: &mut Cam, want: Cam, secs: f32, fr: &Frame) {
     *cam = clamp(*cam, fr);
 }
 
-fn axis(start: f32, n: i32, z: f32, size: i32) -> Vec<(i32, i32, f32)> {
+/// One axis of the sampling: for each output pixel, the two art pixels it falls between and the weight of the second
+/// (0–256) — 0 or 256 inside an art pixel, between only on its edge.
+fn axis(start: f32, n: i32, z: f32, size: i32) -> Vec<(i32, i32, u32)> {
     (0..n)
         .map(|k| {
             let p = start + (k as f32 + 0.5) / z - 0.5;
             let i = p.floor();
             let f = (((p - i) - 0.5) * z + 0.5).clamp(0.0, 1.0);
             let i = i as i32;
-            (i.clamp(0, size - 1), (i + 1).clamp(0, size - 1), f)
+            (i.clamp(0, size - 1), (i + 1).clamp(0, size - 1), (f * 256.0).round() as u32)
         })
         .collect()
 }
 
+fn lerp(a: [u8; 3], b: [u8; 3], f: u32) -> [u8; 3] {
+    let m = |p: u8, q: u8| ((p as u32 * (256 - f) + q as u32 * f + 128) >> 8) as u8;
+    [m(a[0], b[0]), m(a[1], b[1]), m(a[2], b[2])]
+}
+
 /// The output picture: the field under the camera, the interface over it, all dimmed by `light` (a fade). `out`
-/// holds `channels` bytes a pixel (3 for a video's RGB, 4 for the window's RGBA).
+/// holds `channels` bytes a pixel (3 for a video's RGB, 4 for the window's RGBA). Two passes: each art row the
+/// output needs is stretched across the output's width once, then each output row is put together from two of them
+/// (most rows from one) — a screen of 4K costs a few milliseconds, not a hundred.
 pub fn compose(field: &Image, hud: &Image, c: Cam, light: f32, out: &mut [u8], fr: &Frame, channels: usize) {
     let xs = axis(c.cx - fr.w as f32 / 2.0 / c.z, fr.w, c.z, field.w);
     let ys = axis(c.cy - fr.h as f32 / 2.0 / c.z, fr.h, c.z, field.h);
-    let stride = fr.w as usize * channels;
-    out.par_chunks_mut(stride).enumerate().take(fr.h as usize).for_each(|(y, row)| {
+    let w = fr.w as usize;
+    let r0 = ys.iter().map(|y| y.0).min().unwrap_or(0);
+    let r1 = ys.iter().map(|y| y.1).max().unwrap_or(0);
+    let mut rows = vec![[0u8; 3]; (r1 - r0 + 1) as usize * w];
+    rows.par_chunks_mut(w).enumerate().for_each(|(k, row)| {
+        let src = &field.px[(r0 as usize + k) * field.w as usize..][..field.w as usize];
+        for (o, &(x0, x1, fx)) in row.iter_mut().zip(&xs) {
+            let (a, b) = (src[x0 as usize], src[x1 as usize]);
+            *o = match fx {
+                0 => [a[0], a[1], a[2]],
+                256 => [b[0], b[1], b[2]],
+                _ => lerp([a[0], a[1], a[2]], [b[0], b[1], b[2]], fx),
+            };
+        }
+    });
+    let hx: Vec<i32> = (0..fr.w).map(|x| (x - fr.hud_x0).div_euclid(fr.hud_scale)).collect();
+    let lit = (light.clamp(0.0, 1.0) * 256.0).round() as u32;
+    out.par_chunks_mut(w * channels).enumerate().take(fr.h as usize).for_each(|(y, row)| {
         let (y0, y1, fy) = ys[y];
-        let (_, hy) = fr.hud_point(0, y as i32);
-        for (x, &(x0, x1, fx)) in xs.iter().enumerate() {
-            let (a, b, cc, d) = (field.get(x0, y0), field.get(x1, y0), field.get(x0, y1), field.get(x1, y1));
-            let hx = (x as i32 - fr.hud_x0).div_euclid(fr.hud_scale);
-            let h = if (0..hud.w).contains(&hx) && (0..hud.h).contains(&hy) { hud.get(hx, hy) } else { [0, 0, 0, 0] };
-            let ha = h[3] as f32 / 255.0;
-            for k in 0..3 {
-                let top = a[k] as f32 + (b[k] as f32 - a[k] as f32) * fx;
-                let bot = cc[k] as f32 + (d[k] as f32 - cc[k] as f32) * fx;
-                let v = top + (bot - top) * fy;
-                row[x * channels + k] = ((v * (1.0 - ha) + h[k] as f32 * ha) * light).round().clamp(0.0, 255.0) as u8;
+        let ra = &rows[(y0 - r0) as usize * w..][..w];
+        let rb = &rows[(y1 - r0) as usize * w..][..w];
+        let hy = (y as i32).div_euclid(fr.hud_scale);
+        let hrow = (0..hud.h).contains(&hy).then(|| &hud.px[(hy * hud.w) as usize..][..hud.w as usize]);
+        for x in 0..w {
+            let mut v = match fy {
+                0 => ra[x],
+                256 => rb[x],
+                _ => lerp(ra[x], rb[x], fy),
+            };
+            if let Some(hr) = hrow {
+                if (0..hud.w).contains(&hx[x]) {
+                    let h = hr[hx[x] as usize];
+                    let a = h[3] as u32;
+                    if a > 0 {
+                        for k in 0..3 {
+                            v[k] = ((v[k] as u32 * (255 - a) + h[k] as u32 * a + 127) / 255) as u8;
+                        }
+                    }
+                }
             }
+            if lit < 256 {
+                for p in &mut v {
+                    *p = ((*p as u32 * lit + 128) >> 8) as u8;
+                }
+            }
+            row[x * channels..x * channels + 3].copy_from_slice(&v);
             if channels == 4 {
                 row[x * 4 + 3] = 255;
             }

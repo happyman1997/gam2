@@ -201,6 +201,33 @@ pub fn check() -> Result<(), String> {
             return Err(format!("swarm.ron: no form {f:?}"));
         }
     }
+    // numbers the battle cannot run on: an ability every 0 rounds (a division by zero), a body of no size or health
+    let ability = |where_: &str, a: &Ability| match a.every() {
+        Some(0) => Err(format!("{where_}: {a:?} — every must be 1 or more")),
+        _ => Ok(()),
+    };
+    let unit_ok = |where_: &str, t: &Template| -> Result<(), String> {
+        if !(1..=7).contains(&t.size) || t.hp < 1 {
+            return Err(format!("{where_}: \"{}\" — size must be 1–7 and hp 1 or more", t.name));
+        }
+        t.abilities.iter().try_for_each(|a| ability(where_, a))
+    };
+    for (key, a) in &DATA.modules {
+        ability(&format!("modules.ron \"{key}\""), a)?;
+    }
+    for (key, t) in &DATA.units {
+        unit_ok(&format!("units.ron \"{key}\""), t)?;
+    }
+    for c in [Caste::Worker, Caste::Soldier] {
+        for f in FORMS {
+            unit_ok("swarm.ron", &swarm(c, f))?;
+        }
+    }
+    for key in DATA.armies.keys() {
+        for t in army(key) {
+            unit_ok(&format!("armies.ron \"{key}\""), &t)?;
+        }
+    }
     Ok(())
 }
 
