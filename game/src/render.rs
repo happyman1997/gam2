@@ -404,7 +404,7 @@ fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn button(cv: &mut Image, a: &Assets, x0: i32, x1: i32, y: i32, lit: bool, hot: bool, text: &str, key: &str, alpha: f32) {
+fn button(cv: &mut Image, a: &Assets, x0: i32, x1: i32, y: i32, lit: bool, hot: bool, text: &str, key: &str, alpha: f32, keys: f32) {
     let p = &a.ui[if lit { "button_amber_22" } else { "button_chitin_22" }];
     // the kit's 22 px button: 14 px of pad either side, the hexagon's points ~12 px, the middle repeats; under the
     // cursor it is lifted toward white
@@ -415,7 +415,9 @@ fn button(cv: &mut Image, a: &Assets, x0: i32, x1: i32, y: i32, lit: bool, hot: 
     }
     cv.blit(&b, x0 - 14, y, false, alpha);
     a.fonts["text16"].draw(cv, text, (x0 + x1) / 2, y + 7, if lit { DARK } else { INK }, if lit { None } else { Some([16, 12, 16]) }, Align::Center, alpha);
-    keycap(cv, &a.fonts["text16"], (x0 + x1) / 2, y + 29, key, alpha);
+    if keys > 0.0 {
+        keycap(cv, &a.fonts["text16"], (x0 + x1) / 2, y + 29, key, alpha * keys);
+    }
 }
 
 fn keycap(cv: &mut Image, font: &Font, cx: i32, y: i32, t: &str, alpha: f32) {
@@ -428,14 +430,35 @@ fn keycap(cv: &mut Image, font: &Font, cx: i32, y: i32, t: &str, alpha: f32) {
     font.draw(cv, t, cx, y + 1, INK, None, Align::Center, alpha);
 }
 
-fn meter(cv: &mut Image, a: &Assets, cx: i32, y: i32, lit: i32, gem: &str) {
+/// A leader's health, small: ten notches in a dark frame (lit in the side's colour, bevelled), a little crown
+/// before them. Centred on (cx, y); about 52 px wide.
+fn meter(cv: &mut Image, cx: i32, y: i32, lit: i32, swarm: bool) {
+    let (hi, mid, lo) = if swarm {
+        ([255, 150, 120, 255], [214, 64, 44, 255], [120, 26, 22, 255])
+    } else {
+        ([255, 226, 140, 255], [226, 160, 52, 255], [130, 82, 20, 255])
+    };
+    let x0 = cx - 20;
+    cv.fill(x0 - 1, y - 3, 42, 7, [14, 10, 18, 255]);
     for k in 0..10 {
-        let p = &a.ui[if k < lit { gem } else { "scale_dim" }];
-        let x = cx - 46 + k * 9;
-        cv.blit(&p.img, x - p.img.w / 2 + 4, y - p.img.h / 2, false, 1.0);
+        let x = x0 + k * 4;
+        if k < lit {
+            cv.fill(x, y - 2, 3, 1, hi);
+            cv.fill(x, y - 1, 3, 2, mid);
+            cv.fill(x, y + 1, 3, 1, lo);
+        } else {
+            cv.fill(x, y - 2, 3, 4, [52, 44, 60, 255]);
+        }
     }
-    let c = &a.ui["crown"];
-    cv.blit(&c.img, cx - 64, y - 10, false, 1.0);
+    // the crown: three points on a band, gold, outlined
+    let c0 = x0 - 10;
+    cv.fill(c0 - 1, y - 4, 9, 8, [14, 10, 18, 255]);
+    for (dx, dy) in [(0, -3), (3, -3), (6, -3)] {
+        cv.fill(c0 + dx, y + dy, 1, 1, [255, 226, 140, 255]);
+    }
+    cv.fill(c0, y - 2, 7, 1, [255, 226, 140, 255]);
+    cv.fill(c0, y - 1, 7, 2, [226, 160, 52, 255]);
+    cv.fill(c0, y + 1, 7, 1, [130, 82, 20, 255]);
 }
 
 pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec<Effect>), view: &View) {
@@ -499,8 +522,16 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         let ox = if flip { spr.img.w - 1 - spr.ox } else { spr.ox };
         let (sx, sy) = ((x + anim.dx).round() as i32 - ox, (y + anim.dy).round() as i32 - spr.oy);
         if anim.pose == Pose::Dead {
-            // the dead lie darker and greyer than the living, so a heap of them does not read as a living swarm
-            cv.blit_shade(&spr.img, sx, sy, flip, 0.62, 0.55);
+            // the dead lie darker and greyer than the living, so a heap of them does not read as a living swarm; the
+            // longer dead, the deeper they sink into the ground's colour — in steps, opaque, no see-through
+            let age = rec.died_at[s.id].map(|k| (f - k) / FR).unwrap_or(0);
+            let (mul, grey, sink) = match age {
+                0 => (0.62, 0.55, 0.0),
+                1 => (0.52, 0.65, 0.2),
+                2 => (0.46, 0.7, 0.4),
+                _ => (0.42, 0.75, 0.55),
+            };
+            cv.blit_shade_to(&spr.img, sx, sy, flip, mul, grey, [42, 34, 50], sink);
         } else if anim.flash > 0.0 {
             cv.blit_tint(&spr.img, sx, sy, flip, [255, 250, 236], anim.flash);
         } else {
@@ -524,10 +555,10 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             let name = sprite_name(rec, id, s.pose, f);
             let top = a.sprites.get(&name).map(|sp| sp.oy).unwrap_or(40);
             let lit = ((st.hp.max(0) * 10 + info.max_hp - 1) / info.max_hp.max(1)).clamp(0, 10);
-            // kept on the screen: a leader at the very edge still shows his crown and his health
-            let (cx, cy) = ((s.x as i32).clamp(66, W - 52), (s.y as i32 - top - 10).max(48));
-            meter(cv, a, cx, cy, lit, if info.side == 1 { "scale_over" } else { "scale_eat" });
-            bars.push((cx - 66, cy - 12, cx + 52, cy + 12));
+            // over his head; at the very edge it slides just enough to stay on the screen
+            let (cx, cy) = ((s.x as i32).clamp(32, W - 22), (s.y as i32 - top - 8).max(44));
+            meter(cv, cx, cy, lit, info.side == 1);
+            bars.push((cx - 32, cy - 5, cx + 22, cy + 5));
         }
     }
     for e in &sparks.1 {
@@ -588,13 +619,19 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     }
     let text = &a.fonts["text16"];
     let nf = rec.units.iter().filter(|u| u.side == 0).count();
-    text.draw(cv, &format!("Литейщик: {} из {nf}", alive(0)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);
+    let leader = rec.units.iter().find(|u| u.side == 0 && u.leader).map(|u| u.name.as_str()).unwrap_or("Литейщик");
+    // the leader's name and his army's count, short enough to leave room for the turn before the buttons
+    text.draw(cv, &format!("{leader} {}/{nf}", alive(0)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);
     let turn = (f / FR + 1).min(rec.rounds.len() as i32);
     text.draw(cv, &format!("ход {turn}"), 728, 9, MUTED, Some([16, 12, 16]), Align::Right, 1.0);
     let hot = |b: Button| view.hover == Some(b);
-    button(cv, a, 736, 784, 2, view.paused, hot(Button::Pause), "II", "Пробел", 1.0);
-    button(cv, a, 790, 838, 2, !view.paused, hot(Button::Speed), &format!("×{}", view.speed), "Tab", 1.0);
-    button(cv, a, 844, 952, 2, false, hot(Button::ToEnd), "в конец »", "End", 1.0);
+    // the keys show under a button only while the cursor is on it, and for the first seconds of a battle (to teach
+    // them) — not over the field all the time
+    let first = (1.0 - (view.frame - 72.0) / 24.0).clamp(0.0, 1.0);
+    let keys = |b: Button| if hot(b) { 1.0 } else { first };
+    button(cv, a, 736, 784, 2, view.paused, hot(Button::Pause), "II", "Пробел", 1.0, keys(Button::Pause));
+    button(cv, a, 790, 838, 2, !view.paused, hot(Button::Speed), &format!("×{}", view.speed), "Tab", 1.0, keys(Button::Speed));
+    button(cv, a, 844, 952, 2, false, hot(Button::ToEnd), "в конец »", "End", 1.0, keys(Button::ToEnd));
     // the end: the plate across the dimmed field
     let end = view.frame as i32 - (total - 1);
     if end > 0 {
@@ -608,6 +645,6 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
         big.draw(cv, t, W / 2, H / 2 - 30 + dy, c, Some(e), Align::Center, k);
         let sub = format!("ходов: {} · зерно {}", rec.rounds.len(), rec.seed);
         text.draw(cv, &sub, W / 2, H / 2 + 46 + dy, INK, Some([16, 12, 16]), Align::Center, k);
-        button(cv, a, W / 2 - 70, W / 2 + 70, PLATE_BUTTON_Y + dy, true, hot(Button::NewBattle), "новый бой", "R", k);
+        button(cv, a, W / 2 - 70, W / 2 + 70, PLATE_BUTTON_Y + dy, true, hot(Button::NewBattle), "новый бой", "R", k, 1.0);
     }
 }

@@ -43,6 +43,8 @@ pub struct Record {
     pub rounds: Vec<Round>,
     pub outcome: Outcome,
     pub seed: u64,
+    /// The frame each unit was killed on (for a corpse's age).
+    pub died_at: Vec<Option<i32>>,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
@@ -88,7 +90,16 @@ pub fn record(seed: u64) -> Record {
             break o;
         }
     };
-    Record { units: infos(&bt), rounds, outcome, seed }
+    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![] };
+    rec.died_at = vec![None; rec.units.len()];
+    for r in 0..rec.rounds.len() {
+        for m in rec.moments(r) {
+            if let Event::Kill { t } = m.ev {
+                rec.died_at[t].get_or_insert(m.frame);
+            }
+        }
+    }
+    rec
 }
 
 /// What a frame shows of one unit.

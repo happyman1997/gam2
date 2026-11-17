@@ -111,6 +111,13 @@ impl Image {
 
     /// `src` darkened by `mul` and drained of colour by `grey` (0..1): a body that is dead, under the living.
     pub fn blit_shade(&mut self, src: &Image, x: i32, y: i32, flip: bool, mul: f32, grey: f32) {
+        self.blit_shade_to(src, x, y, flip, mul, grey, [0, 0, 0], 0.0);
+    }
+
+    /// As `blit_shade`, then pulled toward `to` by `k` — an old corpse sinking into the ground's colour (opaque,
+    /// in steps: no see-through).
+    #[allow(clippy::too_many_arguments)]
+    pub fn blit_shade_to(&mut self, src: &Image, x: i32, y: i32, flip: bool, mul: f32, grey: f32, to: [u8; 3], k: f32) {
         for j in 0..src.h {
             for i in 0..src.w {
                 let si = if flip { src.w - 1 - i } else { i };
@@ -119,8 +126,11 @@ impl Image {
                     continue;
                 }
                 let l = (c[0] as f32 * 0.3 + c[1] as f32 * 0.59 + c[2] as f32 * 0.11) * (1.0 - 0.15 * grey);
-                let s = |v: u8| ((v as f32 * (1.0 - grey) + l * grey) * mul).clamp(0.0, 255.0) as u8;
-                self.blend_px(x + i, y + j, [s(c[0]), s(c[1]), s(c[2]), c[3]], 1.0);
+                let s = |v: u8, t: u8| {
+                    let d = (v as f32 * (1.0 - grey) + l * grey) * mul;
+                    (d + (t as f32 - d) * k).clamp(0.0, 255.0) as u8
+                };
+                self.blend_px(x + i, y + j, [s(c[0], to[0]), s(c[1], to[1]), s(c[2], to[2]), c[3]], 1.0);
             }
         }
     }

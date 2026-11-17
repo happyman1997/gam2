@@ -1,8 +1,10 @@
-//! The window: winit for the window and the keys, pixels to put the 960×540 frame on screen at a whole factor
-//! (pixels scales by the largest whole multiple that fits and letterboxes the rest). The battle ticks at 24 fps (its
-//! sounds and blows), but the picture is drawn at the screen's own rate, the walks between the ticks, so it moves
-//! smoothly on a 60 or 144 Hz screen.
+//! The window: winit for the window and the keys, pixels to put the picture on screen at the window's own size.
+//! The field is drawn at 960×540 and shown through the camera (camera.rs) — the whole field while the armies stand
+//! apart, closer on the clash; C turns the camera off (the whole field all the time). The interface is laid over it
+//! at the largest whole factor that fits. The battle ticks at 24 fps (its sounds and blows), but the picture is drawn
+//! at the screen's own rate, the walks between the ticks, so it moves smoothly on a 60 or 144 Hz screen.
 
+use crate::camera::{self, Cam, Frame};
 use crate::{gfx, render, Demo};
 use pixels::{Pixels, SurfaceTexture};
 use std::sync::Arc;
@@ -21,7 +23,11 @@ struct App {
     seed: u64,
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
-    canvas: gfx::Image,
+    field: gfx::Image,
+    frame: Frame,
+    cam: Cam,
+    cam_on: bool,
+    last: Instant,
     next: Instant,
     cursor: (f32, f32),
 }
@@ -57,7 +63,19 @@ impl App {
     fn under_cursor(&self) -> Option<render::Button> {
         let px = self.pixels.as_ref()?;
         let (x, y) = px.window_pos_to_pixel(self.cursor).ok()?;
-        render::button_at(&self.demo.rec, &self.demo.view, x as i32, y as i32)
+        let (hx, hy) = self.frame.hud_point(x as i32, y as i32);
+        render::button_at(&self.demo.rec, &self.demo.view, hx, hy)
+    }
+
+    /// The picture fills the window at its own size: the buffer follows the window.
+    fn fit(&mut self, w: u32, h: u32) {
+        let (w, h) = (w.max(render::W as u32), h.max(render::H as u32));
+        if let Some(p) = &mut self.pixels {
+            let _ = p.resize_surface(w, h);
+            let _ = p.resize_buffer(w, h);
+        }
+        self.frame = Frame::fit(w as i32, h as i32);
+        self.cam = camera::whole(&self.frame);
     }
 
     fn click(&mut self) {
@@ -83,20 +101,17 @@ impl ApplicationHandler for App {
         let window = Arc::new(el.create_window(attrs).expect("window"));
         let size = window.inner_size();
         let surface = SurfaceTexture::new(size.width, size.height, window.clone());
-        let pixels = Pixels::new(render::W as u32, render::H as u32, surface).expect("pixels");
+        let pixels = Pixels::new(size.width.max(1), size.height.max(1), surface).expect("pixels");
         self.window = Some(window);
         self.pixels = Some(pixels);
+        self.fit(size.width, size.height);
         self.next = Instant::now();
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::Resized(s) => {
-                if let Some(p) = &mut self.pixels {
-                    let _ = p.resize_surface(s.width.max(1), s.height.max(1));
-                }
-            }
+            WindowEvent::Resized(s) => self.fit(s.width, s.height),
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor = (position.x as f32, position.y as f32);
                 self.demo.view.hover = self.under_cursor();
@@ -108,6 +123,10 @@ impl ApplicationHandler for App {
                 Key::Named(NamedKey::Tab) => self.speed_up(),
                 Key::Named(NamedKey::End) => self.skip_to_end(),
                 Key::Character(ref c) if c.as_str() == "r" || c.as_str() == "к" => self.new_battle(),
+                Key::Character(ref c) if c.as_str() == "c" || c.as_str() == "с" => {
+                    self.cam_on = !self.cam_on;
+                    self.demo.ui_sound("toggle");
+                }
                 _ => {}
             },
             WindowEvent::RedrawRequested => {
@@ -123,12 +142,23 @@ impl ApplicationHandler for App {
                     let part = 1.0 - (self.next.saturating_duration_since(now).as_secs_f32() / TICK.as_secs_f32()).clamp(0.0, 1.0);
                     self.demo.view.frame = (tick + part * self.demo.view.speed as f32).min(end);
                 }
-                self.demo.draw(&mut self.canvas);
+                // the field and the interface on their 960×540 canvases, then through the camera to the window
+                let (w, h) = (render::W, render::H);
+                render::draw_field(&mut self.field, &self.demo.assets, &self.demo.rec, &self.demo.sparks, &self.demo.view);
+                let mut hud = gfx::Image::clear(w, h);
+                render::draw_hud(&mut hud, &self.demo.assets, &self.demo.rec, &self.demo.view);
+                let ff = self.demo.view.frame;
                 self.demo.view.frame = tick;
+                let want = if self.cam_on {
+                    camera::target(&self.demo.rec, ff.min((self.demo.rec.frames() - 1) as f32), &self.frame)
+                } else {
+                    camera::whole(&self.frame)
+                };
+                let secs = now.duration_since(self.last).as_secs_f32().min(0.1);
+                self.last = now;
+                camera::follow(&mut self.cam, want, secs, &self.frame);
                 if let Some(p) = &mut self.pixels {
-                    for (dst, src) in p.frame_mut().chunks_exact_mut(4).zip(self.canvas.px.iter()) {
-                        dst.copy_from_slice(src);
-                    }
+                    camera::compose(&self.field, &hud, self.cam, 1.0, p.frame_mut(), &self.frame, 4);
                     if p.render().is_err() {
                         el.exit();
                     }
@@ -161,7 +191,11 @@ pub fn run(mut demo: Demo, seed: u64) {
         seed,
         window: None,
         pixels: None,
-        canvas: gfx::Image::new(render::W, render::H),
+        field: gfx::Image::new(render::W, render::H),
+        frame: Frame::fit(render::W * 2, render::H * 2),
+        cam: Cam { cx: render::W as f32 / 2.0, cy: render::H as f32 / 2.0, z: 2.0 },
+        cam_on: true,
+        last: Instant::now(),
         next: Instant::now(),
         cursor: (0.0, 0.0),
     };

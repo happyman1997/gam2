@@ -10,6 +10,7 @@
 //!                                                     battles 184 and 142 as a 60 fps video with a camera (see video.rs)
 
 mod assets;
+mod camera;
 #[cfg(feature = "audio")]
 mod audio;
 mod gfx;

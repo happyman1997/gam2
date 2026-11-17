@@ -614,6 +614,7 @@ dependencies = [
  "kira",
  "pixels",
  "png",
+ "rayon",
  "serde_json",
  "sim",
  "winit",
