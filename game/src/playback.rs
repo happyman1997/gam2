@@ -18,6 +18,8 @@ pub struct UnitInfo {
     pub name: String,
     pub side: u8,
     pub fp: i32,
+    /// The simulation's size: in one cell stand four of size 1 or two of size 2, never mixed.
+    pub size: u32,
     pub max_hp: i32,
     pub leader: bool,
 }
@@ -61,8 +63,9 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
             name: u.t.name.to_string(),
             side: u.side,
             fp: u.fp(),
+            size: u.t.size,
             max_hp: u.t.hp,
-            // the Foundry's human leaders don't carry the Leader trait in the simulation yet; the game knows them
+            // the leaders; the Foundry's human leaders also by name, as older records may lack the trait
             leader: u.t.has(Trait::Leader) || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
         })
         .collect()

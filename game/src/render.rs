@@ -482,10 +482,13 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let ms = rec.moments((f / FR) as usize);
     let lying_of = |o: &crate::playback::Shown| o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
     let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader;
-    let mut packs: std::collections::HashMap<((i32, i32), u8), Vec<usize>> = Default::default();
+    // a pack: the small ones of one side, one size, in one cell (big ones never stand among small ones)
+    type PackKey = ((i32, i32), u8, u32);
+    let key = |id: usize, cell: (i32, i32)| -> PackKey { (cell, rec.units[id].side, rec.units[id].size) };
+    let mut packs: std::collections::HashMap<PackKey, Vec<usize>> = Default::default();
     for o in &shown {
         if small(o.id) && !lying_of(o) {
-            packs.entry((o.cell, rec.units[o.id].side)).or_default().push(o.id);
+            packs.entry(key(o.id, o.cell)).or_default().push(o.id);
         }
     }
     struct Placed<'a> {
@@ -498,7 +501,6 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let mut placed: Vec<Placed> = vec![];
     let mut badges: Vec<(f32, f32, usize)> = vec![];
     for s in &shown {
-        let info = &rec.units[s.id];
         let (mut x, mut y) = (s.x, s.y);
         let lying = lying_of(s);
         let mut stands_for = vec![s.id];
@@ -508,7 +510,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
                 x += dead_slot.0;
                 y += dead_slot.1;
             } else {
-                let pack = &packs[&(s.cell, info.side)];
+                let pack = &packs[&key(s.id, s.cell)];
                 let rank = pack.iter().position(|&i| i == s.id).unwrap_or(0);
                 let place = PACK[rank % 3];
                 if let Some(k) = s.dead_at {
@@ -559,8 +561,8 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         let Some(spr) = a.sprites.get(&name) else { continue };
         let big = info.fp >= 2 || info.name.as_str() != "Муравей (рабочая)" && info.side == 0;
         if !lying && anim.pose != Pose::Dead {
-            let pack = small(s.id) && packs.get(&(s.cell, info.side)).map(|v| v.len() > 1).unwrap_or(false);
-            let rank0 = small(s.id) && packs.get(&(s.cell, info.side)).map(|v| v.first() == Some(&s.id)).unwrap_or(true);
+            let pack = small(s.id) && packs.get(&key(s.id, s.cell)).map(|v| v.len() > 1).unwrap_or(false);
+            let rank0 = small(s.id) && packs.get(&key(s.id, s.cell)).map(|v| v.first() == Some(&s.id)).unwrap_or(true);
             if !small(s.id) || !pack {
                 cv.shadow(x + 2.0, y, if big { 40.0 } else { 14.0 }, if big { 7.0 } else { 3.0 });
             } else if rank0 {

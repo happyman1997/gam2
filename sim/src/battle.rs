@@ -162,11 +162,13 @@ pub struct Outcome {
 struct Grid {
     used: Vec<u8>,
     side: Vec<i8>,
+    /// The size of those sharing a cell: small ones and big ones never stand in one cell together.
+    size: Vec<u8>,
 }
 
 impl Grid {
     fn new() -> Self {
-        Grid { used: vec![0; (W * H) as usize], side: vec![-1; (W * H) as usize] }
+        Grid { used: vec![0; (W * H) as usize], side: vec![-1; (W * H) as usize], size: vec![0; (W * H) as usize] }
     }
     fn idx(x: i32, y: i32) -> usize {
         (y * W + x) as usize
@@ -190,6 +192,9 @@ impl Grid {
                 if self.used[i] + c > cap.max(c) {
                     return false;
                 }
+                if self.used[i] > 0 && self.size[i] != size as u8 {
+                    return false; // a big one does not squeeze in among small ones, nor small ones among big
+                }
             }
         }
         true
@@ -201,6 +206,7 @@ impl Grid {
                 let i = Grid::idx(xx, yy);
                 self.used[i] += cell_cost(size);
                 self.side[i] = side as i8;
+                self.size[i] = size as u8;
             }
         }
     }
@@ -212,6 +218,7 @@ impl Grid {
                 self.used[i] -= cell_cost(size);
                 if self.used[i] == 0 {
                     self.side[i] = -1;
+                    self.size[i] = 0;
                 }
             }
         }
