@@ -1,0 +1,30 @@
+# The game is made for Windows only: every push builds it there, runs the tests and keeps the build
+# (game.exe with its assets folder) as a downloadable artifact of the run.
+name: windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Tests
+        run: cargo test --release --workspace
+      - name: Build
+        run: cargo build --release -p game
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/game.exe dist/
+          Copy-Item -Recurse game/assets dist/assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gam2-windows
+          path: dist

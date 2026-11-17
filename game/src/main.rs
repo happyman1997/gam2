@@ -1,3 +1,5 @@
+// A shipped Windows build opens as a game, without a console window beside it (a debug build keeps its console).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 //! gam2, the tech demo: one battle — the Inventor's start against the Devourer's — run by the simulation and played
 //! back with the game's pixel art at 960×540, scaled by a whole factor.
 //!

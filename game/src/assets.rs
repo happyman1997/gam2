@@ -43,8 +43,18 @@ pub struct Assets {
     pub ui: HashMap<String, Piece>,
 }
 
+/// Where the assets are: GAME_ASSETS if set; else `assets` next to the executable (a shipped build — the folder
+/// beside game.exe); else the source tree's (a build run from the repository).
 pub fn dir() -> PathBuf {
-    std::env::var_os("GAME_ASSETS").map(PathBuf::from).unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("assets"))
+    if let Some(p) = std::env::var_os("GAME_ASSETS") {
+        return PathBuf::from(p);
+    }
+    if let Some(beside) = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("assets"))) {
+        if beside.join("assets.json").is_file() {
+            return beside;
+        }
+    }
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets")
 }
 
 fn i(v: &Value) -> i32 {
