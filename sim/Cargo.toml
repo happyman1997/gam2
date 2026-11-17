@@ -6,3 +6,5 @@ description = "Deterministic battle simulation: two armies and a seed in, an out
 
 [dependencies]
 rayon = "1"
+serde = { version = "1", features = ["derive"] }
+ron = "0.8"

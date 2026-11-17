@@ -1,0 +1,35 @@
+#![enable(implicit_some)]
+// Рой: особь = каста × форма (docs/CONCEPT.md). Каста даёт размер и основные числа, форма — здоровье по касте
+// (подобрано утилитой `swarm`) и свои поправки. Имя особи — «Форма (каста)».
+(
+    // каста: приписка к имени, размер, удар 1–die + bonus, тип урона, инициатива, броня, мораль, скорость
+    castes: {
+        Worker: (suffix: "рабочая", size: 1, die: 4, bonus: 1, dmg: Pierce, init: 8, armor: 0, morale: 6, speed: 3),
+        Soldier: (suffix: "солдат", size: 2, die: 8, bonus: 0, dmg: Slash, init: 6, armor: 2, morale: 9, speed: 2),
+    },
+    // у всех: хитин, стая, пожирание
+    armor_type: Chitin,
+    traits: [Staya, Devour],
+    // форма: имя, здоровье (рабочая, солдат); поправки — тип урона, тип брони, дальность (заменяют касту);
+    // die, bonus, armor, init, speed — прибавки (скорость не меньше 1); add — особенности (рабочей, солдата),
+    // remove — убрать из общих; abilities — способности (рабочей, солдата)
+    forms: [
+        (form: Ant, name: "Муравей", hp: (8, 14), add: ([Stroy], [Stroy])),
+        (form: Wasp, name: "Оса", hp: (8, 11), dmg: Pierce, speed: 1, add: ([Flyer], [Flyer])),
+        (form: Scorpion, name: "Скорпион", hp: (8, 14), dmg: Pierce, speed: -1,
+            add: ([Venom(die: 4)], [Venom(die: 6)])),
+        (form: Barrel, name: "Бочонок", hp: (11, 19), dmg: Acid, armor_type: Soft, range: 3, die: 2,
+            add: ([BurstAcid(die: 4)], [BurstAcid(die: 6)])),
+        (form: Beetle, name: "Жук", hp: (8, 12), dmg: Blunt, armor_type: HeavyChitin, speed: -1,
+            add: ([Charge], [Charge])),
+        (form: Isopod, name: "Мокрица", hp: (8, 11), armor_type: HeavyChitin, armor: 1, bonus: -1, speed: -1,
+            add: ([Thorns(die: 2), CurlUp], [Thorns(die: 3), CurlUp])),
+        (form: Grasshopper, name: "Кузнечик", hp: (8, 14), add: ([Leap], [Leap])),
+        (form: Mantis, name: "Богомол", hp: (7, 11), dmg: Slash, init: 2, remove: [Staya],
+            add: ([TwinBlades], [TwinBlades])),
+        (form: Firefly, name: "Светляк", hp: (8, 14), bonus: -1, add: ([Glow], [Glow]),
+            abilities: ([Flash(every: 3)], [Flash(every: 3)])),
+        (form: Spitter, name: "Паук-плевун", hp: (12, 15), range: 3, add: ([Spitter], [Spitter]),
+            abilities: ([Spit(every: 2, die: 4)], [Spit(every: 2, die: 6)])),
+    ],
+)

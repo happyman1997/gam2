@@ -1,7 +1,9 @@
 //! Units as data: damage and armor types, passives, abilities, unit templates.
 
+use serde::{Deserialize, Serialize};
+
 /// Damage types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Dmg {
     #[default]
     Pierce,
@@ -15,7 +17,7 @@ pub enum Dmg {
 }
 
 /// Armor types: what the protection is made of.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArmorType {
     None,
     Soft,
@@ -86,7 +88,7 @@ impl ArmorType {
 }
 
 /// Passives and weaknesses that the battle rules know about.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Trait {
     /// Adjacent enemies must hit this unit first (Страж).
     Zaslon,
@@ -157,7 +159,7 @@ pub enum Trait {
 }
 
 /// Abilities with a condition.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Ability {
     /// Every `every` rounds, instead of the normal attack: area blow on a cell and its neighbours (Мортира).
     Volley { every: u32, die: u32, bonus: i32, dmg: Dmg },
@@ -190,7 +192,7 @@ pub enum Ability {
     Fireball { every: u32, die: u32, bonus: i32, range: u32 },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Template {
     pub name: std::borrow::Cow<'static, str>,
     pub size: u32,

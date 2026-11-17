@@ -36,7 +36,11 @@ python3 tools/sprites/sim_shot.py tools/sprites/out/shot.json
 ![Кадр из симуляции](images/sim_shot.png)
 
 Числа над юнитами — урон за раунд: красные — по убитым, серые — удар не пробил броню.
-Числа лежат в `sim/src/data.rs`.
+Числа лежат в файлах `sim/data/*.ron`: `units.ron` — существа, `modules.ron` — модули, `swarm.ron` — касты
+и формы роя, `armies.ron` — стартовые армии. Файлы вшиты в программу при сборке, `sim/src/data.rs` их читает.
+Тест `sim/tests/data_snapshot.rs` сверяет все числа со снимком `data_snapshot.txt` — после намеренной правки
+снимок обновляют: `WRITE_SNAPSHOT=1 cargo test -p sim --test data_snapshot`; `check()` следит, чтобы армии
+ссылались только на существующих существ и модули.
 
 ## Что уже умеет
 

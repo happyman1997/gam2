@@ -1,0 +1,72 @@
+#![enable(implicit_some)]
+// Армии: стартовые армии лидеров и отряды для проверок баланса. Строка — боец из units.ron (unit) или особь роя
+// (swarm: (каста, форма) из swarm.ron); count — сколько таких (по умолчанию 1); smaller — на размер меньше
+// (малые фреймы Изобретателя: прочность ×0,7, удар −2); modules — модули из modules.ron; abilities — способности
+// прямо числами. Только то, что симуляция уже умеет.
+{
+    // ---- Литейщик
+    // Отец колосса: Броневые листы, Кистень (Магнит — пока нет); Механик с Ремонтом
+    "start_otets": [
+        (unit: "otets_kolossa", abilities: [Plates(3), Flail]),
+        (unit: "mekhanik", modules: ["remont"]),
+    ],
+    // Изобретатель: малый Мудрец с Перегрузкой и Грозовой катушкой, малое Орудие с Мортирой и Грозовой катушкой,
+    // малый Механик с Ремонтом (Отражатель — пока нет)
+    "start_izobretatel": [
+        (unit: "mudrets", smaller: true, modules: ["peregruzka", "grozovaya_katushka"]),
+        (unit: "orudie", smaller: true, modules: ["mortira", "grozovaya_katushka"]),
+        (unit: "mekhanik", smaller: true, modules: ["remont"]),
+        (unit: "izobretatel"),
+    ],
+    // Маньяк: Мудрец с Огненным шаром (Ноги-пилы — пока нет), Орудие с Головой-катапультой и Картечью
+    "start_manyak": [
+        (unit: "mudrets", modules: ["ognenny_shar"]),
+        (unit: "orudie", modules: ["golova_katapulta"], abilities: [PointBlank]),
+        (unit: "manyak"),
+    ],
+    // Зодчий: Страж с Перехватом (Щит-стена — пока нет), Механик с Ремонтом, два Каменщика
+    "start_zodchiy": [
+        (unit: "strazh", abilities: [Intercept]),
+        (unit: "mekhanik", modules: ["remont"]),
+        (unit: "kamenshchik", count: 2),
+        (unit: "zodchiy"),
+    ],
+
+    // ---- Рой: лимит в очках — рабочая 1, солдат 3; старт — 30 очков и лидер
+    "start_matka": [
+        (swarm: (Worker, Ant), count: 12),
+        (swarm: (Worker, Wasp), count: 3),
+        (swarm: (Worker, Scorpion), count: 3),
+        (swarm: (Soldier, Ant), count: 2),
+        (swarm: (Soldier, Beetle)),
+        (swarm: (Soldier, Isopod)),
+        (unit: "matka"),
+    ],
+    "start_razum": [
+        (swarm: (Worker, Ant), count: 9),
+        (swarm: (Worker, Firefly), count: 3),
+        (swarm: (Soldier, Ant), count: 3),
+        (swarm: (Soldier, Mantis), count: 2),
+        (swarm: (Soldier, Scorpion)),
+        (unit: "razum"),
+    ],
+    "start_pozhiratel": [
+        (swarm: (Worker, Ant), count: 15),
+        (swarm: (Worker, Grasshopper), count: 3),
+        (swarm: (Soldier, Ant), count: 2),
+        (unit: "pozhiratel"),
+    ],
+    "start_kukushka": [
+        (swarm: (Worker, Ant), count: 15),
+        (swarm: (Worker, Scorpion), count: 3),
+        (swarm: (Worker, Barrel), count: 3),
+        (swarm: (Soldier, Ant), count: 3),
+        (unit: "kukushka"),
+    ],
+
+    // ---- Для проверок баланса
+    "swarm_start": [(unit: "rabochaya", count: 20), (unit: "soldat", count: 4)],
+    "humans_squad": [(unit: "voin", count: 8)],
+    // эталонный отряд по одному каждого: копейщик, мечник, булавщик, лучник
+    "etalon_types": [(unit: "kopeyshchik"), (unit: "mechnik"), (unit: "bulavshchik"), (unit: "luchnik")],
+}

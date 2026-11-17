@@ -37,7 +37,7 @@ fn main() {
     let tune = std::env::args().any(|a| a == "tune");
     println!("| Форма | Рабочая, эталонов (цель 0,33) | Солдат, эталонов (цель 1,0) |");
     println!("|---|---|---|");
-    let mut hp = SWARM_HP;
+    let mut hp = swarm_hp();
     for (fi, f) in FORMS.iter().enumerate() {
         let mut cells = vec![];
         for (ci, c) in [Caste::Worker, Caste::Soldier].iter().enumerate() {
