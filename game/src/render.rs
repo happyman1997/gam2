@@ -84,6 +84,8 @@ fn sprite_name(rec: &Record, id: usize, pose: Pose, f: i32) -> String {
 }
 
 const SLOTS: [(f32, f32); 4] = [(-11.0, -6.0), (11.0, -7.0), (-10.0, 8.0), (12.0, 7.0)];
+/// A pack's three bodies: one in front, two a little behind it, left and right.
+const PACK: [(f32, f32); 3] = [(1.0, 3.0), (-7.0, -3.0), (8.0, -4.0)];
 
 /// How a unit moves on top of where it stands: the frame to draw, an offset, a flash.
 struct Anim {
@@ -471,52 +473,99 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let total = rec.frames();
     let f = (view.frame as i32).min(total - 1);
     cv.blit(&a.ground, 0, 0, false, 1.0);
-    // the units, in depth order; small ones sharing a cell spread over its four places — the living by their order
-    // in the cell, the dead each on a place of its own (so a corpse never shifts when the living come and go)
+    // the units, in depth order. The small ones of a cell stand as one pack: no more than three bodies show — one in
+    // front, two peeking out from behind it — with one shadow, and a row of dots under the pack when there are more
+    // (a dot a body, no number to translate); a hidden one's swing or hit is shown by the body standing for it. The
+    // dead lie each on a place of their own (so a corpse never shifts when the living come and go).
     let ff = view.frame.min((total - 1) as f32);
     let shown = rec.shown(ff);
     let ms = rec.moments((f / FR) as usize);
-    let mut placed = vec![];
+    let lying_of = |o: &crate::playback::Shown| o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
+    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader;
+    let mut packs: std::collections::HashMap<((i32, i32), u8), Vec<usize>> = Default::default();
+    for o in &shown {
+        if small(o.id) && !lying_of(o) {
+            packs.entry((o.cell, rec.units[o.id].side)).or_default().push(o.id);
+        }
+    }
+    struct Placed<'a> {
+        y: f32,
+        x: f32,
+        s: &'a crate::playback::Shown,
+        lying: bool,
+        stands_for: Vec<usize>,
+    }
+    let mut placed: Vec<Placed> = vec![];
+    let mut badges: Vec<(f32, f32, usize)> = vec![];
     for s in &shown {
         let info = &rec.units[s.id];
-        let pos = |s: &crate::playback::Shown| (s.x, s.y);
-        let (mut x, mut y) = pos(s);
-        let lying = s.pose == Pose::Dead && s.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
-        if info.fp == 1 && !info.leader {
-            let rank = shown
-                .iter()
-                .filter(|o| o.id < s.id && o.cell == s.cell && rec.units[o.id].side == info.side && rec.units[o.id].fp == 1)
-                .filter(|o| !(o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true)))
-                .count();
-            let alive_slot = SLOTS[rank % 4];
+        let (mut x, mut y) = (s.x, s.y);
+        let lying = lying_of(s);
+        let mut stands_for = vec![s.id];
+        if small(s.id) {
             let dead_slot = SLOTS[s.id % 4];
-            let (dx, dy) = if lying {
-                dead_slot
-            } else if let Some(k) = s.dead_at {
-                // the fall: from its place among the living to its own place on the ground
-                let u = ((ff - k as f32 - 3.0) / 3.0).clamp(0.0, 1.0);
-                (alive_slot.0 + (dead_slot.0 - alive_slot.0) * u, alive_slot.1 + (dead_slot.1 - alive_slot.1) * u)
+            if lying {
+                x += dead_slot.0;
+                y += dead_slot.1;
             } else {
-                alive_slot
-            };
-            x += dx;
-            y += dy;
+                let pack = &packs[&(s.cell, info.side)];
+                let rank = pack.iter().position(|&i| i == s.id).unwrap_or(0);
+                let place = PACK[rank % 3];
+                if let Some(k) = s.dead_at {
+                    // the fall: out of the pack to its own place on the ground
+                    let u = ((ff - k as f32 - 3.0) / 3.0).clamp(0.0, 1.0);
+                    x += place.0 + (dead_slot.0 - place.0) * u;
+                    y += place.1 + (dead_slot.1 - place.1) * u;
+                } else {
+                    if rank >= 3 {
+                        continue; // hidden in the pack: a dot under it, its moves shown by the body in front
+                    }
+                    let alive: Vec<usize> = pack.iter().copied().filter(|&i| shown.iter().any(|o| o.id == i && o.dead_at.is_none())).collect();
+                    stands_for = alive.iter().copied().enumerate().filter(|(r, _)| r % 3 == rank).map(|(_, i)| i).collect();
+                    if !stands_for.contains(&s.id) {
+                        stands_for.insert(0, s.id);
+                    }
+                    x += place.0;
+                    y += place.1;
+                    if rank == 0 && alive.len() > 3 {
+                        badges.push((x, y, alive.len()));
+                    }
+                }
+            }
         }
-        placed.push((y, x, s, lying));
+        placed.push(Placed { y, x, s, lying, stands_for });
     }
-    placed.sort_by(|p, q| (!p.3).cmp(&!q.3).then(p.0.partial_cmp(&q.0).unwrap()));
+    placed.sort_by(|p, q| (!p.lying).cmp(&!q.lying).then(p.y.partial_cmp(&q.y).unwrap()));
     let at = |id: usize| shown.iter().find(|o| o.id == id).map(|o| (o.x, o.y));
     // a death is drawn again over the fire and smoke: the flash of the killed and the dust of its fall must show
     // even inside a blast
     let mut over: Vec<Dying> = vec![];
-    for &(y, x, s, lying) in &placed {
+    for p in &placed {
+        let (x, y, s, lying) = (p.x, p.y, p.s, p.lying);
         let info = &rec.units[s.id];
-        let anim = animate(rec, &ms, s, ff, &at);
+        // the body's own life, and the swing or the hit of any it stands for
+        let mut anim = animate(rec, &ms, s, ff, &at);
+        for &id in p.stands_for.iter().filter(|&&i| i != s.id) {
+            let Some(o) = shown.iter().find(|o| o.id == id) else { continue };
+            let other = animate(rec, &ms, o, ff, &at);
+            if other.pose == Pose::Attack && anim.pose != Pose::Attack {
+                anim.pose = Pose::Attack;
+                anim.dx = other.dx;
+                anim.dy = other.dy;
+            }
+            anim.flash = anim.flash.max(other.flash);
+        }
         let name = sprite_name(rec, s.id, anim.pose, f);
         let Some(spr) = a.sprites.get(&name) else { continue };
         let big = info.fp >= 2 || info.name.as_str() != "Муравей (рабочая)" && info.side == 0;
         if !lying && anim.pose != Pose::Dead {
-            cv.shadow(x + 2.0, y, if big { 40.0 } else { 14.0 }, if big { 7.0 } else { 3.0 });
+            let pack = small(s.id) && packs.get(&(s.cell, info.side)).map(|v| v.len() > 1).unwrap_or(false);
+            let rank0 = small(s.id) && packs.get(&(s.cell, info.side)).map(|v| v.first() == Some(&s.id)).unwrap_or(true);
+            if !small(s.id) || !pack {
+                cv.shadow(x + 2.0, y, if big { 40.0 } else { 14.0 }, if big { 7.0 } else { 3.0 });
+            } else if rank0 {
+                cv.shadow(x + 1.0, y - 2.0, 30.0, 6.0); // one shadow under the whole pack
+            }
         }
         let flip = info.side == 1;
         let ox = if flip { spr.img.w - 1 - spr.ox } else { spr.ox };
@@ -539,6 +588,15 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         }
         if let Some(k) = s.dead_at {
             over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.side == 0, big, t: ff - k as f32, name });
+        }
+    }
+    // how many a pack holds: a dot a body, under it
+    for &(x, y, n) in &badges {
+        let w = n as i32 * 3 + 1;
+        let (x0, y0) = (x as i32 - w / 2, y as i32 + 5);
+        cv.fill(x0, y0, w, 4, [14, 10, 18, 255]);
+        for k in 0..n as i32 {
+            cv.fill(x0 + 1 + k * 3, y0 + 1, 2, 2, [232, 220, 178, 255]);
         }
     }
     // the leaders' health, the crown by it
