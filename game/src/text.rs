@@ -56,4 +56,17 @@ mod tests {
         }
         assert!(missing.is_empty(), "no line for {missing:?}");
     }
+
+    /// Every letter of every line is in each of the game's fonts (a missing one would not be drawn).
+    #[test]
+    fn every_letter_is_in_the_fonts() {
+        let assets = crate::assets::Assets::load().expect("assets");
+        let mut chars: Vec<char> = super::table().values().flat_map(|v| v.chars()).filter(|c| *c != '\n').collect();
+        chars.sort_unstable();
+        chars.dedup();
+        for (name, font) in &assets.fonts {
+            let missing: String = chars.iter().filter(|c| !font.glyphs.contains_key(c)).collect();
+            assert!(missing.is_empty(), "{name} has no glyph for «{missing}»");
+        }
+    }
 }

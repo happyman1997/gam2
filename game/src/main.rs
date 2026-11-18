@@ -337,6 +337,63 @@ mod flow {
         }
     }
 
+    /// The workshop at the camp, by the mouse: a module picked up and put into another golem's free cell, then one
+    /// melted into another of the same golem; back after the camp's choice made, the choice is not offered again.
+    #[test]
+    fn the_workshop_by_the_mouse() {
+        use crate::game::CampStage;
+        use sim::run::{Find, Offer, Run, Target, MELT};
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        let mut run = Run::new(Class::Foundry, 1, 9);
+        let module = |k: &str| Offer { key: k.into(), units: vec![], price: 0, find: Find::Module(k.into()) };
+        let mech = run.army.iter().position(|m| m.t.name == "Механик").unwrap();
+        let gun = run.army.iter().position(|m| m.t.name == "Орудие").unwrap();
+        assert!(run.take_find(&module("flail"), Some(&Target::Member(mech))));
+        assert!(run.take_find(&module("mortar"), Some(&Target::Member(gun))));
+        run.money = 10;
+        g.run = Some(run);
+        g.screen = Screen::Camp { stage: CampStage::Choose, said: String::new() };
+        frame(&mut g);
+        g.apply(Act::Workshop);
+        for _ in 0..14 {
+            frame(&mut g);
+        }
+        // where a cell is on the screen (as the workshop lays the golems out)
+        let cell = |g: &Game, member: usize, j: usize| {
+            let r = g.run.as_ref().unwrap();
+            let golems: Vec<usize> = (0..r.army.len()).filter(|&i| r.army[i].t.golem || !r.army[i].mods.is_empty()).collect();
+            let n = golems.iter().position(|&i| i == member).unwrap() as i32;
+            (36 + (n % 2) * 312 + 70 + j as i32 * 42 + 18, 116 + (n / 2) * 80 + 30 + 18)
+        };
+        let click = |g: &mut Game, (x, y): (i32, i32)| {
+            g.ui.mx = x;
+            g.ui.my = y;
+            frame(g);
+            g.ui.mouse_down();
+            g.ui.mouse_up();
+            frame(g);
+        };
+        let at = cell(&g, mech, 0);
+        click(&mut g, at);
+        assert!(matches!(g.screen, Screen::Camp { stage: CampStage::Workshop { held: Some(_) }, .. }), "the module not picked up");
+        let at = cell(&g, gun, 1);
+        click(&mut g, at);
+        let r = g.run.as_ref().unwrap();
+        assert!(r.army[mech].mods.is_empty() && r.army[gun].mods.len() == 2, "the flail did not move: {:?}", r.army[gun].mods);
+        // the flail (second cell) melted into the mortar (first)
+        let (at_flail, at_mortar) = (cell(&g, gun, 1), cell(&g, gun, 0));
+        click(&mut g, at_flail);
+        click(&mut g, at_mortar);
+        let r = g.run.as_ref().unwrap();
+        assert_eq!(r.army[gun].mods, vec!["mortar".to_string()]);
+        assert_eq!(r.army[gun].level(0), 2);
+        assert_eq!(r.money, 10 - MELT);
+        // after the camp's choice the workshop's «back» goes to the camp's end, not to the choice again
+        g.screen = Screen::Camp { stage: CampStage::Workshop { held: None }, said: "done".into() };
+        g.apply(Act::CampBack);
+        assert!(matches!(g.screen, Screen::Camp { stage: CampStage::Done, .. }));
+    }
+
     /// A run of each class walked through every kind of screen by the screens' own acts — roads, battles, spoils,
     /// the find, the trader, events, the camp — each screen drawn on the way, to its end.
     #[test]

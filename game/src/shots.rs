@@ -135,6 +135,19 @@ pub fn run(demo: Demo, dir: &str) {
         snap(&mut g, dir, &format!("16_{tag}_camp"), (660, 250));
         set(&mut g, Screen::Camp { stage: CampStage::Pick, said: String::new() });
         snap(&mut g, dir, &format!("17_{tag}_camp_pick"), (110, 170));
+        // the Foundry's workshop: the cells, then a module held over the crucible's rules
+        if cls == Class::Foundry {
+            let mut r6 = run.clone();
+            r6.money = 20;
+            g.run = Some(r6.clone());
+            set(&mut g, Screen::Camp { stage: CampStage::Workshop { held: None }, said: String::new() });
+            g.ui.opened = g.ui.t;
+            snap(&mut g, dir, &format!("17b_{tag}_workshop"), (124, 164));
+            if let Some(m) = r6.army.iter().position(|m| !m.mods.is_empty()) {
+                set(&mut g, Screen::Camp { stage: CampStage::Workshop { held: Some((m, 0)) }, said: String::new() });
+                snap(&mut g, dir, &format!("17c_{tag}_workshop_held"), (560, 330));
+            }
+        }
         // the end
         let mut r4 = run.clone();
         r4.stats.won = 15;

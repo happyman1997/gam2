@@ -217,6 +217,27 @@ impl Ability {
         }
     }
 
+    /// A module a level stronger: a round sooner and a die bigger (more mended, one more plate); the same when it has
+    /// no numbers to raise.
+    pub fn level_up(self) -> Ability {
+        use Ability::*;
+        let sooner = |e: u32| e.saturating_sub(1).max(1);
+        match self {
+            Volley { every, die, bonus, dmg } => Volley { every: sooner(every), die: die + 2, bonus, dmg },
+            Bolt { every, die, bonus, dmg, range } => Bolt { every: sooner(every), die: die + 2, bonus, dmg, range },
+            Repair { every, amount } => Repair { every: sooner(every), amount: amount + 2 },
+            Overload { every } => Overload { every: sooner(every) },
+            Fireball { every, die, bonus, range } => Fireball { every: sooner(every), die: die + 2, bonus, range },
+            Plates(n) => Plates(n + 1),
+            other => other,
+        }
+    }
+
+    /// Whether a level makes it stronger (else a level gives the body a harder blow instead).
+    pub fn levels(&self) -> bool {
+        self.level_up() != *self
+    }
+
     /// How many rounds between its uses, for those used every so often.
     pub fn every(&self) -> Option<u32> {
         match *self {

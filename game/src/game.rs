@@ -65,6 +65,9 @@ pub enum CampStage {
     Choose,
     Pick,
     Done,
+    /// The Foundry's workshop at the camp: modules moved between golems, melted into others; `held` — the module
+    /// picked up (member, cell).
+    Workshop { held: Option<(usize, usize)> },
 }
 
 pub enum Screen {
@@ -383,6 +386,16 @@ impl Game {
         }
         if let Screen::Rewards { pick: pick @ Some(_), .. } = &mut self.screen {
             *pick = None;
+            self.demo.ui_sound("toggle");
+            return;
+        }
+        // the workshop: the module held put back, else back to the camp's choice
+        if let Screen::Camp { stage: stage @ CampStage::Workshop { .. }, said } = &mut self.screen {
+            *stage = match *stage {
+                CampStage::Workshop { held: Some(_) } => CampStage::Workshop { held: None },
+                _ if said.is_empty() => CampStage::Choose,
+                _ => CampStage::Done,
+            };
             self.demo.ui_sound("toggle");
             return;
         }

@@ -28,6 +28,10 @@ pub enum Act {
     Road(usize),
     Take(usize),
     OpenFind(usize),
+    /// The camp's workshop opened (the Foundry).
+    Workshop,
+    /// A cell of a golem clicked in the workshop: (member, cell).
+    Socket(usize, usize),
     Pick(usize, Option<usize>),
     LeaveRewards,
     BuyOffer(usize),
@@ -372,6 +376,12 @@ fn marks(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, r: Rect, m: &sim::r
         cv.fill(x - 1, y - 1, 18, 18, rim);
         cv.fill(x, y, 16, 16, [12, 9, 14, 255]);
         ui.icon(cv, a, key, x, y, 1, 1.0);
+        // a module above level I: a gold dot for each level under it
+        if run.class == Class::Foundry && m.level(i) > 1 {
+            for p in 0..m.level(i) as i32 {
+                cv.fill(x + 2 + p * 5, y + 18, 3, 3, [255, 200, 90, 255]);
+            }
+        }
     }
     // a free cell: an empty socket with its rim
     for j in 0..empty as i32 {
@@ -421,6 +431,13 @@ fn target_overlay(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, tg: &Targe
         let body = run.body(m);
         let (_, hit) = unit_card(ui, cv, a, cls, &format!("tgt{j}"), r, &body, count, if m.broken { "broken" } else { "normal" }, true);
         marks(ui, cv, a, run, r, m);
+        // the module on it already: taken again, it goes a level up
+        if let (Target::Member(i), Find::Module(k)) = (to, &tg.offer.find) {
+            if run.raises(*i, k) {
+                let lv = m.mods.iter().position(|x| x == k).map(|p| m.level(p) + 1).unwrap_or(2);
+                text(cv, a, &tf("target.raise", &[("n", &t(&format!("lvl.{lv}")))]), r.cx(), r.y + r.h + 6, GOLD, Align::Center);
+            }
+        }
         if hit || ui.key(Key::Digit(j as u8 + 1)) {
             act = Some(Act::Place(to.clone()));
         }
@@ -819,8 +836,42 @@ impl Game {
                 }
             }
             Act::CampBack => {
+                // back to the camp's choice — or, the choice made already (its words said), to the camp's end
+                if let Screen::Camp { stage, said } = &mut self.screen {
+                    *stage = if said.is_empty() { CampStage::Choose } else { CampStage::Done };
+                }
+            }
+            Act::Workshop => {
                 if let Screen::Camp { stage, .. } = &mut self.screen {
-                    *stage = CampStage::Choose;
+                    *stage = CampStage::Workshop { held: None };
+                    self.ui.opened = self.ui.t;
+                }
+            }
+            Act::Socket(m, j) => {
+                if let (Some(run), Screen::Camp { stage: CampStage::Workshop { held }, .. }) = (&mut self.run, &mut self.screen) {
+                    let Some(member) = run.army.get(m) else { return };
+                    let filled = j < member.mods.len();
+                    match *held {
+                        None if filled => *held = Some((m, j)),
+                        None => return,
+                        Some(h) if h == (m, j) => *held = None,
+                        // an empty cell: the module moves there, free
+                        Some((hm, hj)) if !filled => {
+                            if !run.move_module(hm, hj, m) {
+                                return;
+                            }
+                            *held = None;
+                        }
+                        // another module of the frame: the one held melted into it
+                        Some((hm, hj)) if run.can_melt(hm, hj, m, j) => {
+                            run.melt(hm, hj, m, j);
+                            *held = None;
+                            self.demo.ui_sound("heal");
+                            return;
+                        }
+                        Some(_) => *held = Some((m, j)),
+                    }
+                    self.demo.ui_sound("toggle");
                 }
             }
             Act::CloseFind => {
@@ -1613,6 +1664,18 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
                     act = Some(if i == 0 { Act::CampRest } else { Act::CampUp });
                 }
             }
+            // the Foundry's workshop: free, and the choice above still there after it
+            if cls == Class::Foundry {
+                let any = run.army.iter().any(|m| !m.mods.is_empty());
+                if ui.minor(cv, a, cls, "workshop", 14, 484, &t("ws.open"), any) {
+                    act = Some(Act::Workshop);
+                }
+            }
+        }
+        CampStage::Workshop { held } => {
+            if let Some(x) = workshop(ui, cv, a, run, held) {
+                act = Some(x);
+            }
         }
         CampStage::Pick => {
             heading(cv, a, &t("camp.pick"), 480, 60, 16, cols(cls), Align::Center);
@@ -1649,9 +1712,116 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
             if ui.action(cv, a, cls, "next", 652, 478, &t("camp.next"), true) || ui.key(Key::Enter) {
                 act = Some(Act::LeaveStop);
             }
+            if cls == Class::Foundry && ui.minor(cv, a, cls, "workshop", 14, 484, &t("ws.open"), run.army.iter().any(|m| !m.mods.is_empty())) {
+                act = Some(Act::Workshop);
+            }
         }
     }
     army_strip(cv, a, run, 200, 522, 600);
+    act
+}
+
+/// The workshop at the Foundry's camp: every golem with its cells; a module picked up goes into a free cell where it
+/// fits (free) or melts into another module of the same frame (+1 level for its metal).
+fn workshop(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, held: Option<(usize, usize)>) -> Option<Act> {
+    let cls = run.class;
+    let mut act = None;
+    heading(cv, a, &t("ws.title"), 480, 58, 24, cols(cls), Align::Center);
+    text(cv, a, &t("ws.sub"), 480, 90, MUTED, Align::Center);
+    if ui.minor(cv, a, cls, "campback", 14, 484, &t("back"), true) {
+        act = Some(Act::CampBack);
+    }
+    let golems: Vec<usize> = (0..run.army.len()).filter(|&i| run.army[i].t.golem || !run.army[i].mods.is_empty()).collect();
+    let (tw, th) = (300, 72);
+    let held_key = held.and_then(|(m, j)| run.army.get(m).and_then(|x| x.mods.get(j)).cloned());
+    let mut tip = None;
+    for (n, &mi) in golems.iter().enumerate().take(8) {
+        let m = &run.army[mi];
+        let (col, row) = ((n % 2) as i32, (n / 2) as i32);
+        let r = Rect::new(36 + col * (tw + 12), 116 + row * (th + 8) + ui.rise_from(ui.opened, n), tw, th);
+        plate(ui, cv, a, cls, r);
+        let mut pic = Image::clear(56, th - 8);
+        small(&mut pic, a, &m.t, 28, th - 14, false, m.broken);
+        cv.blit(&pic, r.x + 6, r.y + 4, false, 1.0);
+        a.fonts["text16"].draw(cv, &m.t.name, r.x + 70, r.y + 8, if m.broken { MUTED } else { [255, 214, 150] }, Some(EDGE), Align::Left, 1.0);
+        for j in 0..run.cells(m) {
+            let s = Rect::new(r.x + 70 + j as i32 * 42, r.y + 30, 36, 36);
+            let filled = j < m.mods.len();
+            let (over, _) = ui.hot(&format!("ws{mi}_{j}"), s);
+            // what a click there would do with the module held: a place for it, a module to melt it into
+            let fits = held_key.as_ref().is_some_and(|k| !filled && held.map(|h| h.0) != Some(mi) && run.fits(mi, k));
+            let melts = held.is_some_and(|(hm, hj)| filled && run.can_melt(hm, hj, mi, j));
+            let is_held = held == Some((mi, j));
+            let pulse = 0.5 + 0.5 * (ui.t * 6.0).sin();
+            let rim: [u8; 4] = if is_held {
+                [255, 214, 120, 255]
+            } else if fits {
+                [120, 200, 120, (150.0 + 100.0 * pulse) as u8]
+            } else if melts {
+                [255, 130, 50, (150.0 + 100.0 * pulse) as u8]
+            } else if over {
+                [230, 220, 200, 255]
+            } else {
+                [110, 92, 66, 255]
+            };
+            cv.fill(s.x - 1, s.y - 1, s.w + 2, s.h + 2, rim);
+            cv.fill(s.x, s.y, s.w, s.h, [14, 11, 12, 255]);
+            if filled {
+                let key = &m.mods[j];
+                ui.icon(cv, a, &format!("module/{key}"), s.x + 2, s.y + 2, 2, if is_held { 0.35 } else { 1.0 });
+                // its level: pips along the cell's foot
+                for p in 0..sim::run::MAX_LEVEL {
+                    let c: [u8; 4] = if p < m.level(j) { [255, 200, 90, 255] } else { [60, 50, 40, 255] };
+                    cv.fill(s.x + 3 + p as i32 * 6, s.y + s.h - 6, 4, 4, c);
+                }
+                if over {
+                    let lv = t(&format!("lvl.{}", m.level(j)));
+                    tip = Some(vec![(t(&format!("find.{key}")), GOLD), (tf("ws.level", &[("n", &lv)]), INK), (t(&format!("find.{key}.l")), BLUE)]);
+                }
+            }
+            if ui.clicked(s) {
+                act = Some(Act::Socket(mi, j));
+            }
+        }
+    }
+    // the crucible: what is held and what can be done with it
+    let side = Rect::new(660, 116, 270, 300);
+    plate(ui, cv, a, cls, side);
+    heading(cv, a, &t("ws.crucible"), side.cx(), side.y + 22, 16, cols(cls), Align::Center);
+    let glow = 0.18 + 0.06 * (ui.t * 3.0).sin() + if held.is_some() { 0.12 } else { 0.0 };
+    cv.glow(side.cx() as f32, (side.y + 92) as f32, 60.0, [255, 130, 50], glow);
+    let font = &a.fonts["text16"];
+    let mut y = side.y + 56;
+    let lines: Vec<(String, [u8; 3])> = match (&held_key, held) {
+        (Some(k), Some((hm, hj))) => {
+            ui.icon(cv, a, &format!("module/{k}"), side.cx() - 32, y, 4, 1.0);
+            y += 76;
+            let lv = t(&format!("lvl.{}", run.army[hm].level(hj)));
+            vec![
+                (format!("{} · {}", t(&format!("find.{k}")), lv), GOLD),
+                (t("ws.move"), [150, 210, 150]),
+                (tf("ws.melt", &[("n", &sim::run::MELT)]), [255, 160, 90]),
+            ]
+        }
+        _ => vec![(t("ws.take"), INK), (t("ws.move"), MUTED), (tf("ws.melt", &[("n", &sim::run::MELT)]), MUTED)],
+    };
+    for (l, c) in lines {
+        for w in font.wrap(&l, side.w - 28) {
+            if y + 16 > side.y + side.h - 8 {
+                break;
+            }
+            font.draw(cv, &w, side.cx(), y, c, Some(EDGE), Align::Center, 1.0);
+            y += 18;
+        }
+        y += 6;
+    }
+    // the module held follows the mouse
+    if let Some(k) = &held_key {
+        ui.icon(cv, a, &format!("module/{k}"), ui.mx - 16, ui.my - 16, 2, 0.85);
+    }
+    if let Some(lines) = tip {
+        ui.tooltip(lines);
+    }
     act
 }
 

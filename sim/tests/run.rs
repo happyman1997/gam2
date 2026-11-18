@@ -161,3 +161,55 @@ fn every_growth_does_something() {
         }
     }
 }
+
+/// The workshop: a module taken again is a level up (to III, then no more); a module moves between golems where it
+/// fits, its level with it; melted into another of the same frame, it raises that one for its metal.
+#[test]
+fn modules_level_move_and_melt() {
+    use sim::run::{Find, Offer, Target, MAX_LEVEL, MELT};
+    // the Inventor's army: Мудрец, Орудие, Механик — small frames with two cells each
+    let mut r = Run::new(Class::Foundry, 1, 9);
+    let mech = r.army.iter().position(|m| m.t.name == "Механик").unwrap();
+    let gun = r.army.iter().position(|m| m.t.name == "Орудие").unwrap();
+    let flail = Offer { key: "flail".into(), units: vec![], price: 0, find: Find::Module("flail".into()) };
+    let base = r.body(&r.army[mech]).bonus;
+    assert!(r.take_find(&flail, Some(&Target::Member(mech))));
+    assert_eq!(r.army[mech].level(0), 1);
+    // the same again on it: level II, then III; then no more room for it there
+    assert!(r.targets(&flail).contains(&Target::Member(mech)));
+    assert!(r.take_find(&flail, Some(&Target::Member(mech))));
+    assert!(r.take_find(&flail, Some(&Target::Member(mech))));
+    assert_eq!(r.army[mech].level(0), MAX_LEVEL);
+    assert_eq!(r.army[mech].mods.len(), 1);
+    assert!(!r.raises(mech, "flail"));
+    // a flail has no numbers to raise: each level is a harder blow
+    assert_eq!(r.body(&r.army[mech]).bonus, base + 2);
+    // a mortar levelled: a round sooner, a die bigger
+    let mortar = Offer { key: "mortar".into(), units: vec![], price: 0, find: Find::Module("mortar".into()) };
+    assert!(r.take_find(&mortar, Some(&Target::Member(gun))));
+    let at1 = r.body(&r.army[gun]).abilities.clone();
+    assert!(r.take_find(&mortar, Some(&Target::Member(gun))));
+    let at2 = r.body(&r.army[gun]).abilities.clone();
+    assert_ne!(at1, at2, "a mortar at level II the same as at I");
+    // moved to the gun (any frame takes a flail), its level with it
+    assert!(r.move_module(mech, 0, gun));
+    assert!(r.army[mech].mods.is_empty());
+    let j = r.army[gun].mods.iter().position(|k| k == "flail").unwrap();
+    assert_eq!(r.army[gun].level(j), MAX_LEVEL);
+    // the gun's cells are full now: nothing more moves onto it
+    assert!(r.take_find(&flail, Some(&Target::Member(mech))));
+    assert!(!r.move_module(mech, 0, gun));
+    // melting needs one frame: the mechanic's flail can't go into the gun's mortar
+    let m = r.army[gun].mods.iter().position(|k| k == "mortar").unwrap();
+    r.money = 10;
+    assert!(!r.can_melt(mech, 0, gun, m));
+    // on one golem it can: the gun's flail into its mortar (II → III), the flail gone, the metal paid
+    let f = r.army[gun].mods.iter().position(|k| k == "flail").unwrap();
+    assert!(r.melt(gun, f, gun, m));
+    assert_eq!(r.money, 10 - MELT);
+    assert_eq!(r.army[gun].mods, vec!["mortar".to_string()]);
+    assert_eq!(r.army[gun].level(0), MAX_LEVEL);
+    // with no metal there is no melting
+    r.money = 0;
+    assert!(!r.can_melt(mech, 0, mech, 0));
+}

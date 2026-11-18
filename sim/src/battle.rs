@@ -718,7 +718,7 @@ impl Battle {
             let allies: Vec<usize> =
                 (0..self.units.len()).filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.golem && self.dist(i, k) <= 2).collect();
             for k in allies {
-                let up: Vec<Ability> = self.units[k].t.abilities.iter().map(|a| level_up(*a)).collect();
+                let up: Vec<Ability> = self.units[k].t.abilities.iter().map(|a| a.level_up()).collect();
                 self.units[k].t.abilities = up;
             }
         }
@@ -1281,17 +1281,4 @@ pub fn fight(a: &[Template], b: &[Template], seed: u64) -> Outcome {
     let mut bt = Battle::new(seed);
     bt.add_armies(a, b);
     bt.run()
-}
-
-/// A module a level stronger: a round sooner, a die bigger (or more mended).
-fn level_up(a: Ability) -> Ability {
-    let sooner = |e: u32| e.saturating_sub(1).max(1);
-    match a {
-        Ability::Volley { every, die, bonus, dmg } => Ability::Volley { every: sooner(every), die: die + 2, bonus, dmg },
-        Ability::Bolt { every, die, bonus, dmg, range } => Ability::Bolt { every: sooner(every), die: die + 2, bonus, dmg, range },
-        Ability::Repair { every, amount } => Ability::Repair { every: sooner(every), amount: amount + 2 },
-        Ability::Overload { every } => Ability::Overload { every: sooner(every) },
-        Ability::Fireball { every, die, bonus, range } => Ability::Fireball { every: sooner(every), die: die + 2, bonus, range },
-        other => other,
-    }
 }

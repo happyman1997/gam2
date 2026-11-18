@@ -138,6 +138,46 @@ pub struct Member {
     /// The modules put on it in the run (finds.ron keys), in its cells.
     #[serde(default)]
     pub mods: Vec<String>,
+    /// The level of each module (I–III), by its place in `mods`; missing — I.
+    #[serde(default)]
+    pub levels: Vec<u8>,
+}
+
+/// The highest level of a module.
+pub const MAX_LEVEL: u8 = 3;
+/// Metal a melting costs (CONCEPT.md, «Переплавка»).
+pub const MELT: i32 = 3;
+
+impl Member {
+    /// The level of its `j`-th module (1–3).
+    pub fn level(&self, j: usize) -> u8 {
+        self.levels.get(j).copied().unwrap_or(1).clamp(1, MAX_LEVEL)
+    }
+
+    fn set_level(&mut self, j: usize, lv: u8) {
+        while self.levels.len() < self.mods.len() {
+            self.levels.push(1);
+        }
+        self.levels[j] = lv.clamp(1, MAX_LEVEL);
+    }
+
+    fn put(&mut self, key: String, lv: u8) {
+        self.levels.truncate(self.mods.len());
+        while self.levels.len() < self.mods.len() {
+            self.levels.push(1);
+        }
+        self.mods.push(key);
+        self.levels.push(lv);
+    }
+
+    /// Its `j`-th module taken off: the key and its level.
+    fn take_off(&mut self, j: usize) -> (String, u8) {
+        let lv = self.level(j);
+        if j < self.levels.len() {
+            self.levels.remove(j);
+        }
+        (self.mods.remove(j), lv)
+    }
 }
 
 /// What a find is: bodies to take in, a module for a golem, a mutation for a breed.
@@ -342,7 +382,7 @@ impl Run {
     }
 
     fn add(&mut self, t: Template) {
-        self.army.push(Member { id: self.next_id, t, broken: false, mods: vec![] });
+        self.army.push(Member { id: self.next_id, t, broken: false, mods: vec![], levels: vec![] });
         self.next_id += 1;
     }
 
@@ -394,9 +434,21 @@ impl Run {
             }
         }
         let finds = data::finds();
-        for key in &m.mods {
+        for (j, key) in m.mods.iter().enumerate() {
             if let Some(f) = finds.modules.iter().find(|f| &f.key == key) {
+                let had = t.abilities.len();
                 f.give.apply(&mut t);
+                // a level above I: what the module gave a round sooner and a die bigger — or, with nothing of that
+                // to raise, a harder blow
+                for _ in 1..m.level(j) {
+                    if t.abilities[had..].iter().any(|a| a.levels()) {
+                        for a in &mut t.abilities[had..] {
+                            *a = a.level_up();
+                        }
+                    } else {
+                        t.bonus += 1;
+                    }
+                }
             }
         }
         let form = form_of(&m.t).to_string();
@@ -475,10 +527,16 @@ impl Run {
     }
 
     /// Where a find can go: the golems a module fits, the breeds without this mutation; none for bodies (they join).
+    /// Whether a module can be raised a level on a member: it is on it, below III (taking it again is the upgrade).
+    pub fn raises(&self, i: usize, key: &str) -> bool {
+        let m = &self.army[i];
+        m.mods.iter().position(|x| x == key).is_some_and(|j| m.level(j) < MAX_LEVEL)
+    }
+
     pub fn targets(&self, o: &Offer) -> Vec<Target> {
         match &o.find {
             Find::Units => vec![],
-            Find::Module(k) => (0..self.army.len()).filter(|&i| self.fits(i, k)).map(Target::Member).collect(),
+            Find::Module(k) => (0..self.army.len()).filter(|&i| self.fits(i, k) || self.raises(i, k)).map(Target::Member).collect(),
             Find::Mutation(k) => self.forms().into_iter().filter(|f| !self.breeds.iter().any(|(x, y)| x == f && y == k)).map(Target::Form).collect(),
         }
     }
@@ -491,8 +549,15 @@ impl Run {
                 self.recruit(o);
                 true
             }
+            (Find::Module(k), Some(Target::Member(i))) if *i < self.army.len() && self.raises(*i, k) => {
+                let m = &mut self.army[*i];
+                let j = m.mods.iter().position(|x| x == k).unwrap();
+                let lv = m.level(j) + 1;
+                m.set_level(j, lv);
+                true
+            }
             (Find::Module(k), Some(Target::Member(i))) if *i < self.army.len() && self.fits(*i, k) => {
-                self.army[*i].mods.push(k.clone());
+                self.army[*i].put(k.clone(), 1);
                 true
             }
             (Find::Mutation(k), Some(Target::Form(f))) if !self.breeds.iter().any(|(x, y)| x == f && y == k) => {
@@ -501,6 +566,39 @@ impl Run {
             }
             _ => false,
         }
+    }
+
+    /// The workshop at the camp: a module moved from one golem to another (free) — where it fits, a cell free.
+    pub fn move_module(&mut self, from: usize, j: usize, to: usize) -> bool {
+        if from == to || from >= self.army.len() || to >= self.army.len() || j >= self.army[from].mods.len() {
+            return false;
+        }
+        let key = self.army[from].mods[j].clone();
+        if !self.fits(to, &key) {
+            return false;
+        }
+        let (key, lv) = self.army[from].take_off(j);
+        self.army[to].put(key, lv);
+        true
+    }
+
+    /// Whether a module can be melted into another: both there, not the same, the other below III, on golems of one
+    /// frame, the metal there.
+    pub fn can_melt(&self, from: usize, j: usize, to: usize, k: usize) -> bool {
+        let (Some(a), Some(b)) = (self.army.get(from), self.army.get(to)) else { return false };
+        j < a.mods.len() && k < b.mods.len() && !(from == to && j == k) && b.level(k) < MAX_LEVEL && a.t.name == b.t.name && self.money >= MELT
+    }
+
+    /// The workshop's crucible: a module melted down, its metal another module's next level (for `MELT` metal).
+    pub fn melt(&mut self, from: usize, j: usize, to: usize, k: usize) -> bool {
+        if !self.can_melt(from, j, to, k) {
+            return false;
+        }
+        self.money -= MELT;
+        let lv = self.army[to].level(k) + 1;
+        self.army[to].set_level(k, lv);
+        self.army[from].take_off(j);
+        true
     }
 
     pub fn is_leader(&self, m: &Member) -> bool {
