@@ -253,5 +253,6 @@
  "cur.gen.0": "металла",
  "cur.gen.1": "биомассы",
  "card.nohit": "не бьёт",
- "hud.rounds": "ходов: {n}"
+ "hud.rounds": "ходов: {n}",
+ "army.more": "и ещё {n}"
 }

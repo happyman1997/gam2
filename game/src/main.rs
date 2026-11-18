@@ -334,7 +334,23 @@ mod flow {
                                 Reward::Find(_) => {
                                     g.apply(Act::OpenFind(i));
                                     frame(&mut g);
-                                    g.apply(Act::Pick(i, Some(0)));
+                                    // a click on a card under the pause does not reach it
+                                    g.overlays.push(crate::game::Overlay::Pause);
+                                    g.ui.mx = 226;
+                                    g.ui.my = 276;
+                                    frame(&mut g);
+                                    g.ui.mouse_down();
+                                    g.ui.mouse_up();
+                                    frame(&mut g);
+                                    assert!(matches!(g.screen, Screen::Rewards { pick: Some(_), .. }), "a click went through the pause");
+                                    g.overlays.clear();
+                                    // and with the pause gone, the same click takes the card
+                                    frame(&mut g);
+                                    g.ui.mouse_down();
+                                    g.ui.mouse_up();
+                                    frame(&mut g);
+                                    assert!(matches!(g.screen, Screen::Rewards { pick: None, .. }), "the click on the card did not take it");
+                                    g.ui.mx = -1;
                                 }
                                 _ => g.apply(Act::Take(i)),
                             }
@@ -367,6 +383,24 @@ mod flow {
                 settle(&mut g);
             }
             assert!(seen.contains("end"), "{cls:?}: the run did not end: {seen:?}");
+            // a run left for the menu and taken up again, then given up
+            g.apply(Act::StartRun(cls, leader));
+            settle(&mut g);
+            assert!(matches!(g.screen, Screen::Fork) && g.saved.is_some(), "a new run is saved at its first fork");
+            let fight = g.run.as_ref().unwrap().next_fight();
+            g.apply(Act::ToMenu);
+            settle(&mut g);
+            assert!(matches!(g.screen, Screen::Menu) && g.run.is_none());
+            frame(&mut g);
+            g.apply(Act::Continue);
+            settle(&mut g);
+            assert!(matches!(g.screen, Screen::Fork), "«Продолжить» brings the fork back");
+            assert_eq!(g.run.as_ref().unwrap().next_fight(), fight);
+            frame(&mut g);
+            g.apply(Act::Surrender);
+            settle(&mut g);
+            assert!(matches!(g.screen, Screen::End { victory: false }) && g.saved.is_none(), "giving up ends the run and forgets it");
+            frame(&mut g);
             // a run may be lost in its first battle (the seed is the clock's): then no spoils were seen
             assert!(seen.contains("battle"), "{seen:?}");
             eprintln!("{cls:?}: {seen:?}, battles won {}", g.run.as_ref().map(|r| r.stats.won).unwrap_or(0));

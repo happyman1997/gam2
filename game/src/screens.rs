@@ -38,6 +38,8 @@ pub enum Act {
     CampRest,
     CampUp,
     CampPick(usize),
+    CampBack,
+    CloseFind,
     Resume,
     Army,
     Surrender,
@@ -194,11 +196,19 @@ fn unit_card(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, id: &str, r: R
     let name = t.name.as_ref();
     let font = &a.fonts["text16"];
     let title_col = if cls == Class::Foundry { [255, 214, 150] } else { ACID2 };
-    font.draw(cv, name, r.cx(), pedestal + 8, if on { title_col } else { MUTED }, Some(EDGE), Align::Center, 1.0);
+    let mut y = pedestal + 30;
+    match name.split_once(" (") {
+        // a name too wide for the card (a narrow one: the camp, the army): the form, and its caste under it
+        Some((form, caste)) if font.width(name) > r.w - 10 => {
+            font.draw(cv, form, r.cx(), pedestal + 8, if on { title_col } else { MUTED }, Some(EDGE), Align::Center, 1.0);
+            font.draw(cv, caste.trim_end_matches(')'), r.cx(), pedestal + 26, if on { MUTED } else { PALE }, Some(EDGE), Align::Center, 1.0);
+            y += 16;
+        }
+        _ => font.draw(cv, name, r.cx(), pedestal + 8, if on { title_col } else { MUTED }, Some(EDGE), Align::Center, 1.0),
+    }
     if n > 1 {
         a.fonts["title16"].draw(cv, &tf("card.count", &[("n", &n)]), r.x + r.w - 14, r.y + 12, GOLD, Some(EDGE), Align::Right, 1.0);
     }
-    let mut y = pedestal + 30;
     let lines = [
         tf("card.hp", &[("n", &t.hp)]),
         hit_text(t),
@@ -560,6 +570,16 @@ impl Game {
             Act::CampUp => {
                 if let Screen::Camp { stage, .. } = &mut self.screen {
                     *stage = CampStage::Pick;
+                }
+            }
+            Act::CampBack => {
+                if let Screen::Camp { stage, .. } = &mut self.screen {
+                    *stage = CampStage::Choose;
+                }
+            }
+            Act::CloseFind => {
+                if let Screen::Rewards { pick, .. } = &mut self.screen {
+                    *pick = None;
                 }
             }
             Act::CampPick(m) => {
@@ -943,8 +963,9 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
     }
     let mut y = panel.y + 70;
     let mut left = 0;
-    let blocked = pick.is_some();
-    if blocked {
+    // with the find open, the spoils under it don't answer; an overlay over both blocks the find too
+    let outer = ui.blocked;
+    if pick.is_some() {
         ui.blocked = true;
     }
     for (i, (r, taken)) in list.iter().enumerate() {
@@ -1008,7 +1029,7 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
     }
     // the find: three cards over the screen, or none
     if let Some(i) = pick {
-        ui.blocked = false;
+        ui.blocked = outer;
         if let Some((Reward::Find(offers), _)) = list.get(i) {
             cv.fill(0, 44, 960, 424, [6, 4, 8, 120]);
             heading(cv, a, &t("pick.title"), 480, 58, 24, cols(cls), Align::Center);
@@ -1027,11 +1048,13 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
             if ui.minor(cv, a, cls, "skip", 380, 452, &tf("pick.skip", &[("cur", &t(&format!("cur.gen.{c}")))]), true) {
                 act = Some(Act::Pick(i, None));
             }
+            // back to the spoils, the find still there to take (Esc does the same)
+            if ui.minor(cv, a, cls, "pickback", 14, 484, &t("back"), true) {
+                act = Some(Act::CloseFind);
+            }
         }
     }
-    if blocked && pick.is_none() {
-        ui.blocked = false;
-    }
+    ui.blocked = outer;
     act
 }
 
@@ -1072,7 +1095,7 @@ fn shop_screen(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, shop: &sim::r
     for (i, (art, price, sold)) in shop.artifacts.iter().enumerate() {
         let r = Rect::new(60 + i as i32 * 232, y2 + 8, 222, 78);
         let can = !sold && run.money >= *price;
-        let (over, _, hit) = ui.card(cv, a, cls, &format!("art{i}"), r, "rare", !sold);
+        let (over, _, hit) = ui.card(cv, a, cls, &format!("shopart{i}"), r, "rare", !sold);
         let sock = if cls == Class::Foundry { "foundry/artifact_socket_normal" } else { "swarm/artifact_cell_normal" };
         ui.put(cv, a, sock, r.x + 12, r.y + 10, 1.0);
         artifact_icon(ui, cv, a, *art, r.x + 10, r.y + 8, 2);
@@ -1326,6 +1349,9 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
                 }
                 items.push((i, m.t.clone(), 1));
             }
+            if ui.minor(cv, a, cls, "campback", 14, 484, &t("back"), true) {
+                act = Some(Act::CampBack);
+            }
             let (cw, ch, gap) = (140, 186, 12);
             let per = 6;
             for (j, (m, tt, n)) in items.iter().enumerate().take(12) {
@@ -1345,7 +1371,7 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
             }
         }
     }
-    army_strip(cv, a, run, 30, 522, 600);
+    army_strip(cv, a, run, 200, 522, 600);
     act
 }
 
@@ -1537,7 +1563,11 @@ fn army(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
             gs.push((m.t.clone(), 1, m.broken));
         }
     }
-    let (cw, ch, gap) = (130, 178, 10);
+    let (cw, ch, gap) = (130, 170, 10);
+    if gs.len() > 12 {
+        let more: usize = gs[12..].iter().map(|g| g.1).sum();
+        text(cv, a, &tf("army.more", &[("n", &more)]), r.x + r.w - 30, r.y + 30, MUTED, Align::Right);
+    }
     for (j, (tt, n, broken)) in gs.iter().enumerate().take(12) {
         let (col, row) = (j % 6, j / 6);
         let rc = Rect::new(r.x + 30 + col as i32 * (cw + gap), r.y + 56 + row as i32 * (ch + gap), cw, ch);

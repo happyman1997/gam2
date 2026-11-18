@@ -108,6 +108,10 @@ pub struct Game {
     /// The currency as last drawn, and the changes floating up from it: (when, how much).
     pub(crate) money_seen: Option<i32>,
     pub(crate) floats: Vec<(f32, i32)>,
+    /// Work for the moment the shutters are shut (it takes a few battles played out, a tenth of a second or two:
+    /// done there, it shows as no stall): a run to begin, the next fork to build.
+    pending_run: Option<(Class, usize, u64)>,
+    fork_due: bool,
 }
 
 impl Game {
@@ -128,6 +132,8 @@ impl Game {
             saved,
             money_seen: None,
             floats: vec![],
+            pending_run: None,
+            fork_due: false,
         };
         g.apply_volume();
         g
@@ -186,6 +192,14 @@ impl Game {
             self.money_seen = None;
         }
         if matches!(s, Screen::Fork) {
+            if let Some((c, l, seed)) = self.pending_run.take() {
+                self.run = Some(Run::new(c, l, seed));
+            }
+            if std::mem::take(&mut self.fork_due) {
+                if let Some(run) = &mut self.run {
+                    run.fork();
+                }
+            }
             self.save();
         }
         self.screen = s;
@@ -208,7 +222,7 @@ impl Game {
 
     pub fn new_run(&mut self, class: Class, leader: usize) {
         let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(7);
-        self.run = Some(Run::new(class, leader, seed));
+        self.pending_run = Some((class, leader, seed));
         self.go(Screen::Fork);
     }
 
@@ -270,7 +284,7 @@ impl Game {
             self.forget_save();
             self.go(Screen::End { victory: true });
         } else {
-            run.fork();
+            self.fork_due = true;
             self.go(Screen::Fork);
         }
     }
@@ -278,8 +292,9 @@ impl Game {
     /// A stop (the trader, an event, the camp) left: the next fork is battles only.
     pub fn leave_stop(&mut self) {
         if let Some(run) = &mut self.run {
-            run.left_stop();
+            run.stopped = true;
         }
+        self.fork_due = true;
         self.go(Screen::Fork);
     }
 
@@ -292,11 +307,13 @@ impl Game {
         self.go(Screen::End { victory: false });
     }
 
+    /// To the menu. The run stays as it was saved when its last fork came up: saving in the middle of a step (after
+    /// an event's choice, at the trader's) would bring that same fork back, its event or trader to take again; a
+    /// step left halfway is replayed from the fork — the same, the run is deterministic.
     pub fn back_to_menu(&mut self) {
         self.overlays.clear();
-        if self.run.as_ref().is_some_and(|r| r.over.is_none()) && !self.in_battle() {
-            self.save();
-        }
+        self.pending_run = None;
+        self.fork_due = false;
         self.run = None;
         self.go(Screen::Menu);
     }
@@ -331,11 +348,16 @@ impl Game {
             self.demo.ui_sound("toggle");
             return;
         }
+        if let Screen::Rewards { pick: pick @ Some(_), .. } = &mut self.screen {
+            *pick = None;
+            self.demo.ui_sound("toggle");
+            return;
+        }
         match self.screen {
             Screen::Menu => {}
             Screen::Class => self.go(Screen::Menu),
             Screen::Leaders { .. } => self.go(Screen::Class),
-            Screen::End { .. } => self.go(Screen::Menu),
+            Screen::End { .. } => self.back_to_menu(),
             _ => {
                 self.overlays.push(Overlay::Pause);
                 self.demo.ui_sound("toggle");

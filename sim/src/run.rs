@@ -217,6 +217,8 @@ pub enum Effect {
     Hurt(i32),
     /// Recruits join: a golem (Foundry) or a clutch of workers (swarm).
     Join,
+    /// One fighter joins: a golem (Foundry) or a soldier of some form (swarm).
+    Recruit,
     /// All fighters +health.
     Feast,
     Leave,
@@ -229,7 +231,7 @@ pub const EVENTS: [(&str, Option<Class>, [Effect; 3]); 6] = [
     ("nest", Some(Class::Swarm), [Effect::Hurt(14), Effect::Join, Effect::Leave]),
     ("carcass", Some(Class::Swarm), [Effect::Money(8), Effect::Feast, Effect::Leave]),
     ("shadow", None, [Effect::TradeUnit, Effect::BuyArtifact(15), Effect::Leave]),
-    ("deserter", None, [Effect::Join, Effect::Money(6), Effect::Leave]),
+    ("deserter", None, [Effect::Recruit, Effect::Money(6), Effect::Leave]),
 ];
 
 /// What a battle did to the player's army: who of `fighters()` was killed, how many of the enemy fell.
@@ -315,7 +317,7 @@ impl Run {
     }
 
     pub fn boss_next(&self) -> bool {
-        self.next_fight() % BOSS_EVERY == 0
+        self.next_fight().is_multiple_of(BOSS_EVERY)
     }
 
     /// Who goes into battle: the army without the broken, the leader first, then the rest in their order as long as
@@ -412,7 +414,7 @@ impl Run {
         // the smallest army is one step (a boss: its own army); find the longest prefix still beaten often enough
         let (mut lo, mut hi) = (if base.is_empty() { 1 } else { 0 }, ladder.len());
         while lo < hi {
-            let mid = (lo + hi + 1) / 2;
+            let mid = (lo + hi).div_ceil(2);
             if self.win_rate(&with(mid), 24) >= target {
                 lo = mid;
             } else {
@@ -812,6 +814,16 @@ impl Run {
                     self.add(g);
                 }
                 Class::Swarm => self.service_effect(),
+            },
+            Effect::Recruit => match self.class {
+                Class::Foundry => {
+                    let g = self.golem(false);
+                    self.add(g);
+                }
+                Class::Swarm => {
+                    let form = data::FORMS[self.roll(data::FORMS.len())];
+                    self.add(data::swarm(Caste::Soldier, form));
+                }
             },
             Effect::Feast => {
                 for m in &mut self.army {

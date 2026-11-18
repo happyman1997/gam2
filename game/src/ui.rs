@@ -288,15 +288,11 @@ impl Ui {
         let font = &a.fonts["title16"];
         let col = if on { [255, 222, 150] } else { [120, 112, 104] };
         font.draw_grad(cv, label, x + 44 + w / 2, y + h / 2 - 9, col, if on { [176, 120, 50] } else { [80, 74, 70] }, EDGE, Align::Center, 1.0);
-        let hit = on && (self.clicked(r) || (over && self.key_enter_on()));
+        let hit = on && self.clicked(r);
         if hit {
             self.sound("click");
         }
         hit
-    }
-
-    fn key_enter_on(&mut self) -> bool {
-        false
     }
 
     /// A push-button in its nut with a stamped tag on a wire (kinds: steel, brass, rust, dull). Returns whether it
