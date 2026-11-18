@@ -277,6 +277,17 @@ mod flow {
         }
     }
 
+    /// If a place is asked for (a module, a mutation): the picker is drawn, the first place taken.
+    fn place_first(g: &mut Game) {
+        if let Some(tg) = g.targeting.clone() {
+            frame(g);
+            let to = g.run.as_ref().unwrap().targets(&tg.offer).into_iter().next().expect("a picker with no place");
+            g.apply(Act::Place(to));
+            assert!(g.targeting.is_none());
+            frame(g);
+        }
+    }
+
     fn frame(g: &mut Game) {
         let mut field = gfx::Image::new(render::W, render::H);
         let mut hud = gfx::Image::clear(render::W, render::H);
@@ -351,6 +362,8 @@ mod flow {
                                     frame(&mut g);
                                     assert!(matches!(g.screen, Screen::Rewards { pick: None, .. }), "the click on the card did not take it");
                                     g.ui.mx = -1;
+                                    // a module or a mutation asks where it goes: the first place offered
+                                    place_first(&mut g);
                                 }
                                 _ => g.apply(Act::Take(i)),
                             }
@@ -358,6 +371,10 @@ mod flow {
                         g.apply(Act::LeaveRewards);
                     }
                     Screen::Shop(_) => {
+                        // a part of the trader's (the third good) goes somewhere too
+                        g.run.as_mut().unwrap().money += 40;
+                        g.apply(Act::BuyOffer(2));
+                        place_first(&mut g);
                         g.apply(Act::BuyOffer(0));
                         g.apply(Act::BuyArtifact(0));
                         g.apply(Act::BuyService);
@@ -383,6 +400,8 @@ mod flow {
                 settle(&mut g);
             }
             assert!(seen.contains("end"), "{cls:?}: the run did not end: {seen:?}");
+            let r = g.run.as_ref().unwrap();
+            eprintln!("  modules {}, breeds {}", r.army.iter().map(|m| m.mods.len()).sum::<usize>(), r.breeds.len());
             // a run left for the menu and taken up again, then given up
             g.apply(Act::StartRun(cls, leader));
             settle(&mut g);
@@ -406,6 +425,23 @@ mod flow {
             eprintln!("{cls:?}: {seen:?}, battles won {}", g.run.as_ref().map(|r| r.stats.won).unwrap_or(0));
         }
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+}
+
+#[cfg(test)]
+mod finds {
+    /// Every find of finds.ron has its icon in the atlases and its words.
+    #[test]
+    fn every_find_has_an_icon_and_words() {
+        let a = crate::assets::Assets::load().unwrap();
+        let f = sim::data::finds();
+        let keys = f.modules.iter().map(|m| ("module", &m.key)).chain(f.mutations.iter().map(|m| ("swarm", &m.key)));
+        for (atlas, k) in keys {
+            assert!(a.icons.contains_key(&format!("{atlas}/{k}")), "no icon {atlas}/{k}");
+            for w in [format!("find.{k}"), format!("find.{k}.l")] {
+                assert_ne!(crate::text::t(&w), w, "no words for {w}");
+            }
+        }
     }
 }
 

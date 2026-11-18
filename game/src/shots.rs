@@ -3,7 +3,7 @@
 //! 1920×1080. For a look at the screens from the cloud.
 
 use crate::camera::{self, Frame};
-use crate::game::{CampStage, Game, Overlay, Screen};
+use crate::game::{CampStage, From, Game, Overlay, Screen, Targeting};
 use crate::gfx::Image;
 use crate::render::{H, W};
 use crate::Demo;
@@ -59,6 +59,13 @@ pub fn run(demo: Demo, dir: &str) {
     for (cls, leader, tag) in [(Class::Foundry, 1, "f"), (Class::Swarm, 0, "s")] {
         let mut run = Run::new(cls, leader, 21);
         run.artifacts = vec![Artifact::Znamya, Artifact::Grani];
+        // something already put on: a module on the first golem that takes one, a mutation on the first breed
+        for _ in 0..3 {
+            if let Some(o) = run.find(3, false).into_iter().find(|o| o.find != sim::run::Find::Units) {
+                let to = run.targets(&o).into_iter().next();
+                run.take_find(&o, to.as_ref());
+            }
+        }
         run.money = 37;
         run.fight = 3;
         run.fork();
@@ -83,8 +90,18 @@ pub fn run(demo: Demo, dir: &str) {
         let find = list.iter().position(|(r, _)| matches!(r, Reward::Find(_))).unwrap_or(0);
         set(&mut g, Screen::Rewards { list: list.clone(), pick: None });
         snap(&mut g, dir, &format!("11_{tag}_rewards"), (480, 200));
-        set(&mut g, Screen::Rewards { list, pick: Some(find) });
+        set(&mut g, Screen::Rewards { list: list.clone(), pick: Some(find) });
         snap(&mut g, dir, &format!("12_{tag}_find"), (480, 280));
+        // a module or a mutation of the find being given its place
+        if let Some((Reward::Find(offers), _)) = list.get(find) {
+            if let Some(o) = offers.iter().find(|o| o.find != sim::run::Find::Units) {
+                set(&mut g, Screen::Rewards { list: list.clone(), pick: None });
+                g.targeting = Some(Targeting { offer: o.clone(), from: From::Reward(find) });
+                g.ui.opened = g.ui.t;
+                snap(&mut g, dir, &format!("12b_{tag}_target"), (180, 200));
+                g.targeting = None;
+            }
+        }
         // the trader
         let mut r3 = run.clone();
         let shop = r3.shop();

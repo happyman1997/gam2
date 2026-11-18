@@ -82,6 +82,19 @@ pub enum Screen {
     End { victory: bool },
 }
 
+/// A module or a mutation on its way to where it goes: from the spoils (which reward) or the trader (which good).
+#[derive(Clone, Debug)]
+pub struct Targeting {
+    pub offer: sim::run::Offer,
+    pub from: From,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum From {
+    Reward(usize),
+    Shop(usize),
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Overlay {
     Pause,
@@ -112,6 +125,8 @@ pub struct Game {
     /// done there, it shows as no stall): a run to begin, the next fork to build.
     pending_run: Option<(Class, usize, u64)>,
     fork_due: bool,
+    /// A module or a mutation being given a place (over the screen, under the overlays).
+    pub targeting: Option<Targeting>,
 }
 
 impl Game {
@@ -134,6 +149,7 @@ impl Game {
             floats: vec![],
             pending_run: None,
             fork_due: false,
+            targeting: None,
         };
         g.apply_volume();
         g
@@ -182,8 +198,19 @@ impl Game {
         }
     }
 
+    /// The place-picking given up: back to the find it came from (the trader's goods stay as they were).
+    pub fn cancel_target(&mut self) {
+        if let Some(tg) = self.targeting.take() {
+            if let (From::Reward(i), Screen::Rewards { pick, .. }) = (tg.from, &mut self.screen) {
+                *pick = Some(i);
+                self.ui.opened = self.ui.t;
+            }
+        }
+    }
+
     fn enter(&mut self, s: Screen) {
         self.ui.blocked = false;
+        self.targeting = None;
         self.ui.entered = self.ui.t;
         if let Screen::Battle { node } = &s {
             self.start_battle(node.clone());
@@ -312,6 +339,7 @@ impl Game {
     /// step left halfway is replayed from the fork — the same, the run is deterministic.
     pub fn back_to_menu(&mut self) {
         self.overlays.clear();
+        self.targeting = None;
         self.pending_run = None;
         self.fork_due = false;
         self.run = None;
@@ -345,6 +373,11 @@ impl Game {
     /// nothing; on the class or leader screens goes back.
     fn escape(&mut self) {
         if self.overlays.pop().is_some() {
+            self.demo.ui_sound("toggle");
+            return;
+        }
+        if self.targeting.is_some() {
+            self.cancel_target();
             self.demo.ui_sound("toggle");
             return;
         }

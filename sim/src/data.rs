@@ -120,11 +120,73 @@ fn one() -> usize {
     1
 }
 
+/// What a find gives a body (finds.ron): a module of modules.ron, abilities and traits outright, additions, a new kind
+/// of damage.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Give {
+    pub module: Option<String>,
+    pub abilities: Vec<Ability>,
+    pub traits: Vec<Trait>,
+    pub hp: i32,
+    pub armor: i32,
+    pub bonus: i32,
+    pub range: i32,
+    pub speed: i32,
+    pub dmg: Option<Dmg>,
+}
+
+impl Give {
+    /// The body with the find on it.
+    pub fn apply(&self, t: &mut Template) {
+        if let Some(m) = &self.module {
+            t.abilities.push(module(m));
+        }
+        t.abilities.extend(self.abilities.iter().copied());
+        for tr in &self.traits {
+            if !t.traits.contains(tr) {
+                t.traits.push(*tr);
+            }
+        }
+        t.hp = (t.hp + self.hp).max(1);
+        t.armor += self.armor;
+        t.bonus += self.bonus;
+        t.range = (t.range as i32 + self.range).max(1) as u32;
+        t.speed = (t.speed as i32 + self.speed).max(1) as u32;
+        if let Some(d) = self.dmg {
+            t.dmg = d;
+        }
+    }
+}
+
+/// A module of the Foundry: its key (the icon's name, the game's words) and the frames it goes on (none — any).
+#[derive(Clone, Debug, Deserialize)]
+pub struct ModuleFind {
+    pub key: String,
+    #[serde(rename = "for")]
+    pub frames: Vec<String>,
+    pub give: Give,
+}
+
+/// A mutation of the swarm: the whole breed takes it.
+#[derive(Clone, Debug, Deserialize)]
+pub struct MutationFind {
+    pub key: String,
+    pub give: Give,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Finds {
+    pub modules: Vec<ModuleFind>,
+    pub mutations: Vec<MutationFind>,
+}
+
 struct Data {
     units: BTreeMap<String, Template>,
     modules: BTreeMap<String, Ability>,
     swarm: SwarmDef,
     armies: BTreeMap<String, Vec<Entry>>,
+    finds: Finds,
 }
 
 fn parse<T: serde::de::DeserializeOwned>(file: &str, text: &str) -> T {
@@ -136,7 +198,13 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     modules: parse("modules.ron", include_str!("../data/modules.ron")),
     swarm: parse("swarm.ron", include_str!("../data/swarm.ron")),
     armies: parse("armies.ron", include_str!("../data/armies.ron")),
+    finds: parse("finds.ron", include_str!("../data/finds.ron")),
 });
+
+/// The run's finds: the Foundry's modules, the swarm's mutations.
+pub fn finds() -> &'static Finds {
+    &DATA.finds
+}
 
 /// The key in units.ron of the unit named `name` (the name a template carries).
 pub fn unit_key(name: &str) -> Option<&'static str> {
@@ -231,6 +299,24 @@ pub fn check() -> Result<(), String> {
     for key in DATA.armies.keys() {
         for t in army(key) {
             unit_ok(&format!("armies.ron \"{key}\""), &t)?;
+        }
+    }
+    let gives = DATA.finds.modules.iter().map(|m| (&m.key, &m.give)).chain(DATA.finds.mutations.iter().map(|m| (&m.key, &m.give)));
+    for (key, g) in gives {
+        if let Some(m) = &g.module {
+            if !DATA.modules.contains_key(m) {
+                return Err(format!("finds.ron \"{key}\": no module \"{m}\" in modules.ron"));
+            }
+        }
+        for a in &g.abilities {
+            ability(&format!("finds.ron \"{key}\""), a)?;
+        }
+    }
+    for m in &DATA.finds.modules {
+        for f in &m.frames {
+            if !DATA.units.contains_key(f) {
+                return Err(format!("finds.ron \"{}\": no unit \"{f}\" in units.ron", m.key));
+            }
         }
     }
     Ok(())

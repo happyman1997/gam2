@@ -8,12 +8,12 @@
 //! applied when the frame is drawn.
 
 use crate::assets::{Align, Assets};
-use crate::game::{CampStage, Game, Overlay, Screen};
+use crate::game::{CampStage, From, Game, Overlay, Screen, Targeting};
 use crate::gfx::Image;
 use crate::text::{t, tf};
 use crate::ui::{self, cell, heading, para, plate, text, Key, Rect, Ui, ACID, ACID2, BLUE, BRASS, EDGE, GOLD, INK, MUTED, PALE, RED, TITLE_F, TITLE_S, VIOLET};
 use sim::model::{Ability, Dmg, Template};
-use sim::run::{Artifact, Class, Effect, Kind, Reward, Run, EVENTS, FIGHTS};
+use sim::run::{form_of, Artifact, Class, Effect, Find, Kind, Offer, Reward, Run, Target, EVENTS, FIGHTS};
 
 pub enum Act {
     NewRun,
@@ -39,6 +39,8 @@ pub enum Act {
     CampUp,
     CampPick(usize),
     CampBack,
+    Place(Target),
+    CancelTarget,
     CloseFind,
     Resume,
     Army,
@@ -236,6 +238,163 @@ fn unit_card(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, id: &str, r: R
     (over, hit)
 }
 
+/// The finds' words and icons: a module's in the Foundry's atlas, a mutation's in the swarm's.
+fn part_icon(o: &Offer) -> Option<(String, String)> {
+    match &o.find {
+        Find::Module(k) => Some((format!("module/{k}"), k.clone())),
+        Find::Mutation(k) => Some((format!("swarm/{k}"), k.clone())),
+        Find::Units => None,
+    }
+}
+
+/// Who a module is for, in words: its frames' names, or any golem.
+fn module_for(key: &str) -> String {
+    let Some(f) = sim::data::finds().modules.iter().find(|f| f.key == key) else { return String::new() };
+    if f.frames.is_empty() {
+        return t("find.any");
+    }
+    let names: Vec<String> = f.frames.iter().map(|k| sim::data::unit(k).name.to_string()).collect();
+    tf("find.for", &[("who", &names.join(", "))])
+}
+
+/// A find's card: bodies as a body's card, a module or a mutation as its icon large on a glowing disc, its name,
+/// what kind of find it is, what it does — dimmed if the army has nowhere to put it.
+#[allow(clippy::too_many_arguments)]
+fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: Rect, o: &Offer, state: &str, on: bool) -> (bool, bool) {
+    let cls = run.class;
+    let Some((icon, key)) = part_icon(o) else {
+        return unit_card(ui, cv, a, cls, id, r, &o.units[0], o.units.len(), state, on);
+    };
+    let room = !run.targets(o).is_empty();
+    let on = on && room;
+    let (over, k, hit) = ui.card(cv, a, cls, id, r, "rare", on);
+    let r = r.shift(0, -(k * 4.0).round() as i32);
+    let disc = (r.cx(), r.y + r.h / 3 + 4);
+    let g = if cls == Class::Foundry { [255, 150, 60] } else { [150, 230, 70] };
+    cv.glow(disc.0 as f32, disc.1 as f32, 56.0, g, 0.18 + 0.15 * k + 0.04 * (ui.t * 2.5).sin());
+    let sock = if cls == Class::Foundry { "foundry/artifact_socket_normal" } else { "swarm/artifact_cell_normal" };
+    if let Some(p) = a.ui.get(sock) {
+        let big = p.img.scaled(3);
+        cv.blit(&big, disc.0 - big.w / 2, disc.1 - big.h / 2, false, if on { 1.0 } else { 0.5 });
+    }
+    ui.icon(cv, a, &icon, disc.0 - 32, disc.1 - 32, 4, if on { 1.0 } else { 0.45 });
+    let font = &a.fonts["text16"];
+    let mut y = r.y + r.h / 2 + 38;
+    let name = t(&format!("find.{key}"));
+    let title_col = if cls == Class::Foundry { [255, 214, 150] } else { ACID2 };
+    for l in font.wrap(&name, r.w - 16) {
+        font.draw(cv, &l, r.cx(), y, if on { title_col } else { MUTED }, Some(EDGE), Align::Center, 1.0);
+        y += 18;
+    }
+    let kind = match &o.find {
+        Find::Module(k) => format!("{} · {}", t("find.module"), module_for(k)),
+        _ => t("find.mutation"),
+    };
+    for l in font.wrap(&kind, r.w - 16).into_iter().take(2) {
+        font.draw(cv, &l, r.cx(), y, if on { MUTED } else { PALE }, Some(EDGE), Align::Center, 1.0);
+        y += 18;
+    }
+    y += 4;
+    let line = if room { t(&format!("find.{key}.l")) } else { t("target.none") };
+    for l in font.wrap(&line, r.w - 16).into_iter().take(3) {
+        if y + 16 > r.y + r.h - 4 {
+            break;
+        }
+        font.draw(cv, &l, r.cx(), y, if room { BLUE } else { RED }, Some(EDGE), Align::Center, 1.0);
+        y += 18;
+    }
+    (over, hit)
+}
+
+/// What a body carries, as a row of small icons along its card's foot: a golem's modules (and its free cells as
+/// empty sockets), a breed's mutations.
+fn marks(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, r: Rect, m: &sim::run::Member) {
+    let mut icons: Vec<String> = vec![];
+    let mut empty = 0;
+    match run.class {
+        Class::Foundry => {
+            if m.t.golem || !m.mods.is_empty() {
+                icons.extend(m.mods.iter().map(|k| format!("module/{k}")));
+                empty = run.cells(m).saturating_sub(m.mods.len());
+            }
+        }
+        Class::Swarm => {
+            let f = form_of(&m.t);
+            icons.extend(run.breeds.iter().filter(|(x, _)| x == f).map(|(_, k)| format!("swarm/{k}")));
+        }
+    }
+    let n = (icons.len() + empty) as i32;
+    if n == 0 {
+        return;
+    }
+    // along the card's top-left (its count stands at the top-right)
+    let x0 = r.x + 8;
+    let y = r.y + 7;
+    let rim = if run.class == Class::Foundry { [150, 118, 64, 255] } else { [110, 90, 130, 255] };
+    for (i, key) in icons.iter().enumerate() {
+        let x = x0 + i as i32 * 19;
+        cv.fill(x - 1, y - 1, 18, 18, rim);
+        cv.fill(x, y, 16, 16, [12, 9, 14, 255]);
+        ui.icon(cv, a, key, x, y, 1, 1.0);
+    }
+    // a free cell: an empty socket with its rim
+    for j in 0..empty as i32 {
+        let x = x0 + (icons.len() as i32 + j) * 19;
+        cv.fill(x - 1, y - 1, 18, 18, [70, 60, 52, 255]);
+        cv.fill(x, y, 16, 16, [12, 9, 14, 255]);
+        cv.fill(x + 6, y + 6, 4, 4, [44, 38, 46, 255]);
+    }
+}
+
+/// Where a module or a mutation goes: the golems it fits (with their cells) or the breeds (a body of each, how
+/// many), over the dimmed screen; Esc or «Назад» gives it up.
+fn target_overlay(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, tg: &Targeting) -> Option<Act> {
+    let cls = run.class;
+    cv.fill(0, 44, 960, 424, [6, 4, 8, 236]);
+    let (icon, key) = part_icon(&tg.offer)?;
+    let (title, sub) = match tg.offer.find {
+        Find::Module(_) => ("target.module", "target.sub.module"),
+        _ => ("target.mutation", "target.sub.mutation"),
+    };
+    heading(cv, a, &t(title), 480, 56, 24, cols(cls), Align::Center);
+    let name = t(&format!("find.{key}"));
+    let line = tf(sub, &[("name", &name)]);
+    let w = a.fonts["text16"].width(&line);
+    ui.icon(cv, a, &icon, 480 - w / 2 - 40, 84, 2, 1.0);
+    text(cv, a, &line, 480, 92, INK, Align::Center);
+    let mut act = None;
+    let targets = run.targets(&tg.offer);
+    let (cw, ch, gap) = (140, 196, 12);
+    let per = 6;
+    let n = targets.len().min(12) as i32;
+    let x0 = (960 - n.min(per) * cw - (n.min(per) - 1) * gap) / 2;
+    for (j, to) in targets.iter().enumerate().take(12) {
+        let (col, row) = (j as i32 % per, j as i32 / per);
+        let r = Rect::new(x0 + col * (cw + gap), 118 + row * (ch + gap) + ui.rise_from(ui.opened, j), cw, ch);
+        let (m, count) = match to {
+            Target::Member(i) => (&run.army[*i], 1),
+            Target::Form(f) => {
+                let ms: Vec<&sim::run::Member> = run.army.iter().filter(|m| form_of(&m.t) == f && !run.is_leader(m)).collect();
+                let pick = ms.iter().find(|m| m.t.name.contains("рабоч")).or(ms.first()).copied();
+                match pick {
+                    Some(m) => (m, ms.len()),
+                    None => continue,
+                }
+            }
+        };
+        let body = run.body(m);
+        let (_, hit) = unit_card(ui, cv, a, cls, &format!("tgt{j}"), r, &body, count, if m.broken { "broken" } else { "normal" }, true);
+        marks(ui, cv, a, run, r, m);
+        if hit || ui.key(Key::Digit(j as u8 + 1)) {
+            act = Some(Act::Place(to.clone()));
+        }
+    }
+    if ui.minor(cv, a, cls, "tgtback", 410, 420, &t("back"), true) {
+        act = Some(Act::CancelTarget);
+    }
+    act
+}
+
 /// A price under a good: the brass tag (the Foundry) or an amber chip (the swarm), the currency's glyph, the
 /// number — red when it can't be paid.
 #[allow(clippy::too_many_arguments)]
@@ -401,7 +560,8 @@ impl Game {
     /// The interface (the window's upper layer): the screen, the overlays over it, a tooltip over all.
     pub fn draw_ui(&mut self, cv: &mut Image) {
         let busy = self.next.is_some();
-        self.ui.blocked = !self.overlays.is_empty() || busy;
+        // under the place-picker and the overlays the screen does not answer
+        self.ui.blocked = !self.overlays.is_empty() || busy || self.targeting.is_some();
         let mut act = None;
         {
             let a = &self.demo.assets;
@@ -423,6 +583,12 @@ impl Game {
         }
         if self.in_battle() {
             self.battle_input();
+        }
+        if let (Some(tg), Some(run)) = (self.targeting.clone(), self.run.as_ref()) {
+            self.ui.blocked = !self.overlays.is_empty() || busy;
+            if let Some(x) = target_overlay(&mut self.ui, cv, &self.demo.assets, run, &tg) {
+                act = Some(x);
+            }
         }
         // the overlays: only the uppermost answers
         let n = self.overlays.len();
@@ -516,6 +682,15 @@ impl Game {
                 if let (Some(run), Screen::Rewards { list, pick }) = (&mut self.run, &mut self.screen) {
                     if let Some((Reward::Find(offers), taken)) = list.get_mut(i) {
                         match card.and_then(|c| offers.get(c)) {
+                            // a module or a mutation: where it goes is asked next
+                            Some(o) if o.find != Find::Units => {
+                                if !run.targets(o).is_empty() {
+                                    self.targeting = Some(Targeting { offer: o.clone(), from: From::Reward(i) });
+                                    self.ui.opened = self.ui.t;
+                                    *pick = None;
+                                }
+                                return;
+                            }
                             Some(o) => run.recruit(o),
                             None => {
                                 run.pass_find();
@@ -529,11 +704,37 @@ impl Game {
             Act::LeaveRewards => self.leave_rewards(),
             Act::BuyOffer(i) => {
                 if let (Some(run), Screen::Shop(shop)) = (&mut self.run, &mut self.screen) {
-                    if run.buy_offer(shop, i) {
+                    let Some((o, sold)) = shop.offers.get(i).cloned() else { return };
+                    if o.find != Find::Units {
+                        if !sold && run.money >= o.price && !run.targets(&o).is_empty() {
+                            self.targeting = Some(Targeting { offer: o, from: From::Shop(i) });
+                            self.ui.opened = self.ui.t;
+                        }
+                    } else if run.buy_offer(shop, i, None) {
                         self.demo.ui_sound("toggle");
                     }
                 }
             }
+            Act::Place(to) => {
+                let Some(tg) = self.targeting.take() else { return };
+                if let Some(run) = &mut self.run {
+                    match (tg.from, &mut self.screen) {
+                        (From::Reward(i), Screen::Rewards { list, .. }) => {
+                            if run.take_find(&tg.offer, Some(&to)) {
+                                if let Some((_, taken)) = list.get_mut(i) {
+                                    *taken = true;
+                                }
+                            }
+                        }
+                        (From::Shop(i), Screen::Shop(shop)) => {
+                            run.buy_offer(shop, i, Some(&to));
+                        }
+                        _ => {}
+                    }
+                }
+                self.demo.ui_sound("toggle");
+            }
+            Act::CancelTarget => self.cancel_target(),
             Act::BuyArtifact(i) => {
                 if let (Some(run), Screen::Shop(shop)) = (&mut self.run, &mut self.screen) {
                     if run.buy_artifact(shop, i) {
@@ -826,6 +1027,16 @@ fn fork(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
             _ => cols(cls),
         };
         heading(cv, a, &label, r.cx(), r.y + 14, 16, hc, Align::Center);
+        if node.kind.is_battle() {
+            // how dangerous: a skull a step, its words under the mouse
+            for d in 0..node.danger as i32 {
+                ui.icon(cv, a, "glyph/гибель", r.x + r.w - 30 - d * 22, r.y + 12, 2, 1.0);
+            }
+            let sk = Rect::new(r.x + r.w - 30 - (node.danger as i32 - 1) * 22, r.y + 8, node.danger as i32 * 22, 24);
+            if ui.hot(&format!("danger{i}"), sk).0 {
+                ui.tooltip(vec![(t(&format!("danger.{}", node.danger.clamp(1, 3))), if node.danger >= 2 { RED } else { INK })]);
+            }
+        }
         a.fonts["text16"].draw(cv, &format!("{}", i + 1), r.x + 14, r.y + 12, PALE, Some(EDGE), Align::Left, 1.0);
         let scene = Rect::new(r.x + 14, r.y + 42, r.w - 28, 168);
         cv.fill(scene.x, scene.y, scene.w, scene.h, [8, 6, 10, 170]);
@@ -891,7 +1102,8 @@ fn fork(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
                 cv.fill(r.x + 20, ry - 6, r.w - 40, 1, [80, 70, 60, 255]);
                 ui.icon(cv, a, currency_icon(cls), r.x + 30, ry + 2, 2, 1.0);
                 a.fonts["title16"].draw(cv, &format!("+{}", node.reward), r.x + 58, ry + 2, GOLD, Some(EDGE), Align::Left, 1.0);
-                text(cv, a, &t("node.find"), r.x + r.w - 20, ry + 2, INK, Align::Right);
+                let find = if node.danger >= 2 { t("node.find.rare") } else { t("node.find") };
+                text(cv, a, &find, r.x + r.w - 20, ry + 2, if node.danger >= 2 { GOLD } else { INK }, Align::Right);
                 if node.kind != Kind::Fight {
                     let p = a.ui.get("foundry/artifacts").map(|p| p.img.crop(0, 0, 16, 16).scaled(2));
                     if let Some(img) = p {
@@ -1039,8 +1251,7 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
             let x0 = (960 - n * cw - (n - 1) * gap) / 2;
             for (j, o) in offers.iter().enumerate() {
                 let r = Rect::new(x0 + j as i32 * (cw + gap), 126 + ui.rise_from(ui.opened, j), cw, 300);
-                let t0 = &o.units[0];
-                let (_, hit) = unit_card(ui, cv, a, cls, &format!("pick{j}"), r, t0, o.units.len(), "new", true);
+                let (_, hit) = offer_card(ui, cv, a, run, &format!("pick{j}"), r, o, "new", true);
                 if hit || ui.key(Key::Digit(j as u8 + 1)) {
                     act = Some(Act::Pick(i, Some(j)));
                 }
@@ -1078,7 +1289,7 @@ fn shop_screen(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, shop: &sim::r
     for (i, (o, sold)) in shop.offers.iter().enumerate() {
         let r = Rect::new(60 + i as i32 * (cw + gap), 74 + ui.rise(i), cw, 226);
         let can = !sold && run.money >= o.price;
-        let (_, hit) = unit_card(ui, cv, a, cls, &format!("off{i}"), r, &o.units[0], o.units.len(), "normal", !sold);
+        let (_, hit) = offer_card(ui, cv, a, run, &format!("off{i}"), r, o, "normal", !sold);
         if *sold {
             sold_stamp(ui, cv, a, r);
         } else {
@@ -1358,7 +1569,9 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
                 let (col, row) = (j % per, j / per);
                 let r = Rect::new(36 + col as i32 * (cw + gap), 84 + row as i32 * (ch + gap), cw, ch);
                 let broken = run.army[*m].broken;
-                let (_, hit) = unit_card(ui, cv, a, cls, &format!("cp{j}"), r, tt, *n, if broken { "broken" } else { "normal" }, true);
+                let _ = tt;
+                let (_, hit) = unit_card(ui, cv, a, cls, &format!("cp{j}"), r, &run.body(&run.army[*m]), *n, if broken { "broken" } else { "normal" }, true);
+                marks(ui, cv, a, run, r, &run.army[*m]);
                 if hit {
                     act = Some(Act::CampPick(*m));
                 }
@@ -1555,25 +1768,31 @@ fn army(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
     let r = Rect::new(40, 40, 880, 460);
     plate(ui, cv, a, cls, r);
     heading(cv, a, &t("army.title"), 480, r.y + 16, 24, cols(cls), Align::Center);
-    let mut gs: Vec<(Template, usize, bool)> = vec![];
-    for m in &run.army {
-        if let Some(g) = gs.iter_mut().find(|(t, _, b)| t.name == m.t.name && t.size == m.t.size && *b == m.broken) {
-            g.1 += 1;
-        } else {
-            gs.push((m.t.clone(), 1, m.broken));
+    // a card a golem (with its modules), a card a kind of the swarm (with its breed's mutations); the numbers as
+    // they go into battle
+    let mut gs: Vec<(usize, usize)> = vec![];
+    for (i, m) in run.army.iter().enumerate() {
+        if cls == Class::Swarm {
+            if let Some(g) = gs.iter_mut().find(|(j, _)| run.army[*j].t.name == m.t.name && run.army[*j].broken == m.broken) {
+                g.1 += 1;
+                continue;
+            }
         }
+        gs.push((i, 1));
     }
     let (cw, ch, gap) = (130, 170, 10);
     if gs.len() > 12 {
         let more: usize = gs[12..].iter().map(|g| g.1).sum();
         text(cv, a, &tf("army.more", &[("n", &more)]), r.x + r.w - 30, r.y + 30, MUTED, Align::Right);
     }
-    for (j, (tt, n, broken)) in gs.iter().enumerate().take(12) {
+    for (j, &(i, n)) in gs.iter().enumerate().take(12) {
+        let m = &run.army[i];
         let (col, row) = (j % 6, j / 6);
         let rc = Rect::new(r.x + 30 + col as i32 * (cw + gap), r.y + 56 + row as i32 * (ch + gap), cw, ch);
-        unit_card(ui, cv, a, cls, &format!("ar{j}"), rc, tt, *n, if *broken { "broken" } else { "normal" }, !broken);
-        if *broken {
-            text(cv, a, &t("card.broken"), rc.cx(), rc.y + 10, RED, Align::Center);
+        unit_card(ui, cv, a, cls, &format!("ar{j}"), rc, &run.body(m), n, if m.broken { "broken" } else { "normal" }, !m.broken);
+        marks(ui, cv, a, run, rc, m);
+        if m.broken {
+            text(cv, a, &t("card.broken"), rc.cx(), rc.y + 26, RED, Align::Center);
         }
     }
     let ay = r.y + r.h - 40;

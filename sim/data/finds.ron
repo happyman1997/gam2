@@ -1,0 +1,48 @@
+#![enable(implicit_some)]
+// Находки похода: модули Литейщика (ставятся на одного голема, в его ячейку) и мутации роя (их получает вся порода,
+// и будущий выводок тоже). key — имя значка в атласе (module_icons / swarm_icons) и ключ слов в игре; for — ключи
+// корпусов из units.ron, на которые модуль ставится ([] — на любой); give — что даёт: module — способность из
+// modules.ron, abilities / traits — прямо, hp / armor / bonus / range / speed — прибавки, dmg — новый тип урона.
+// Только то, что симуляция уже умеет; числа временные.
+(
+    modules: [
+        // Страж
+        (key: "intercept", for: ["strazh"], give: (abilities: [Intercept])),
+        (key: "plates", for: ["strazh"], give: (abilities: [Plates(3)])),
+        (key: "tower", for: ["strazh"], give: (armor: 2, speed: -1)),
+        (key: "counter", for: ["strazh"], give: (traits: [Thorns(die: 6)])),
+        // Мудрец
+        (key: "overload", for: ["mudrets"], give: (module: "peregruzka")),
+        (key: "fireball", for: ["mudrets"], give: (module: "ognenny_shar")),
+        (key: "a_coil", for: ["mudrets", "gorn", "izobretatel"], give: (module: "grozovaya_katushka")),
+        // Орудие
+        (key: "mortar", for: ["orudie"], give: (module: "mortira")),
+        (key: "canister", for: ["orudie"], give: (abilities: [PointBlank])),
+        (key: "long", for: ["orudie"], give: (range: 1)),
+        (key: "c_catapult", for: ["orudie", "manyak"], give: (module: "golova_katapulta")),
+        // Механик
+        (key: "repair", for: ["mekhanik"], give: (module: "remont")),
+        // любой корпус
+        (key: "flail", for: [], give: (abilities: [Flail])),
+        (key: "ram", for: [], give: (traits: [Charge])),
+        (key: "spark", for: [], give: (dmg: Shock, bonus: 1)),
+        (key: "torch", for: [], give: (dmg: Fire)),
+    ],
+    mutations: [
+        (key: "evo_formic", give: (dmg: Acid)),
+        (key: "evo_syringe", give: (traits: [Venom(die: 4)])),
+        (key: "evo_longspines", give: (traits: [Thorns(die: 3)])),
+        (key: "evo_lime", give: (armor: 1)),
+        (key: "evo_bosses", give: (hp: 3)),
+        (key: "evo_forked", give: (traits: [Charge])),
+        (key: "evo_saws", give: (traits: [TwinBlades], hp: -2)),
+        (key: "evo_longlegs", give: (speed: 1)),
+        (key: "evo_flyer", give: (traits: [Flyer])),
+        (key: "evo_farjump", give: (traits: [Leap])),
+        (key: "evo_phalanx", give: (traits: [Stroy])),
+        (key: "m_regen", give: (hp: 4)),
+        (key: "m_cutters", give: (bonus: 1)),
+        (key: "m_exploder", give: (traits: [BurstAcid(die: 4)])),
+        (key: "iron", give: (armor: 2, speed: -1)),
+    ],
+)

@@ -25,7 +25,13 @@ fn play_run(class: Class, leader: usize, seed: u64) -> (Run, f64) {
                     match rw {
                         Reward::Find(offers) => {
                             assert_eq!(offers.len(), 3);
-                            r.recruit(&offers[0]);
+                            // the first find that can go somewhere: bodies join, a part onto its first target
+                            for o in offers {
+                                let to = r.targets(o).into_iter().next();
+                                if (o.find == run::Find::Units || to.is_some()) && r.take_find(o, to.as_ref()) {
+                                    break;
+                                }
+                            }
                         }
                         other => {
                             if r.can_take(other) {
@@ -41,7 +47,8 @@ fn play_run(class: Class, leader: usize, seed: u64) -> (Run, f64) {
             Kind::Merchant => {
                 let mut shop = r.shop();
                 for i in 0..shop.offers.len() {
-                    r.buy_offer(&mut shop, i);
+                    let to = r.targets(&shop.offers[i].0).into_iter().next();
+                    r.buy_offer(&mut shop, i, to.as_ref());
                 }
                 r.buy_service(&mut shop);
                 r.left_stop();
@@ -66,6 +73,8 @@ fn runs_end() {
     for class in [Class::Foundry, Class::Swarm] {
         for leader in 0..4 {
             let (r, fork) = play_run(class, leader, 11 + leader as u64);
+            let mods: usize = r.army.iter().map(|m| m.mods.len()).sum();
+            eprintln!("  modules on golems {mods}, breeds mutated {}", r.breeds.len());
             eprintln!(
                 "{class:?} {}: {} after {} battles, army {}, money {}, artifacts {}, slowest fork {:.2} s",
                 class.leaders()[leader],
@@ -77,6 +86,10 @@ fn runs_end() {
                 fork
             );
             assert!(r.army.iter().any(|m| r.is_leader(m)), "the leader is never lost");
+            // every module sits on a golem it fits, within its cells
+            for m in &r.army {
+                assert!(m.mods.len() <= r.cells(m), "{} carries more modules than it has cells", m.t.name);
+            }
         }
     }
 }

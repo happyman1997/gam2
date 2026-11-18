@@ -135,6 +135,30 @@ pub struct Member {
     pub t: Template,
     /// A golem broken in battle: it sits battles out until repaired.
     pub broken: bool,
+    /// The modules put on it in the run (finds.ron keys), in its cells.
+    #[serde(default)]
+    pub mods: Vec<String>,
+}
+
+/// What a find is: bodies to take in, a module for a golem, a mutation for a breed.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum Find {
+    #[default]
+    Units,
+    Module(String),
+    Mutation(String),
+}
+
+/// Where a module or a mutation goes: a golem of the army (its index), a breed (its form's name).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Target {
+    Member(usize),
+    Form(String),
+}
+
+/// A body's breed: its form's name without the caste («Оса (рабочая)» → «Оса»).
+pub fn form_of(t: &Template) -> &str {
+    t.name.split(" (").next().unwrap_or(&t.name)
 }
 
 
@@ -145,6 +169,8 @@ pub struct Offer {
     pub key: String,
     pub units: Vec<Template>,
     pub price: i32,
+    #[serde(default)]
+    pub find: Find,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,6 +200,9 @@ pub struct Node {
     pub reward: i32,
     /// Which event (an Event road).
     pub event: usize,
+    /// How hard the battle is: 1 — the usual, 2 — dangerous (pays more, a rarer find), 3 — a boss.
+    #[serde(default)]
+    pub danger: u8,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -255,6 +284,9 @@ pub struct Run {
     /// The leader's member id: it always comes back from a battle and is never given away.
     pub leader_id: u32,
     pub artifacts: Vec<Artifact>,
+    /// The swarm's breeds and their mutations: (form, mutation key); every body of the form has them.
+    #[serde(default)]
+    pub breeds: Vec<(String, String)>,
     /// The roads to choose from now.
     pub path: Vec<Node>,
     /// A stop (trader, event, camp) was taken since the last battle: the next fork is battles only.
@@ -280,6 +312,7 @@ impl Run {
             army: vec![],
             next_id: 0,
             leader_id: 0,
+            breeds: vec![],
             artifacts: vec![],
             path: vec![],
             stopped: false,
@@ -303,7 +336,7 @@ impl Run {
     }
 
     fn add(&mut self, t: Template) {
-        self.army.push(Member { id: self.next_id, t, broken: false });
+        self.army.push(Member { id: self.next_id, t, broken: false, mods: vec![] });
         self.next_id += 1;
     }
 
@@ -338,14 +371,94 @@ impl Run {
                 continue;
             }
             used += c;
-            let mut t = m.t.clone();
-            for a in &self.artifacts {
-                a.apply(&mut t);
-            }
-            out.push(t);
+            out.push(self.body(m));
             idx.push(i);
         }
         (out, idx)
+    }
+
+    /// A member as it goes into battle: its modules, its breed's mutations, the artifacts on it.
+    pub fn body(&self, m: &Member) -> Template {
+        let mut t = m.t.clone();
+        let finds = data::finds();
+        for key in &m.mods {
+            if let Some(f) = finds.modules.iter().find(|f| &f.key == key) {
+                f.give.apply(&mut t);
+            }
+        }
+        let form = form_of(&m.t).to_string();
+        for (f, key) in &self.breeds {
+            if *f == form {
+                if let Some(mu) = finds.mutations.iter().find(|x| &x.key == key) {
+                    mu.give.apply(&mut t);
+                }
+            }
+        }
+        for a in &self.artifacts {
+            a.apply(&mut t);
+        }
+        t
+    }
+
+    /// How many modules a golem takes (its cells): the Father of the Colossus four, a big frame three, the rest two.
+    pub fn cells(&self, m: &Member) -> usize {
+        match data::unit_key(&m.t.name) {
+            Some("otets_kolossa") => 4,
+            _ if m.t.size >= 5 => 3,
+            _ => 2,
+        }
+    }
+
+    /// Whether a module can go on a member: the module made for its frame (or for any), a cell free, not on it yet.
+    pub fn fits(&self, i: usize, key: &str) -> bool {
+        let m = &self.army[i];
+        let Some(f) = data::finds().modules.iter().find(|f| f.key == key) else { return false };
+        let frame = data::unit_key(&m.t.name).unwrap_or("");
+        (f.frames.is_empty() || f.frames.iter().any(|x| x == frame)) && m.mods.len() < self.cells(m) && !m.mods.iter().any(|x| x == key) && (m.t.golem || !f.frames.is_empty())
+    }
+
+    /// The breeds of the army (not the leader), each once.
+    pub fn forms(&self) -> Vec<String> {
+        let mut out: Vec<String> = vec![];
+        for m in &self.army {
+            if self.is_leader(m) {
+                continue;
+            }
+            let f = form_of(&m.t).to_string();
+            if !out.contains(&f) {
+                out.push(f);
+            }
+        }
+        out
+    }
+
+    /// Where a find can go: the golems a module fits, the breeds without this mutation; none for bodies (they join).
+    pub fn targets(&self, o: &Offer) -> Vec<Target> {
+        match &o.find {
+            Find::Units => vec![],
+            Find::Module(k) => (0..self.army.len()).filter(|&i| self.fits(i, k)).map(Target::Member).collect(),
+            Find::Mutation(k) => self.forms().into_iter().filter(|f| !self.breeds.iter().any(|(x, y)| x == f && y == k)).map(Target::Form).collect(),
+        }
+    }
+
+    /// A find taken: bodies join; a module goes into a golem's cell; a mutation onto a breed. False if it can't go
+    /// where it was asked.
+    pub fn take_find(&mut self, o: &Offer, to: Option<&Target>) -> bool {
+        match (&o.find, to) {
+            (Find::Units, _) => {
+                self.recruit(o);
+                true
+            }
+            (Find::Module(k), Some(Target::Member(i))) if *i < self.army.len() && self.fits(*i, k) => {
+                self.army[*i].mods.push(k.clone());
+                true
+            }
+            (Find::Mutation(k), Some(Target::Form(f))) if !self.breeds.iter().any(|(x, y)| x == f && y == k) => {
+                self.breeds.push((f.clone(), k.clone()));
+                true
+            }
+            _ => false,
+        }
     }
 
     pub fn is_leader(&self, m: &Member) -> bool {
@@ -373,22 +486,64 @@ impl Run {
 
     /// The enemy for a battle of `kind`: a base (a leader's army for a boss) and a ladder of additions; the longest
     /// prefix the player still beats `target` of the time.
-    fn enemy(&mut self, kind: Kind) -> (Vec<Template>, String) {
+    fn enemy(&mut self, kind: Kind, danger: u8) -> (Vec<Template>, String) {
         let fight = self.next_fight();
-        // one battle lost ends the run: each must be won nearly always, the risk is in what it costs
-        let target = match kind {
-            Kind::Boss => 0.75,
-            Kind::Elite => 0.85,
+        // one battle lost ends the run: each must be won nearly always, the risk is in what it costs; a dangerous
+        // road a little less
+        let target = match (kind, danger) {
+            (Kind::Boss, _) => 0.75,
+            (Kind::Elite, _) => 0.85,
+            (_, 2) => 0.9 - 0.004 * fight as f32,
             _ => 0.97 - 0.004 * fight as f32,
         };
-        let (base, key) = if kind == Kind::Boss {
+        // a boss: the other class's leader, then its own army a step at a time, then more of its kind — fitted like
+        // any enemy (a whole start army can be more than a small army can beat)
+        let mut ladder: Vec<Vec<Template>> = vec![];
+        let (base, key): (Vec<Template>, String) = if kind == Kind::Boss {
             let leaders = self.class.other().leaders();
             let k = leaders[self.roll(4)];
-            (data::army(k), k.to_string())
+            let mut army = data::army(k);
+            let lead = army.iter().position(|t| t.has(Trait::Leader)).or_else(|| (0..army.len()).max_by_key(|&i| army[i].size)).unwrap_or(0);
+            let leader = army.remove(lead);
+            let mut small: Vec<Template> = vec![];
+            for t in army {
+                if t.size <= 2 {
+                    small.push(t);
+                    if small.len() == 3 {
+                        ladder.push(std::mem::take(&mut small));
+                    }
+                } else {
+                    ladder.push(vec![t]);
+                }
+            }
+            if !small.is_empty() {
+                ladder.push(small);
+            }
+            (vec![leader], k.to_string())
         } else {
             (vec![], if self.class == Class::Foundry { "swarm".to_string() } else { "golems".to_string() })
         };
-        let mut ladder = self.ladder(kind, 28);
+        // the ladder's first step decides the weakest enemy there can be: if the player can't beat it often enough
+        // (a Guard against ants that can't get through its iron), a few other ladders are tried and the one whose
+        // first step is beaten most often is kept
+        let lead_steps = ladder.len();
+        let mut best: Option<(f32, Vec<Vec<Template>>)> = None;
+        for _ in 0..4 {
+            let mut l = ladder.clone();
+            l.extend(self.ladder(kind, 28));
+            let mut first = base.clone();
+            if base.is_empty() || lead_steps == 0 {
+                first.extend(l[0].iter().cloned());
+            }
+            let rate = self.win_rate(&first, 12);
+            if best.as_ref().is_none_or(|(r, _)| rate > *r) {
+                best = Some((rate, l));
+            }
+            if rate >= target {
+                break;
+            }
+        }
+        let mut ladder = best.map(|b| b.1).unwrap_or_default();
         // no more than the deployment zone holds — those that find no room would not fight, and the fitting would
         // count them
         let room = ROOM;
@@ -485,17 +640,24 @@ impl Run {
                 self.path.push(a);
                 self.path.push(b);
             } else {
-                let (enemy, key) = self.enemy(Kind::Boss);
-                self.path.push(Node { kind: Kind::Boss, enemy, enemy_key: key, reward: 25 + fight as i32, event: 0 });
+                let (enemy, key) = self.enemy(Kind::Boss, 3);
+                self.path.push(Node { kind: Kind::Boss, enemy, enemy_key: key, reward: 25 + fight as i32, event: 0, danger: 3 });
             }
             return;
         }
+        // two battles: the usual one and a harder one — an elite (an artifact) from the third battle on, else a
+        // dangerous road (more currency, a rarer find)
         let elite = fight >= 3 && self.roll(2) == 0;
         for k in 0..2 {
             let kind = if k == 1 && elite { Kind::Elite } else { Kind::Fight };
-            let (enemy, key) = self.enemy(kind);
-            let reward = if kind == Kind::Elite { 14 } else { 7 } + fight as i32 / 2;
-            self.path.push(Node { kind, enemy, enemy_key: key, reward, event: 0 });
+            let danger = if k == 1 { 2 } else { 1 };
+            let (enemy, key) = self.enemy(kind, danger);
+            let reward = match (kind, danger) {
+                (Kind::Elite, _) => 14,
+                (_, 2) => 11,
+                _ => 7,
+            } + fight as i32 / 2;
+            self.path.push(Node { kind, enemy, enemy_key: key, reward, event: 0, danger });
         }
         if !self.stopped && fight > 1 {
             let kind = [Kind::Merchant, Kind::Event, Kind::Event, Kind::Camp][self.roll(4)];
@@ -510,7 +672,7 @@ impl Run {
             let fit: Vec<usize> = (0..EVENTS.len()).filter(|&i| EVENTS[i].1.is_none_or(|c| c == self.class)).collect();
             event = fit[self.roll(fit.len())];
         }
-        Node { kind, enemy: vec![], enemy_key: String::new(), reward: 0, event }
+        Node { kind, enemy: vec![], enemy_key: String::new(), reward: 0, event, danger: 0 }
     }
 
     /// A stop taken: the next fork has battles only.
@@ -568,7 +730,7 @@ impl Run {
             }
             _ => {}
         }
-        let find = self.find(3, node.kind == Kind::Boss);
+        let find = self.find(3, node.kind == Kind::Boss || node.danger >= 2);
         rewards.push(Reward::Find(find));
         if node.kind != Kind::Fight {
             rewards.push(Reward::Artifact(self.new_artifact()));
@@ -634,18 +796,51 @@ impl Run {
         free[self.roll(free.len())]
     }
 
-    /// `n` recruits of the player's class, different from each other.
+    /// `n` finds of the player's class, different from each other: a module or a mutation (as long as the army has
+    /// somewhere to put it) for every two of three, bodies for the rest.
     pub fn find(&mut self, n: usize, rare: bool) -> Vec<Offer> {
         let mut out: Vec<Offer> = vec![];
         let mut guard = 0;
-        while out.len() < n && guard < 50 {
+        while out.len() < n && guard < 60 {
             guard += 1;
-            let o = self.offer(rare);
+            let want_part = out.len() % 3 != 2;
+            // a part, if there is a new one to offer; else bodies
+            let part = if want_part { self.part().filter(|p| out.iter().all(|x| x.key != p.key)) } else { None };
+            let o = part.unwrap_or_else(|| self.offer(rare));
             if out.iter().all(|x| x.key != o.key) {
                 out.push(o);
             }
         }
         out
+    }
+
+    /// A module (the Foundry) or a mutation (the swarm) the army can take now, if there is one.
+    fn part(&mut self) -> Option<Offer> {
+        let finds = data::finds();
+        match self.class {
+            Class::Foundry => {
+                let fit: Vec<&str> = finds.modules.iter().filter(|f| (0..self.army.len()).any(|i| self.fits(i, &f.key))).map(|f| f.key.as_str()).collect();
+                if fit.is_empty() {
+                    return None;
+                }
+                let k = fit[self.roll(fit.len())].to_string();
+                Some(Offer { key: k.clone(), units: vec![], price: 10 + self.roll(5) as i32, find: Find::Module(k) })
+            }
+            Class::Swarm => {
+                let forms = self.forms();
+                let fit: Vec<&str> = finds
+                    .mutations
+                    .iter()
+                    .filter(|m| forms.iter().any(|f| !self.breeds.iter().any(|(x, y)| x == f && *y == m.key)))
+                    .map(|m| m.key.as_str())
+                    .collect();
+                if fit.is_empty() {
+                    return None;
+                }
+                let k = fit[self.roll(fit.len())].to_string();
+                Some(Offer { key: k.clone(), units: vec![], price: 9 + self.roll(5) as i32, find: Find::Mutation(k) })
+            }
+        }
     }
 
     fn offer(&mut self, rare: bool) -> Offer {
@@ -655,7 +850,7 @@ impl Run {
                 let g = self.golem(module);
                 let key = data::unit_key(&g.name).unwrap_or("golem").to_string();
                 let price = 8 + g.size as i32 + g.abilities.len() as i32 * 2;
-                Offer { key, units: vec![g], price }
+                Offer { key, units: vec![g], price, find: Find::Units }
             }
             Class::Swarm => {
                 let form = data::FORMS[self.roll(data::FORMS.len())];
@@ -664,13 +859,23 @@ impl Run {
                 let units: Vec<Template> = (0..n).map(|_| data::swarm(c, form)).collect();
                 let key = format!("{form:?}.{}", if soldier { "soldier" } else { "worker" });
                 let price = units.len() as i32 * if soldier { 4 } else { 2 };
-                Offer { key, units, price }
+                Offer { key, units, price, find: Find::Units }
             }
         }
     }
 
     pub fn shop(&mut self) -> Shop {
-        let offers = self.find(4, false).into_iter().map(|o| (o, false)).collect();
+        let mut offers: Vec<(Offer, bool)> = vec![];
+        for _ in 0..8 {
+            if offers.len() >= 4 {
+                break;
+            }
+            let part = if offers.len() >= 2 { self.part().filter(|p| offers.iter().all(|(x, _)| x.key != p.key)) } else { None };
+            let o = part.unwrap_or_else(|| self.offer(false));
+            if offers.iter().all(|(x, _)| x.key != o.key) {
+                offers.push((o, false));
+            }
+        }
         let mut artifacts = vec![];
         for _ in 0..2 {
             let a = self.new_artifact();
@@ -686,13 +891,16 @@ impl Run {
         Shop { offers, artifacts, service, service_used: false }
     }
 
-    pub fn buy_offer(&mut self, shop: &mut Shop, i: usize) -> bool {
+    /// A good bought: bodies join; a module or a mutation goes where `to` says (and is not sold if it can't).
+    pub fn buy_offer(&mut self, shop: &mut Shop, i: usize, to: Option<&Target>) -> bool {
         let Some((o, sold)) = shop.offers.get(i).cloned() else { return false };
         if sold || self.money < o.price {
             return false;
         }
+        if !self.take_find(&o, to) {
+            return false;
+        }
         self.money -= o.price;
-        self.recruit(&o);
         shop.offers[i].1 = true;
         true
     }
