@@ -1,5 +1,5 @@
-//! Whole runs played by a simple bot (the first road, every spoil taken, the first find, what it can afford at the
-//! trader, the first event option it can take, rest at camp): a run goes from the first battle to its end for every
+//! Whole runs played by a simple bot (the first road, every spoil taken, the first find, an evolution when it can,
+//! what it can afford at the trader, the first event option it can take, rest at camp): a run goes from the first battle to its end for every
 //! leader of both classes; the forks are quick enough to build between screens.
 
 use sim::run::{self, Class, Kind, Reward, Run};
@@ -43,6 +43,14 @@ fn play_run(class: Class, leader: usize, seed: u64) -> (Run, f64) {
                             if r.can_take(other) {
                                 r.take(other)
                             }
+                        }
+                    }
+                }
+                // the swarm: an evolution for the first form that has one left, when the biomass is there
+                for f in r.forms() {
+                    if let Some(e) = Run::evolutions(&f).iter().find(|e| !r.breeds.iter().any(|(x, k)| *x == f && k == &e.key)) {
+                        if r.evolve(&f, &e.key) {
+                            break;
                         }
                     }
                 }
@@ -212,4 +220,50 @@ fn modules_level_move_and_melt() {
     // with no metal there is no melting
     r.money = 0;
     assert!(!r.can_melt(mech, 0, mech, 0));
+}
+
+/// The swarm: evolutions are a form's own and bought with biomass, dearer each time, never found; a leader's own
+/// mutations come only with that leader, the common ones with any.
+#[test]
+fn evolutions_and_leader_pools() {
+    use sim::run::{Find, EVO_PRICE, EVO_STEP};
+    // every leader of the swarm: what its finds offer, over many
+    let mut seen: Vec<Vec<String>> = vec![];
+    for leader in 0..4 {
+        let mut r = Run::new(Class::Swarm, leader, 4);
+        let mut keys = vec![];
+        for _ in 0..200 {
+            for o in r.find(3, false) {
+                if let Find::Mutation(k) = o.find {
+                    keys.push(k);
+                }
+            }
+        }
+        keys.sort();
+        keys.dedup();
+        let own = r.leader_key().to_string();
+        for k in &keys {
+            let m = sim::data::finds().mutations.iter().find(|m| &m.key == k).unwrap();
+            assert!(m.form.is_none(), "{k}: an evolution offered as a find");
+            assert!(m.leader.as_deref().is_none_or(|l| l == own), "{k}: another leader's mutation with {own}");
+        }
+        assert!(keys.iter().any(|k| sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.as_deref() == Some(own.as_str()))), "{own}: its own pool never offered");
+        seen.push(keys);
+    }
+    // evolutions: the ant's, bought dearer each time; another form's not for the ant; no biomass, no evolution
+    let mut r = Run::new(Class::Swarm, 0, 4);
+    let ant = "Муравей";
+    assert!(r.forms().iter().any(|f| f == ant));
+    r.money = 100;
+    assert_eq!(r.evo_price(ant), EVO_PRICE);
+    assert!(!r.evolve(ant, "evo_syringe"), "a wasp's evolution on the ant");
+    assert!(r.evolve(ant, "evo_formic"));
+    assert!(!r.evolve(ant, "evo_formic"), "the same evolution twice");
+    assert_eq!(r.money, 100 - EVO_PRICE);
+    assert_eq!(r.evo_price(ant), EVO_PRICE + EVO_STEP);
+    // the ants are acid now, in battle
+    let m = r.army.iter().find(|m| sim::run::form_of(&m.t) == ant && !r.is_leader(m)).unwrap();
+    assert_eq!(r.body(m).dmg, sim::model::Dmg::Acid);
+    r.money = EVO_PRICE + EVO_STEP - 1;
+    assert!(!r.evolve(ant, "evo_phalanx"), "an evolution without the biomass for it");
 }

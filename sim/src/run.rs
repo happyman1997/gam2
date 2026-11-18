@@ -147,6 +147,9 @@ pub struct Member {
 pub const MAX_LEVEL: u8 = 3;
 /// Metal a melting costs (CONCEPT.md, «Переплавка»).
 pub const MELT: i32 = 3;
+/// Biomass a form's first evolution costs, and how much more each next one.
+pub const EVO_PRICE: i32 = 8;
+pub const EVO_STEP: i32 = 4;
 
 impl Member {
     /// The level of its `j`-th module (1–3).
@@ -537,7 +540,14 @@ impl Run {
         match &o.find {
             Find::Units => vec![],
             Find::Module(k) => (0..self.army.len()).filter(|&i| self.fits(i, k) || self.raises(i, k)).map(Target::Member).collect(),
-            Find::Mutation(k) => self.forms().into_iter().filter(|f| !self.breeds.iter().any(|(x, y)| x == f && y == k)).map(Target::Form).collect(),
+            Find::Mutation(k) => {
+                let only = data::finds().mutations.iter().find(|m| &m.key == k).and_then(|m| m.form.clone());
+                self.forms()
+                    .into_iter()
+                    .filter(|f| only.as_ref().is_none_or(|o| o == f) && !self.breeds.iter().any(|(x, y)| x == f && y == k))
+                    .map(Target::Form)
+                    .collect()
+            }
         }
     }
 
@@ -560,12 +570,38 @@ impl Run {
                 self.army[*i].put(k.clone(), 1);
                 true
             }
-            (Find::Mutation(k), Some(Target::Form(f))) if !self.breeds.iter().any(|(x, y)| x == f && y == k) => {
+            (Find::Mutation(k), Some(to @ Target::Form(f))) if self.targets(o).contains(to) => {
                 self.breeds.push((f.clone(), k.clone()));
                 true
             }
             _ => false,
         }
+    }
+
+    /// A form's evolutions (CONCEPT.md, «Эволюция форм»).
+    pub fn evolutions(form: &str) -> Vec<&'static data::MutationFind> {
+        data::finds().mutations.iter().filter(|m| m.form.as_deref() == Some(form)).collect()
+    }
+
+    /// What the next evolution of a form costs: each one more than the last.
+    pub fn evo_price(&self, form: &str) -> i32 {
+        let had = self.breeds.iter().filter(|(f, k)| f == form && Run::evolutions(form).iter().any(|e| &e.key == k)).count();
+        EVO_PRICE + EVO_STEP * had as i32
+    }
+
+    /// A form evolved: every body of it, now and to come, for biomass.
+    pub fn evolve(&mut self, form: &str, key: &str) -> bool {
+        let price = self.evo_price(form);
+        let ok = self.class == Class::Swarm
+            && self.money >= price
+            && self.forms().iter().any(|f| f == form)
+            && Run::evolutions(form).iter().any(|e| e.key == key)
+            && !self.breeds.iter().any(|(f, k)| f == form && k == key);
+        if ok {
+            self.money -= price;
+            self.breeds.push((form.to_string(), key.to_string()));
+        }
+        ok
     }
 
     /// The workshop at the camp: a module moved from one golem to another (free) — where it fits, a cell free.
@@ -965,7 +1001,8 @@ impl Run {
         let finds = data::finds();
         match self.class {
             Class::Foundry => {
-                let fit: Vec<&str> = finds.modules.iter().filter(|f| (0..self.army.len()).any(|i| self.fits(i, &f.key))).map(|f| f.key.as_str()).collect();
+                let fit: Vec<&str> =
+                    finds.modules.iter().filter(|f| (0..self.army.len()).any(|i| self.fits(i, &f.key) || self.raises(i, &f.key))).map(|f| f.key.as_str()).collect();
                 if fit.is_empty() {
                     return None;
                 }
@@ -974,9 +1011,12 @@ impl Run {
             }
             Class::Swarm => {
                 let forms = self.forms();
+                let leader = self.leader_key();
+                // the common pool and the leader's own; evolutions are bought, not found
                 let fit: Vec<&str> = finds
                     .mutations
                     .iter()
+                    .filter(|m| m.form.is_none() && m.leader.as_deref().is_none_or(|l| l == leader))
                     .filter(|m| forms.iter().any(|f| !self.breeds.iter().any(|(x, y)| x == f && *y == m.key)))
                     .map(|m| m.key.as_str())
                     .collect();

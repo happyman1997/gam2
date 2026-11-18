@@ -30,6 +30,9 @@ pub enum Act {
     OpenFind(usize),
     /// The camp's workshop opened (the Foundry).
     Workshop,
+    /// The swarm's evolutions opened; a form evolved: (form, evolution).
+    Evolution,
+    Evolve(String, String),
     /// A cell of a golem clicked in the workshop: (member, cell).
     Socket(usize, usize),
     Pick(usize, Option<usize>),
@@ -295,6 +298,7 @@ fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: R
     }
     let kind = match &o.find {
         Find::Module(k) => format!("{} · {}", t("find.module"), module_for(k)),
+        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.is_some()) => t("find.pool"),
         _ => t("find.mutation"),
     };
     for l in font.wrap(&kind, r.w - 16).into_iter().take(2) {
@@ -657,6 +661,7 @@ impl Game {
                 Overlay::Settings => settings(ui, cv, a, cls, &self.settings),
                 Overlay::Army => self.run.as_ref().and_then(|r| army(ui, cv, a, r)),
                 Overlay::About => about(ui, cv, a, cls),
+                Overlay::Evolution => self.run.as_ref().and_then(|r| evolution(ui, cv, a, r)),
             };
             if r.is_some() {
                 act = r;
@@ -708,6 +713,17 @@ impl Game {
             Act::Army => {
                 self.overlays.push(Overlay::Army);
                 self.ui.opened = self.ui.t;
+            }
+            Act::Evolution => {
+                self.overlays.push(Overlay::Evolution);
+                self.ui.opened = self.ui.t;
+            }
+            Act::Evolve(form, key) => {
+                if let Some(run) = &mut self.run {
+                    if run.evolve(&form, &key) {
+                        self.demo.ui_sound("heal");
+                    }
+                }
             }
             Act::Quit => self.quit = true,
             Act::ToLeaders(c) => self.go(Screen::Leaders { class: c, chosen: 0 }),
@@ -1339,6 +1355,10 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
     if ui.action(cv, a, cls, "next", 652, 478, &t("rewards.next"), true) || ui.key(Key::Enter) {
         act = Some(Act::LeaveRewards);
     }
+    // the swarm spends its biomass on its forms right here, as the brood hatches
+    if cls == Class::Swarm && pick.is_none() && ui.minor(cv, a, cls, "evo", 300, 484, &t("evo.open"), true) {
+        act = Some(Act::Evolution);
+    }
     // the find: three cards over the screen, or none
     if let Some(i) = pick {
         ui.blocked = outer;
@@ -1664,12 +1684,14 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
                     act = Some(if i == 0 { Act::CampRest } else { Act::CampUp });
                 }
             }
-            // the Foundry's workshop: free, and the choice above still there after it
+            // the Foundry's workshop, the swarm's evolutions: the choice above still there after them
             if cls == Class::Foundry {
                 let any = run.army.iter().any(|m| !m.mods.is_empty());
                 if ui.minor(cv, a, cls, "workshop", 14, 484, &t("ws.open"), any) {
                     act = Some(Act::Workshop);
                 }
+            } else if ui.minor(cv, a, cls, "evo", 14, 484, &t("evo.open"), true) {
+                act = Some(Act::Evolution);
             }
         }
         CampStage::Workshop { held } => {
@@ -1714,6 +1736,9 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
             }
             if cls == Class::Foundry && ui.minor(cv, a, cls, "workshop", 14, 484, &t("ws.open"), run.army.iter().any(|m| !m.mods.is_empty())) {
                 act = Some(Act::Workshop);
+            }
+            if cls == Class::Swarm && ui.minor(cv, a, cls, "evo", 14, 484, &t("evo.open"), true) {
+                act = Some(Act::Evolution);
             }
         }
     }
@@ -1818,6 +1843,79 @@ fn workshop(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, held: Option<(us
     // the module held follows the mouse
     if let Some(k) = &held_key {
         ui.icon(cv, a, &format!("module/{k}"), ui.mx - 16, ui.my - 16, 2, 0.85);
+    }
+    if let Some(lines) = tip {
+        ui.tooltip(lines);
+    }
+    act
+}
+
+/// The swarm's evolutions: each form of the army with its own, what the next costs; one clicked is bought (the whole
+/// breed, the brood to come too).
+fn evolution(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
+    let cls = run.class;
+    let r = Rect::new(40, 40, 880, 460);
+    plate(ui, cv, a, cls, r);
+    heading(cv, a, &t("evo.title"), 480, r.y + 16, 24, cols(cls), Align::Center);
+    text(cv, a, &t("evo.sub"), 480, r.y + 50, MUTED, Align::Center);
+    let mut act = None;
+    let forms: Vec<String> = run.forms().into_iter().filter(|f| !Run::evolutions(f).is_empty()).collect();
+    if forms.is_empty() {
+        text(cv, a, &t("evo.none"), 480, r.y + 140, PALE, Align::Center);
+    }
+    let font = &a.fonts["text16"];
+    let mut tip = None;
+    for (i, form) in forms.iter().enumerate().take(5) {
+        let y = r.y + 80 + i as i32 * 62 + ui.rise_from(ui.opened, i);
+        // the form: a body of it, its name, what its next evolution costs
+        if let Some(m) = run.army.iter().find(|m| form_of(&m.t) == form && !run.is_leader(m)) {
+            let mut pic = Image::clear(60, 60);
+            small(&mut pic, a, &m.t, 30, 54, false, false);
+            cv.blit(&pic, r.x + 24, y - 4, false, 1.0);
+        }
+        font.draw(cv, form, r.x + 92, y + 6, ACID2, Some(EDGE), Align::Left, 1.0);
+        let price = run.evo_price(form);
+        let can_pay = run.money >= price;
+        ui.icon(cv, a, currency_icon(cls), r.x + 92, y + 30, 2, 1.0);
+        a.fonts["title16"].draw(cv, &price.to_string(), r.x + 116, y + 30, if can_pay { GOLD } else { RED }, Some(EDGE), Align::Left, 1.0);
+        for (j, e) in Run::evolutions(form).iter().enumerate() {
+            let tile = Rect::new(r.x + 200 + j as i32 * 222, y, 212, 52);
+            let taken = run.breeds.iter().any(|(f, k)| f == form && k == &e.key);
+            let on = !taken && can_pay;
+            let (over, k) = ui.hot(&format!("evo{i}_{j}"), tile);
+            let rim: [u8; 4] = if taken {
+                [255, 200, 90, 255]
+            } else if over && on {
+                [170, 240, 90, 255]
+            } else {
+                [96, 80, 110, 255]
+            };
+            cv.fill(tile.x - 1, tile.y - 1, tile.w + 2, tile.h + 2, rim);
+            cv.fill(tile.x, tile.y, tile.w, tile.h, if taken { [40, 32, 18, 255] } else { [18, 14, 22, 255] });
+            if on {
+                cv.glow(tile.x as f32 + 26.0, tile.cy() as f32, 30.0, [150, 230, 70], 0.1 + 0.2 * k);
+            }
+            ui.icon(cv, a, &format!("swarm/{}", e.key), tile.x + 8, tile.y + 10, 2, if taken || on { 1.0 } else { 0.45 });
+            let name = t(&format!("find.{}", e.key));
+            let lines = font.wrap(&name, tile.w - 56);
+            let mut ly = tile.y + if lines.len() > 1 { 2 } else { 8 };
+            for l in lines.iter().take(2) {
+                font.draw(cv, l, tile.x + 48, ly, if taken { GOLD } else if on { INK } else { MUTED }, Some(EDGE), Align::Left, 1.0);
+                ly += 18;
+            }
+            if taken {
+                font.draw(cv, &t("evo.taken"), tile.x + tile.w - 8, tile.y + tile.h - 20, GOLD, Some(EDGE), Align::Right, 1.0);
+            }
+            if over {
+                tip = Some(vec![(name, GOLD), (t(&format!("find.{}.l", e.key)), BLUE)]);
+            }
+            if on && ui.clicked(tile) {
+                act = Some(Act::Evolve(form.clone(), e.key.clone()));
+            }
+        }
+    }
+    if ui.minor(cv, a, cls, "evoback", 410, 452, &t("back"), true) {
+        act = Some(Act::CloseOverlay);
     }
     if let Some(lines) = tip {
         ui.tooltip(lines);

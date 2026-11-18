@@ -104,6 +104,8 @@ pub enum Overlay {
     Settings,
     Army,
     About,
+    /// The swarm's evolutions of its forms, for biomass (from the spoils and the Hive).
+    Evolution,
 }
 
 pub struct Game {

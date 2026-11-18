@@ -394,6 +394,39 @@ mod flow {
         assert!(matches!(g.screen, Screen::Camp { stage: CampStage::Done, .. }));
     }
 
+    /// The swarm's evolutions from its spoils, by the mouse: the first evolution of the first form bought for its
+    /// biomass, a second click on it does nothing.
+    #[test]
+    fn evolution_by_the_mouse() {
+        use sim::run::{Run, EVO_PRICE};
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        let mut run = Run::new(Class::Swarm, 0, 4);
+        run.money = 50;
+        let form = run.forms().into_iter().find(|f| !Run::evolutions(f).is_empty()).expect("a form with evolutions");
+        let key = Run::evolutions(&form)[0].key.clone();
+        g.run = Some(run);
+        g.screen = Screen::Rewards { list: vec![], pick: None };
+        frame(&mut g);
+        g.apply(Act::Evolution);
+        for _ in 0..14 {
+            frame(&mut g);
+        }
+        // the first tile of the first row, as the overlay lays them out
+        for _ in 0..2 {
+            g.ui.mx = 40 + 200 + 106;
+            g.ui.my = 40 + 80 + 26;
+            frame(&mut g);
+            g.ui.mouse_down();
+            g.ui.mouse_up();
+            frame(&mut g);
+        }
+        let r = g.run.as_ref().unwrap();
+        assert!(r.breeds.contains(&(form.clone(), key.clone())), "{form}: {key} not bought");
+        assert_eq!(r.money, 50 - EVO_PRICE, "bought twice, or not paid");
+        g.apply(Act::CloseOverlay);
+        assert!(g.overlays.is_empty());
+    }
+
     /// A run of each class walked through every kind of screen by the screens' own acts — roads, battles, spoils,
     /// the find, the trader, events, the camp — each screen drawn on the way, to its end.
     #[test]

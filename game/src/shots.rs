@@ -90,6 +90,23 @@ pub fn run(demo: Demo, dir: &str) {
         let find = list.iter().position(|(r, _)| matches!(r, Reward::Find(_))).unwrap_or(0);
         set(&mut g, Screen::Rewards { list: list.clone(), pick: None });
         snap(&mut g, dir, &format!("11_{tag}_rewards"), (480, 200));
+        // the swarm's evolutions over its spoils: one taken already, the rest for biomass
+        if cls == Class::Swarm {
+            let mut r7 = r2.clone();
+            r7.money = 200;
+            if let Some(f) = r7.forms().into_iter().find(|f| !Run::evolutions(f).is_empty()) {
+                let k = Run::evolutions(&f)[0].key.clone();
+                r7.evolve(&f, &k);
+            }
+            r7.money = 14;
+            g.run = Some(r7);
+            set(&mut g, Screen::Rewards { list: list.clone(), pick: None });
+            g.overlays.push(Overlay::Evolution);
+            g.ui.opened = g.ui.t;
+            snap(&mut g, dir, &format!("11c_{tag}_evolution"), (520, 140));
+            g.overlays.clear();
+            g.run = Some(r2.clone());
+        }
         set(&mut g, Screen::Rewards { list: list.clone(), pick: Some(find) });
         snap(&mut g, dir, &format!("12_{tag}_find"), (480, 280));
         // a module or a mutation of the find being given its place

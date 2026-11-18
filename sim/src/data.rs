@@ -176,10 +176,15 @@ pub struct ModuleFind {
     pub give: Give,
 }
 
-/// A mutation of the swarm: the whole breed takes it.
+/// A mutation of the swarm: the whole breed takes it. An evolution is one form's (`form`, its name) and is bought
+/// with biomass, not found; a mutation of a leader's pool (`leader`, its key in units.ron) comes only with that leader.
 #[derive(Clone, Debug, Deserialize)]
 pub struct MutationFind {
     pub key: String,
+    #[serde(default)]
+    pub form: Option<String>,
+    #[serde(default)]
+    pub leader: Option<String>,
     pub give: Give,
 }
 
@@ -370,6 +375,18 @@ pub fn check() -> Result<(), String> {
                 if !DATA.units.contains_key(u) {
                     return Err(format!("{at}: no unit \"{u}\" in units.ron"));
                 }
+            }
+        }
+    }
+    for m in &DATA.finds.mutations {
+        if let Some(f) = &m.form {
+            if !DATA.swarm.forms.iter().any(|d| &d.name == f) {
+                return Err(format!("finds.ron \"{}\": no form \"{f}\" in swarm.ron", m.key));
+            }
+        }
+        if let Some(l) = &m.leader {
+            if !DATA.units.contains_key(l) {
+                return Err(format!("finds.ron \"{}\": no leader \"{l}\" in units.ron", m.key));
             }
         }
     }
