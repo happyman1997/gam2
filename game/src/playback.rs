@@ -4,6 +4,7 @@
 
 use sim::data::{start_izobretatel, start_pozhiratel};
 use sim::model::{Template, Trait};
+use crate::text::t as t_;
 use sim::{Battle, Event, Outcome};
 
 pub const FR: i32 = 30; // frames a round takes at ×1 (24 fps)
@@ -402,7 +403,7 @@ impl Record {
                         // a sum never shows more than the unit had: three shells into one ant are not "−86"
                         let value = value.min(self.units[t].max_hp.max(1));
                         let text = match style {
-                            NumStyle::Miss => "мимо".to_string(),
+                            NumStyle::Miss => t_("num.miss"),
                             NumStyle::Crit => format!("{value}!"),
                             NumStyle::Hurt => format!("-{value}"),
                             _ => format!("{value}"),
@@ -439,7 +440,11 @@ impl Record {
                         if let Some(j) = nums.iter().rposition(|n: &Number| n.t == t && n.style == NumStyle::Miss && m.frame - n.start < 14) {
                             nums[j].end = m.frame;
                         }
-                        nums.push(Number { text: "мимо".into(), style: NumStyle::Miss, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                        nums.push(Number { text: t_("num.miss"), style: NumStyle::Miss, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                    }
+                    Event::Stun { t } => {
+                        let (x, y) = at(t);
+                        nums.push(Number { text: t_("num.stun"), style: NumStyle::Miss, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
                     }
                     _ => {}
                 }

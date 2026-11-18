@@ -110,6 +110,9 @@ pub fn ability_name(ab: &Ability) -> String {
         Ability::Mark { .. } => "ab.mark",
         Ability::Overload { .. } => "ab.overload",
         Ability::Fireball { .. } => "ab.fireball",
+        Ability::Quake { .. } => "ab.quake",
+        Ability::Augment => "ab.augment",
+        Ability::Tinker { .. } => "ab.tinker",
     };
     t(k)
 }
@@ -304,6 +307,39 @@ fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: R
         y += 18;
     }
     (over, hit)
+}
+
+/// A way for the leader to grow: the leader, what it becomes, the words of it. True when clicked.
+fn growth_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: Rect, key: &str) -> bool {
+    let cls = run.class;
+    let (_, k, hit) = ui.card(cv, a, cls, id, r, "rare", true);
+    let r = r.shift(0, -(k * 4.0).round() as i32);
+    let pedestal = r.y + 128;
+    let g = if cls == Class::Foundry { [255, 170, 70] } else { [150, 230, 70] };
+    cv.glow(r.cx() as f32, (pedestal - 40) as f32, 70.0, g, 0.16 + 0.14 * k + 0.04 * (ui.t * 2.5).sin());
+    cv.shadow(r.cx() as f32, pedestal as f32, 90.0, 10.0);
+    if let Some(m) = run.army.iter().find(|m| run.is_leader(m)) {
+        let inner = r.inset(6);
+        let mut pic = Image::clear(inner.w, pedestal - inner.y + 6);
+        portrait(ui, &mut pic, a, &m.t, r.cx() - inner.x, pedestal - inner.y, 1.0, false);
+        cv.blit(&pic, inner.x, inner.y, false, 1.0);
+    }
+    let font = &a.fonts["text16"];
+    let title_col = if cls == Class::Foundry { [255, 214, 150] } else { ACID2 };
+    let mut y = pedestal + 14;
+    for l in font.wrap(&t(&format!("growth.{key}")), r.w - 20) {
+        font.draw(cv, &l, r.cx(), y, title_col, Some(EDGE), Align::Center, 1.0);
+        y += 18;
+    }
+    y += 6;
+    for l in font.wrap(&t(&format!("growth.{key}.l")), r.w - 24).into_iter().take(5) {
+        if y + 16 > r.y + r.h - 6 {
+            break;
+        }
+        font.draw(cv, &l, r.cx(), y, INK, Some(EDGE), Align::Center, 1.0);
+        y += 18;
+    }
+    hit
 }
 
 /// What a body carries, as a row of small icons along its card's foot: a golem's modules (and its free cells as
@@ -680,6 +716,15 @@ impl Game {
             }
             Act::Pick(i, card) => {
                 if let (Some(run), Screen::Rewards { list, pick }) = (&mut self.run, &mut self.screen) {
+                    // the leader's growth: one of two, for good (no passing it by)
+                    if let Some((Reward::Growth(keys), taken)) = list.get_mut(i) {
+                        if let Some(k) = card.and_then(|c| keys.get(c)) {
+                            run.grow(k);
+                            *taken = true;
+                            *pick = None;
+                        }
+                        return;
+                    }
                     if let Some((Reward::Find(offers), taken)) = list.get_mut(i) {
                         match card.and_then(|c| offers.get(c)) {
                             // a module or a mutation: where it goes is asked next
@@ -1216,6 +1261,10 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
                 artifact_icon(ui, cv, a, *art, ix - 6, row.y + 10, 2);
                 (tf("rewards.artifact", &[("name", &t(&format!("art.{}", art.key())))]), GOLD)
             }
+            Reward::Growth(_) => {
+                ui.icon(cv, a, if cls == Class::Foundry { "glyph/рост" } else { "swarm/selection" }, ix, row.y + 15, 2, 1.0);
+                (t("rewards.growth"), GOLD)
+            }
         };
         a.fonts["text16"].draw(cv, &label, row.x + 52, row.y + 17, if can { col } else { MUTED }, Some(EDGE), Align::Left, 1.0);
         if let Reward::Artifact(art) = r {
@@ -1225,7 +1274,7 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
         }
         if hit || ui.key(Key::Digit(left as u8)) {
             act = Some(match r {
-                Reward::Find(_) => Act::OpenFind(i),
+                Reward::Find(_) | Reward::Growth(_) => Act::OpenFind(i),
                 _ => Act::Take(i),
             });
         }
@@ -1260,6 +1309,24 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
                 act = Some(Act::Pick(i, None));
             }
             // back to the spoils, the find still there to take (Esc does the same)
+            if ui.minor(cv, a, cls, "pickback", 14, 484, &t("back"), true) {
+                act = Some(Act::CloseFind);
+            }
+        }
+        // the leader's growth: two cards, one for good
+        if let Some((Reward::Growth(keys), _)) = list.get(i) {
+            cv.fill(0, 44, 960, 424, [6, 4, 8, 120]);
+            heading(cv, a, &t("growth.title"), 480, 58, 24, cols(cls), Align::Center);
+            text(cv, a, &t("growth.sub"), 480, 92, MUTED, Align::Center);
+            let n = keys.len() as i32;
+            let (cw, gap) = (240, 48);
+            let x0 = (960 - n * cw - (n - 1) * gap) / 2;
+            for (j, key) in keys.iter().enumerate() {
+                let r = Rect::new(x0 + j as i32 * (cw + gap), 140 + ui.rise_from(ui.opened, j), cw, 250);
+                if growth_card(ui, cv, a, run, &format!("grow{j}"), r, key) || ui.key(Key::Digit(j as u8 + 1)) {
+                    act = Some(Act::Pick(i, Some(j)));
+                }
+            }
             if ui.minor(cv, a, cls, "pickback", 14, 484, &t("back"), true) {
                 act = Some(Act::CloseFind);
             }

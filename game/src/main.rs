@@ -301,6 +301,42 @@ mod flow {
         g.ui.end(0.05);
     }
 
+    /// A boss beaten: the leader's growth among the spoils, two cards; a click on one and the leader has grown, the
+    /// battle body with it.
+    #[test]
+    fn the_leader_grows_after_a_boss() {
+        use sim::run::{BattleResult, Kind, Run};
+        for (cls, leader) in [(Class::Foundry, 0), (Class::Swarm, 0)] {
+            let mut g = Game::new(crate::Demo::new(184).unwrap());
+            let mut run = Run::new(cls, leader, 7);
+            run.fight = 4;
+            let mut boss = run.path[0].clone();
+            boss.kind = Kind::Boss;
+            let list = run.after_battle(&boss, &BattleResult { won: true, dead: vec![], kills: 5 });
+            let i = list.iter().position(|r| matches!(r, Reward::Growth(_))).expect("no growth after a boss");
+            let Reward::Growth(keys) = &list[i] else { unreachable!() };
+            let keys = keys.clone();
+            assert_eq!(keys.len(), 2);
+            g.run = Some(run);
+            g.screen = Screen::Rewards { list: list.into_iter().map(|r| (r, false)).collect(), pick: None };
+            frame(&mut g);
+            g.apply(Act::OpenFind(i));
+            settle(&mut g);
+            frame(&mut g);
+            // the first card (left of the middle)
+            g.ui.mx = 340;
+            g.ui.my = 300;
+            frame(&mut g);
+            g.ui.mouse_down();
+            g.ui.mouse_up();
+            frame(&mut g);
+            assert!(matches!(g.screen, Screen::Rewards { pick: None, .. }), "{cls:?}: the card did not take");
+            let r = g.run.as_ref().unwrap();
+            assert_eq!(r.growth, vec![keys[0].clone()]);
+            // what each growth changes is checked in sim/tests/run.rs
+        }
+    }
+
     /// A run of each class walked through every kind of screen by the screens' own acts — roads, battles, spoils,
     /// the find, the trader, events, the camp — each screen drawn on the way, to its end.
     #[test]
@@ -364,6 +400,21 @@ mod flow {
                                     g.ui.mx = -1;
                                     // a module or a mutation asks where it goes: the first place offered
                                     place_first(&mut g);
+                                }
+                                Reward::Growth(keys) => {
+                                    // the leader's growth: the second card, by a click
+                                    g.apply(Act::OpenFind(i));
+                                    frame(&mut g);
+                                    g.ui.mx = 600;
+                                    g.ui.my = 300;
+                                    frame(&mut g);
+                                    g.ui.mouse_down();
+                                    g.ui.mouse_up();
+                                    frame(&mut g);
+                                    g.ui.mx = -1;
+                                    assert!(matches!(g.screen, Screen::Rewards { pick: None, .. }), "the growth card did not take");
+                                    assert!(g.run.as_ref().unwrap().growth.contains(&keys[1]), "the leader did not grow");
+                                    seen.insert("growth");
                                 }
                                 _ => g.apply(Act::Take(i)),
                             }

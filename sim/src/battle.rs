@@ -150,6 +150,8 @@ pub enum Event {
     Mark { t: usize },
     Blind { t: usize },
     Glue { t: usize },
+    /// Stunned: skips its next attack (Сотрясение).
+    Stun { t: usize },
 }
 
 #[derive(Clone, Debug)]
@@ -239,6 +241,8 @@ struct Hit {
     venom: u32,
     infect: bool,
     ignite: bool,
+    /// The blow stuns: the target skips its next attack (not the unstoppable).
+    stun: bool,
 }
 
 pub struct Battle {
@@ -407,7 +411,7 @@ impl Battle {
                 let (nx, ny) = (x + dx, y + dy);
                 if self.grid.can_place(side, size, nx, ny) {
                     let d = dx * dx + dy * dy;
-                    if best.map_or(true, |b| d < b.0) {
+                    if best.is_none_or(|b| d < b.0) {
                         best = Some((d, nx, ny));
                     }
                 }
@@ -456,6 +460,9 @@ impl Battle {
         self.exhaustion();
         if let Some(o) = self.check_end() {
             return Some(o);
+        }
+        if self.round == 1 {
+            self.battle_begins();
         }
         self.movement();
         self.fear();
@@ -561,7 +568,7 @@ impl Battle {
             for nx in tx - f..=tx + tf {
                 if rect_dist(nx, ny, f, tx, ty, tf) == 1 && self.grid.can_place(side, size, nx, ny) {
                     let d = center_d2(nx, ny, f, tx, ty, tf);
-                    if best.map_or(true, |b| d < b.0) {
+                    if best.is_none_or(|b| d < b.0) {
                         best = Some((d, nx, ny));
                     }
                 }
@@ -701,6 +708,22 @@ impl Battle {
         }
     }
 
+    /// What happens as the battle begins, the armies stood: the Inventor's augments.
+    fn battle_begins(&mut self) {
+        for i in 0..self.units.len() {
+            if !self.units[i].present() || !self.units[i].t.abilities.contains(&Ability::Augment) {
+                continue;
+            }
+            let side = self.units[i].side;
+            let allies: Vec<usize> =
+                (0..self.units.len()).filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.golem && self.dist(i, k) <= 2).collect();
+            for k in allies {
+                let up: Vec<Ability> = self.units[k].t.abilities.iter().map(|a| level_up(*a)).collect();
+                self.units[k].t.abilities = up;
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- attacks
     fn attacks(&mut self) {
         for u in &mut self.units {
@@ -752,7 +775,7 @@ impl Battle {
         let abilities = self.units[i].t.abilities.clone();
         for ab in abilities {
             match ab {
-                Ability::Overload { every } if round % every == 0 => {
+                Ability::Overload { every } if round.is_multiple_of(every) => {
                     let side = self.units[i].side;
                     let ally = (0..self.units.len())
                         .filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.golem)
@@ -763,7 +786,7 @@ impl Battle {
                         return;
                     }
                 }
-                Ability::Fireball { every, die, bonus, range } if round % every_of(every, Dmg::Fire) == 0 => {
+                Ability::Fireball { every, die, bonus, range } if round.is_multiple_of(every_of(every, Dmg::Fire)) => {
                     if let Some(tj) = self.ranged_target(i, range) {
                         let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
                         for v in victims {
@@ -773,12 +796,37 @@ impl Battle {
                         return;
                     }
                 }
-                Ability::Repair { every, amount } if round % every == 0 => {
+                Ability::Repair { every, amount } if round.is_multiple_of(every) => {
                     if self.repair(i, amount) {
                         return;
                     }
                 }
-                Ability::Volley { every, die, bonus, dmg } if round % every_of(every, dmg) == 0 => {
+                Ability::Quake { every, die, bonus, radius } if round.is_multiple_of(every) => {
+                    let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(i, v) <= radius as i32).collect();
+                    if !victims.is_empty() {
+                        for v in victims {
+                            let raw = self.rng.damage(die, bonus);
+                            let stun = self.units[v].t.size <= 2;
+                            hits.push(Hit { attacker: i, target: v, raw, dmg: Dmg::Blunt, melee: true, stun, ..Default::default() });
+                        }
+                        return;
+                    }
+                }
+                Ability::Tinker { every } if round.is_multiple_of(every) => {
+                    let side = self.units[i].side;
+                    let near: Vec<usize> =
+                        (0..self.units.len()).filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.golem && self.dist(i, k) <= 2).collect();
+                    if !near.is_empty() {
+                        let k = near[self.rng.die(near.len() as u32) as usize - 1];
+                        match self.rng.die(4) {
+                            1 => self.units[k].t.abilities.push(Ability::Flail),
+                            2 => self.units[k].t.abilities.push(Ability::Bolt { every: 2, die: 6, bonus: 2, dmg: Dmg::Blunt, range: 3 }),
+                            3 => self.units[k].plates += 2,
+                            _ => self.units[k].t.abilities.push(Ability::Repair { every: 2, amount: 3 }),
+                        }
+                    }
+                }
+                Ability::Volley { every, die, bonus, dmg } if round.is_multiple_of(every_of(every, dmg)) => {
                     if let Some(tj) = self.ranged_target(i, self.units[i].t.range) {
                         let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
                         for v in victims {
@@ -788,7 +836,7 @@ impl Battle {
                         return;
                     }
                 }
-                Ability::Flash { every } if round % every == 0 => {
+                Ability::Flash { every } if round.is_multiple_of(every) => {
                     let adj = self.adjacent_enemies(i);
                     if !adj.is_empty() {
                         for j in adj {
@@ -798,7 +846,7 @@ impl Battle {
                         return;
                     }
                 }
-                Ability::Spit { every, die } if round % every == 0 => {
+                Ability::Spit { every, die } if round.is_multiple_of(every) => {
                     if let Some(tj) = self.ranged_target(i, self.units[i].t.range) {
                         self.units[tj].glued_until = round + 1;
                         if !self.units[tj].t.has(Trait::PoisonImmune) {
@@ -808,7 +856,7 @@ impl Battle {
                         return;
                     }
                 }
-                Ability::Brood { every, n } if round % every == 0 => {
+                Ability::Brood { every, n } if round.is_multiple_of(every) => {
                     let (side, x, y) = (self.units[i].side, self.units[i].x, self.units[i].y);
                     for _ in 0..n {
                         let mut larva = crate::data::rabochaya();
@@ -816,7 +864,7 @@ impl Battle {
                         self.spawn(side, larva, x, y);
                     }
                 }
-                Ability::Mark { every } if round % every == 0 => {
+                Ability::Mark { every } if round.is_multiple_of(every) => {
                     let side = self.units[i].side as usize;
                     let target = self.enemies_of(i).max_by_key(|&j| {
                         let t = &self.units[j].t;
@@ -827,7 +875,7 @@ impl Battle {
                         self.ev(Event::Mark { t });
                     }
                 }
-                Ability::Bolt { every, die, bonus, dmg, range } if round % every_of(every, dmg) == 0 => {
+                Ability::Bolt { every, die, bonus, dmg, range } if round.is_multiple_of(every_of(every, dmg)) => {
                     let target = if range <= 1 { self.melee_target(i) } else { self.ranged_target(i, range) };
                     if let Some(tj) = target {
                         let raw = self.rng.damage(die, bonus);
@@ -958,7 +1006,7 @@ impl Battle {
             if charge {
                 raw = raw * 3 / 2;
             }
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false });
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false, stun: false });
         }
     }
 
@@ -1024,6 +1072,10 @@ impl Battle {
         }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
+        if h.stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
+            self.units[t].stunned = true;
+            self.ev(Event::Stun { t });
+        }
         let a = h.attacker;
         if d > 0 && !self.units[t].t.has(Trait::PoisonImmune) {
             if h.venom > 0 {
@@ -1109,7 +1161,7 @@ impl Battle {
         }
         if u.t.has(Trait::Grows) {
             u.kills += 1;
-            if u.kills % 2 == 0 && u.growth < 2 {
+            if u.kills.is_multiple_of(2) && u.growth < 2 {
                 u.growth += 1;
                 let gain = u.t.hp * 2 / 5;
                 u.t.hp += gain;
@@ -1229,4 +1281,17 @@ pub fn fight(a: &[Template], b: &[Template], seed: u64) -> Outcome {
     let mut bt = Battle::new(seed);
     bt.add_armies(a, b);
     bt.run()
+}
+
+/// A module a level stronger: a round sooner, a die bigger (or more mended).
+fn level_up(a: Ability) -> Ability {
+    let sooner = |e: u32| e.saturating_sub(1).max(1);
+    match a {
+        Ability::Volley { every, die, bonus, dmg } => Ability::Volley { every: sooner(every), die: die + 2, bonus, dmg },
+        Ability::Bolt { every, die, bonus, dmg, range } => Ability::Bolt { every: sooner(every), die: die + 2, bonus, dmg, range },
+        Ability::Repair { every, amount } => Ability::Repair { every: sooner(every), amount: amount + 2 },
+        Ability::Overload { every } => Ability::Overload { every: sooner(every) },
+        Ability::Fireball { every, die, bonus, range } => Ability::Fireball { every: sooner(every), die: die + 2, bonus, range },
+        other => other,
+    }
 }

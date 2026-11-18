@@ -92,7 +92,7 @@ fn main() {
         Some(p) => {
             let mut g = vec![p.clone()];
             g.extend(vec![t.clone(); k]);
-            (strength(&g, m) - strength(&[p.clone()], m)) / k as f64
+            (strength(&g, m) - strength(std::slice::from_ref(p), m)) / k as f64
         }
         None => strength(&vec![t.clone(); k], m) / k as f64,
     };

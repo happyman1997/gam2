@@ -102,6 +102,21 @@ pub fn run(demo: Demo, dir: &str) {
                 g.targeting = None;
             }
         }
+        // a boss beaten: the leader's growth among the spoils, its two cards open
+        let mut r5 = run.clone();
+        r5.fight = 4;
+        let mut boss = node.clone();
+        boss.kind = Kind::Boss;
+        let spoils = r5.after_battle(&boss, &sim::run::BattleResult { won: true, dead: vec![], kills: 30 });
+        if let Some(gi) = spoils.iter().position(|r| matches!(r, Reward::Growth(_))) {
+            g.run = Some(r5);
+            let list: Vec<(Reward, bool)> = spoils.into_iter().map(|r| (r, false)).collect();
+            set(&mut g, Screen::Rewards { list: list.clone(), pick: None });
+            snap(&mut g, dir, &format!("11b_{tag}_boss_rewards"), (480, 200));
+            set(&mut g, Screen::Rewards { list, pick: Some(gi) });
+            g.ui.opened = g.ui.t;
+            snap(&mut g, dir, &format!("12c_{tag}_growth"), (340, 300));
+        }
         // the trader
         let mut r3 = run.clone();
         let shop = r3.shop();

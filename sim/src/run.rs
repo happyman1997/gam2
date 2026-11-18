@@ -215,6 +215,8 @@ pub enum Reward {
     /// One of these into the army, or none (a little currency for passing).
     Find(Vec<Offer>),
     Artifact(Artifact),
+    /// After a boss: one of these for the leader, for good (keys of growth.ron).
+    Growth(Vec<String>),
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -287,6 +289,9 @@ pub struct Run {
     /// The swarm's breeds and their mutations: (form, mutation key); every body of the form has them.
     #[serde(default)]
     pub breeds: Vec<(String, String)>,
+    /// How the leader has grown after the bosses (keys of growth.ron).
+    #[serde(default)]
+    pub growth: Vec<String>,
     /// The roads to choose from now.
     pub path: Vec<Node>,
     /// A stop (trader, event, camp) was taken since the last battle: the next fork is battles only.
@@ -313,6 +318,7 @@ impl Run {
             next_id: 0,
             leader_id: 0,
             breeds: vec![],
+            growth: vec![],
             artifacts: vec![],
             path: vec![],
             stopped: false,
@@ -380,6 +386,13 @@ impl Run {
     /// A member as it goes into battle: its modules, its breed's mutations, the artifacts on it.
     pub fn body(&self, m: &Member) -> Template {
         let mut t = m.t.clone();
+        for g in self.growth.iter().filter_map(|k| data::growth_by_key(k)) {
+            if self.is_leader(m) {
+                g.leader.apply(&mut t);
+            } else {
+                g.army.apply(&mut t);
+            }
+        }
         let finds = data::finds();
         for key in &m.mods {
             if let Some(f) = finds.modules.iter().find(|f| &f.key == key) {
@@ -402,10 +415,39 @@ impl Run {
 
     /// How many modules a golem takes (its cells): the Father of the Colossus four, a big frame three, the rest two.
     pub fn cells(&self, m: &Member) -> usize {
-        match data::unit_key(&m.t.name) {
+        let more: usize = self.growth.iter().filter_map(|k| data::growth_by_key(k)).map(|g| g.cells).sum();
+        more + match data::unit_key(&m.t.name) {
             Some("otets_kolossa") => 4,
             _ if m.t.size >= 5 => 3,
             _ => 2,
+        }
+    }
+
+    /// The leader's key in units.ron.
+    pub fn leader_key(&self) -> &'static str {
+        self.army.iter().find(|m| self.is_leader(m)).and_then(|m| data::unit_key(&m.t.name)).unwrap_or("")
+    }
+
+    /// Two ways for the leader to grow, of those not taken yet (fewer when fewer are left).
+    pub fn growth_offer(&mut self) -> Vec<String> {
+        let mut left: Vec<String> = data::growth(self.leader_key()).iter().map(|g| g.key.clone()).filter(|k| !self.growth.contains(k)).collect();
+        let mut out = vec![];
+        while out.len() < 2 && !left.is_empty() {
+            let i = self.roll(left.len());
+            out.push(left.remove(i));
+        }
+        out
+    }
+
+    /// The leader grows: for good, and the bodies it brings join the army.
+    pub fn grow(&mut self, key: &str) {
+        let Some(g) = data::growth_by_key(key) else { return };
+        if self.growth.iter().any(|k| k == key) {
+            return;
+        }
+        self.growth.push(key.to_string());
+        for u in &g.units {
+            self.add(data::unit(u));
         }
     }
 
@@ -730,6 +772,12 @@ impl Run {
             }
             _ => {}
         }
+        if node.kind == Kind::Boss && self.fight < FIGHTS {
+            let g = self.growth_offer();
+            if !g.is_empty() {
+                rewards.push(Reward::Growth(g));
+            }
+        }
         let find = self.find(3, node.kind == Kind::Boss || node.danger >= 2);
         rewards.push(Reward::Find(find));
         if node.kind != Kind::Fight {
@@ -765,7 +813,7 @@ impl Run {
                 }
             }
             Reward::Artifact(a) => self.artifacts.push(*a),
-            Reward::Find(_) => {}
+            Reward::Find(_) | Reward::Growth(_) => {}
         }
     }
 

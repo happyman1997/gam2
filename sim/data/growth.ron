@@ -1,0 +1,56 @@
+#![enable(implicit_some)]
+// Развитие лидера: после босса (кроме последнего) — выбор одного из двух, навсегда. Ключ верхнего уровня — лидер из
+// units.ron; key — ключ слов в игре (growth.<key>); leader — что получает сам лидер (как give в finds.ron, и ещё
+// better — способности, которые заменяют такую же у него); army — что получает каждый в армии, кроме лидера;
+// cells — ещё ячеек каждому голему (Отцу колосса — себе); units — тела в армию (ключи units.ron).
+// По концепту (CONCEPT.md, «Развитие: …»), только то, что симуляция уже умеет; числа временные.
+{
+    // +1 ячейка или колоссальный модуль (колоссальных модулей в симуляции пока нет)
+    "otets_kolossa": [
+        (key: "colossus_cell", cells: 1),
+        (key: "colossus_quake", leader: (better: [Quake(every: 2, die: 8, bonus: 2, radius: 1)])),
+        (key: "colossus_hull", leader: (hp: 40, armor: 1)),
+    ],
+    // новый вид аугментов или +1 аугмент на голема
+    "izobretatel": [
+        (key: "inventor_cells", cells: 1),
+        (key: "inventor_coil", leader: (module: "grozovaya_katushka")),
+        (key: "inventor_shocker", leader: (dmg: Shock, bonus: 2)),
+    ],
+    // новый безумный модуль или причуды чаще полезны
+    "manyak": [
+        (key: "maniac_tinker", leader: (better: [Tinker(every: 2)])),
+        (key: "maniac_cells", cells: 1),
+        (key: "maniac_saw", leader: (dmg: Slash, bonus: 3)),
+    ],
+    // развёртывания в симуляции пока нет: каменщик, стены, кирпичи
+    "zodchiy": [
+        (key: "builder_mason", units: ["kamenshchik"]),
+        (key: "builder_walls", army: (armor: 1)),
+        (key: "builder_bricks", leader: (bonus: 2, range: 1)),
+    ],
+    // кладка чаще, +1 личинка или крупнее
+    "matka": [
+        (key: "matka_often", leader: (better: [Brood(every: 2, n: 2)])),
+        (key: "matka_more", leader: (better: [Brood(every: 3, n: 3)])),
+        (key: "matka_big", leader: (hp: 25, armor: 1)),
+    ],
+    // пси-удара, Захвата и Помутнения в симуляции пока нет: метка чаще, воля роя, панцирь
+    "razum": [
+        (key: "mind_mark", leader: (better: [Mark(every: 1)])),
+        (key: "mind_will", army: (bonus: 1)),
+        (key: "mind_shell", leader: (hp: 12, armor: 2)),
+    ],
+    // крупнее, челюсти, шкура
+    "pozhiratel": [
+        (key: "devourer_bigger", leader: (hp: 20, bonus: 1)),
+        (key: "devourer_jaws", leader: (bonus: 3)),
+        (key: "devourer_hide", leader: (armor: 2)),
+    ],
+    // заражает и яд скорпионов; чумная кровь стае; панцирь
+    "kukushka": [
+        (key: "plague_venom", leader: (traits: [Venom(die: 6)])),
+        (key: "plague_blood", army: (hp: 2)),
+        (key: "plague_shell", leader: (hp: 12, armor: 1)),
+    ],
+}

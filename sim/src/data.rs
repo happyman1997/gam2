@@ -127,6 +127,8 @@ fn one() -> usize {
 pub struct Give {
     pub module: Option<String>,
     pub abilities: Vec<Ability>,
+    /// Abilities that take the place of one of the same kind the body has (a leader's grown stronger), else added.
+    pub better: Vec<Ability>,
     pub traits: Vec<Trait>,
     pub hp: i32,
     pub armor: i32,
@@ -143,6 +145,12 @@ impl Give {
             t.abilities.push(module(m));
         }
         t.abilities.extend(self.abilities.iter().copied());
+        for b in &self.better {
+            match t.abilities.iter_mut().find(|a| std::mem::discriminant(*a) == std::mem::discriminant(b)) {
+                Some(a) => *a = a.stronger(*b),
+                None => t.abilities.push(*b),
+            }
+        }
         for tr in &self.traits {
             if !t.traits.contains(tr) {
                 t.traits.push(*tr);
@@ -175,6 +183,17 @@ pub struct MutationFind {
     pub give: Give,
 }
 
+/// A leader's growth after a boss (growth.ron): onto the leader, onto the rest of the army, more cells, more bodies.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Growth {
+    pub key: String,
+    pub leader: Give,
+    pub army: Give,
+    pub cells: usize,
+    pub units: Vec<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Finds {
     pub modules: Vec<ModuleFind>,
@@ -187,6 +206,7 @@ struct Data {
     swarm: SwarmDef,
     armies: BTreeMap<String, Vec<Entry>>,
     finds: Finds,
+    growth: BTreeMap<String, Vec<Growth>>,
 }
 
 fn parse<T: serde::de::DeserializeOwned>(file: &str, text: &str) -> T {
@@ -199,11 +219,22 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     swarm: parse("swarm.ron", include_str!("../data/swarm.ron")),
     armies: parse("armies.ron", include_str!("../data/armies.ron")),
     finds: parse("finds.ron", include_str!("../data/finds.ron")),
+    growth: parse("growth.ron", include_str!("../data/growth.ron")),
 });
 
 /// The run's finds: the Foundry's modules, the swarm's mutations.
 pub fn finds() -> &'static Finds {
     &DATA.finds
+}
+
+/// The ways a leader (its key in units.ron) can grow after a boss.
+pub fn growth(leader: &str) -> &'static [Growth] {
+    DATA.growth.get(leader).map(Vec::as_slice).unwrap_or(&[])
+}
+
+/// A growth by its key, whoever's it is.
+pub fn growth_by_key(key: &str) -> Option<&'static Growth> {
+    DATA.growth.values().flatten().find(|g| g.key == key)
 }
 
 /// The key in units.ron of the unit named `name` (the name a template carries).
@@ -308,8 +339,38 @@ pub fn check() -> Result<(), String> {
                 return Err(format!("finds.ron \"{key}\": no module \"{m}\" in modules.ron"));
             }
         }
-        for a in &g.abilities {
+        for a in g.abilities.iter().chain(&g.better) {
             ability(&format!("finds.ron \"{key}\""), a)?;
+        }
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for (leader, list) in &DATA.growth {
+        if !DATA.units.contains_key(leader) {
+            return Err(format!("growth.ron: no unit \"{leader}\" in units.ron"));
+        }
+        if list.len() < 2 {
+            return Err(format!("growth.ron \"{leader}\": fewer than two to choose from"));
+        }
+        for g in list {
+            let at = format!("growth.ron \"{}\"", g.key);
+            if !seen.insert(&g.key) {
+                return Err(format!("{at}: the key twice"));
+            }
+            for give in [&g.leader, &g.army] {
+                if let Some(m) = &give.module {
+                    if !DATA.modules.contains_key(m) {
+                        return Err(format!("{at}: no module \"{m}\" in modules.ron"));
+                    }
+                }
+                for a in give.abilities.iter().chain(&give.better) {
+                    ability(&at, a)?;
+                }
+            }
+            for u in &g.units {
+                if !DATA.units.contains_key(u) {
+                    return Err(format!("{at}: no unit \"{u}\" in units.ron"));
+                }
+            }
         }
     }
     for m in &DATA.finds.modules {

@@ -190,9 +190,33 @@ pub enum Ability {
     /// Every `every` rounds, instead of the spell: a fireball within `range` — the cell and its neighbours,
     /// fire, sets them burning (Огненный шар).
     Fireball { every: u32, die: u32, bonus: i32, range: u32 },
+    /// Every `every` rounds, instead of attacking: a blunt blow on every enemy within `radius`; the small ones (size
+    /// 1–2) that take damage are stunned for their next attack (Сотрясение, Отец колосса).
+    Quake { every: u32, die: u32, bonus: i32, radius: u32 },
+    /// As the battle begins: the modules of allied golems within two cells a level stronger — a round sooner, a die
+    /// bigger (Аугменты, Изобретатель).
+    Augment,
+    /// Every `every` rounds (besides attacking): an allied golem within two cells gets a module at random until the
+    /// battle ends (Маньяк).
+    Tinker { every: u32 },
 }
 
 impl Ability {
+    /// Two of one kind put together (a leader grown twice the same way): the better of each number, so the second
+    /// growth adds to the first rather than taking its place.
+    pub fn stronger(self, other: Ability) -> Ability {
+        use Ability::*;
+        match (self, other) {
+            (Brood { every: a, n: x }, Brood { every: b, n: y }) => Brood { every: a.min(b), n: x.max(y) },
+            (Mark { every: a }, Mark { every: b }) => Mark { every: a.min(b) },
+            (Tinker { every: a }, Tinker { every: b }) => Tinker { every: a.min(b) },
+            (Quake { every: a, die: d, bonus: x, radius: r }, Quake { every: b, die: e, bonus: y, radius: q }) => {
+                Quake { every: a.min(b), die: d.max(e), bonus: x.max(y), radius: r.max(q) }
+            }
+            (_, o) => o,
+        }
+    }
+
     /// How many rounds between its uses, for those used every so often.
     pub fn every(&self) -> Option<u32> {
         match *self {
@@ -204,7 +228,9 @@ impl Ability {
             | Ability::Brood { every, .. }
             | Ability::Mark { every }
             | Ability::Overload { every }
-            | Ability::Fireball { every, .. } => Some(every),
+            | Ability::Fireball { every, .. }
+            | Ability::Quake { every, .. }
+            | Ability::Tinker { every } => Some(every),
             _ => None,
         }
     }

@@ -121,7 +121,7 @@
         armor_type: Cast,
         golem: true,
         traits: [FireResist75, Mindless, PoisonImmune, Unstoppable, Fear(die: 9, radius: 3)],
-        abilities: [],
+        abilities: [Quake(every: 3, die: 8, bonus: 2, radius: 1)],
     ),
     "izobretatel": (
         name: "Изобретатель",
@@ -138,7 +138,7 @@
         armor_type: Leather,
         golem: false,
         traits: [FireResist75, Leader],
-        abilities: [],
+        abilities: [Augment],
     ),
     "manyak": (
         name: "Маньяк",
@@ -155,7 +155,7 @@
         armor_type: Leather,
         golem: false,
         traits: [FireResist75, Leader, Fear(die: 8, radius: 2)],
-        abilities: [],
+        abilities: [Tinker(every: 3)],
     ),
     "zodchiy": (
         name: "Зодчий",
