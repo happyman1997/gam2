@@ -34,7 +34,7 @@ def save_sprite(name, spr, emit=None):
     rgba = np.zeros((y1 - y0, x1 - x0, 4), np.uint8)
     rgba[..., :3] = np.clip(spr.rgb[y0:y1, x0:x1], 0, 255).astype(np.uint8)
     rgba[..., 3] = spr.a[y0:y1, x0:x1] * 255
-    os.makedirs(os.path.join(DST, "sprites"), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.join(DST, "sprites", name + ".png")), exist_ok=True)
     Image.fromarray(rgba, "RGBA").save(os.path.join(DST, "sprites", name + ".png"))
     MANIFEST["sprites"][name] = dict(file=f"sprites/{name}.png", w=int(x1 - x0), h=int(y1 - y0),
                                      ox=int(spr.ox - x0), oy=int(spr.oy - y0))
@@ -42,46 +42,75 @@ def save_sprite(name, spr, emit=None):
         MANIFEST["sprites"][name]["emit"] = [int(round(emit[0])), int(round(emit[1]))]
 
 
+# The Foundry's bodies on the field: (name, size) as the simulation has them (a «smaller» frame is a size less) and
+# the scale each is drawn at — the frames by size (the demo's small Sage, Gun and Mechanic as before), the leaders and
+# the Mason at their own.
+GOLEM_K = {3: BT.GK[4] * 0.88, 4: BT.GK[4], 5: BT.GK[5], 6: BT.GK[6]}
+FOUNDRY = [("Страж", 6), ("Страж", 5), ("Мудрец", 5), ("Мудрец", 4), ("Горн", 5), ("Горн", 4), ("Орудие", 5),
+           ("Орудие", 4), ("Механик", 4), ("Механик", 3), ("Каменщик", 2), ("Отец колосса", 7), ("Изобретатель", 3),
+           ("Маньяк", 4), ("Зодчий", 4)]
+OWN_K = {"Каменщик": 0.85, "Отец колосса": 3.2, "Изобретатель": 1.05, "Маньяк": 1.3, "Зодчий": 1.05}
+# the swarm's forms: the trait that makes each (swarm1.PLANS), the ant has none
+FORMS = [("Муравей", ())] + [(nm, (tr,)) for tr, nm in W.PLANS.items()]
+SWARM_LEADERS = ["Матка", "Разум улья", "Чума"]
+
+
+def foundry_spec(name):
+    """The builder's description of a body (golems_h for the frames and the Maniac and the Colossus, leaders_h for the
+    Inventor and the Architect); None for the Guard (humanoid.py, no walk)."""
+    if name == "Изобретатель":
+        return LH.INVENTOR
+    if name == "Зодчий":
+        return LH.ZODCHIY
+    return LH.GH.BY_NAME.get(name)
+
+
+def foundry_build(name, pose, k):
+    S = foundry_spec(name)
+    if name == "Страж":
+        return F.build(name, pose, k=k)
+    return LH.GH.build(S, pose, k)
+
+
 def units():
-    """The Inventor's golems and himself (idle, attack, broken, four frames of a walk), the Devourer's ants and
-    grasshoppers in four variants each (idle, attack, dead, two frames of a walk), the Devourer at each growth step
-    (idle, attack, dead, two frames of a walk)."""
-    for name, k in (("Мудрец", BT.GK[4]), ("Орудие", BT.GK[4]), ("Механик", BT.GK[4] * 0.88)):
+    """Every body a battle can show: the Foundry's frames, the Mason and the leaders (idle, attack — the casters'
+    with the point their bolt leaves from — broken, four frames of a walk), each form of the swarm as worker and
+    soldier in four variants (idle, attack, dead, two frames of a walk), the swarm's leaders (the Devourer at each
+    growth step) and the larva."""
+    for name, size in FOUNDRY:
+        k = OWN_K.get(name, GOLEM_K.get(size))
+        S = foundry_spec(name)
+        key = f"{name}_{size}"
         for pose in ("idle", "attack", "broken"):
-            if name == "Мудрец" and pose == "attack":
-                # the Sage casts; the game draws the bolt from the ball of the staff to the target (emit)
-                _, info = LH.GH.creature_parts(LH.GH.SAGE, LH.GH.SAGE["poses"]["cast"], fx=False)
-                save_sprite(f"{name}_{pose}", F.build(name, "cast", k=k), emit=F.to_screen(info["n"]["tip"], k))
+            if pose == "attack" and S is not None and "cast" in S["poses"]:
+                # a caster: the game draws the bolt from the ball of the staff / the prongs to the target (emit)
+                _, info = LH.GH.creature_parts(S, S["poses"]["cast"], fx=False)
+                tip = info["n"].get("tip", info["n"].get("muzzle"))
+                save_sprite(f"{key}_{pose}", foundry_build(name, "cast", k), emit=F.to_screen(tip, k))
                 continue
-            save_sprite(f"{name}_{pose}", F.build(name, pose, k=k))
-        # a walk of four frames: a step on the near foot, passing, a step on the far one, passing
-        S = LH.GH.BY_NAME[name]
-        for i in range(4):
-            S["poses"][f"walk{i}"] = LH.GH.walk_pose(S, i)
-            save_sprite(f"{name}_walk{i}", F.build(name, f"walk{i}", k=k))
-    for i in range(4):
-        LH.INVENTOR["poses"][f"walk{i}"] = LH.GH.walk_pose(LH.INVENTOR, i)
-        save_sprite(f"Изобретатель_walk{i}", LH.GH.build(LH.INVENTOR, f"walk{i}", 1.05))
-    for pose in ("idle", "attack", "broken"):
-        if pose == "attack":
-            # the Inventor raises the shocker; the game draws the arc from its prongs to the target (emit)
-            _, info = LH.GH.creature_parts(LH.INVENTOR, LH.INVENTOR["poses"]["cast"], fx=False)
-            save_sprite("Изобретатель_attack", LH.GH.build(LH.INVENTOR, "cast", 1.05),
-                        emit=F.to_screen(info["n"]["muzzle"], 1.05))
-            continue
-        save_sprite(f"Изобретатель_{pose}", LH.GH.build(LH.INVENTOR, pose, 1.05))
-    for name, traits, soldier in (("Муравей (рабочая)", (), False), ("Муравей (солдат)", (), True),
-                                  ("Кузнечик (рабочая)", ("jumper",), False)):
-        for v in range(4):
-            seed = 700 + v * 13 + len(name)
-            hue = (-0.12, -0.04, 0.05, 0.12)[v]
-            for pose in ("idle", "attack", "walk0", "walk1"):          # walk: the two tripods of legs in turn
-                save_sprite(f"{name}_{v}_{pose}", W.build(traits, hue, pose, soldier, k=1.0, genes=W.genes_for(seed)))
-            save_sprite(f"{name}_{v}_dead", flip_dead(W.build(traits, hue, "idle", soldier, k=1.0, genes=W.genes_for(seed)), 0.3))
+            save_sprite(f"{key}_{pose}", foundry_build(name, pose, k))
+        if S is not None:                                    # the Guard (humanoid.py) has no walk: it glides
+            for i in range(4):
+                S["poses"][f"walk{i}"] = LH.GH.walk_pose(S, i)
+                save_sprite(f"{key}_walk{i}", foundry_build(name, f"walk{i}", k))
+    for name, traits in FORMS:
+        for caste, soldier in (("рабочая", False), ("солдат", True)):
+            full = f"{name} ({caste})"
+            for v in range(4):
+                seed = 700 + v * 13 + len(full)
+                hue = (-0.12, -0.04, 0.05, 0.12)[v]
+                for pose in ("idle", "attack", "walk0", "walk1"):          # walk: the two tripods of legs in turn
+                    save_sprite(f"{full}_{v}_{pose}", W.build(traits, hue, pose, soldier, k=1.0, genes=W.genes_for(seed)))
+                save_sprite(f"{full}_{v}_dead", flip_dead(W.build(traits, hue, "idle", soldier, k=1.0, genes=W.genes_for(seed)), 0.3))
     for stage in range(3):
         for pose in ("idle", "attack", "walk0", "walk1"):
             save_sprite(f"Пожиратель_{stage}_{pose}", SL.build("Пожиратель", pose, 1.0, stage=stage))
         save_sprite(f"Пожиратель_{stage}_dead", flip_dead(SL.build("Пожиратель", "idle", 1.0, stage=stage), 0.3))
+    for name in SWARM_LEADERS + ["личинка"]:
+        key = "Личинка" if name == "личинка" else name
+        for pose in ("idle", "attack", "walk0", "walk1"):
+            save_sprite(f"{key}_{pose}", SL.build(name, pose, 1.0))
+        save_sprite(f"{key}_dead", flip_dead(SL.build(name, "idle", 1.0), 0.3))
 
 
 def ground():
@@ -160,17 +189,75 @@ def ui():
         MANIFEST["ui"][nm] = dict(file=f"ui/{nm}.png", size=[376, 15])
 
 
+def kits():
+    """Both engine kits whole (tools/sprites/assets/ui_kit/{foundry,swarm}: plates, cells, buttons, tags, levers,
+    sills, wings…) under ui/foundry/… and ui/swarm/…, each with its slicing; the icon atlases (the Foundry's modules,
+    the swarm's traits and mutations, the Foundry's glyphs) under icons/, with where each icon is."""
+    for kit in ("foundry", "swarm"):
+        src = os.path.join(HERE, "assets", "ui_kit", kit)
+        kj = json.load(open(os.path.join(src, "kit.json")))["pieces"]
+        os.makedirs(os.path.join(DST, "ui", kit), exist_ok=True)
+        for name, meta in kj.items():
+            if not isinstance(meta, dict) or "file" not in meta or not meta["file"].endswith(".png"):
+                continue
+            f = os.path.join(src, meta["file"])
+            if not os.path.isfile(f):
+                continue
+            shutil.copy(f, os.path.join(DST, "ui", kit, name + ".png"))
+            MANIFEST["ui"][f"{kit}/{name}"] = dict({k: v for k, v in meta.items() if k in ("size", "slice", "tile_x", "tile_y", "mode", "pad")},
+                                                   file=f"ui/{kit}/{name}.png")
+    os.makedirs(os.path.join(DST, "icons"), exist_ok=True)
+    MANIFEST["icons"] = {}
+    for key, png, idx in (("module", "module_icons.png", "module_icons.json"), ("swarm", "swarm_icons.png", "swarm_icons.json")):
+        shutil.copy(os.path.join(HERE, "assets", png), os.path.join(DST, "icons", png))
+        j = json.load(open(os.path.join(HERE, "assets", idx)))
+        cell = j.get("cell", 16)
+        for name, v in j["icons"].items():
+            cx, cy = v["cell"]
+            MANIFEST["icons"][f"{key}/{name}"] = dict(atlas=f"icons/{png}", rect=[cx * cell, cy * cell, cell, cell], name=v.get("name", ""))
+    g = json.load(open(os.path.join(HERE, "assets", "ui_kit", "foundry", "glyphs.json")))
+    shutil.copy(os.path.join(HERE, "assets", "ui_kit", "foundry", g["image"]), os.path.join(DST, "icons", "glyphs.png"))
+    for name, v in g["glyphs"].items():
+        MANIFEST["icons"][f"glyph/{name}"] = dict(atlas="icons/glyphs.png", rect=[v["x"], v["y"], v["w"], v["h"]], name=v.get("name", ""))
+
+
+def portraits():
+    """Each body larger, for the cards of the screens between battles (a reward, the trader's goods, the army, the
+    camp): about a hundred pixels tall for a golem, the swarm's forms as worker and soldier, its leaders."""
+    import foundry_hud as FH
+    for name, k in (("Страж", 2.3), ("Мудрец", 2.1), ("Горн", 2.1), ("Орудие", 2.0), ("Механик", 2.4)):
+        save_sprite(f"portrait/{name}", F.build(name, "idle", k=k))
+    save_sprite("portrait/Каменщик", LH.GH.build(LH.GH.BY_NAME["Каменщик"], "idle", 2.4))
+    for name, kind, k in (("Отец колосса", "colossus", 1.5), ("Изобретатель", "inventor", 2.6), ("Маньяк", "maniac", 2.2),
+                          ("Зодчий", "zodchiy", 2.1)):
+        save_sprite(f"portrait/{name}", FH.leader_sprite(kind, k))
+    for name, traits in FORMS:
+        for caste, soldier, k in (("рабочая", False, 4.2), ("солдат", True, 3.2)):
+            save_sprite(f"portrait/{name} ({caste})", W.build(traits, 0.0, "idle", soldier, k=k, genes=W.genes_for(31 + len(name))))
+    for name in ["Матка", "Разум улья", "Пожиратель", "Чума"]:
+        spr = SL.build(name, "idle", 1.0)
+        kk = min(2.2, 180 / spr.w, 110 / spr.h)
+        save_sprite(f"portrait/{name}", SL.build(name, "idle", kk))
+
+
 def main():
     os.makedirs(DST, exist_ok=True)
     UI.WOBBLE[0] = 0.0
     ground()
     units()
+    portraits()
     fx()
     fonts()
     ui()
+    kits()
+    import bake_screens
+    bake_screens.DST = DST
+    bake_screens.main(write_manifest=False)
+    MANIFEST["bg"] = bake_screens.MANIFEST["bg"]
+    MANIFEST["ui"].update(bake_screens.MANIFEST["ui"])
     json.dump(MANIFEST, open(os.path.join(DST, "assets.json"), "w"), ensure_ascii=False, indent=1)
     print("sprites", len(MANIFEST["sprites"]), "fx", len(MANIFEST["fx"]), "fonts", len(MANIFEST["fonts"]),
-          "ui", len(MANIFEST["ui"]))
+          "ui", len(MANIFEST["ui"]), "icons", len(MANIFEST["icons"]), "bg", len(MANIFEST["bg"]))
 
 
 if __name__ == "__main__":

@@ -49,6 +49,12 @@ impl Audio {
         Some(Audio { mgr, sounds, seed: 0x2545_f491_4f6c_dd1d, bed: None })
     }
 
+    /// The whole game's loudness, 0..1 (the settings' slider): on the main track, under the limiter's input.
+    pub fn set_volume(&mut self, v: f32) {
+        let db = if v <= 0.001 { -80.0 } else { 20.0 * v.log10() * 1.5 };
+        self.mgr.main_track().set_volume(Decibels(db), Tween::default());
+    }
+
     fn rand(&mut self) -> f32 {
         self.seed ^= self.seed << 13;
         self.seed ^= self.seed >> 7;

@@ -208,6 +208,98 @@ impl Image {
         }
     }
 
+    /// Light added round a point, falling off to the rim (a fire's glow, a button lit, a lantern): additive, so it
+    /// brightens what is under it without covering it.
+    pub fn glow(&mut self, cx: f32, cy: f32, r: f32, col: [u8; 3], k: f32) {
+        if r <= 0.0 || k <= 0.0 {
+            return;
+        }
+        for j in (cy - r) as i32..=(cy + r) as i32 {
+            for i in (cx - r) as i32..=(cx + r) as i32 {
+                if i < 0 || j < 0 || i >= self.w || j >= self.h {
+                    continue;
+                }
+                let d = ((i as f32 - cx).hypot(j as f32 - cy) / r).min(1.0);
+                let a = (1.0 - d) * (1.0 - d) * k;
+                if a <= 0.004 {
+                    continue;
+                }
+                let p = &mut self.px[(j * self.w + i) as usize];
+                for c in 0..3 {
+                    p[c] = (p[c] as f32 + col[c] as f32 * a).min(255.0) as u8;
+                }
+                if p[3] < 255 {
+                    p[3] = (p[3] as f32 + 255.0 * a).min(255.0) as u8;
+                }
+            }
+        }
+    }
+
+    /// A copy `k` times larger, each pixel a k×k block (an icon at a card's size).
+    pub fn scaled(&self, k: i32) -> Image {
+        let mut out = Image::clear(self.w * k, self.h * k);
+        for y in 0..out.h {
+            for x in 0..out.w {
+                out.px[(y * out.w + x) as usize] = self.get(x / k, y / k);
+            }
+        }
+        out
+    }
+
+    /// A region cut out as its own image.
+    pub fn crop(&self, x: i32, y: i32, w: i32, h: i32) -> Image {
+        let mut out = Image::clear(w, h);
+        for j in 0..h {
+            for i in 0..w {
+                if x + i >= 0 && y + j >= 0 && x + i < self.w && y + j < self.h {
+                    out.px[(j * w + i) as usize] = self.get(x + i, y + j);
+                }
+            }
+        }
+        out
+    }
+
+    /// The piece grown to w×h the way the kit's pieces grow (tools/sprites/engine_kit.py `grow`): the corners as
+    /// they are, the edges and the middle repeating their strips — the columns `tx` along the top and bottom, the
+    /// rows `ty` down the sides — cut at the far end. `sl` = (left, top, right, bottom); a 3-slice has top = bottom
+    /// = 0 and keeps its own height.
+    pub fn grow(&self, w: i32, h: i32, sl: [i32; 4], tx: (i32, i32), ty: (i32, i32)) -> Image {
+        let [l, t, r, b] = sl;
+        let axis = |n: i32, lo: i32, hi: i32, tile: (i32, i32), full: i32| -> Vec<i32> {
+            let mut v: Vec<i32> = (0..lo).collect();
+            let period = (tile.1 - tile.0).max(1);
+            for k in 0..(n - lo - hi).max(0) {
+                v.push(tile.0 + k % period);
+            }
+            v.extend(full - hi..full);
+            v
+        };
+        let xs = axis(w, l, r, tx, self.w);
+        let ys = axis(h, t, b, ty, self.h);
+        let mut out = Image::clear(xs.len() as i32, ys.len() as i32);
+        for (j, &sy) in ys.iter().enumerate() {
+            for (i, &sx) in xs.iter().enumerate() {
+                out.px[j * xs.len() + i] = self.get(sx.clamp(0, self.w - 1), sy.clamp(0, self.h - 1));
+            }
+        }
+        out
+    }
+
+    /// A coverage mask (a title's letters) in a colour running from `top` to `bot` down its rows `y0..y1`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn mask_grad(&mut self, src: &Image, sx: i32, sy: i32, sw: i32, sh: i32, x: i32, y: i32, top: [u8; 3], bot: [u8; 3], rows: (i32, i32), alpha: f32) {
+        for j in 0..sh {
+            let t = ((j - rows.0) as f32 / (rows.1 - rows.0).max(1) as f32).clamp(0.0, 1.0);
+            let col = [0, 1, 2].map(|k| (top[k] as f32 + (bot[k] as f32 - top[k] as f32) * t) as u8);
+            for i in 0..sw {
+                let a = src.get(sx + i, sy + j)[3];
+                if a > 0 {
+                    self.blend_px(x + i, y + j, [col[0], col[1], col[2], a], alpha);
+                }
+            }
+        }
+    }
+
     /// A piece grown to a new width along its middle (a 3-slice): `left`/`right` stay, the columns
     /// `tile.0..tile.1` repeat.
     #[allow(clippy::too_many_arguments)]

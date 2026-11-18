@@ -138,6 +138,11 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     armies: parse("armies.ron", include_str!("../data/armies.ron")),
 });
 
+/// The key in units.ron of the unit named `name` (the name a template carries).
+pub fn unit_key(name: &str) -> Option<&'static str> {
+    DATA.units.iter().find(|(_, t)| t.name == name).map(|(k, _)| k.as_str())
+}
+
 /// A unit by its key in units.ron.
 pub fn unit(key: &str) -> Template {
     DATA.units.get(key).cloned().unwrap_or_else(|| panic!("sim/data/units.ron: no unit \"{key}\""))

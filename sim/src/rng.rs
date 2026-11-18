@@ -1,6 +1,6 @@
 //! Small deterministic generator (SplitMix64): the same seed always replays the same battle.
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Rng(u64);
 
 impl Rng {

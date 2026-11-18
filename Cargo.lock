@@ -624,6 +624,7 @@ dependencies = [
  "pixels",
  "png",
  "rayon",
+ "serde",
  "serde_json",
  "sim",
  "winit",
@@ -1944,6 +1945,7 @@ dependencies = [
  "rayon",
  "ron",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

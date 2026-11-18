@@ -16,6 +16,8 @@ pub struct View {
     pub paused: bool,
     /// The button under the cursor, lit a little: one of the `Button`s.
     pub hover: Option<Button>,
+    /// The end plate's button in a run: its words and its key (None: «новый бой», R — the demo's).
+    pub end: Option<(String, String)>,
 }
 
 /// The clickable things of the battle screen.
@@ -50,37 +52,41 @@ const DARK: [u8; 3] = [40, 22, 8];
 fn sprite_name(rec: &Record, id: usize, pose: Pose, f: i32) -> String {
     let info = &rec.units[id];
     let n = info.name.as_str();
-    match n {
-        "Мудрец" | "Орудие" | "Механик" | "Изобретатель" => {
-            let p = match pose {
-                Pose::Idle => "idle".to_string(),
-                Pose::Attack => "attack".to_string(),
-                Pose::Dead => "broken".to_string(),
-                Pose::Walk(k) => format!("walk{}", (k / 2) % 4), // four frames, each held two counts
-            };
-            format!("{n}_{p}")
-        }
-        "Пожиратель" => {
-            let st = rec.state_at(id, f).growth.min(2);
-            let p = match pose {
-                Pose::Idle => "idle".to_string(),
-                Pose::Attack => "attack".to_string(),
-                Pose::Dead => "dead".to_string(),
-                Pose::Walk(k) => format!("walk{}", (k / 2) % 2),
-            };
-            format!("Пожиратель_{st}_{p}")
-        }
-        _ => {
-            let p = match pose {
-                Pose::Idle => "idle".to_string(),
-                Pose::Attack => "attack".to_string(),
-                Pose::Dead => "dead".to_string(),
-                Pose::Walk(k) => format!("walk{}", k % 2), // the small ones scuttle: a frame every count
-            };
-            let base = if n.starts_with("Кузнечик") { "Кузнечик (рабочая)" } else if n.contains("солдат") { "Муравей (солдат)" } else { "Муравей (рабочая)" };
-            format!("{base}_{}_{p}", id % 4)
-        }
+    if info.machine {
+        // the Foundry's bodies by name and size (a «smaller» frame is a size less): four frames of a walk
+        let p = match pose {
+            Pose::Idle => "idle".to_string(),
+            Pose::Attack => "attack".to_string(),
+            Pose::Dead => "broken".to_string(),
+            Pose::Walk(k) => format!("walk{}", (k / 2) % 4), // four frames, each held two counts
+        };
+        return format!("{n}_{}_{p}", info.size);
     }
+    let p = |dead: &str| match pose {
+        Pose::Idle => "idle".to_string(),
+        Pose::Attack => "attack".to_string(),
+        Pose::Dead => dead.to_string(),
+        Pose::Walk(k) => format!("walk{}", if info.fp >= 2 || info.leader { (k / 2) % 2 } else { k % 2 }),
+    };
+    match n {
+        "Пожиратель" => format!("Пожиратель_{}_{}", rec.state_at(id, f).growth.min(2), p("dead")),
+        "Матка" | "Разум улья" | "Чума" | "Личинка" => format!("{n}_{}", p("dead")),
+        "Рабочая" => format!("Муравей (рабочая)_{}_{}", id % 4, p("dead")),
+        "Солдат" => format!("Муравей (солдат)_{}_{}", id % 4, p("dead")),
+        // the swarm's forms: four variants of each, the small ones scuttle a frame every count
+        _ => format!("{n}_{}_{}", id % 4, p("dead")),
+    }
+}
+
+/// The sprite to draw: the pose asked for, else the body standing (a body with no walk glides, one with no attack
+/// pose strikes standing), else nothing.
+fn sprite<'a>(a: &'a Assets, rec: &Record, id: usize, pose: Pose, f: i32) -> Option<(&'a crate::assets::Sprite, String)> {
+    let name = sprite_name(rec, id, pose, f);
+    if let Some(s) = a.sprites.get(&name) {
+        return Some((s, name));
+    }
+    let idle = sprite_name(rec, id, Pose::Idle, f);
+    a.sprites.get(&idle).map(|s| (s, idle))
 }
 
 const SLOTS: [(f32, f32); 4] = [(-11.0, -6.0), (11.0, -7.0), (-10.0, 8.0), (12.0, 7.0)];
@@ -124,7 +130,7 @@ fn animate(rec: &Record, ms: &[crate::playback::Moment], s: &crate::playback::Sh
         return an;
     }
     if s.pose == Pose::Idle {
-        let slow = info.side == 0 || info.fp >= 2;
+        let slow = info.machine || info.fp >= 2;
         let period = if slow { 40.0 } else { 18.0 };
         let phase = (s.id as f32 * 0.37).fract();
         if ((ff / period) + phase).fract() >= 0.5 {
@@ -229,7 +235,7 @@ fn number(cv: &mut Image, a: &Assets, rec: &Record, n: &Number, f: i32, bars: &[
     }
     // over the head (and over a leader's health), not on the body: the blow and who took it stay in sight
     let info = &rec.units[n.t];
-    let head = a.sprites.get(&sprite_name(rec, n.t, Pose::Idle, n.start)).map(|s| s.oy).unwrap_or(40);
+    let head = sprite(a, rec, n.t, Pose::Idle, n.start).map(|(s, _)| s.oy).unwrap_or(40);
     let over = if info.leader { 22 } else { 3 };
     let tall = if matches!(n.style, NumStyle::Crit) { 24 } else { 16 };
     let (nx, ny) = (n.x, n.y - (head + over + tall) as f32 - n.k as f32 * 20.0); // a second number one line higher
@@ -269,12 +275,12 @@ fn bolt(cv: &mut Image, a: &Assets, rec: &Record, shown: &[crate::playback::Show
         return;
     }
     let (Some(s), Some(t)) = (shown.iter().find(|s| s.id == src), shown.iter().find(|s| s.id == tgt)) else { return };
-    let spr = a.sprites.get(&sprite_name(rec, src, Pose::Attack, f));
+    let spr = sprite(a, rec, src, Pose::Attack, f).map(|(s, _)| s);
     let (mut ex, ey) = spr.and_then(|p| p.emit).unwrap_or((0, -30));
     if rec.units[src].side == 1 {
         ex = -ex;
     }
-    let body = a.sprites.get(&sprite_name(rec, tgt, Pose::Idle, f)).map(|p| p.oy).unwrap_or(20);
+    let body = sprite(a, rec, tgt, Pose::Idle, f).map(|(p, _)| p.oy).unwrap_or(20);
     let from = (s.x + ex as f32, s.y + ey as f32);
     let to = (t.x, t.y - body as f32 * 0.45);
     let reach = ((k + 1) as f32 / 3.0).min(1.0);
@@ -557,9 +563,9 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             }
             anim.flash = anim.flash.max(other.flash);
         }
-        let name = sprite_name(rec, s.id, anim.pose, f);
-        let Some(spr) = a.sprites.get(&name) else { continue };
-        let big = info.fp >= 2 || info.name.as_str() != "Муравей (рабочая)" && info.side == 0;
+        let Some((spr, name)) = sprite(a, rec, s.id, anim.pose, f) else { continue };
+        // a body that has no broken pose lies as it stood, dark (the drawing below darkens the dead)
+        let big = info.fp >= 2 || info.machine;
         if !lying && anim.pose != Pose::Dead {
             let pack = small(s.id) && packs.get(&key(s.id, s.cell)).map(|v| v.len() > 1).unwrap_or(false);
             let rank0 = small(s.id) && packs.get(&key(s.id, s.cell)).map(|v| v.first() == Some(&s.id)).unwrap_or(true);
@@ -589,7 +595,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             cv.blit(&spr.img, sx, sy, flip, 1.0);
         }
         if let Some(k) = s.dead_at {
-            over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.side == 0, big, t: ff - k as f32, name });
+            over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.machine, big, t: ff - k as f32, name });
         }
     }
     // how many a pack holds: a dot a body, under it
@@ -612,12 +618,11 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             continue;
         }
         if let Some(s) = shown.iter().find(|s| s.id == id) {
-            let name = sprite_name(rec, id, s.pose, f);
-            let top = a.sprites.get(&name).map(|sp| sp.oy).unwrap_or(40);
+            let top = sprite(a, rec, id, s.pose, f).map(|(sp, _)| sp.oy).unwrap_or(40);
             let lit = ((st.hp.max(0) * 10 + info.max_hp - 1) / info.max_hp.max(1)).clamp(0, 10);
             // over his head; at the very edge it slides just enough to stay on the screen
             let (cx, cy) = ((s.x as i32).clamp(32, W - 22), (s.y as i32 - top - 8).max(44));
-            meter(cv, cx, cy, lit, info.side == 1);
+            meter(cv, cx, cy, lit, !info.machine);
             bars.push((cx - 32, cy - 5, cx + 22, cy + 5));
         }
     }
@@ -652,6 +657,9 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     // the wing: the swarm against the Foundry, the turn, the speed
     cv.blit(&a.ui["wing_battle_960"].img, 0, 0, false, 1.0);
     let alive = |side: u8| rec.units.iter().enumerate().filter(|(i, u)| u.side == side && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count();
+    // the swarm's count on the left, the Foundry's leader and its golems on the right, whichever side each is on
+    let swarm = if rec.units.iter().any(|u| u.side == 1 && !u.machine) { 1 } else { 0 };
+    let forge = 1 - swarm;
     let hp = |side: u8| -> f32 {
         let (mut now, mut all) = (0.0, 0.0);
         for (i, u) in rec.units.iter().enumerate() {
@@ -665,10 +673,10 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
         }
         now / all.max(1.0)
     };
-    let (sw, fo) = (hp(1), hp(0));
+    let (sw, fo) = (hp(swarm), hp(forge));
     let share = if sw + fo > 0.0 { sw / (sw + fo) } else { 0.5 };
     let title = &a.fonts["title16"];
-    title.draw(cv, &format!("рой {}", alive(1)), 16, 8, ACID, Some(ACID_EDGE), Align::Left, 1.0);
+    title.draw(cv, &crate::text::tf("hud.swarm", &[("n", &alive(swarm))]), 16, 8, ACID, Some(ACID_EDGE), Align::Left, 1.0);
     let (ts, tf) = (&a.ui["tug_swarm"].img, &a.ui["tug_foundry"].img);
     let cut = (share * ts.w as f32) as i32;
     cv.blit_region(ts, 0, 0, cut, ts.h, 144, 10, false, 1.0);
@@ -678,12 +686,12 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
         cv.blend_px(x, 10 + j, [255, 244, 200, 255], 1.0);
     }
     let text = &a.fonts["text16"];
-    let nf = rec.units.iter().filter(|u| u.side == 0).count();
-    let leader = rec.units.iter().find(|u| u.side == 0 && u.leader).map(|u| u.name.as_str()).unwrap_or("Литейщик");
+    let nf = rec.units.iter().filter(|u| u.side == forge).count();
+    let leader = rec.units.iter().find(|u| u.side == forge && u.leader).map(|u| u.name.as_str()).unwrap_or("Литейщик");
     // the leader's name and his army's count, short enough to leave room for the turn before the buttons
-    text.draw(cv, &format!("{leader} {}/{nf}", alive(0)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);
+    text.draw(cv, &format!("{leader} {}/{nf}", alive(forge)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);
     let turn = (f / FR + 1).min(rec.rounds.len() as i32);
-    text.draw(cv, &format!("ход {turn}"), 728, 9, MUTED, Some([16, 12, 16]), Align::Right, 1.0);
+    text.draw(cv, &crate::text::tf("hud.turn", &[("n", &turn)]), 728, 9, MUTED, Some([16, 12, 16]), Align::Right, 1.0);
     let hot = |b: Button| view.hover == Some(b);
     // the keys show under a button only while the cursor is on it, and for the first seconds of a battle (to teach
     // them) — not over the field all the time
@@ -696,20 +704,28 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     let end = view.frame as i32 - (total - 1);
     if end > 0 {
         let k = (end as f32 / 12.0).min(1.0);
-        let win = rec.outcome.winner == Some(1);
+        // the plate as the player sees it: side 0 is the player's in a run; the demo is watched from the swarm's side
+        let mine = if view.end.is_some() { 0 } else { 1 };
+        let win = rec.outcome.winner == Some(mine);
         let p = &a.ui[if win { "end_plate_win" } else { "end_plate_lose" }];
         let dy = ((1.0 - k) * -40.0) as i32;
         cv.blit(&p.img, W / 2 - p.img.w / 2, H / 2 - 60 + dy, false, k);
         let big = &a.fonts["title24"];
         // both armies gone at once, or the rounds run out: a draw, on the grey plate
         let (t, c, e) = match rec.outcome.winner {
-            Some(1) => ("ПОБЕДА", ACID, ACID_EDGE),
-            Some(_) => ("ПОРАЖЕНИЕ", [176, 178, 186], [56, 58, 68]),
-            None => ("НИЧЬЯ", [176, 178, 186], [56, 58, 68]),
+            Some(w) if w == mine => (crate::text::t("hud.win"), ACID, ACID_EDGE),
+            Some(_) => (crate::text::t("hud.lose"), [176, 178, 186], [56, 58, 68]),
+            None => (crate::text::t("hud.draw"), [176, 178, 186], [56, 58, 68]),
         };
-        big.draw(cv, t, W / 2, H / 2 - 30 + dy, c, Some(e), Align::Center, k);
-        let sub = format!("ходов: {} · зерно {}", rec.rounds.len(), rec.seed);
+        big.draw(cv, &t, W / 2, H / 2 - 30 + dy, c, Some(e), Align::Center, k);
+        // the demo tells its seed (to replay a battle); a run's battle only how long it was
+        let sub = if view.end.is_some() {
+            crate::text::tf("hud.rounds", &[("n", &rec.rounds.len())])
+        } else {
+            crate::text::tf("hud.sub", &[("n", &rec.rounds.len()), ("seed", &rec.seed)])
+        };
         text.draw(cv, &sub, W / 2, H / 2 + 46 + dy, INK, Some([16, 12, 16]), Align::Center, k);
-        button(cv, a, W / 2 - 70, W / 2 + 70, PLATE_BUTTON_Y + dy, true, hot(Button::NewBattle), "новый бой", "R", k, 1.0);
+        let (label, key) = view.end.clone().unwrap_or_else(|| (crate::text::t("hud.new"), "R".to_string()));
+        button(cv, a, W / 2 - 70, W / 2 + 70, PLATE_BUTTON_Y + dy, true, hot(Button::NewBattle), &label, &key, k, 1.0);
     }
 }

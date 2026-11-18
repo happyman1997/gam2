@@ -9,7 +9,7 @@ pub const H: i32 = 14;
 pub const EXHAUSTION_FROM: u32 = 50;
 pub const MAX_ROUNDS: u32 = 150;
 /// Deployment zone depth for each side.
-const ZONE: i32 = 6;
+pub const ZONE: i32 = 6;
 
 /// Side length of the square a unit occupies.
 pub fn footprint(size: u32) -> i32 {
@@ -109,6 +109,8 @@ pub struct Unit {
     pub born: u32,
     pub charged: bool,
     pub kills: u32,
+    /// Its place in the army it was deployed from (None for one summoned in the battle).
+    pub src: Option<usize>,
     pub growth: u32,
     pub last_meal: u32,
     /// Side whose larvae hatch from this unit when it dies (Чума).
@@ -313,7 +315,8 @@ impl Battle {
             'outer: for &x in &cols {
                 for &y in &rows {
                     if self.grid.can_place_cap(side, t.size, x, y, cap) {
-                        self.place(side, t.clone(), x, y);
+                        let id = self.place(side, t.clone(), x, y);
+                        self.units[id].src = Some(i);
                         placed = true;
                         break 'outer;
                     }
@@ -323,7 +326,8 @@ impl Battle {
                 'any: for &x in &cols {
                     for &y in &rows {
                         if self.grid.can_place(side, t.size, x, y) {
-                            self.place(side, t.clone(), x, y);
+                            let id = self.place(side, t.clone(), x, y);
+                            self.units[id].src = Some(i);
                             placed = true;
                             break 'any;
                         }
@@ -364,6 +368,7 @@ impl Battle {
             born: self.round,
             charged: false,
             kills: 0,
+            src: None,
             growth: 0,
             last_meal: self.round,
             infected: None,

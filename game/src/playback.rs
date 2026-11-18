@@ -22,6 +22,8 @@ pub struct UnitInfo {
     pub size: u32,
     pub max_hp: i32,
     pub leader: bool,
+    /// A body of the Foundry (a golem, a leader of the forge), not of the swarm: it walks heavily, rings, breaks.
+    pub machine: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -47,6 +49,9 @@ pub struct Record {
     pub seed: u64,
     /// The frame each unit was killed on (for a corpse's age).
     pub died_at: Vec<Option<i32>>,
+    /// What the battle did to side 0's army (who of it fell, by its place in the army) and how many of side 1 fell.
+    pub dead0: Vec<usize>,
+    pub kills1: u32,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
@@ -67,6 +72,7 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
             max_hp: u.t.hp,
             // the leaders; the Foundry's human leaders also by name, as older records may lack the trait
             leader: u.t.has(Trait::Leader) || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
+            machine: u.t.golem || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
         })
         .collect()
 }
@@ -103,7 +109,8 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
         r.before.resize(bt.units.len(), State::default());
         r.after.resize(bt.units.len(), State::default());
     }
-    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![] };
+    let res = sim::run::result_of(&bt, outcome.winner);
+    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![], dead0: res.dead, kills1: res.kills };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
         for m in rec.moments(r) {
@@ -279,7 +286,7 @@ impl Record {
         for r in 0..self.rounds.len() {
             let round = &self.rounds[r];
             let walked = self.units.iter().enumerate().any(|(i, u)| {
-                u.side == 0 && round.before[i].alive && (round.before[i].x, round.before[i].y) != (round.after[i].x, round.after[i].y)
+                u.machine && round.before[i].alive && (round.before[i].x, round.before[i].y) != (round.after[i].x, round.after[i].y)
             });
             if walked {
                 out.push(Cue { frame: r as i32 * FR + 1, name: "step", gain: 0.0, x: 200.0 });
@@ -309,7 +316,7 @@ impl Record {
                                     out.push(Cue { frame: m.frame - 4, name: "shot", gain: 0.0, x: at(a) });
                                     "blast"
                                 }
-                                _ if att.side == 1 => "bite",
+                                _ if !att.machine => "bite",
                                 _ => "hit_flesh",
                             }
                         };
@@ -320,9 +327,9 @@ impl Record {
                         }
                     }
                     Event::Kill { t } => {
-                        let name = if self.units[t].side == 1 { "squish" } else { "break" };
+                        let name = if !self.units[t].machine { "squish" } else { "break" };
                         out.push(Cue { frame: m.frame, name, gain: 0.0, x: at(t) });
-                        if self.units[t].side == 1 {
+                        if !self.units[t].machine {
                             out.push(Cue { frame: m.frame + 2, name: "death_rattle", gain: 0.0, x: at(t) });
                         }
                     }
@@ -369,7 +376,7 @@ impl Record {
                     Event::Hit { a, t, dmg } => {
                         let (x, y) = at(t);
                         let att = &self.units[a];
-                        let swarm_hits = att.side == 1;
+                        let swarm_hits = !att.machine;
                         let style = if dmg <= 0 {
                             NumStyle::Miss
                         } else if swarm_hits && dmg >= 10 {

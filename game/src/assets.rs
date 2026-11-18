@@ -35,12 +35,46 @@ pub struct Piece {
     pub meta: Value,
 }
 
+/// How a piece grows: (left, top, right, bottom) kept, the columns and the rows that repeat.
+pub type Slicing = ([i32; 4], (i32, i32), (i32, i32));
+
+impl Piece {
+    /// How it grows; None — drawn as it is.
+    pub fn slicing(&self) -> Option<Slicing> {
+        let sl = self.meta.get("slice")?.as_array()?;
+        let sl = [i(&sl[0]), i(&sl[1]), i(&sl[2]), i(&sl[3])];
+        let pair = |k: &str, full: i32| {
+            self.meta.get(k).and_then(|v| v.as_array()).map(|v| (i(&v[0]), i(&v[1]))).unwrap_or((0, full))
+        };
+        let tx = self.meta.get("tile_x").map(|_| pair("tile_x", self.img.w)).unwrap_or((sl[0], self.img.w - sl[2]));
+        let ty = self.meta.get("tile_y").map(|_| pair("tile_y", self.img.h)).unwrap_or((sl[1], self.img.h - sl[3]));
+        Some((sl, tx, ty))
+    }
+
+    /// The see-through margin round it (for a halo, a spark): (x, y).
+    pub fn pad(&self) -> (i32, i32) {
+        match self.meta.get("pad") {
+            Some(Value::Array(v)) => (i(&v[0]), i(&v[1])),
+            Some(v) => (i(v), i(v)),
+            None => (0, 0),
+        }
+    }
+}
+
+/// An icon: its atlas, and its rectangle in it (x, y, w, h).
+pub type Icon = (String, [i32; 4]);
+
 pub struct Assets {
     pub ground: Image,
     pub sprites: HashMap<String, Sprite>,
     pub fx: HashMap<String, Fx>,
     pub fonts: HashMap<String, Font>,
     pub ui: HashMap<String, Piece>,
+    /// The screens' backgrounds (960×540, or a part of one), baked by tools/sprites/bake_screens.py.
+    pub bg: HashMap<String, Image>,
+    /// Icons: each a rectangle of one of the atlases.
+    pub icons: HashMap<String, Icon>,
+    pub atlases: HashMap<String, Image>,
 }
 
 /// Where the assets are: GAME_ASSETS if set; else `assets` next to the executable (a shipped build — the folder
@@ -100,7 +134,24 @@ impl Assets {
         for (k, v) in m["ui"].as_object().ok_or("no ui")? {
             ui.insert(k.clone(), Piece { img: img(&v["file"])?, meta: v.clone() });
         }
-        Ok(Assets { ground: Image::load(&root.join("ground.png"))?, sprites, fx, fonts, ui })
+        let mut bg = HashMap::new();
+        if let Some(o) = m["bg"].as_object() {
+            for (k, v) in o {
+                bg.insert(k.clone(), img(&v["file"])?);
+            }
+        }
+        let (mut icons, mut atlases) = (HashMap::new(), HashMap::new());
+        if let Some(o) = m["icons"].as_object() {
+            for (k, v) in o {
+                let atlas = v["atlas"].as_str().unwrap_or("").to_string();
+                if !atlases.contains_key(&atlas) {
+                    atlases.insert(atlas.clone(), Image::load(&root.join(&atlas))?);
+                }
+                let r = &v["rect"];
+                icons.insert(k.clone(), (atlas, [i(&r[0]), i(&r[1]), i(&r[2]), i(&r[3])]));
+            }
+        }
+        Ok(Assets { ground: Image::load(&root.join("ground.png"))?, sprites, fx, fonts, ui, bg, icons, atlases })
     }
 }
 
@@ -113,6 +164,59 @@ pub enum Align {
 impl Font {
     pub fn width(&self, text: &str) -> i32 {
         text.chars().map(|c| self.glyphs.get(&c).map(|g| g.3).unwrap_or(self.line / 2)).sum()
+    }
+
+    /// The text broken into lines no wider than `w` (at spaces; a line break kept).
+    pub fn wrap(&self, text: &str, w: i32) -> Vec<String> {
+        let mut out = vec![];
+        for para in text.split('\n') {
+            let mut line = String::new();
+            for word in para.split(' ') {
+                let cand = if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
+                if self.width(&cand) > w && !line.is_empty() {
+                    out.push(std::mem::take(&mut line));
+                    line = word.to_string();
+                } else {
+                    line = cand;
+                }
+            }
+            out.push(line);
+        }
+        out
+    }
+
+    /// A title: the letters running from `top` to `bot` down their height, a dark outline and a shadow under them
+    /// (the mockups' cast-metal headings).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_grad(&self, cv: &mut Image, text: &str, x: i32, y: i32, top: [u8; 3], bot: [u8; 3], edge: [u8; 3], align: Align, alpha: f32) {
+        let w = self.width(text);
+        let x0 = match align {
+            Align::Left => x,
+            Align::Center => x - w / 2,
+            Align::Right => x - w,
+        };
+        let px = self.line * 2 / 3;
+        let mut cx = x0;
+        for c in text.chars() {
+            if let Some(&(gx, gy, gw, adv)) = self.glyphs.get(&c) {
+                cv.mask(&self.img, gx, gy, gw, self.line, cx + 2, y + 2, [10, 6, 12], alpha * 0.85);
+                for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1), (1, 1)] {
+                    cv.mask(&self.img, gx, gy, gw, self.line, cx + dx, y + dy, edge, alpha);
+                }
+                cx += adv;
+            } else {
+                cx += self.line / 2;
+            }
+        }
+        let mut cx = x0;
+        for c in text.chars() {
+            if let Some(&(gx, gy, gw, adv)) = self.glyphs.get(&c) {
+                cv.mask_grad(&self.img, gx, gy, gw, self.line, cx, y, top, bot, (px / 6, px), alpha);
+                cx += adv;
+            } else {
+                cx += self.line / 2;
+            }
+        }
     }
 
     /// Text with its top at y; a dark outline round it and a shadow under it when `edge` is given (as the art's
