@@ -185,6 +185,29 @@ pub fn run(demo: Demo, dir: &str) {
         g.overlays.push(Overlay::Army);
         snap(&mut g, dir, &format!("22_{tag}_army"), (200, 200));
     }
+    // crowded: a workshop of twelve golems, the evolutions of every form
+    {
+        use sim::data::{self, Caste, FORMS};
+        use sim::run::{Find, Offer};
+        let mut run = Run::new(Class::Foundry, 3, 5);
+        let golems = vec![data::strazh(), data::orudie(), data::mudrets(), data::gorn(), data::mekhanik(), data::strazh(), data::orudie(), data::kamenshchik()];
+        run.recruit(&Offer { key: "strazh".into(), units: golems, price: 0, find: Find::Units });
+        run.money = 30;
+        g.run = Some(run);
+        set(&mut g, Screen::Camp { stage: CampStage::Workshop { held: None }, said: String::new() });
+        g.ui.opened = g.ui.t;
+        snap(&mut g, dir, "40_f_workshop_full", (0, 0));
+        let mut run = Run::new(Class::Swarm, 0, 5);
+        let bodies = FORMS.iter().map(|f| data::swarm(Caste::Worker, *f)).collect();
+        run.recruit(&Offer { key: "ant".into(), units: bodies, price: 0, find: Find::Units });
+        run.money = 30;
+        g.run = Some(run);
+        set(&mut g, Screen::Rewards { list: vec![], pick: None });
+        g.overlays.push(Overlay::Evolution);
+        g.ui.opened = g.ui.t;
+        snap(&mut g, dir, "41_s_evolution_full", (0, 0));
+        g.overlays.clear();
+    }
     set(&mut g, Screen::Menu);
     g.overlays.push(Overlay::About);
     snap(&mut g, dir, "05_about", (0, 0));

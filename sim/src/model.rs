@@ -147,13 +147,16 @@ pub enum Trait {
     Glow,
     /// Hive Mind: every ally has the full «Стая» bonus.
     HiveMind,
-    /// Devourer: every 2nd kill — ×1.4 health and +2 to the blow, up to twice; starves without kills.
+    /// Devourer: every 2nd kill — ×1.4 health and +2 to the blow, up to twice; the leader starves without kills.
     Grows,
     /// Cuckoo: a blow that gets through infects; an infected enemy that dies hatches 2 larvae
     /// (not mechanisms).
     Infects,
     /// Cuckoo: in the first round one allied worker appears in the enemy's rear («Подкидыш»).
     Changeling,
+    /// Viviparous (a mutation of the Mother's pool): dying, it lets out a larva of its side — one, the larva without
+    /// the trait («Живородящая»).
+    Viviparous,
     /// Spitter: no shot between its spits; whoever reaches it gets only a weak bite («слабый укус»).
     Spitter,
 }

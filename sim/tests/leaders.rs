@@ -50,3 +50,23 @@ fn the_maniac_screws_modules_on() {
     let n = count(start_manyak, 9, 40, |bt| start(bt) > before);
     assert!(n >= 10, "a module screwed on in only {n} of 40 battles");
 }
+
+/// Живородящая: a body that dies lets out one larva of its side, and the larva does not carry it on — no flood.
+#[test]
+fn viviparous_lets_out_one_larva() {
+    use sim::model::Trait;
+    use sim::Event;
+    let mut ants = many(rabochaya(), 8);
+    for a in &mut ants {
+        a.traits.push(Trait::Viviparous);
+    }
+    let mut bt = Battle::new(2).with_log();
+    bt.add_armies(&ants, &start_otets());
+    bt.run();
+    let log = bt.log.as_ref().unwrap();
+    let deaths = log.iter().filter(|e| matches!(e, Event::Kill { t } if bt.units[*t].side == 0 && bt.units[*t].t.has(Trait::Viviparous))).count();
+    let larvae: Vec<usize> = log.iter().filter_map(|e| if let Event::Summon { u } = e { Some(*u) } else { None }).filter(|&u| bt.units[u].side == 0).collect();
+    assert!(!larvae.is_empty(), "no larva from {deaths} viviparous deaths");
+    assert!(larvae.len() <= deaths, "{} larvae from {deaths} deaths", larvae.len());
+    assert!(larvae.iter().all(|&u| !bt.units[u].t.has(Trait::Viviparous)), "a larva viviparous too");
+}

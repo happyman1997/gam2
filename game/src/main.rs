@@ -414,7 +414,7 @@ mod flow {
         // the first tile of the first row, as the overlay lays them out
         for _ in 0..2 {
             g.ui.mx = 40 + 200 + 106;
-            g.ui.my = 40 + 80 + 26;
+            g.ui.my = 24 + 70 + 26;
             frame(&mut g);
             g.ui.mouse_down();
             g.ui.mouse_up();

@@ -1757,20 +1757,26 @@ fn workshop(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, held: Option<(us
         act = Some(Act::CampBack);
     }
     let golems: Vec<usize> = (0..run.army.len()).filter(|&i| run.army[i].t.golem || !run.army[i].mods.is_empty()).collect();
-    let (tw, th) = (300, 72);
+    // ten golems fit, lower rows for more than eight; the rest are counted
+    let compact = golems.len() > 8;
+    let (tw, th, gap) = if compact { (300, 58, 6) } else { (300, 72, 8) };
+    let (name_y, cell_y) = if compact { (4, 20) } else { (8, 30) };
+    if golems.len() > 10 {
+        text(cv, a, &tf("army.more", &[("n", &(golems.len() - 10))]), 36, 442, MUTED, Align::Left);
+    }
     let held_key = held.and_then(|(m, j)| run.army.get(m).and_then(|x| x.mods.get(j)).cloned());
     let mut tip = None;
-    for (n, &mi) in golems.iter().enumerate().take(8) {
+    for (n, &mi) in golems.iter().enumerate().take(10) {
         let m = &run.army[mi];
         let (col, row) = ((n % 2) as i32, (n / 2) as i32);
-        let r = Rect::new(36 + col * (tw + 12), 116 + row * (th + 8) + ui.rise_from(ui.opened, n), tw, th);
+        let r = Rect::new(36 + col * (tw + 12), 116 + row * (th + gap) + ui.rise_from(ui.opened, n), tw, th);
         plate(ui, cv, a, cls, r);
         let mut pic = Image::clear(56, th - 8);
         small(&mut pic, a, &m.t, 28, th - 14, false, m.broken);
         cv.blit(&pic, r.x + 6, r.y + 4, false, 1.0);
-        a.fonts["text16"].draw(cv, &m.t.name, r.x + 70, r.y + 8, if m.broken { MUTED } else { [255, 214, 150] }, Some(EDGE), Align::Left, 1.0);
+        a.fonts["text16"].draw(cv, &m.t.name, r.x + 70, r.y + name_y, if m.broken { MUTED } else { [255, 214, 150] }, Some(EDGE), Align::Left, 1.0);
         for j in 0..run.cells(m) {
-            let s = Rect::new(r.x + 70 + j as i32 * 42, r.y + 30, 36, 36);
+            let s = Rect::new(r.x + 70 + j as i32 * 42, r.y + cell_y, 36, 36);
             let filled = j < m.mods.len();
             let (over, _) = ui.hot(&format!("ws{mi}_{j}"), s);
             // what a click there would do with the module held: a place for it, a module to melt it into
@@ -1854,32 +1860,36 @@ fn workshop(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, held: Option<(us
 /// breed, the brood to come too).
 fn evolution(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
     let cls = run.class;
-    let r = Rect::new(40, 40, 880, 460);
+    let r = Rect::new(40, 24, 880, 492);
     plate(ui, cv, a, cls, r);
-    heading(cv, a, &t("evo.title"), 480, r.y + 16, 24, cols(cls), Align::Center);
-    text(cv, a, &t("evo.sub"), 480, r.y + 50, MUTED, Align::Center);
+    heading(cv, a, &t("evo.title"), 480, r.y + 12, 24, cols(cls), Align::Center);
+    text(cv, a, &t("evo.sub"), 480, r.y + 44, MUTED, Align::Center);
     let mut act = None;
     let forms: Vec<String> = run.forms().into_iter().filter(|f| !Run::evolutions(f).is_empty()).collect();
+    // every form that has evolutions gets its row (eight at most): lower rows when there are more than five
+    let compact = forms.len() > 5;
+    let (step, th) = if compact { (44, 40) } else { (62, 52) };
     if forms.is_empty() {
         text(cv, a, &t("evo.none"), 480, r.y + 140, PALE, Align::Center);
     }
     let font = &a.fonts["text16"];
     let mut tip = None;
-    for (i, form) in forms.iter().enumerate().take(5) {
-        let y = r.y + 80 + i as i32 * 62 + ui.rise_from(ui.opened, i);
+    for (i, form) in forms.iter().enumerate().take(8) {
+        let y = r.y + 70 + i as i32 * step + ui.rise_from(ui.opened, i);
         // the form: a body of it, its name, what its next evolution costs
         if let Some(m) = run.army.iter().find(|m| form_of(&m.t) == form && !run.is_leader(m)) {
-            let mut pic = Image::clear(60, 60);
-            small(&mut pic, a, &m.t, 30, 54, false, false);
-            cv.blit(&pic, r.x + 24, y - 4, false, 1.0);
+            let mut pic = Image::clear(60, th + 4);
+            small(&mut pic, a, &m.t, 30, th - 2, false, false);
+            cv.blit(&pic, r.x + 24, y - 2, false, 1.0);
         }
-        font.draw(cv, form, r.x + 92, y + 6, ACID2, Some(EDGE), Align::Left, 1.0);
+        font.draw(cv, form, r.x + 92, y + if compact { 2 } else { 6 }, ACID2, Some(EDGE), Align::Left, 1.0);
         let price = run.evo_price(form);
         let can_pay = run.money >= price;
-        ui.icon(cv, a, currency_icon(cls), r.x + 92, y + 30, 2, 1.0);
-        a.fonts["title16"].draw(cv, &price.to_string(), r.x + 116, y + 30, if can_pay { GOLD } else { RED }, Some(EDGE), Align::Left, 1.0);
+        let (py, ik) = if compact { (y + 21, 1) } else { (y + 30, 2) };
+        ui.icon(cv, a, currency_icon(cls), r.x + 92, py, ik, 1.0);
+        a.fonts["title16"].draw(cv, &price.to_string(), r.x + 100 + 8 * ik, py, if can_pay { GOLD } else { RED }, Some(EDGE), Align::Left, 1.0);
         for (j, e) in Run::evolutions(form).iter().enumerate() {
-            let tile = Rect::new(r.x + 200 + j as i32 * 222, y, 212, 52);
+            let tile = Rect::new(r.x + 200 + j as i32 * 222, y, 212, th);
             let taken = run.breeds.iter().any(|(f, k)| f == form && k == &e.key);
             let on = !taken && can_pay;
             let (over, k) = ui.hot(&format!("evo{i}_{j}"), tile);
@@ -1895,15 +1905,16 @@ fn evolution(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> 
             if on {
                 cv.glow(tile.x as f32 + 26.0, tile.cy() as f32, 30.0, [150, 230, 70], 0.1 + 0.2 * k);
             }
-            ui.icon(cv, a, &format!("swarm/{}", e.key), tile.x + 8, tile.y + 10, 2, if taken || on { 1.0 } else { 0.45 });
+            ui.icon(cv, a, &format!("swarm/{}", e.key), tile.x + 8, tile.y + (th - 32) / 2, 2, if taken || on { 1.0 } else { 0.45 });
             let name = t(&format!("find.{}", e.key));
             let lines = font.wrap(&name, tile.w - 56);
-            let mut ly = tile.y + if lines.len() > 1 { 2 } else { 8 };
-            for l in lines.iter().take(2) {
+            let rows = if compact { 1 } else { 2 };
+            let mut ly = tile.y + if lines.len() > 1 && !compact { 2 } else { (th - 16) / 2 - 2 };
+            for l in lines.iter().take(rows) {
                 font.draw(cv, l, tile.x + 48, ly, if taken { GOLD } else if on { INK } else { MUTED }, Some(EDGE), Align::Left, 1.0);
                 ly += 18;
             }
-            if taken {
+            if taken && !compact {
                 font.draw(cv, &t("evo.taken"), tile.x + tile.w - 8, tile.y + tile.h - 20, GOLD, Some(EDGE), Align::Right, 1.0);
             }
             if over {
@@ -1914,7 +1925,7 @@ fn evolution(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> 
             }
         }
     }
-    if ui.minor(cv, a, cls, "evoback", 410, 452, &t("back"), true) {
+    if ui.minor(cv, a, cls, "evoback", 410, 474, &t("back"), true) {
         act = Some(Act::CloseOverlay);
     }
     if let Some(lines) = tip {

@@ -195,7 +195,10 @@ pub struct Growth {
     pub key: String,
     pub leader: Give,
     pub army: Give,
+    /// More cells for every golem of the army.
     pub cells: usize,
+    /// More cells for the leader alone (the Father of the Colossus).
+    pub own_cells: usize,
     pub units: Vec<String>,
 }
 

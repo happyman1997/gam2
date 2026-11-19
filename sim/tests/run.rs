@@ -121,6 +121,24 @@ fn saves_and_loads() {
     assert_eq!(back.path.len(), r.path.len());
 }
 
+/// A save from before the modules had levels and the leader grew: it still loads, every module at level I.
+#[test]
+fn an_older_save_loads() {
+    use sim::run::{Find, Offer, Target};
+    let mut r = Run::new(Class::Foundry, 1, 5);
+    let i = r.army.iter().position(|m| m.t.golem).unwrap();
+    assert!(r.take_find(&Offer { key: "flail".into(), units: vec![], price: 0, find: Find::Module("flail".into()) }, Some(&Target::Member(i))));
+    let mut v: serde_json::Value = serde_json::to_value(&r).unwrap();
+    v.as_object_mut().unwrap().remove("growth");
+    for m in v["army"].as_array_mut().unwrap() {
+        m.as_object_mut().unwrap().remove("levels");
+    }
+    let back: Run = serde_json::from_value(v).expect("an older save");
+    assert!(back.growth.is_empty());
+    assert_eq!(back.army[i].mods, vec!["flail".to_string()]);
+    assert_eq!(back.army[i].level(0), 1);
+}
+
 /// Every way a leader can grow changes something: the leader's battle body, the rest of the army's, the cells, or the
 /// army itself.
 #[test]
@@ -266,4 +284,23 @@ fn evolutions_and_leader_pools() {
     assert_eq!(r.body(m).dmg, sim::model::Dmg::Acid);
     r.money = EVO_PRICE + EVO_STEP - 1;
     assert!(!r.evolve(ant, "evo_phalanx"), "an evolution without the biomass for it");
+}
+
+/// «Ещё ячейка» of the Father of the Colossus is his alone; «Ещё аугмент» of the Inventor is every golem's.
+#[test]
+fn growth_cells_go_where_they_say() {
+    use sim::run::{Find, Offer};
+    let mut r = Run::new(Class::Foundry, 0, 3);
+    r.recruit(&Offer { key: "strazh".into(), units: vec![sim::data::strazh()], price: 0, find: Find::Units });
+    let lead = r.army.iter().position(|m| r.is_leader(m)).unwrap();
+    let other = r.army.iter().position(|m| !r.is_leader(m) && m.t.golem).unwrap();
+    let (l0, o0) = (r.cells(&r.army[lead]), r.cells(&r.army[other]));
+    r.grow("colossus_cell");
+    assert_eq!(r.cells(&r.army[lead]), l0 + 1);
+    assert_eq!(r.cells(&r.army[other]), o0, "the colossus's cell went to another golem");
+    let mut r = Run::new(Class::Foundry, 1, 3);
+    let before: Vec<usize> = r.army.iter().filter(|m| m.t.golem).map(|m| r.cells(m)).collect();
+    r.grow("inventor_cells");
+    let after: Vec<usize> = r.army.iter().filter(|m| m.t.golem).map(|m| r.cells(m)).collect();
+    assert!(before.iter().zip(&after).all(|(b, a)| a == &(b + 1)));
 }

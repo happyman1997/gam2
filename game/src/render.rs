@@ -251,6 +251,7 @@ fn number(cv: &mut Image, a: &Assets, rec: &Record, n: &Number, f: i32, bars: &[
         NumStyle::Heal => ("title16", [196, 250, 160], [40, 110, 40]),
         NumStyle::Poison => ("title16", [150, 230, 60], [30, 70, 10]),
         NumStyle::Miss => ("text16", [170, 166, 160], [50, 48, 52]),
+        NumStyle::Status => ("text16", [200, 190, 255], [50, 40, 90]),
     };
     // never on a leader's health: a number that would cover one goes up over it
     let w = a.fonts[font].width(&n.text) / 2 + 2;

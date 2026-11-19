@@ -1197,6 +1197,12 @@ impl Battle {
                 }
             }
         }
+        // a viviparous body lets out one larva of its own side
+        if self.units[t].t.has(Trait::Viviparous) {
+            let mut larva = crate::data::rabochaya();
+            larva.name = "Личинка".into();
+            self.spawn(side, larva, x, y);
+        }
         // larvae hatch from an infected body
         if let Some(by) = self.units[t].infected {
             for _ in 0..2 {
@@ -1238,8 +1244,8 @@ impl Battle {
                     self.kill(j);
                 }
             }
-            // the Devourer starves without a kill for 3 rounds
-            if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.round >= self.units[j].last_meal + 3 {
+            // the Devourer starves without a kill for 3 rounds (the leader; its blood in a breed grows, never starves)
+            if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.units[j].t.has(Trait::Leader) && self.round >= self.units[j].last_meal + 3 {
                 let loss = (self.units[j].t.hp / 10).max(1);
                 self.units[j].hp -= loss;
                 if self.units[j].hp <= 0 {

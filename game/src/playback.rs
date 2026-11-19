@@ -158,6 +158,8 @@ pub enum NumStyle {
     Heal,
     Poison,
     Miss,
+    /// A state put on it (оглушён): its own line, not merged with the blows' numbers.
+    Status,
 }
 
 pub struct Number {
@@ -444,7 +446,7 @@ impl Record {
                     }
                     Event::Stun { t } => {
                         let (x, y) = at(t);
-                        nums.push(Number { text: t_("num.stun"), style: NumStyle::Miss, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                        nums.push(Number { text: t_("num.stun"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
                     }
                     _ => {}
                 }

@@ -470,7 +470,8 @@ impl Run {
 
     /// How many modules a golem takes (its cells): the Father of the Colossus four, a big frame three, the rest two.
     pub fn cells(&self, m: &Member) -> usize {
-        let more: usize = self.growth.iter().filter_map(|k| data::growth_by_key(k)).map(|g| g.cells).sum();
+        let own = self.is_leader(m);
+        let more: usize = self.growth.iter().filter_map(|k| data::growth_by_key(k)).map(|g| g.cells + if own { g.own_cells } else { 0 }).sum();
         more + match data::unit_key(&m.t.name) {
             Some("otets_kolossa") => 4,
             _ if m.t.size >= 5 => 3,
