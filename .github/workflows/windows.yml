@@ -1,5 +1,5 @@
-# The game is made for Windows only: every push builds it there, runs the tests and keeps the build
-# (game.exe with its assets folder) as a downloadable artifact of the run.
+# The game is made for Windows only: every push builds it there, runs the tests and keeps the tech demo
+# (game.exe with its assets folder and README.txt) as a downloadable artifact of the run.
 name: windows
 
 on:
@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # the commit, shown in the main menu as the build's number
+      GAM2_BUILD: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -24,7 +27,21 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/game.exe dist/
           Copy-Item -Recurse game/assets dist/assets
+          Copy-Item game/dist/README.txt dist/
+      # a copy handed to someone has to start on a Windows without the Visual C++ runtime (.cargo/config.toml)
+      - name: No runtime DLLs needed
+        shell: bash
+        run: |
+          python -m pip install --quiet pefile
+          python - <<'PY'
+          import pefile
+          pe = pefile.PE("dist/game.exe")
+          dlls = sorted({e.dll.decode().lower() for e in pe.DIRECTORY_ENTRY_IMPORT})
+          print("imports:", ", ".join(dlls))
+          bad = [d for d in dlls if d.startswith(("vcruntime", "msvcp"))]
+          assert not bad, f"game.exe needs the Visual C++ runtime: {bad}"
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: gam2-windows
+          name: gam2-techdemo-windows
           path: dist

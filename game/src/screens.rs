@@ -939,6 +939,11 @@ impl Game {
 
 // ---------------------------------------------------------------- the menu, the class, the leader
 
+/// Which build this is: the commit it was built from (CI sets GAM2_BUILD), «dev» for a local one.
+pub fn build() -> String {
+    option_env!("GAM2_BUILD").map(|s| s.chars().take(7).collect()).filter(|s: &String| !s.is_empty()).unwrap_or_else(|| "dev".to_string())
+}
+
 fn menu(ui: &mut Ui, cv: &mut Image, a: &Assets, saved: Option<(u32, Class)>) -> Option<Act> {
     ui::motes(cv, ui.t, Rect::new(250, 120, 300, 300), 26, Class::Foundry, 1.0);
     ui::motes(cv, ui.t, Rect::new(680, 160, 240, 260), 14, Class::Swarm, 0.8);
@@ -963,7 +968,8 @@ fn menu(ui: &mut Ui, cv: &mut Image, a: &Assets, saved: Option<(u32, Class)>) ->
     if ui.tag(cv, a, "quit", 650, 492, &t("menu.quit"), "rust", true) {
         act = Some(Act::Quit);
     }
-    text(cv, a, &t("menu.version"), 948, 516, PALE, Align::Right);
+    // which build: up in the corner, clear of the buttons
+    text(cv, a, &tf("menu.version", &[("v", &build())]), 948, 8, PALE, Align::Right);
     act
 }
 

@@ -1,0 +1,4 @@
+# The game is handed out as game.exe and its assets folder: the C runtime goes into game.exe, so it starts on a Windows
+# without the Visual C++ runtime installed (no «VCRUNTIME140.dll not found»).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
