@@ -427,6 +427,234 @@ mod flow {
         assert!(g.overlays.is_empty());
     }
 
+    /// A monkey at the keyboard and the mouse: random clicks all over the screen, random keys, battles wound to their
+    /// end now and then — thousands of frames from the menu on, every screen drawn. Nothing may panic, and the game
+    /// must keep moving (`GAME_MONKEY=N` runs N monkeys, each a few thousand frames).
+    #[test]
+    #[ignore]
+    fn monkey() {
+        use crate::ui::Key;
+        let tmp = std::env::temp_dir().join(format!("gam2-monkey-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let runs: u64 = std::env::var("GAME_MONKEY").ok().and_then(|s| s.parse().ok()).unwrap_or(2);
+        let keys = [Key::Enter, Key::Space, Key::Tab, Key::End, Key::R, Key::C, Key::Digit(1), Key::Digit(2), Key::Digit(3), Key::Digit(4)];
+        for seed in 0..runs {
+            let mut x = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+            let mut rnd = move |n: u64| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                x % n.max(1)
+            };
+            let mut g = Game::new(crate::Demo::new(184).unwrap());
+            let mut screens = std::collections::BTreeMap::new();
+            let mut last_run = None;
+            for _ in 0..3000 {
+                if let Some(r) = &g.run {
+                    if last_run != Some(r.seed) {
+                        last_run = Some(r.seed);
+                        eprintln!("monkey {seed}: a run of {:?}, leader {}, seed {}", r.class, r.leader, r.seed);
+                    }
+                }
+                *screens.entry(format!("{:?}", std::mem::discriminant(&g.screen))).or_insert(0) += 1;
+                match rnd(100) {
+                    0..=69 => {
+                        g.ui.mx = rnd(960) as i32;
+                        g.ui.my = rnd(540) as i32;
+                        frame(&mut g);
+                        g.ui.mouse_down();
+                        g.ui.mouse_up();
+                    }
+                    70..=79 => g.key(keys[rnd(keys.len() as u64) as usize]),
+                    80..=83 => g.key(Key::Esc),
+                    _ => {
+                        g.ui.mx = rnd(960) as i32;
+                        g.ui.my = rnd(540) as i32;
+                    }
+                }
+                // a battle runs out now and then (in the window it plays on its own)
+                if g.in_battle() && rnd(8) == 0 {
+                    g.demo.view.frame = (g.demo.rec.frames() + 24) as f32;
+                }
+                g.step_fade(0.05);
+                frame(&mut g);
+                if g.quit {
+                    g.quit = false;
+                }
+            }
+            eprintln!("monkey {seed}: {} screens, {:?}", screens.len(), screens);
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// A random player: whole runs of all eight leaders to their end, every screen's choice made at random by its own
+    /// acts — roads, spoils, cards, places, growth, the trader, events, the camp, the workshop's cells, evolutions —
+    /// each screen drawn after each act, the run checked after each step (`GAME_PLAYER=N` seeds a leader, 2 by default).
+    #[test]
+    #[ignore]
+    fn random_player() {
+        use crate::game::{CampStage, Overlay};
+        use sim::run::{Run, MAX_LEVEL};
+        let tmp = std::env::temp_dir().join(format!("gam2-player-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let seeds: u64 = std::env::var("GAME_PLAYER").ok().and_then(|s| s.parse().ok()).unwrap_or(2);
+        let check = |g: &Game, what: &str| {
+            let r = g.run.as_ref().unwrap();
+            assert!(r.money >= 0, "{what}: money {}", r.money);
+            assert!(r.army.iter().any(|m| r.is_leader(m)), "{what}: no leader");
+            for m in &r.army {
+                assert!(m.mods.len() <= r.cells(m), "{what}: {} has {} modules in {} cells", m.t.name, m.mods.len(), r.cells(m));
+                assert!((0..m.mods.len()).all(|j| (1..=MAX_LEVEL).contains(&m.level(j))), "{what}: a level out of I–III");
+                let mut k = m.mods.clone();
+                k.sort();
+                k.dedup();
+                assert_eq!(k.len(), m.mods.len(), "{what}: a module twice on {}", m.t.name);
+            }
+        };
+        for cls in [Class::Foundry, Class::Swarm] {
+            for leader in 0..4 {
+                for seed in 0..seeds {
+                    let mut x = (seed + 1) * 7919 + leader as u64 * 104729 + cls as u64;
+                    let mut rnd = move |n: usize| {
+                        x ^= x << 13;
+                        x ^= x >> 7;
+                        x ^= x << 17;
+                        (x % n.max(1) as u64) as usize
+                    };
+                    let mut g = Game::new(crate::Demo::new(184).unwrap());
+                    g.run = Some(Run::new(cls, leader, 1000 + seed));
+                    g.screen = Screen::Fork;
+                    let mut steps = 0;
+                    loop {
+                        steps += 1;
+                        assert!(steps < 300, "{cls:?} {leader} {seed}: a run that does not end");
+                        frame(&mut g);
+                        let what = format!("{cls:?} leader {leader} seed {seed} step {steps}");
+                        match &g.screen {
+                            Screen::Fork => {
+                                let n = g.run.as_ref().unwrap().path.len();
+                                g.apply(Act::Road(rnd(n)));
+                            }
+                            Screen::Battle { .. } => {
+                                g.demo.view.frame = (g.demo.rec.frames() + 24) as f32;
+                                frame(&mut g);
+                                g.battle_done();
+                            }
+                            Screen::Rewards { list, .. } => {
+                                let list: Vec<Reward> = list.iter().map(|(r, _)| r.clone()).collect();
+                                for (i, r) in list.iter().enumerate() {
+                                    match r {
+                                        Reward::Find(o) => {
+                                            g.apply(Act::OpenFind(i));
+                                            frame(&mut g);
+                                            let pick = rnd(o.len() + 1);
+                                            g.apply(Act::Pick(i, (pick < o.len()).then_some(pick)));
+                                        }
+                                        Reward::Growth(k) => {
+                                            g.apply(Act::OpenFind(i));
+                                            frame(&mut g);
+                                            g.apply(Act::Pick(i, Some(rnd(k.len()))));
+                                        }
+                                        _ if rnd(4) > 0 => g.apply(Act::Take(i)),
+                                        _ => {}
+                                    }
+                                    frame(&mut g);
+                                    // a module or a mutation: a place at random, or given up
+                                    if let Some(tg) = g.targeting.clone() {
+                                        let to = g.run.as_ref().unwrap().targets(&tg.offer);
+                                        g.apply(if to.is_empty() || rnd(5) == 0 { Act::CancelTarget } else { Act::Place(to[rnd(to.len())].clone()) });
+                                        frame(&mut g);
+                                    }
+                                }
+                                if cls == Class::Swarm && rnd(2) == 0 {
+                                    evolve(&mut g, &mut rnd);
+                                }
+                                g.apply(Act::LeaveRewards);
+                            }
+                            Screen::Shop(shop) => {
+                                let (no, na) = (shop.offers.len(), shop.artifacts.len());
+                                for _ in 0..3 {
+                                    match rnd(3) {
+                                        0 => g.apply(Act::BuyOffer(rnd(no))),
+                                        1 => g.apply(Act::BuyArtifact(rnd(na))),
+                                        _ => g.apply(Act::BuyService),
+                                    }
+                                    frame(&mut g);
+                                    if let Some(tg) = g.targeting.clone() {
+                                        let to = g.run.as_ref().unwrap().targets(&tg.offer);
+                                        g.apply(if to.is_empty() { Act::CancelTarget } else { Act::Place(to[rnd(to.len())].clone()) });
+                                        frame(&mut g);
+                                    }
+                                }
+                                g.apply(Act::LeaveStop);
+                            }
+                            Screen::Event { id, .. } => {
+                                let can: Vec<usize> = (0..3).filter(|&o| g.run.as_ref().unwrap().event_can(*id, o)).collect();
+                                g.apply(Act::EventChoose(can[rnd(can.len())]));
+                                frame(&mut g);
+                                g.apply(Act::LeaveStop);
+                            }
+                            Screen::Camp { .. } => {
+                                if cls == Class::Foundry {
+                                    g.apply(Act::Workshop);
+                                    frame(&mut g);
+                                    for _ in 0..12 {
+                                        let r = g.run.as_ref().unwrap();
+                                        let m = rnd(r.army.len());
+                                        let j = rnd(r.cells(&r.army[m]) + 1);
+                                        g.apply(Act::Socket(m, j));
+                                        frame(&mut g);
+                                        check(&g, &format!("{what} workshop"));
+                                    }
+                                    g.apply(Act::CampBack);
+                                    assert!(matches!(g.screen, Screen::Camp { stage: CampStage::Choose, .. }));
+                                } else if rnd(2) == 0 {
+                                    evolve(&mut g, &mut rnd);
+                                }
+                                frame(&mut g);
+                                if rnd(2) == 0 && (cls == Class::Swarm || g.run.as_ref().unwrap().broken() > 0) {
+                                    g.apply(Act::CampRest);
+                                } else {
+                                    g.apply(Act::CampUp);
+                                    frame(&mut g);
+                                    let n = g.run.as_ref().unwrap().army.len();
+                                    g.apply(Act::CampPick(rnd(n)));
+                                }
+                                frame(&mut g);
+                                g.apply(Act::LeaveStop);
+                            }
+                            Screen::End { .. } => break,
+                            _ => panic!("{what}: an unexpected screen"),
+                        }
+                        settle(&mut g);
+                        check(&g, &what);
+                    }
+                    let r = g.run.as_ref().unwrap();
+                    eprintln!("{cls:?} leader {leader} seed {seed}: {} after {} battles, army {}, growth {:?}", if r.over == Some(true) { "won" } else { "lost" }, r.stats.won, r.army.len(), r.growth);
+                    assert!(g.overlays.is_empty() || matches!(g.overlays[..], [Overlay::Evolution]), "overlays left: {}", g.overlays.len());
+                }
+            }
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        // the swarm's evolutions: the overlay opened, an evolution clicked at random (a form, one of its own), closed
+        fn evolve(g: &mut Game, rnd: &mut impl FnMut(usize) -> usize) {
+            g.apply(Act::Evolution);
+            frame(g);
+            let r = g.run.as_ref().unwrap();
+            let forms: Vec<String> = r.forms().into_iter().filter(|f| !Run::evolutions(f).is_empty()).collect();
+            if !forms.is_empty() {
+                let f = forms[rnd(forms.len())].clone();
+                let e = Run::evolutions(&f);
+                let k = e[rnd(e.len())].key.clone();
+                g.apply(Act::Evolve(f, k));
+                frame(g);
+            }
+            g.apply(Act::CloseOverlay);
+            frame(g);
+        }
+    }
+
     /// A run of each class walked through every kind of screen by the screens' own acts — roads, battles, spoils,
     /// the find, the trader, events, the camp — each screen drawn on the way, to its end.
     #[test]
