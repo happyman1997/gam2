@@ -639,7 +639,12 @@ impl Game {
                 Screen::Leaders { class, chosen } => leaders(ui, cv, a, *class, chosen),
                 Screen::Fork => run.and_then(|r| fork(ui, cv, a, r)),
                 Screen::Battle { .. } => None,
-                Screen::Rewards { list, pick } => run.and_then(|r| rewards(ui, cv, a, r, list, *pick)),
+                Screen::Rewards { list, pick } => {
+                    if let (Some(r), Some(sum)) = (run, &self.summary) {
+                        summary(ui, cv, a, r.class, sum);
+                    }
+                    run.and_then(|r| rewards(ui, cv, a, r, list, *pick))
+                }
                 Screen::Shop(shop) => run.and_then(|r| shop_screen(ui, cv, a, r, shop)),
                 Screen::Event { id, done } => run.and_then(|r| event(ui, cv, a, r, *id, done)),
                 Screen::Camp { stage, said } => run.and_then(|r| camp(ui, cv, a, r, *stage, said)),
@@ -1497,6 +1502,59 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
     }
     ui.blocked = outer;
     act
+}
+
+/// The battle's summary beside the spoils: how long it went, how many of the enemy fell, who of ours killed most,
+/// what it cost (each body lost, broken or dead — none, if so).
+fn summary(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, s: &crate::game::Summary) {
+    let r = Rect::new(14, 66, 236, 390);
+    let k = ((ui.t - ui.entered) / 0.3).clamp(0.0, 1.0);
+    if k <= 0.0 {
+        return;
+    }
+    cv.fill(r.x, r.y, r.w, r.h, [10, 8, 12, (130.0 * k) as u8]);
+    let font = &a.fonts["text16"];
+    heading(cv, a, &t("sum.title"), r.cx(), r.y + 10, 16, cols(cls), Align::Center);
+    let mut y = r.y + 40;
+    for (g, l) in [("glyph/инициатива", tf("sum.rounds", &[("n", &s.rounds)])), ("glyph/убийство", tf("sum.kills", &[("n", &s.kills)]))] {
+        ui.icon(cv, a, g, r.x + 10, y, 1, k);
+        font.draw(cv, &l, r.x + 32, y, INK, Some(EDGE), Align::Left, k);
+        y += 22;
+    }
+    if let Some((b, n)) = &s.best {
+        y += 6;
+        font.draw(cv, &t("sum.best"), r.x + 10, y, MUTED, Some(EDGE), Align::Left, k);
+        y += 18;
+        let mut pic = Image::clear(44, 40);
+        small(&mut pic, a, b, 22, 38, false, false);
+        cv.blit(&pic, r.x + 6, y, false, k);
+        let name = font.wrap(&b.name, r.w - 64).into_iter().next().unwrap_or_default();
+        font.draw(cv, &name, r.x + 54, y + 4, GOLD, Some(EDGE), Align::Left, k);
+        font.draw(cv, &tf("sum.killed", &[("n", n)]), r.x + 54, y + 22, INK, Some(EDGE), Align::Left, k);
+        y += 48;
+    }
+    y += 6;
+    font.draw(cv, &t("sum.lost"), r.x + 10, y, MUTED, Some(EDGE), Align::Left, k);
+    y += 20;
+    if s.lost.is_empty() {
+        font.draw(cv, &t("sum.none"), r.x + 10, y, ACID2, Some(EDGE), Align::Left, k);
+    }
+    for (i, (b, n, broken)) in s.lost.iter().enumerate() {
+        if y + 36 > r.y + r.h {
+            let more: usize = s.lost[i..].iter().map(|l| l.1).sum();
+            font.draw(cv, &tf("army.more", &[("n", &more)]), r.x + 10, y, MUTED, Some(EDGE), Align::Left, k);
+            break;
+        }
+        let mut pic = Image::clear(44, 34);
+        small(&mut pic, a, b, 22, 32, false, true);
+        cv.blit(&pic, r.x + 6, y, false, k);
+        let name = font.wrap(&b.name, r.w - 64).into_iter().next().unwrap_or_default();
+        font.draw(cv, &name, r.x + 54, y, INK, Some(EDGE), Align::Left, k);
+        let what = if *broken { t("card.broken") } else { t("sum.dead") };
+        let cnt = if *n > 1 { format!("{what} ×{n}") } else { what };
+        font.draw(cv, &cnt, r.x + 54, y + 16, RED, Some(EDGE), Align::Left, k);
+        y += 38;
+    }
 }
 
 // ---------------------------------------------------------------- the trader

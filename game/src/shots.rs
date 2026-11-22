@@ -88,6 +88,9 @@ pub fn run(demo: Demo, dir: &str) {
         g.run = Some(r2.clone());
         let list: Vec<(Reward, bool)> = rewards.into_iter().map(|r| (r, false)).collect();
         let find = list.iter().position(|(r, _)| matches!(r, Reward::Find(_))).unwrap_or(0);
+        // the battle's summary beside the spoils: a best fighter, a loss
+        let first = r2.army.iter().find(|m| !r2.is_leader(m)).map(|m| m.t.clone()).unwrap_or_else(|| r2.army[0].t.clone());
+        g.summary = Some(crate::game::Summary { rounds: 11, kills: 9, lost: vec![(first.clone(), 2, cls == Class::Foundry)], best: Some((first, 4)) });
         set(&mut g, Screen::Rewards { list: list.clone(), pick: None });
         snap(&mut g, dir, &format!("11_{tag}_rewards"), (480, 200));
         // the swarm's evolutions over its spoils: one taken already, the rest for biomass

@@ -908,7 +908,12 @@ mod flow {
                     Screen::Battle { .. } => {
                         g.demo.view.frame = (g.demo.rec.frames() + 24) as f32;
                         frame(&mut g);
+                        let dead = g.demo.rec.dead0.len();
                         g.battle_done();
+                        // the battle's summary: its losses, no more than fell
+                        let sum = g.summary.as_ref().expect("no summary of the battle");
+                        assert!(sum.lost.iter().map(|l| l.1).sum::<usize>() <= dead);
+                        assert_eq!(sum.rounds, g.demo.rec.outcome.rounds);
                     }
                     Screen::Rewards { list, .. } => {
                         let list: Vec<Reward> = list.iter().map(|(r, _)| r.clone()).collect();

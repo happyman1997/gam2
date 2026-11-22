@@ -53,6 +53,8 @@ pub struct Record {
     /// What the battle did to side 0's army (who of it fell, by its place in the army) and how many of side 1 fell.
     pub dead0: Vec<usize>,
     pub kills1: u32,
+    /// How many each unit killed in the battle (for its summary).
+    pub kills: Vec<u32>,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
@@ -111,7 +113,8 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
         r.after.resize(bt.units.len(), State::default());
     }
     let res = sim::run::result_of(&bt, outcome.winner);
-    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![], dead0: res.dead, kills1: res.kills };
+    let kills = bt.units.iter().map(|u| u.kills).collect();
+    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![], dead0: res.dead, kills1: res.kills, kills };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
         for m in rec.moments(r) {

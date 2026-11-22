@@ -150,6 +150,16 @@ pub enum Ask {
     Quit,
 }
 
+/// What a battle came to: how long, how many of the enemy fell, ours lost (a body, how many, broken — a golem —
+/// or dead), the one of ours who killed most.
+#[derive(Clone)]
+pub struct Summary {
+    pub rounds: u32,
+    pub kills: u32,
+    pub lost: Vec<(sim::model::Template, usize, bool)>,
+    pub best: Option<(sim::model::Template, u32)>,
+}
+
 pub struct Game {
     pub demo: Demo,
     pub ui: Ui,
@@ -185,6 +195,8 @@ pub struct Game {
     pub field_mouse: Option<(f32, f32)>,
     /// The bodies of the battle being watched, in its units' order (ours, then the enemy's).
     pub battle_bodies: Vec<sim::model::Template>,
+    /// What the last battle came to, for the spoils' screen.
+    pub summary: Option<Summary>,
     /// How far down the picked body's sheet is scrolled (lines).
     pub sheet_top: usize,
 }
@@ -210,6 +222,7 @@ impl Game {
             inspect: None,
             field_mouse: None,
             battle_bodies: vec![],
+            summary: None,
             sheet_top: 0,
             saved,
             money_seen: None,
@@ -363,6 +376,25 @@ impl Game {
             dead: self.demo.rec.dead0.clone(),
             kills: self.demo.rec.kills1,
         };
+        // the battle's summary, read before its losses are taken from the army: who fell (the leader always comes
+        // back), who killed most
+        let (fighters, idx) = run.fighters();
+        let mut lost: Vec<(sim::model::Template, usize, bool)> = vec![];
+        for &d in &res.dead {
+            let Some(&m) = idx.get(d) else { continue };
+            if run.is_leader(&run.army[m]) {
+                continue;
+            }
+            let t = run.army[m].t.clone();
+            let broken = run.class == run::Class::Foundry;
+            match lost.iter_mut().find(|(x, _, _)| x.name == t.name) {
+                Some(l) => l.1 += 1,
+                None => lost.push((t, 1, broken)),
+            }
+        }
+        let rec = &self.demo.rec;
+        let best = (0..fighters.len().min(rec.kills.len())).filter(|&i| rec.kills[i] > 0).max_by_key(|&i| (rec.kills[i], std::cmp::Reverse(i))).map(|i| (fighters[i].clone(), rec.kills[i]));
+        self.summary = Some(Summary { rounds: rec.outcome.rounds, kills: res.kills, lost, best });
         let rewards = run.after_battle(&node, &res);
         if run.over == Some(false) {
             self.forget_save();
