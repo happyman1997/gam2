@@ -17,8 +17,15 @@ use std::path::PathBuf;
 /// The player's settings, kept between games (settings.json in the game's folder of the user's data).
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Settings {
-    /// 0..=10.
+    /// 0..=10: the whole game's; the battle's sounds and the interface's under it, each 0..=10 of the whole.
     pub volume: u8,
+    #[serde(default = "full")]
+    pub battle_vol: u8,
+    #[serde(default = "full")]
+    pub ui_vol: u8,
+    /// The words' language (its file in assets/text).
+    #[serde(default = "base_lang")]
+    pub lang: String,
     pub fullscreen: bool,
     pub camera: bool,
     /// How close the battle's camera may come, 1..=4 (with `camera` off — the whole field); the last one kept.
@@ -37,7 +44,19 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { volume: 8, fullscreen: true, camera: true, ui_scale: 0, speed: 1, zoom: ZOOM_DEFAULT, hints: true, hints_seen: 0 }
+        Settings {
+            volume: 8,
+            battle_vol: 10,
+            ui_vol: 10,
+            lang: base_lang(),
+            fullscreen: true,
+            camera: true,
+            ui_scale: 0,
+            speed: 1,
+            zoom: ZOOM_DEFAULT,
+            hints: true,
+            hints_seen: 0,
+        }
     }
 }
 
@@ -51,6 +70,14 @@ fn zoom_default() -> u8 {
 
 fn yes() -> bool {
     true
+}
+
+fn full() -> u8 {
+    10
+}
+
+fn base_lang() -> String {
+    crate::text::BASE.into()
 }
 
 /// The screens with a first-time hint: the leaders, the fork, a battle, the spoils, the trader, the camp.
@@ -222,6 +249,7 @@ pub struct Game {
 impl Game {
     pub fn new(demo: Demo) -> Game {
         let mut settings = Settings::load();
+        crate::text::set_lang(&settings.lang);
         // the tests click their way through the screens: no first-time hints in their way
         if cfg!(test) {
             settings.hints = false;
@@ -261,7 +289,8 @@ impl Game {
     pub fn apply_volume(&mut self) {
         #[cfg(feature = "audio")]
         if let Some(a) = &mut self.demo.audio {
-            a.set_volume(self.settings.volume as f32 / 10.0);
+            let s = &self.settings;
+            a.set_volume(s.volume as f32 / 10.0, s.battle_vol as f32 / 10.0, s.ui_vol as f32 / 10.0);
         }
     }
 

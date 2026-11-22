@@ -103,7 +103,7 @@ impl Demo {
     pub fn ui_sound(&mut self, _name: &str) {
         #[cfg(feature = "audio")]
         if let Some(a) = &mut self.audio {
-            a.play(_name, 0.0, 480.0);
+            a.play_ui(_name);
         }
     }
 
@@ -437,7 +437,21 @@ mod flow {
         let tmp = std::env::temp_dir().join(format!("gam2-monkey-{}", std::process::id()));
         std::env::set_var("APPDATA", &tmp);
         let runs: u64 = std::env::var("GAME_MONKEY").ok().and_then(|s| s.parse().ok()).unwrap_or(2);
-        let keys = [Key::Enter, Key::Space, Key::Tab, Key::End, Key::R, Key::C, Key::Digit(1), Key::Digit(2), Key::Digit(3), Key::Digit(4)];
+        let keys = [
+            Key::Enter,
+            Key::Space,
+            Key::Tab,
+            Key::End,
+            Key::R,
+            Key::C,
+            Key::Digit(1),
+            Key::Digit(2),
+            Key::Digit(3),
+            Key::Digit(4),
+            Key::ZoomIn,
+            Key::ZoomOut,
+            Key::Help,
+        ];
         for seed in 0..runs {
             let mut x = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
             let mut rnd = move |n: u64| {
@@ -447,6 +461,11 @@ mod flow {
                 x % n.max(1)
             };
             let mut g = Game::new(crate::Demo::new(184).unwrap());
+            // every other monkey with the first-time hints on
+            if seed % 2 == 1 {
+                g.settings.hints = true;
+                g.settings.hints_seen = 0;
+            }
             let mut screens = std::collections::BTreeMap::new();
             let mut last_run = None;
             for _ in 0..3000 {
@@ -467,6 +486,16 @@ mod flow {
                     }
                     70..=79 => g.key(keys[rnd(keys.len() as u64) as usize]),
                     80..=83 => g.key(Key::Esc),
+                    // the right button (a look closer), Alt, the wheel
+                    84..=88 => {
+                        g.ui.mx = rnd(960) as i32;
+                        g.ui.my = rnd(540) as i32;
+                        frame(&mut g);
+                        g.ui.rmouse_down();
+                        g.ui.rmouse_up();
+                    }
+                    89..=90 => g.ui.alt = !g.ui.alt,
+                    91..=92 => g.ui.wheel = rnd(5) as i32 - 2,
                     _ => {
                         g.ui.mx = rnd(960) as i32;
                         g.ui.my = rnd(540) as i32;
@@ -744,6 +773,49 @@ mod flow {
             let w = crate::screens::icon_label(k);
             assert!(w.as_deref().is_some_and(|w| !w.is_empty() && !w.contains('.')), "no name for {k}: {w:?}");
         }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// The settings by the mouse: each loudness on its own, the hints off and on again (from the start), the language
+    /// (only Russian yet: it stays); all of it kept for the next game.
+    #[test]
+    fn the_settings() {
+        use crate::game::{Overlay, Settings};
+        let tmp = std::env::temp_dir().join(format!("gam2-settings-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        g.screen = Screen::Menu;
+        g.overlays.push(Overlay::Settings);
+        settle(&mut g);
+        let click = |g: &mut Game, x: i32, y: i32| {
+            g.ui.mx = x;
+            g.ui.my = y;
+            frame(g);
+            g.ui.mouse_down();
+            g.ui.mouse_up();
+            frame(g);
+        };
+        let (all, battle, ui) = (g.settings.volume, g.settings.battle_vol, g.settings.ui_vol);
+        // the battle's slider: its left arrow; the interface's: its left arrow twice
+        click(&mut g, 510, 124 + 10);
+        click(&mut g, 510, 158 + 10);
+        click(&mut g, 510, 158 + 10);
+        assert_eq!((g.settings.volume, g.settings.battle_vol, g.settings.ui_vol), (all, battle - 1, ui - 2));
+        // the hints: off, then on — every one of them again
+        g.settings.hints = true;
+        g.settings.hints_seen = 0b101;
+        click(&mut g, 587, 364);
+        assert!(!g.settings.hints);
+        click(&mut g, 587, 364);
+        assert!(g.settings.hints);
+        assert_eq!(g.settings.hints_seen, 0);
+        // the language: Russian, the only one
+        click(&mut g, 587, 402);
+        assert_eq!(g.settings.lang, crate::text::BASE);
+        assert_eq!(crate::text::t("lang.name"), "Русский");
+        assert_eq!(g.overlays.last(), Some(&Overlay::Settings), "a click closed the settings");
+        let kept = Settings::load();
+        assert_eq!((kept.battle_vol, kept.ui_vol, kept.hints), (battle - 1, ui - 2, true));
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

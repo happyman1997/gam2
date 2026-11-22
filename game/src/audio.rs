@@ -17,6 +17,18 @@ pub struct Audio {
     sounds: HashMap<String, Vec<StaticSoundData>>,
     seed: u64,
     bed: Option<StaticSoundHandle>,
+    /// The battle's sounds and the interface's, in dB under the whole (the settings' two lower sliders).
+    battle_db: f32,
+    ui_db: f32,
+}
+
+/// A slider's 0..1 as dB: a little steeper than the plain law, so its lower notches are quiet indeed; 0 — silence.
+fn db(v: f32) -> f32 {
+    if v <= 0.001 {
+        -80.0
+    } else {
+        20.0 * v.log10() * 1.5
+    }
 }
 
 impl Audio {
@@ -46,13 +58,18 @@ impl Audio {
             .release_duration(Duration::from_millis(150));
         let settings = AudioManagerSettings { main_track_builder: MainTrackBuilder::new().with_effect(limiter), ..Default::default() };
         let mgr = AudioManager::<DefaultBackend>::new(settings).ok()?;
-        Some(Audio { mgr, sounds, seed: 0x2545_f491_4f6c_dd1d, bed: None })
+        Some(Audio { mgr, sounds, seed: 0x2545_f491_4f6c_dd1d, bed: None, battle_db: 0.0, ui_db: 0.0 })
     }
 
-    /// The whole game's loudness, 0..1 (the settings' slider): on the main track, under the limiter's input.
-    pub fn set_volume(&mut self, v: f32) {
-        let db = if v <= 0.001 { -80.0 } else { 20.0 * v.log10() * 1.5 };
-        self.mgr.main_track().set_volume(Decibels(db), Tween::default());
+    /// The loudness, each 0..1 (the settings' sliders): the whole game's on the main track (under the limiter's
+    /// input), the battle's and the interface's on each sound of theirs (the battle's bed at once).
+    pub fn set_volume(&mut self, all: f32, battle: f32, ui: f32) {
+        self.mgr.main_track().set_volume(Decibels(db(all)), Tween::default());
+        self.battle_db = db(battle);
+        self.ui_db = db(ui);
+        if let Some(h) = &mut self.bed {
+            h.set_volume(Decibels(HEADROOM + self.battle_db), Tween::default());
+        }
     }
 
     fn rand(&mut self) -> f32 {
@@ -67,7 +84,7 @@ impl Audio {
         match (on, self.bed.is_some()) {
             (true, false) => {
                 if let Some(v) = self.sounds.get("swarm_bed") {
-                    self.bed = self.mgr.play(v[0].loop_region(..).volume(Decibels(HEADROOM))).ok();
+                    self.bed = self.mgr.play(v[0].loop_region(..).volume(Decibels(HEADROOM + self.battle_db))).ok();
                 }
             }
             (false, true) => {
@@ -79,8 +96,18 @@ impl Audio {
         }
     }
 
-    /// `gain` in dB on top of the sound's own level; `x` — where on the 960-wide field, for the panning.
+    /// A battle's sound: `gain` in dB on top of the sound's own level; `x` — where on the 960-wide field, for the
+    /// panning.
     pub fn play(&mut self, name: &str, gain: f32, x: f32) {
+        self.sound(name, gain + self.battle_db, x);
+    }
+
+    /// The interface's sound (a click, a toggle), in the middle.
+    pub fn play_ui(&mut self, name: &str) {
+        self.sound(name, self.ui_db, 480.0);
+    }
+
+    fn sound(&mut self, name: &str, gain: f32, x: f32) {
         let r1 = self.rand();
         let r2 = self.rand();
         let Some(v) = self.sounds.get(name) else { return };

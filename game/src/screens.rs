@@ -67,11 +67,16 @@ pub enum Act {
     Resume,
     Army,
     CloseOverlay,
-    Volume(i32),
+    /// A slider of the loudness (0 — the whole game's, 1 — the battle's, 2 — the interface's) a notch up or down.
+    Volume(u8, i32),
     Fullscreen,
     Camera,
     UiScale,
     Speed,
+    /// The first-time hints off, or on again from the start.
+    Hints,
+    /// The next language there are words for.
+    Lang,
 }
 
 fn cols(c: Class) -> ([u8; 3], [u8; 3]) {
@@ -1036,10 +1041,32 @@ impl Game {
             Act::Resume | Act::CloseOverlay => {
                 self.overlays.pop();
             }
-            Act::Volume(d) => {
-                self.settings.volume = (self.settings.volume as i32 + d).clamp(0, 10) as u8;
+            Act::Volume(which, d) => {
+                let s = &mut self.settings;
+                let v = match which {
+                    0 => &mut s.volume,
+                    1 => &mut s.battle_vol,
+                    _ => &mut s.ui_vol,
+                };
+                *v = (*v as i32 + d).clamp(0, 10) as u8;
                 self.settings.save();
                 self.apply_volume();
+            }
+            Act::Hints => {
+                self.settings.hints = !self.settings.hints;
+                if self.settings.hints {
+                    self.settings.hints_seen = 0;
+                }
+                self.settings.save();
+            }
+            Act::Lang => {
+                let langs = crate::text::langs();
+                let i = langs.iter().position(|(c, _)| *c == self.settings.lang).map_or(0, |i| (i + 1) % langs.len().max(1));
+                if let Some((code, _)) = langs.get(i) {
+                    self.settings.lang = code.clone();
+                    crate::text::set_lang(code);
+                    self.settings.save();
+                }
             }
             Act::Fullscreen => {
                 self.settings.fullscreen = !self.settings.fullscreen;
@@ -2436,39 +2463,47 @@ impl Game {
 }
 
 fn settings(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, s: &crate::game::Settings) -> Option<Act> {
-    let r = Rect::new(230, 80, 500, 380);
+    let r = Rect::new(230, 26, 500, 488);
     plate(ui, cv, a, cls, r);
     heading(cv, a, &t("settings.title"), 480, r.y + 18, 24, cols(cls), Align::Center);
     let mut act = None;
     let lx = r.x + 36;
     let cx = r.x + 300;
-    let mut y = r.y + 70;
-    // the volume: ten notches, arrows either side
-    text(cv, a, &t("settings.volume"), lx, y + 2, INK, Align::Left);
-    if arrow(ui, cv, a, "vol-", cx - 30, y, true) {
-        act = Some(Act::Volume(-1));
+    let mut y = r.y + 64;
+    // the loudness: the whole game's, the battle's and the interface's under it — ten notches each, arrows either side
+    let sliders = [("settings.volume", s.volume), ("settings.vol.battle", s.battle_vol), ("settings.vol.ui", s.ui_vol)];
+    for (i, (k, v)) in sliders.into_iter().enumerate() {
+        text(cv, a, &t(k), lx, y + 2, INK, Align::Left);
+        if arrow(ui, cv, a, &format!("vol{i}-"), cx - 30, y, true) {
+            act = Some(Act::Volume(i as u8, -1));
+        }
+        for n in 0..10 {
+            let on = (n as u8) < v;
+            let c = if !on {
+                [52, 44, 60, 255]
+            } else if cls == Class::Foundry {
+                [240, 170, 70, 255]
+            } else {
+                [150, 230, 70, 255]
+            };
+            cv.fill(cx + n * 12, y + 3, 9, 14, [14, 10, 18, 255]);
+            cv.fill(cx + n * 12 + 1, y + 4, 7, 12, c);
+        }
+        if arrow(ui, cv, a, &format!("vol{i}+"), cx + 124, y, false) {
+            act = Some(Act::Volume(i as u8, 1));
+        }
+        y += 34;
     }
-    for i in 0..10 {
-        let on = (i as u8) < s.volume;
-        let c = if !on {
-            [52, 44, 60, 255]
-        } else if cls == Class::Foundry {
-            [240, 170, 70, 255]
-        } else {
-            [150, 230, 70, 255]
-        };
-        cv.fill(cx + i * 12, y + 3, 9, 14, [14, 10, 18, 255]);
-        cv.fill(cx + i * 12 + 1, y + 4, 7, 12, c);
-    }
-    if arrow(ui, cv, a, "vol+", cx + 124, y, false) {
-        act = Some(Act::Volume(1));
-    }
-    y += 52;
-    let rows: [(&str, String, Act); 4] = [
+    y += 10;
+    let on_off = |b: bool| if b { t("settings.on") } else { t("settings.off") };
+    let lang = crate::text::langs().into_iter().find(|(c, _)| *c == s.lang).map_or_else(|| t("lang.name"), |(_, n)| n);
+    let rows: [(&str, String, Act); 6] = [
         ("settings.screen", if s.fullscreen { t("settings.full") } else { t("settings.window") }, Act::Fullscreen),
         ("settings.camera", t(&format!("cam.{}", s.cam_level())), Act::Camera),
         ("settings.scale", if s.ui_scale == 0 { t("settings.auto") } else { format!("×{}", s.ui_scale) }, Act::UiScale),
         ("settings.speed", format!("×{}", s.speed), Act::Speed),
+        ("settings.hints", on_off(s.hints), Act::Hints),
+        ("settings.lang", lang, Act::Lang),
     ];
     for (i, (k, v, a2)) in rows.into_iter().enumerate() {
         text(cv, a, &t(k), lx, y + 2, INK, Align::Left);
@@ -2483,11 +2518,11 @@ fn settings(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, s: &crate::game
             ui.sound("toggle");
             act = Some(a2);
         }
-        y += 46;
+        y += 38;
     }
     let done = match cls {
-        Class::Foundry => ui.tag(cv, a, "done", r.cx() - 60, r.y + r.h - 62, &t("settings.done"), "brass", true),
-        Class::Swarm => ui.chitin(cv, a, "done", Rect::new(r.cx() - 90, r.y + r.h - 62, 180, 42), &t("settings.done"), "acid", true, false),
+        Class::Foundry => ui.tag(cv, a, "done", r.cx() - 60, r.y + r.h - 58, &t("settings.done"), "brass", true),
+        Class::Swarm => ui.chitin(cv, a, "done", Rect::new(r.cx() - 90, r.y + r.h - 58, 180, 42), &t("settings.done"), "acid", true, false),
     };
     if done {
         act = Some(Act::CloseOverlay);
