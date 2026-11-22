@@ -32,6 +32,11 @@ pub enum Act {
     Workshop,
     /// A roster opened to look at: its title, its rows, the row picked first.
     Inspect(String, Vec<SheetItem>, usize),
+    /// The help opened; its page turned.
+    Help,
+    HelpTab(usize),
+    /// A first-time hint read.
+    HintDone(u8),
     /// «Are you sure?» asked; the answer yes.
     Ask(Ask),
     Confirmed(Ask),
@@ -93,6 +98,9 @@ fn currency_icon(c: Class) -> &'static str {
 /// An artifact's icon (the kit's atlas, 16 px a cell) at k×.
 fn artifact_icon(ui: &mut Ui, cv: &mut Image, a: &Assets, art: Artifact, x: i32, y: i32, k: i32) {
     let idx = Artifact::ALL.iter().position(|&x| x == art).unwrap_or(0) as i32;
+    if ui.alt {
+        ui.named.push((x + 8 * k, y + 16 * k, 16 * k, format!("art:{}", art.key())));
+    }
     let Some(p) = a.ui.get("foundry/artifacts") else { return };
     if k == 1 {
         cv.blit_region(&p.img, idx * 16, 0, 16, 16, x, y, false, 1.0);
@@ -625,6 +633,15 @@ impl Game {
 
     /// The interface (the window's upper layer): the screen, the overlays over it, a tooltip over all.
     pub fn draw_ui(&mut self, cv: &mut Image) {
+        // a first-time hint about the screen comes up over it, once
+        if self.settings.hints && self.overlays.is_empty() && self.next.is_none() && self.targeting.is_none() && self.fade < 0.05 {
+            if let Some(h) = self.hint_here() {
+                if self.settings.hints_seen & (1 << h) == 0 {
+                    self.overlays.push(Overlay::Hint(h));
+                    self.ui.opened = self.ui.t;
+                }
+            }
+        }
         let busy = self.next.is_some();
         // under the place-picker and the overlays the screen does not answer
         self.ui.blocked = !self.overlays.is_empty() || busy || self.targeting.is_some();
@@ -686,6 +703,8 @@ impl Game {
         let battle = self.in_battle();
         let army_at = (self.army_sel, self.army_top, self.sheet_top);
         let inspect = self.inspect.clone();
+        let help_tab = self.help_tab;
+        let named_before = self.ui.named.len();
         for (i, ov) in self.overlays.clone().into_iter().enumerate() {
             self.ui.blocked = i + 1 < n || busy;
             cv.fill(0, 0, 960, 540, [6, 4, 8, 150]);
@@ -698,6 +717,8 @@ impl Game {
                 Overlay::Army => self.run.as_ref().and_then(|r| roster(ui, cv, a, cls, &t("army.title"), &army_items(r), army_at.0, army_at.1, army_at.2, Some(r))),
                 Overlay::Inspect => inspect.as_ref().and_then(|(title, items)| roster(ui, cv, a, cls, title, items, army_at.0, army_at.1, army_at.2, None)),
                 Overlay::Confirm(q) => confirm(ui, cv, a, cls, q),
+                Overlay::Help => help(ui, cv, a, cls, help_tab),
+                Overlay::Hint(h) => hint(ui, cv, a, cls, h),
                 Overlay::About => about(ui, cv, a, cls),
                 Overlay::Evolution => self.run.as_ref().and_then(|r| evolution(ui, cv, a, r)),
             };
@@ -727,6 +748,34 @@ impl Game {
             let col = if *d > 0 { GOLD } else { RED };
             let alpha = (1.2 - age).clamp(0.0, 1.0);
             self.demo.assets.fonts["title16"].draw(cv, &s, x, y + 8 + (age * 22.0) as i32, col, Some(EDGE), Align::Center, alpha);
+        }
+        // Alt held: every icon's name under it
+        let named = std::mem::take(&mut self.ui.named);
+        if self.ui.alt {
+            let from = if self.overlays.is_empty() { 0 } else { named_before.min(named.len()) };
+            let font = &self.demo.assets.fonts["text16"];
+            // kept on the screen; a name over the same name already put is left out (two skulls side by side say
+            // «danger» once), over another one goes a line lower
+            let mut put: Vec<(Rect, String)> = vec![];
+            let over = |a: &Rect, b: &Rect| a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+            for (cx, y, _, key) in &named[from..] {
+                let Some(name) = icon_label(key) else { continue };
+                let w = font.width(&name) + 8;
+                let x = (cx - w / 2).clamp(2, cv.w - w - 2);
+                let mut r = Rect::new(x, (*y).min(cv.h - 20), w, 18);
+                if put.iter().any(|(p, n)| *n == name && over(p, &r)) {
+                    continue;
+                }
+                for _ in 0..3 {
+                    if !put.iter().any(|(p, _)| over(p, &r)) {
+                        break;
+                    }
+                    r.y += 19;
+                }
+                cv.fill(r.x, r.y + 1, r.w, r.h, [8, 6, 10, 210]);
+                font.draw(cv, &name, r.x + 4, r.y + 2, GOLD, None, Align::Left, 1.0);
+                put.push((r, name));
+            }
         }
         self.ui.draw_tip(cv, &self.demo.assets, cls);
         ui::shutters(cv, self.fade, cls);
@@ -774,6 +823,15 @@ impl Game {
                     self.open_inspect(title, items, sel);
                 }
             }
+            Act::Help => {
+                self.overlays.push(Overlay::Help);
+                self.ui.opened = self.ui.t;
+            }
+            Act::HelpTab(k) => {
+                self.help_tab = k;
+                self.demo.ui_sound("toggle");
+            }
+            Act::HintDone(h) => self.hint_seen(h),
             Act::Ask(q) => {
                 self.overlays.push(Overlay::Confirm(q));
                 self.ui.opened = self.ui.t;
@@ -1037,6 +1095,9 @@ fn menu(ui: &mut Ui, cv: &mut Image, a: &Assets, saved: Option<(u32, Class)>) ->
     }
     if ui.tag(cv, a, "about", 360, 492, &t("menu.about"), "steel", true) {
         act = Some(Act::About);
+    }
+    if ui.tag(cv, a, "help", 505, 492, &t("menu.help"), "steel", true) {
+        act = Some(Act::Help);
     }
     if ui.tag(cv, a, "quit", 650, 492, &t("menu.quit"), "rust", true) {
         act = Some(Act::Quit);
@@ -2142,7 +2203,7 @@ fn end(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, victory: bool) -> Opt
 // ---------------------------------------------------------------- the overlays
 
 fn pause(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, run: Option<&Run>, battle: bool) -> Option<Act> {
-    let r = Rect::new(330, 70, 300, 400);
+    let r = Rect::new(330, 44, 300, 458);
     plate(ui, cv, a, cls, r);
     heading(cv, a, &t("pause.title"), 480, r.y + 18, 24, cols(cls), Align::Center);
     cv.fill(r.x + 16, r.y + 50, r.w - 32, 1, [180, 140, 70, 255]);
@@ -2165,7 +2226,8 @@ fn pause(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, run: Option<&Run>,
             }
         }
     }
-    let items: [(&str, &str, Act); 5] = [
+    let items: [(&str, &str, Act); 6] = [
+        ("pause.help", "steel", Act::Help),
         ("pause.settings", "steel", Act::Settings),
         ("pause.army", "steel", Act::Army),
         ("pause.surrender", "rust", Act::Ask(Ask::Surrender)),
@@ -2182,7 +2244,7 @@ fn pause(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, run: Option<&Run>,
         if hit {
             act = Some(a2);
         }
-        y += 42;
+        y += 40;
     }
     let _ = battle;
     text(cv, a, &t("pause.esc"), 480, r.y + r.h - 28, PALE, Align::Center);
@@ -2200,6 +2262,131 @@ fn rmb_hint(ui: &mut Ui, cv: &mut Image, a: &Assets, key: &str, x: i32, y: i32, 
     };
     ui.icon(cv, a, "glyph/пкм", x0, y, 1, 0.9);
     text(cv, a, &s, x0 + 22, y, PALE, Align::Left);
+}
+
+/// An icon's name, for Alt: a module's or a mutation's, an artifact's, a glyph's.
+pub fn icon_label(key: &str) -> Option<String> {
+    if let Some(k) = key.strip_prefix("art:") {
+        return Some(t(&format!("art.{k}")));
+    }
+    if let Some(k) = key.strip_prefix("module/").or_else(|| key.strip_prefix("swarm/")) {
+        let w = t(&format!("find.{k}"));
+        if !w.starts_with("find.") {
+            return Some(w);
+        }
+    }
+    let k = match key {
+        "glyph/здоровье" => "sheet.hp",
+        "glyph/броня" => "sheet.armor",
+        "glyph/дальность" => "sheet.range",
+        "glyph/скорость" => "sheet.speed",
+        "glyph/инициатива" => "sheet.init",
+        "glyph/дух" => "sheet.morale",
+        "glyph/размер" => "sheet.size",
+        "glyph/урон" => "sheet.hit",
+        "glyph/металл" => "cur.0",
+        "glyph/биомасса" => "cur.1",
+        "glyph/гибель" => "alt.danger",
+        "glyph/ремонт" => "alt.repair",
+        "glyph/рост" => "alt.growth",
+        "glyph/выбор" => "alt.find",
+        "glyph/убийство" => "alt.kills",
+        "glyph/пкм" => "alt.rmb",
+        "glyph/dmg:кол" => "dmg.pierce",
+        "glyph/dmg:руб" => "dmg.slash",
+        "glyph/dmg:дроб" => "dmg.blunt",
+        "glyph/dmg:огонь" => "dmg.fire",
+        "glyph/dmg:молния" => "dmg.shock",
+        "glyph/dmg:холод" => "dmg.cold",
+        "glyph/dmg:яд" => "dmg.poison",
+        "glyph/dmg:кисл" => "dmg.acid",
+        "swarm/clutch" => "alt.brood",
+        "swarm/selection" => "alt.selection",
+        _ => return None,
+    };
+    Some(t(k))
+}
+
+/// The help's pages: the keys, the battle, the run, the icons.
+pub const HELP_TABS: [&str; 4] = ["help.keys", "help.battle", "help.run", "help.icons"];
+
+/// The help: its pages as tabs along the top, the page under them (F1 or Esc closes it).
+fn help(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, tab: usize) -> Option<Act> {
+    let r = Rect::new(60, 30, 840, 480);
+    plate(ui, cv, a, cls, r);
+    heading(cv, a, &t("help.title"), 480, r.y + 12, 24, cols(cls), Align::Center);
+    let mut act = None;
+    let tab = tab.min(HELP_TABS.len() - 1);
+    let tw = 180;
+    let x0 = r.cx() - (HELP_TABS.len() as i32 * (tw + 8) - 8) / 2;
+    for (k, key) in HELP_TABS.iter().enumerate() {
+        let row = Rect::new(x0 + k as i32 * (tw + 8), r.y + 52, tw, 30);
+        let (over, _) = ui.hot(&format!("htab{k}"), row);
+        cell(ui, cv, a, cls, row, if k == tab || over { "hover" } else { "normal" });
+        text(cv, a, &t(&format!("{key}.tab")), row.cx(), row.y + 6, if k == tab { GOLD } else { INK }, Align::Center);
+        if ui.clicked(row) {
+            act = Some(Act::HelpTab(k));
+        }
+    }
+    let body = Rect::new(r.x + 30, r.y + 100, r.w - 60, r.h - 160);
+    let font = &a.fonts["text16"];
+    if HELP_TABS[tab] == "help.icons" {
+        // every glyph the game shows, with its name
+        let glyphs = [
+            "glyph/здоровье", "glyph/броня", "glyph/урон", "glyph/дальность", "glyph/скорость", "glyph/инициатива", "glyph/дух",
+            "glyph/размер", "glyph/dmg:кол", "glyph/dmg:руб", "glyph/dmg:дроб", "glyph/dmg:огонь", "glyph/dmg:молния", "glyph/dmg:яд",
+            "glyph/dmg:кисл", "glyph/металл", "glyph/биомасса", "glyph/гибель", "glyph/ремонт", "glyph/выбор", "glyph/убийство",
+        ];
+        for (k, g) in glyphs.iter().enumerate() {
+            let (col, row) = ((k % 3) as i32, (k / 3) as i32);
+            let (x, y) = (body.x + col * 260, body.y + row * 30);
+            ui.icon(cv, a, g, x, y, 2, 1.0);
+            font.draw(cv, &icon_label(g).unwrap_or_default(), x + 42, y + 8, INK, Some(EDGE), Align::Left, 1.0);
+        }
+        text(cv, a, &t("help.icons.l"), body.x, body.y + 7 * 30 + 6, MUTED, Align::Left);
+    } else {
+        let mut y = body.y;
+        for para in t(HELP_TABS[tab]).split('\n') {
+            for l in font.wrap(para, body.w) {
+                if y + 18 > body.y + body.h {
+                    break;
+                }
+                // a line «Key — what» shows its key in gold
+                match l.split_once(" — ") {
+                    Some((k, v)) if HELP_TABS[tab] == "help.keys" => {
+                        font.draw(cv, k, body.x, y, GOLD, Some(EDGE), Align::Left, 1.0);
+                        font.draw(cv, v, body.x + 260, y, INK, Some(EDGE), Align::Left, 1.0);
+                    }
+                    _ => font.draw(cv, &l, body.x, y, INK, Some(EDGE), Align::Left, 1.0),
+                }
+                y += 20;
+            }
+            y += 6;
+        }
+    }
+    if ui.minor(cv, a, cls, "helpclose", r.x + r.w - 190, r.y + r.h - 46, &t("army.close"), true) {
+        act = Some(Act::CloseOverlay);
+    }
+    text(cv, a, &t("help.f1"), r.x + 30, r.y + r.h - 38, PALE, Align::Left);
+    act
+}
+
+/// A first-time hint about the screen: what it is and what to do on it, «Понятно» (Enter, Esc) and it is gone for good.
+fn hint(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, h: u8) -> Option<Act> {
+    let r = Rect::new(250, 330 + ui.rise_from(ui.opened, 0), 460, 170);
+    plate(ui, cv, a, cls, r);
+    heading(cv, a, &t(&format!("hint.{h}.title")), r.cx(), r.y + 12, 16, cols(cls), Align::Center);
+    let font = &a.fonts["text16"];
+    let mut y = r.y + 42;
+    for l in font.wrap(&t(&format!("hint.{h}")), r.w - 40) {
+        if y + 18 > r.y + r.h - 44 {
+            break;
+        }
+        font.draw(cv, &l, r.x + 20, y, INK, Some(EDGE), Align::Left, 1.0);
+        y += 19;
+    }
+    let done = ui.minor(cv, a, cls, "hintok", r.cx() - 80, r.y + r.h - 42, &t("hint.ok"), true) || ui.key(Key::Enter);
+    done.then_some(Act::HintDone(h))
 }
 
 /// «Are you sure?»: what will happen, yes or no (Enter — yes, Esc — no).

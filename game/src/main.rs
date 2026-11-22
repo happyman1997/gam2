@@ -655,6 +655,98 @@ mod flow {
         }
     }
 
+    /// First-time hints: one comes up over a screen it has, Enter (or Esc) puts it away for good, and with the hints
+    /// off none comes; F1 opens the help from anywhere and closes it again; Alt names the icons.
+    #[test]
+    fn the_help_and_the_hints() {
+        use crate::game::{Overlay, Settings};
+        use crate::ui::Key;
+        use sim::run::Run;
+        let tmp = std::env::temp_dir().join(format!("gam2-hints-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        g.settings.hints = true;
+        g.settings.hints_seen = 0;
+        g.run = Some(Run::new(Class::Foundry, 1, 3));
+        g.screen = Screen::Fork;
+        settle(&mut g);
+        frame(&mut g);
+        assert_eq!(g.overlays.last(), Some(&Overlay::Hint(1)), "no hint over the fork");
+        // under the hint the fork does not answer: a click on the first road leads nowhere
+        g.ui.mx = 190;
+        g.ui.my = 300;
+        frame(&mut g);
+        g.ui.mouse_down();
+        g.ui.mouse_up();
+        frame(&mut g);
+        assert!(matches!(g.screen, Screen::Fork), "a click went through the hint");
+        g.key(Key::Enter);
+        frame(&mut g);
+        assert!(g.overlays.is_empty(), "Enter did not put the hint away");
+        assert!(matches!(g.screen, Screen::Fork) && g.next.is_none(), "Enter went through the hint to the screen");
+        for _ in 0..5 {
+            frame(&mut g);
+        }
+        assert!(g.overlays.is_empty(), "the hint came back");
+        assert_ne!(Settings::load().hints_seen & (1 << 1), 0, "the hint read is not kept");
+        // Esc puts one away the same
+        g.settings.hints_seen = 0;
+        frame(&mut g);
+        assert_eq!(g.overlays.last(), Some(&Overlay::Hint(1)));
+        g.key(Key::Esc);
+        frame(&mut g);
+        assert!(g.overlays.is_empty(), "Esc did not put the hint away");
+        assert_ne!(g.settings.hints_seen & (1 << 1), 0);
+        // hints off: none
+        g.settings.hints = false;
+        g.settings.hints_seen = 0;
+        frame(&mut g);
+        assert!(g.overlays.is_empty(), "a hint with the hints off");
+        // F1: the help, its tabs, F1 again — closed; over the pause too
+        g.key(Key::Help);
+        frame(&mut g);
+        assert_eq!(g.overlays.last(), Some(&Overlay::Help));
+        g.apply(Act::HelpTab(3));
+        assert_eq!(g.help_tab, 3);
+        frame(&mut g);
+        g.key(Key::Help);
+        frame(&mut g);
+        assert!(g.overlays.is_empty(), "F1 did not close the help");
+        g.overlays.push(Overlay::Pause);
+        g.key(Key::Help);
+        frame(&mut g);
+        assert_eq!(g.overlays, vec![Overlay::Pause, Overlay::Help]);
+        g.key(Key::Esc);
+        frame(&mut g);
+        assert_eq!(g.overlays, vec![Overlay::Pause], "Esc closed more than the help");
+        g.overlays.clear();
+        // Alt: the icons get their names (the interface drawn differs)
+        let hud = |g: &mut Game| {
+            let mut hud = gfx::Image::clear(render::W, render::H);
+            g.draw_ui(&mut hud);
+            g.ui.end(0.05);
+            hud
+        };
+        settle(&mut g);
+        let plain = hud(&mut g);
+        g.ui.alt = true;
+        let named = hud(&mut g);
+        g.ui.alt = false;
+        assert!(plain.px != named.px, "Alt named nothing on the fork");
+        // every glyph the screens draw has its name, and every find's icon
+        let src = include_str!("screens.rs");
+        let mut keys: Vec<String> = src.split('"').filter(|p| p.starts_with("glyph/") && p.len() > 6).map(String::from).collect();
+        let finds = sim::data::finds();
+        keys.extend(finds.modules.iter().map(|m| format!("module/{}", m.key)));
+        keys.extend(finds.mutations.iter().map(|m| format!("swarm/{}", m.key)));
+        assert!(keys.len() > 30);
+        for k in &keys {
+            let w = crate::screens::icon_label(k);
+            assert!(w.as_deref().is_some_and(|w| !w.is_empty() && !w.contains('.')), "no name for {k}: {w:?}");
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
     /// The battle's camera by the player: the wheel and + / − step its level (down to the whole field, kept in the
     /// settings, a note says it), C turns it off and back on at the same level; each level comes no closer than its
     /// own limit, the farthest shows the whole field.

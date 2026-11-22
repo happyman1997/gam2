@@ -24,6 +24,11 @@ pub struct Settings {
     /// How close the battle's camera may come, 1..=4 (with `camera` off — the whole field); the last one kept.
     #[serde(default = "zoom_default")]
     pub zoom: u8,
+    /// First-time hints on; which of them were seen (a bit each).
+    #[serde(default = "yes")]
+    pub hints: bool,
+    #[serde(default)]
+    pub hints_seen: u32,
     /// The interface's whole factor: 0 — the largest that fits.
     pub ui_scale: u8,
     /// The battle's speed at its start: 1, 2 or 4.
@@ -32,7 +37,7 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { volume: 8, fullscreen: true, camera: true, ui_scale: 0, speed: 1, zoom: ZOOM_DEFAULT }
+        Settings { volume: 8, fullscreen: true, camera: true, ui_scale: 0, speed: 1, zoom: ZOOM_DEFAULT, hints: true, hints_seen: 0 }
     }
 }
 
@@ -43,6 +48,13 @@ const ZOOM_DEFAULT: u8 = 2;
 fn zoom_default() -> u8 {
     ZOOM_DEFAULT
 }
+
+fn yes() -> bool {
+    true
+}
+
+/// The screens with a first-time hint: the leaders, the fork, a battle, the spoils, the trader, the camp.
+pub const HINTS: u8 = 6;
 
 impl Settings {
     /// The camera's level now: 0 — the whole field (the camera off), 1..=4 — how close it may come.
@@ -138,6 +150,10 @@ pub enum Overlay {
     Evolution,
     /// A roster to look at (an enemy, a recruit, a leader's start, the battle's fighters): `Game::inspect`.
     Inspect,
+    /// The help: the keys, the battle, the run, the icons (`Game::help_tab`).
+    Help,
+    /// A first-time hint about the screen (its number, `HINTS`).
+    Hint(u8),
     /// «Are you sure?» before something that cannot be undone.
     Confirm(Ask),
 }
@@ -197,13 +213,19 @@ pub struct Game {
     pub battle_bodies: Vec<sim::model::Template>,
     /// What the last battle came to, for the spoils' screen.
     pub summary: Option<Summary>,
+    /// The help's page.
+    pub help_tab: usize,
     /// How far down the picked body's sheet is scrolled (lines).
     pub sheet_top: usize,
 }
 
 impl Game {
     pub fn new(demo: Demo) -> Game {
-        let settings = Settings::load();
+        let mut settings = Settings::load();
+        // the tests click their way through the screens: no first-time hints in their way
+        if cfg!(test) {
+            settings.hints = false;
+        }
         let saved = load_run().filter(|r| r.over.is_none()).map(|r| (r.next_fight(), r.class));
         let mut g = Game {
             demo,
@@ -223,6 +245,7 @@ impl Game {
             field_mouse: None,
             battle_bodies: vec![],
             summary: None,
+            help_tab: 0,
             sheet_top: 0,
             saved,
             money_seen: None,
@@ -466,12 +489,26 @@ impl Game {
             self.escape();
             return;
         }
+        // F1: the help, from anywhere (again — closed)
+        if k == Key::Help {
+            if self.overlays.last() == Some(&Overlay::Help) {
+                self.overlays.pop();
+            } else {
+                self.overlays.push(Overlay::Help);
+                self.ui.opened = self.ui.t;
+            }
+            return;
+        }
         self.ui.keys.push(k);
     }
 
     /// Esc: closes the uppermost overlay; on a screen of the run (and in battle) opens the pause; in the menu does
     /// nothing; on the class or leader screens goes back.
     fn escape(&mut self) {
+        if let Some(Overlay::Hint(h)) = self.overlays.last().copied() {
+            self.hint_seen(h);
+            return;
+        }
         if self.overlays.pop().is_some() {
             self.demo.ui_sound("toggle");
             return;
@@ -505,6 +542,29 @@ impl Game {
                 self.overlays.push(Overlay::Pause);
                 self.demo.ui_sound("toggle");
             }
+        }
+    }
+
+    /// A first-time hint read: gone, and not shown again.
+    pub fn hint_seen(&mut self, h: u8) {
+        debug_assert!(h < HINTS);
+        if self.overlays.last() == Some(&Overlay::Hint(h)) {
+            self.overlays.pop();
+        }
+        self.settings.hints_seen |= 1 << h;
+        self.settings.save();
+    }
+
+    /// The first-time hint the screen has, if it has one (and the battle's only while it plays).
+    pub fn hint_here(&self) -> Option<u8> {
+        match self.screen {
+            Screen::Leaders { .. } => Some(0),
+            Screen::Fork => Some(1),
+            Screen::Battle { .. } => Some(2),
+            Screen::Rewards { pick: None, .. } => Some(3),
+            Screen::Shop(_) => Some(4),
+            Screen::Camp { .. } => Some(5),
+            _ => None,
         }
     }
 

@@ -237,9 +237,15 @@ impl ApplicationHandler for App {
                 self.game.ui.mx = -1;
                 self.game.ui.my = -1;
             }
-            WindowEvent::ModifiersChanged(m) => self.mods = m.state(),
+            WindowEvent::ModifiersChanged(m) => {
+                self.mods = m.state();
+                self.game.ui.alt = self.mods.alt_key();
+            }
             // Alt+Tab away: the Alt let go elsewhere must not stay held here
-            WindowEvent::Focused(false) => self.mods = ModifiersState::empty(),
+            WindowEvent::Focused(false) => {
+                self.mods = ModifiersState::empty();
+                self.game.ui.alt = false;
+            }
             WindowEvent::MouseInput { state, button: MouseButton::Left, .. } => match state {
                 ElementState::Pressed => self.game.ui.mouse_down(),
                 ElementState::Released => self.game.ui.mouse_up(),
@@ -283,6 +289,7 @@ impl ApplicationHandler for App {
                     KeyCode::End => Some(Key::End),
                     KeyCode::KeyR => Some(Key::R),
                     KeyCode::KeyC => Some(Key::C),
+                    KeyCode::F1 => Some(Key::Help),
                     KeyCode::Minus | KeyCode::NumpadSubtract => Some(Key::ZoomOut),
                     KeyCode::Equal | KeyCode::NumpadAdd => Some(Key::ZoomIn),
                     KeyCode::Digit1 | KeyCode::Numpad1 => Some(Key::Digit(1)),

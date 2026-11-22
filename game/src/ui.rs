@@ -71,6 +71,8 @@ pub enum Key {
     /// The battle's camera nearer / farther (+ / −).
     ZoomIn,
     ZoomOut,
+    /// F1: the help.
+    Help,
 }
 
 /// A tooltip: where the mouse was, its lines with their colours.
@@ -89,6 +91,9 @@ pub struct Ui {
     pub keys: Vec<Key>,
     /// Steps of the mouse wheel this frame: up (away from the player) positive.
     pub wheel: i32,
+    /// Alt held: every icon drawn gets its name under it (`named` gathers them for the frame).
+    pub alt: bool,
+    pub named: Vec<(i32, i32, i32, String)>,
     /// Seconds since the game began, and since the last frame.
     pub t: f32,
     pub dt: f32,
@@ -127,6 +132,8 @@ impl Ui {
             released: false,
             keys: vec![],
             wheel: 0,
+            alt: false,
+            named: vec![],
             t: 0.0,
             dt: 0.0,
             hover: HashMap::new(),
@@ -275,6 +282,9 @@ impl Ui {
     #[allow(clippy::too_many_arguments)]
     pub fn icon(&mut self, cv: &mut Image, a: &Assets, key: &str, x: i32, y: i32, k: i32, alpha: f32) {
         let Some((atlas, r)) = a.icons.get(key) else { return };
+        if self.alt && alpha > 0.5 {
+            self.named.push((x + r[2] * k / 2, y + r[3] * k, r[2] * k, key.to_string()));
+        }
         let Some(img) = a.atlases.get(atlas) else { return };
         if k == 1 {
             cv.blit_region(img, r[0], r[1], r[2], r[3], x, y, false, alpha);

@@ -48,6 +48,8 @@ fn set(g: &mut Game, s: Screen) {
 pub fn run(demo: Demo, dir: &str) {
     std::fs::create_dir_all(dir).expect("dir");
     let mut g = Game::new(demo);
+    // the first-time hints only where asked for (27_), not over every screen
+    g.settings.hints = false;
     set(&mut g, Screen::Menu);
     snap(&mut g, dir, "01_menu", (150, 484));
     set(&mut g, Screen::Class);
@@ -197,6 +199,20 @@ pub fn run(demo: Demo, dir: &str) {
         g.overlays.push(Overlay::Confirm(crate::game::Ask::Surrender));
         snap(&mut g, dir, &format!("24_{tag}_confirm"), (330, 330));
         g.overlays.clear();
+        // the help (its keys, its icons), a first-time hint, Alt's names
+        g.overlays.push(Overlay::Help);
+        g.help_tab = 0;
+        snap(&mut g, dir, &format!("25_{tag}_help_keys"), (0, 0));
+        g.help_tab = 3;
+        snap(&mut g, dir, &format!("26_{tag}_help_icons"), (0, 0));
+        g.overlays.clear();
+        g.overlays.push(Overlay::Hint(1));
+        g.ui.opened = g.ui.t;
+        snap(&mut g, dir, &format!("27_{tag}_hint"), (0, 0));
+        g.overlays.clear();
+        g.ui.alt = true;
+        snap(&mut g, dir, &format!("28_{tag}_alt"), (0, 0));
+        g.ui.alt = false;
     }
     // crowded: a workshop of twelve golems, the evolutions of every form
     {
