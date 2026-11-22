@@ -202,6 +202,20 @@ pub struct Growth {
     pub units: Vec<String>,
 }
 
+/// The difficulty curve (curve.ron): the enemy's strength by the battle's number, in reference fighters, for each
+/// class, and what a dangerous road, an elite and a boss put on top of it.
+#[derive(Debug, Deserialize)]
+pub struct Curve {
+    /// The enemy's strength for a player of each class, battles 1..15: the classes meet different enemies (the
+    /// Foundry the swarm, the swarm golems), and reference fighters measure them differently — a swarm the
+    /// reference beats is still a hard match for metal that acid eats.
+    pub foundry: Vec<f32>,
+    pub swarm: Vec<f32>,
+    pub danger: f32,
+    pub elite: f32,
+    pub boss: f32,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Finds {
     pub modules: Vec<ModuleFind>,
@@ -215,6 +229,7 @@ struct Data {
     armies: BTreeMap<String, Vec<Entry>>,
     finds: Finds,
     growth: BTreeMap<String, Vec<Growth>>,
+    curve: Curve,
 }
 
 fn parse<T: serde::de::DeserializeOwned>(file: &str, text: &str) -> T {
@@ -228,11 +243,17 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     armies: parse("armies.ron", include_str!("../data/armies.ron")),
     finds: parse("finds.ron", include_str!("../data/finds.ron")),
     growth: parse("growth.ron", include_str!("../data/growth.ron")),
+    curve: parse("curve.ron", include_str!("../data/curve.ron")),
 });
 
 /// The run's finds: the Foundry's modules, the swarm's mutations.
 pub fn finds() -> &'static Finds {
     &DATA.finds
+}
+
+/// The difficulty curve.
+pub fn curve() -> &'static Curve {
+    &DATA.curve
 }
 
 /// The ways a leader (its key in units.ron) can grow after a boss.

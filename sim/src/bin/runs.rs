@@ -132,12 +132,16 @@ fn main() {
     let n: u64 = std::env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(40);
     println!("| Лидер | Бот | Походов выиграно | Боёв в среднем | Сила к боссам 5 / 10 / 15 | Враг упёрся в зону | Где проиграны |");
     println!("|---|---|---|---|---|---|---|");
+    let mut total = [(0usize, 0u64); 2];
     let names = ["Отец колосса", "Изобретатель", "Маньяк", "Зодчий", "Матка", "Разум улья", "Пожиратель", "Чума"];
     for class in [Class::Foundry, Class::Swarm] {
         for leader in 0..4 {
             for takes in [true, false] {
                 let outs: Vec<Out> = (0..n).into_par_iter().map(|s| play(class, leader, 7000 + s * 31, takes)).collect();
                 let won = outs.iter().filter(|o| o.won).count();
+                let t = &mut total[usize::from(!takes)];
+                t.0 += won;
+                t.1 += n;
                 let battles = outs.iter().map(|o| o.battles as f32).sum::<f32>() / n as f32;
                 let at = |b: usize| -> String {
                     let v: Vec<f32> = outs.iter().filter_map(|o| o.boss.get(b)).map(|&x| x as f32).collect();
@@ -166,5 +170,8 @@ fn main() {
                 );
             }
         }
+    }
+    for (k, (won, all)) in total.iter().enumerate() {
+        println!("\n{}: {won}/{all} походов ({:.0}%)", if k == 0 { "берёт" } else { "пропускает" }, 100.0 * *won as f32 / (*all).max(1) as f32);
     }
 }

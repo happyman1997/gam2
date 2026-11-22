@@ -119,6 +119,10 @@ impl Artifact {
 /// a golem its footprint's cells): three quarters of it, the rest is the room the formation needs.
 pub const ROOM: i32 = crate::battle::ZONE * crate::battle::H * 4 * 3 / 4;
 
+/// Battles a step of the enemy's fitting is measured by (fewer and an enemy of one strength comes out anywhere
+/// from two thirds to half again of it).
+const FIT_TRIES: u32 = 40;
+
 /// How many steps an enemy's ladder has: enough to fill its zone with the smallest of them.
 const LADDER: usize = (ROOM / 3) as usize;
 
@@ -649,14 +653,13 @@ impl Run {
         self.army.iter().filter(|m| m.broken).count()
     }
 
-    /// The share of `tries` battles the player's army wins against `enemy`.
-    fn win_rate(&mut self, enemy: &[Template], tries: u32) -> f32 {
-        let (me, _) = self.fighters();
+    /// The share of `tries` battles `a` wins against `b` (each on a seed of the run's own).
+    fn share(&mut self, a: &[Template], b: &[Template], tries: u32) -> f32 {
         let base = self.rng.next_u64();
         let mut won = 0;
         for k in 0..tries {
             let mut bt = Battle::new(base.wrapping_add(k as u64 * 7919));
-            bt.add_armies(&me, enemy);
+            bt.add_armies(a, b);
             if bt.run().winner == Some(0) {
                 won += 1;
             }
@@ -664,20 +667,37 @@ impl Run {
         won as f32 / tries as f32
     }
 
-    /// The enemy for a battle of `kind`: a base (a leader's army for a boss) and a ladder of additions; the longest
-    /// prefix the player still beats `target` of the time.
-    fn enemy(&mut self, kind: Kind, danger: u8) -> (Vec<Template>, String) {
-        let fight = self.next_fight();
-        // one battle lost ends the run: each must be won nearly always, the risk is in what it costs; a dangerous
-        // road a little less
-        let target = match (kind, danger) {
-            (Kind::Boss, _) => 0.75,
-            (Kind::Elite, _) => 0.85,
-            (_, 2) => 0.9 - 0.004 * fight as f32,
-            _ => 0.97 - 0.004 * fight as f32,
+    /// How strong the enemy of a battle is, in reference fighters: the difficulty curve of the player's class
+    /// (curve.ron) by the battle's number, with a dangerous road, an elite or a boss on top. The same in every run —
+    /// the player's army has no say.
+    pub fn budget(class: Class, fight: u32, kind: Kind, danger: u8) -> f32 {
+        let c = data::curve();
+        let row = match class {
+            Class::Foundry => &c.foundry,
+            Class::Swarm => &c.swarm,
         };
+        let base = row[(fight.max(1) as usize - 1).min(row.len() - 1)];
+        base * match (kind, danger) {
+            (Kind::Boss, _) => c.boss,
+            (Kind::Elite, _) => c.elite,
+            (_, 2) => c.danger,
+            _ => 1.0,
+        }
+    }
+
+    /// The enemy for a battle of `kind`: a base (a leader's army for a boss) and a ladder of additions; the longest
+    /// prefix that the curve's number of reference fighters still beats half the time — as strong as the curve
+    /// says, whatever the player brings.
+    fn enemy(&mut self, kind: Kind, danger: u8) -> (Vec<Template>, String) {
+        let b = Self::budget(self.class, self.next_fight(), kind, danger);
+        self.enemy_of(kind, b)
+    }
+
+    /// An enemy of `kind` as strong as `budget` reference fighters (the balance tools ask for one of any strength).
+    pub fn enemy_of(&mut self, kind: Kind, budget: f32) -> (Vec<Template>, String) {
+        let reference = data::etalon(budget.round().max(1.0) as usize);
         // a boss: the other class's leader, then its own army a step at a time, then more of its kind — fitted like
-        // any enemy (a whole start army can be more than a small army can beat)
+        // any enemy (a whole start army can be more than the curve asks for yet)
         let mut ladder: Vec<Vec<Template>> = vec![];
         let (base, key): (Vec<Template>, String) = if kind == Kind::Boss {
             let leaders = self.class.other().leaders();
@@ -703,36 +723,14 @@ impl Run {
         } else {
             (vec![], if self.class == Class::Foundry { "swarm".to_string() } else { "golems".to_string() })
         };
-        // the ladder's first step decides the weakest enemy there can be: if the player can't beat it often enough
-        // (a Guard against ants that can't get through its iron), a few other ladders are tried and the one whose
-        // first step is beaten most often is kept
-        let lead_steps = ladder.len();
-        let mut best: Option<(f32, Vec<Vec<Template>>)> = None;
-        for _ in 0..4 {
-            let mut l = ladder.clone();
-            l.extend(self.ladder(kind, LADDER));
-            let mut first = base.clone();
-            if base.is_empty() || lead_steps == 0 {
-                first.extend(l[0].iter().cloned());
-            }
-            let rate = self.win_rate(&first, 12);
-            if best.as_ref().is_none_or(|(r, _)| rate > *r) {
-                best = Some((rate, l));
-            }
-            if rate >= target {
-                break;
-            }
-        }
-        let mut ladder = best.map(|b| b.1).unwrap_or_default();
+        ladder.extend(self.ladder(kind, LADDER));
         // no more than the deployment zone holds — those that find no room would not fight, and the fitting would
         // count them
-        let room = ROOM;
-        let cost = room_cost;
-        let mut used: i32 = base.iter().map(cost).sum();
+        let mut used: i32 = base.iter().map(room_cost).sum();
         let mut keep = 0;
         for step in &ladder {
-            let c: i32 = step.iter().map(cost).sum();
-            if used + c > room {
+            let c: i32 = step.iter().map(room_cost).sum();
+            if used + c > ROOM {
                 break;
             }
             used += c;
@@ -746,13 +744,13 @@ impl Run {
             }
             a
         };
-        // the smallest army is one step (a boss: its own army); find the longest prefix still beaten often enough —
-        // first by doubling (a small army is never measured against hundreds), then by halving what is left
+        // the smallest army is one step (a boss: its leader alone); the longest prefix the reference still beats
+        // half the time — first by doubling (a small one is never measured against hundreds), then by halving
         let (mut lo, mut hi) = (if base.is_empty() { 1 } else { 0 }, ladder.len());
         let mut step = 1;
         while lo < hi {
             let n = (lo + step).min(hi);
-            if self.win_rate(&with(n), 24) >= target {
+            if self.share(&reference, &with(n), FIT_TRIES) >= 0.5 {
                 lo = n;
                 step *= 2;
             } else {
@@ -762,7 +760,7 @@ impl Run {
         }
         while lo < hi {
             let mid = (lo + hi).div_ceil(2);
-            if self.win_rate(&with(mid), 24) >= target {
+            if self.share(&reference, &with(mid), FIT_TRIES) >= 0.5 {
                 lo = mid;
             } else {
                 hi = mid - 1;
