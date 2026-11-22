@@ -640,6 +640,26 @@ impl Game {
         }
         if self.in_battle() {
             self.battle_input();
+            // the camera's level, for a moment after it changed: its name and five marks
+            if let Some(t0) = self.cam_note {
+                let age = self.ui.t - t0;
+                if age > 1.4 || !self.overlays.is_empty() {
+                    self.cam_note = None;
+                } else {
+                    let a = &self.demo.assets;
+                    let alpha = (1.4 - age).clamp(0.0, 0.35) / 0.35;
+                    let l = self.settings.cam_level();
+                    let s = tf("cam.note", &[("v", &t(&format!("cam.{l}")))]);
+                    let w = a.fonts["text16"].width(&s);
+                    let (x0, y0) = (480 - (w + 80) / 2, 46);
+                    cv.fill(x0, y0, w + 80, 26, [10, 8, 12, (170.0 * alpha) as u8]);
+                    a.fonts["text16"].draw(cv, &s, x0 + 10, y0 + 5, INK, Some(EDGE), Align::Left, alpha);
+                    for i in 0..5 {
+                        let c: [u8; 4] = if i <= l as i32 { [255, 200, 90, (255.0 * alpha) as u8] } else { [70, 60, 50, (255.0 * alpha) as u8] };
+                        cv.fill(x0 + w + 20 + i * 10, y0 + 9, 7, 9, c);
+                    }
+                }
+            }
         }
         if let (Some(tg), Some(run)) = (self.targeting.clone(), self.run.as_ref()) {
             self.ui.blocked = !self.overlays.is_empty() || busy;
@@ -918,7 +938,9 @@ impl Game {
                 self.settings.save();
             }
             Act::Camera => {
-                self.settings.camera = !self.settings.camera;
+                // through the levels: the whole field, then nearer and nearer, round to the whole field again
+                let next = (self.settings.cam_level() + 1) % 5;
+                self.settings.set_cam_level(next);
                 self.settings.save();
             }
             Act::UiScale => {
@@ -2072,7 +2094,7 @@ fn settings(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, s: &crate::game
     y += 52;
     let rows: [(&str, String, Act); 4] = [
         ("settings.screen", if s.fullscreen { t("settings.full") } else { t("settings.window") }, Act::Fullscreen),
-        ("settings.camera", if s.camera { t("settings.on") } else { t("settings.off") }, Act::Camera),
+        ("settings.camera", t(&format!("cam.{}", s.cam_level())), Act::Camera),
         ("settings.scale", if s.ui_scale == 0 { t("settings.auto") } else { format!("×{}", s.ui_scale) }, Act::UiScale),
         ("settings.speed", format!("×{}", s.speed), Act::Speed),
     ];

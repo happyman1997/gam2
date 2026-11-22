@@ -655,6 +655,68 @@ mod flow {
         }
     }
 
+    /// The battle's camera by the player: the wheel and + / − step its level (down to the whole field, kept in the
+    /// settings, a note says it), C turns it off and back on at the same level; each level comes no closer than its
+    /// own limit, the farthest shows the whole field.
+    #[test]
+    fn the_camera_zooms_out() {
+        use crate::camera::{self, Frame};
+        use crate::game::ZOOMS;
+        use crate::ui::Key;
+        let tmp = std::env::temp_dir().join(format!("gam2-zoom-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        g.run = Some(sim::run::Run::new(Class::Foundry, 1, 3));
+        g.screen = Screen::Fork;
+        g.apply(Act::Road(0));
+        settle(&mut g);
+        frame(&mut g);
+        assert!(g.in_battle());
+        g.settings.set_cam_level(2);
+        // two notches of the wheel toward the player: farther twice
+        g.ui.wheel = -2;
+        frame(&mut g);
+        assert_eq!(g.settings.cam_level(), 0, "two notches farther from «обычно» is the whole field");
+        assert!(g.cam_note.is_some());
+        // no farther than the whole field
+        g.key(Key::ZoomOut);
+        frame(&mut g);
+        assert_eq!(g.settings.cam_level(), 0);
+        g.key(Key::ZoomIn);
+        frame(&mut g);
+        g.key(Key::ZoomIn);
+        frame(&mut g);
+        g.key(Key::ZoomIn);
+        frame(&mut g);
+        assert_eq!(g.settings.cam_level(), 3);
+        // C: off, and on again at the same level
+        g.key(Key::C);
+        frame(&mut g);
+        assert_eq!(g.settings.cam_level(), 0);
+        g.key(Key::C);
+        frame(&mut g);
+        assert_eq!(g.settings.cam_level(), 3);
+        // kept for the next game
+        assert_eq!(crate::game::Settings::load().cam_level(), 3);
+        // under the pause the wheel does nothing
+        g.overlays.push(crate::game::Overlay::Pause);
+        g.ui.wheel = 1;
+        frame(&mut g);
+        assert_eq!(g.settings.cam_level(), 3);
+        g.overlays.clear();
+        // each level no closer than its limit, the farthest the whole field
+        let rec = &g.demo.rec;
+        let fr = Frame::fit(1920, 1080);
+        for f in (0..rec.frames()).step_by(7) {
+            assert_eq!(camera::at_level(rec, f as f32, &fr, 0, &ZOOMS).z, fr.zmin);
+            for l in 1..=4u8 {
+                let c = camera::at_level(rec, f as f32, &fr, l, &ZOOMS);
+                assert!(c.z >= fr.zmin - 1e-3 && c.z <= fr.zmin * ZOOMS[l as usize] + 1e-3, "level {l}: z {}", c.z);
+            }
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
     /// A run of each class walked through every kind of screen by the screens' own acts — roads, battles, spoils,
     /// the find, the trader, events, the camp — each screen drawn on the way, to its end.
     #[test]

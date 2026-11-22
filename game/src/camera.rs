@@ -96,6 +96,19 @@ pub fn target(rec: &Record, ff: f32, fr: &Frame) -> Cam {
     clamp(Cam { cx: (x0 + x1) / 2.0, cy: (y0 + y1) / 2.0 - fr.wing / 2.0 / z, z }, fr)
 }
 
+/// Where the battle's camera wants to be at frame `ff` with the player's level: 0 — the whole field, else the clash
+/// with the camera coming at most `zooms[level]` times as close as the whole field.
+pub fn at_level(rec: &Record, ff: f32, fr: &Frame, level: u8, zooms: &[f32]) -> Cam {
+    match zooms.get(level as usize) {
+        Some(&k) if level > 0 => {
+            let mut f = *fr;
+            f.zmax = f.zmin * k;
+            target(rec, ff.min((rec.frames() - 1) as f32), &f)
+        }
+        _ => whole(fr),
+    }
+}
+
 /// Kept inside the field: no edge of the output looks past it.
 pub fn clamp(c: Cam, fr: &Frame) -> Cam {
     let (hw, hh) = (fr.w as f32 / 2.0 / c.z, fr.h as f32 / 2.0 / c.z);

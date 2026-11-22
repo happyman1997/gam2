@@ -68,6 +68,9 @@ pub enum Key {
     R,
     C,
     Digit(u8),
+    /// The battle's camera nearer / farther (+ / −).
+    ZoomIn,
+    ZoomOut,
 }
 
 /// A tooltip: where the mouse was, its lines with their colours.
@@ -81,6 +84,8 @@ pub struct Ui {
     pub pressed: bool,
     pub released: bool,
     pub keys: Vec<Key>,
+    /// Steps of the mouse wheel this frame: up (away from the player) positive.
+    pub wheel: i32,
     /// Seconds since the game began, and since the last frame.
     pub t: f32,
     pub dt: f32,
@@ -116,6 +121,7 @@ impl Ui {
             pressed: false,
             released: false,
             keys: vec![],
+            wheel: 0,
             t: 0.0,
             dt: 0.0,
             hover: HashMap::new(),
@@ -154,6 +160,7 @@ impl Ui {
         self.pressed = false;
         self.released = false;
         self.keys.clear();
+        self.wheel = 0;
     }
 
     /// Whether the mouse is on `r`, and how far this control has eased into its hover (0..1).

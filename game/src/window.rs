@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{Fullscreen, Window, WindowId};
@@ -38,6 +38,8 @@ struct App {
     size: (u32, u32),
     frame: Frame,
     cam: Cam,
+    /// The mouse wheel's scroll not yet a whole step (a touchpad's).
+    wheel: f32,
     last: Instant,
     next: Instant,
     cursor: (f32, f32),
@@ -168,9 +170,10 @@ impl App {
         }
         self.game.draw_ui(&mut hud);
         self.game.ui.end(dt);
-        let want = if battle && self.game.settings.camera {
-            let rec = &self.game.demo.rec;
-            camera::target(rec, ff.min((rec.frames() - 1) as f32), &self.frame)
+        // the camera's level: how close it may come to the clash (0 — the whole field)
+        let level = self.game.settings.cam_level();
+        let want = if battle {
+            camera::at_level(&self.game.demo.rec, ff, &self.frame, level, &crate::game::ZOOMS)
         } else {
             camera::whole(&self.frame)
         };
@@ -238,6 +241,19 @@ impl ApplicationHandler for App {
                 ElementState::Pressed => self.game.ui.mouse_down(),
                 ElementState::Released => self.game.ui.mouse_up(),
             },
+            // the wheel: a notch a step; a touchpad's smooth scroll gathered into steps of 40 pixels
+            WindowEvent::MouseWheel { delta, .. } => {
+                let dy = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y,
+                    MouseScrollDelta::PixelDelta(p) => p.y as f32 / 40.0,
+                };
+                self.wheel += dy;
+                let steps = self.wheel.trunc();
+                if steps != 0.0 {
+                    self.wheel -= steps;
+                    self.game.ui.wheel += steps as i32;
+                }
+            }
             // keys by their place on the keyboard, not their letter: R and C work in any layout, with Caps Lock too;
             // a held key does not repeat its action; with Alt held only Alt+Enter counts (Alt+Tab is the system's)
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed && !event.repeat => {
@@ -260,6 +276,8 @@ impl ApplicationHandler for App {
                     KeyCode::End => Some(Key::End),
                     KeyCode::KeyR => Some(Key::R),
                     KeyCode::KeyC => Some(Key::C),
+                    KeyCode::Minus | KeyCode::NumpadSubtract => Some(Key::ZoomOut),
+                    KeyCode::Equal | KeyCode::NumpadAdd => Some(Key::ZoomIn),
                     KeyCode::Digit1 | KeyCode::Numpad1 => Some(Key::Digit(1)),
                     KeyCode::Digit2 | KeyCode::Numpad2 => Some(Key::Digit(2)),
                     KeyCode::Digit3 | KeyCode::Numpad3 => Some(Key::Digit(3)),
@@ -324,6 +342,7 @@ pub fn run(mut demo: Demo) {
         size: (render::W as u32 * 2, render::H as u32 * 2),
         frame: Frame::fit(render::W * 2, render::H * 2),
         cam: Cam { cx: render::W as f32 / 2.0, cy: render::H as f32 / 2.0, z: 2.0 },
+        wheel: 0.0,
         last: Instant::now(),
         next: Instant::now(),
         cursor: (0.0, 0.0),

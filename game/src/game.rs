@@ -21,6 +21,9 @@ pub struct Settings {
     pub volume: u8,
     pub fullscreen: bool,
     pub camera: bool,
+    /// How close the battle's camera may come, 1..=4 (with `camera` off — the whole field); the last one kept.
+    #[serde(default = "zoom_default")]
+    pub zoom: u8,
     /// The interface's whole factor: 0 — the largest that fits.
     pub ui_scale: u8,
     /// The battle's speed at its start: 1, 2 or 4.
@@ -29,7 +32,34 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { volume: 8, fullscreen: true, camera: true, ui_scale: 0, speed: 1 }
+        Settings { volume: 8, fullscreen: true, camera: true, ui_scale: 0, speed: 1, zoom: ZOOM_DEFAULT }
+    }
+}
+
+/// The camera's levels: 0 — the whole field, then how close it may come (as many times the whole field).
+pub const ZOOMS: [f32; 5] = [1.0, 1.2, 1.5, 1.85, 2.25];
+const ZOOM_DEFAULT: u8 = 2;
+
+fn zoom_default() -> u8 {
+    ZOOM_DEFAULT
+}
+
+impl Settings {
+    /// The camera's level now: 0 — the whole field (the camera off), 1..=4 — how close it may come.
+    pub fn cam_level(&self) -> u8 {
+        if self.camera {
+            self.zoom.clamp(1, 4)
+        } else {
+            0
+        }
+    }
+
+    /// The camera set to a level; 0 turns it off and keeps the last level for when it comes back on.
+    pub fn set_cam_level(&mut self, l: u8) {
+        self.camera = l > 0;
+        if l > 0 {
+            self.zoom = l.min(4);
+        }
     }
 }
 
@@ -132,6 +162,8 @@ pub struct Game {
     fork_due: bool,
     /// A module or a mutation being given a place (over the screen, under the overlays).
     pub targeting: Option<Targeting>,
+    /// When the camera's level was last changed in battle (its note shows for a moment).
+    pub cam_note: Option<f32>,
 }
 
 impl Game {
@@ -149,6 +181,7 @@ impl Game {
             next: None,
             quit: false,
             want_fullscreen: None,
+            cam_note: None,
             saved,
             money_seen: None,
             floats: vec![],
@@ -442,10 +475,23 @@ impl Game {
             self.demo.view.frame = (self.demo.rec.frames() - 1) as f32;
             self.demo.ui_sound("click");
         }
+        // the camera: C on and off, the wheel and + / − nearer and farther (down to the whole field)
+        let now = self.settings.cam_level();
+        let mut want = now;
         if key(self, Key::C) {
-            self.settings.camera = !self.settings.camera;
+            want = if now > 0 { 0 } else { self.settings.zoom.clamp(1, 4) };
+        }
+        let steps = self.ui.wheel + key(self, Key::ZoomIn) as i32 - key(self, Key::ZoomOut) as i32;
+        if steps != 0 {
+            want = (now as i32 + steps).clamp(0, 4) as u8;
+        }
+        if want != now || steps != 0 {
+            self.settings.set_cam_level(want);
             self.settings.save();
-            self.demo.ui_sound("toggle");
+            self.cam_note = Some(self.ui.t);
+            if want != now {
+                self.demo.ui_sound("toggle");
+            }
         }
         if ended && (clicked == Some(render::Button::NewBattle) || key(self, Key::Enter) || key(self, Key::R)) {
             self.demo.ui_sound("click");
