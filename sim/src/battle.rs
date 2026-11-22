@@ -3,6 +3,7 @@
 use crate::model::{Ability, Dmg, Template, Trait};
 use crate::rng::Rng;
 use std::cmp::Reverse;
+use std::collections::VecDeque;
 
 pub const W: i32 = 18;
 pub const H: i32 = 14;
@@ -152,6 +153,8 @@ pub enum Event {
     Glue { t: usize },
     /// Stunned: skips its next attack (Сотрясение).
     Stun { t: usize },
+    /// A melee blow from behind the target (its back, away from the enemy it faces): half as hard again.
+    Rear { t: usize },
 }
 
 #[derive(Clone, Debug)]
@@ -253,11 +256,15 @@ pub struct Battle {
     pub log: Option<Vec<Event>>,
     /// Target marked by each side's Hive Mind.
     mark: [Option<usize>; 2],
+    /// The way-finding's own scratch (kept to spare an allocation a step): what each place costs to fight from, the
+    /// first step of the way to each place.
+    aim: Vec<u8>,
+    first: Vec<(i32, i32)>,
 }
 
 impl Battle {
     pub fn new(seed: u64) -> Self {
-        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None, mark: [None, None] }
+        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None, mark: [None, None], aim: vec![], first: vec![] }
     }
 
     pub fn with_log(mut self) -> Self {
@@ -655,6 +662,23 @@ impl Battle {
             (t.x, t.y, t.fp())
         };
         self.grid.sub(size, x, y);
+        // a flanker (fast, on the wings) goes round the line for the archers and the leader behind it
+        if role(&self.units[i].t) == Role::Flank && d > reach {
+            let back: Vec<usize> = self.enemies_of(i).filter(|&j| self.units[j].t.range > 1 || self.units[j].t.has(Trait::Leader)).collect();
+            if let Some((nx, ny)) = self.way_round(i, x, y, &back, reach, 16) {
+                self.move_to(i, nx, ny);
+                return;
+            }
+        }
+        // close to the fight, a melee fighter picks where to strike from: round the enemy's flank or to its back when
+        // that is not much longer than straight into its front
+        if reach == 1 && d <= 4 && !self.units[i].fleeing {
+            let all: Vec<usize> = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 8).collect();
+            if let Some((nx, ny)) = self.way_round(i, x, y, &all, reach, 8) {
+                self.move_to(i, nx, ny);
+                return;
+            }
+        }
         let mut best = (d, center_d2(x, y, f, tx, ty, tf), x, y);
         for (dx, dy) in DIRS {
             let (nx, ny) = (x + dx, y + dy);
@@ -666,10 +690,98 @@ impl Battle {
                 best = (key.0, key.1, nx, ny);
             }
         }
+        // the way ahead shut (its own in front, the enemy's line too thick): round them to the flank — the
+        // shortest way to a free place next to any enemy
+        if best.0 >= d {
+            let all: Vec<usize> = self.enemies_of(i).collect();
+            if let Some((nx, ny)) = self.way_round(i, x, y, &all, reach, 12) {
+                self.move_to(i, nx, ny);
+                return;
+            }
+        }
         if (best.2, best.3) != (x, y) {
             self.move_to(i, best.2, best.3);
         } else {
             self.grid.add(side, size, x, y);
+        }
+    }
+
+    /// Where to go to fight: the first step of the best way (eight directions, round everyone in the way) to a place
+    /// within `reach` of one of `goals`, no longer than `limit` steps; a place at an enemy's back counts as the
+    /// nearest, at its side one step farther, at its front three (so a unit goes round when that is up to two or three
+    /// steps longer — it flanks). None if no place can be reached. The unit is off the grid.
+    fn way_round(&mut self, i: usize, x: i32, y: i32, goals: &[usize], reach: i32, limit: i32) -> Option<(i32, i32)> {
+        if goals.is_empty() {
+            return None;
+        }
+        let (side, size, f) = (self.units[i].side, self.units[i].t.size, self.units[i].fp());
+        let n = (W * H) as usize;
+        let mut aim = std::mem::take(&mut self.aim);
+        let mut first = std::mem::take(&mut self.first);
+        aim.clear();
+        aim.resize(n, u8::MAX);
+        first.clear();
+        first.resize(n, (-1, -1));
+        // what a place next to an enemy costs, by where it is on the enemy: its back 0, its side 1, its front 3
+        for &j in goals {
+            let t = &self.units[j];
+            let (tf, tx, ty) = (t.fp(), t.x, t.y);
+            for ny in (ty - f - reach + 1).max(0)..=(ty + tf + reach - 1).min(H - f) {
+                for nx in (tx - f - reach + 1).max(0)..=(tx + tf + reach - 1).min(W - f) {
+                    if rect_dist(nx, ny, f, tx, ty, tf) <= reach {
+                        let c = nx as f32 + f as f32 / 2.0;
+                        let (back, front) = if t.side == 0 { (c <= tx as f32, c >= (tx + tf) as f32) } else { (c >= (tx + tf) as f32, c <= tx as f32) };
+                        let cost = if back { 0 } else if front { 3 } else { 1 };
+                        let k = Grid::idx(nx, ny);
+                        aim[k] = aim[k].min(cost);
+                    }
+                }
+            }
+        }
+        let mut best: Option<(i32, (i32, i32))> = None;
+        first[Grid::idx(x, y)] = (x, y);
+        let mut queue = VecDeque::from([(x, y, 0)]);
+        while let Some((cx, cy, depth)) = queue.pop_front() {
+            // nothing farther can beat what is found
+            if depth >= limit || best.is_some_and(|b| depth + 1 >= b.0) {
+                break;
+            }
+            for (dx, dy) in DIRS {
+                let (nx, ny) = (cx + dx, cy + dy);
+                if nx < 0 || ny < 0 || nx + f > W || ny + f > H || first[Grid::idx(nx, ny)].0 >= 0 {
+                    continue;
+                }
+                if !self.grid.can_place(side, size, nx, ny) {
+                    first[Grid::idx(nx, ny)] = (-2, -2);
+                    continue;
+                }
+                let step = if depth == 0 { (nx, ny) } else { first[Grid::idx(cx, cy)] };
+                first[Grid::idx(nx, ny)] = step;
+                let c = aim[Grid::idx(nx, ny)];
+                if c != u8::MAX {
+                    let total = depth + 1 + c as i32;
+                    if best.is_none_or(|b| total < b.0) {
+                        best = Some((total, step));
+                    }
+                    continue; // a place to fight from: no need to go through it
+                }
+                queue.push_back((nx, ny, depth + 1));
+            }
+        }
+        self.aim = aim;
+        self.first = first;
+        best.map(|b| b.1)
+    }
+
+    /// Whether `i` stands behind `j`: beyond the back of `j`, away from the enemy its side faces (the near side
+    /// faces right).
+    fn behind(&self, i: usize, j: usize) -> bool {
+        let (a, t) = (&self.units[i], &self.units[j]);
+        let ac = a.x as f32 + a.fp() as f32 / 2.0;
+        if t.side == 0 {
+            ac <= t.x as f32
+        } else {
+            ac >= (t.x + t.fp()) as f32
         }
     }
 
@@ -1005,6 +1117,11 @@ impl Battle {
             let mut raw = self.rng.damage(die, bonus + extra);
             if charge {
                 raw = raw * 3 / 2;
+            }
+            // a blow in the back: half as hard again
+            if self.behind(i, v) {
+                raw = raw * 3 / 2;
+                self.ev(Event::Rear { t: v });
             }
             hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false, stun: false });
         }
