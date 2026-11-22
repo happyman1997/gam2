@@ -5,12 +5,17 @@ use crate::rng::Rng;
 use std::cmp::Reverse;
 use std::collections::VecDeque;
 
-pub const W: i32 = 18;
-pub const H: i32 = 14;
+/// The field: wide and tall enough for armies of hundreds (a side's zone holds 450 cells, four small bodies to a
+/// cell); the no man's land between the zones is 6 cells, as it always was, so armies meet as soon as before.
+pub const W: i32 = 36;
+pub const H: i32 = 30;
 pub const EXHAUSTION_FROM: u32 = 50;
 pub const MAX_ROUNDS: u32 = 150;
 /// Deployment zone depth for each side.
-pub const ZONE: i32 = 6;
+pub const ZONE: i32 = 15;
+/// The block an army of the usual size stands in: as deep and as tall as the whole zone once was. A bigger army
+/// widens it in the same proportions, up to the whole zone.
+pub const BLOCK: (i32, i32) = (6, 14);
 
 /// Side length of the square a unit occupies.
 pub fn footprint(size: u32) -> i32 {
@@ -295,6 +300,21 @@ impl Battle {
     /// A kind of unit (a flock) is placed in one run, so it stands together.
     pub fn deploy(&mut self, side: u8, army: &[Template], enemy: &[Template]) {
         let area = enemy.iter().any(|t| t.has_ability(|a| matches!(a, Ability::Volley { .. })));
+        // the block the army stands in: the cells it needs (a little more — kinds don't share a cell), in a block of
+        // the usual proportions, at least the usual size, at most the zone; in the middle of the field's height
+        let need: f32 = army
+            .iter()
+            .map(|t| match t.size {
+                1 => if area { 0.5 } else { 0.25 },
+                2 => 0.5,
+                s => (footprint(s) * footprint(s)) as f32,
+            })
+            .sum::<f32>()
+            * 1.2;
+        let grow = (need / (BLOCK.0 * BLOCK.1) as f32).sqrt().max(1.0);
+        let depth = ((BLOCK.0 as f32 * grow).ceil() as i32).clamp(BLOCK.0, ZONE);
+        let tall = ((BLOCK.1 as f32 * grow).ceil() as i32).clamp(BLOCK.1, H);
+        let (top, bottom) = ((H - tall) / 2, (H - tall) / 2 + tall);
         let mut order: Vec<(Role, usize)> = army.iter().enumerate().map(|(i, t)| (role(t), i)).collect();
         // leaders first (theirs are the middles), then the front and the strikers, the flanks, support, shooters; within a role the
         // toughest first; a kind together
@@ -303,13 +323,16 @@ impl Battle {
             let t = &army[i];
             let f = footprint(t.size);
             let cap = if area && t.size == 1 { 2 } else { 4 };
-            // ranks from the front of the zone (side 0's front is its right edge)
+            // ranks from the front of the block (side 0's front is its right edge); the rest of the zone behind it
+            let d = depth.max(f);
             let ranks: Vec<i32> = match r {
-                Role::LeaderFront | Role::Front | Role::Strike | Role::Flank => (0..ZONE - f + 1).collect(),
-                Role::Support => (1..ZONE - f + 1).chain(0..1).collect(),
-                Role::Ranged | Role::LeaderBack => (0..ZONE - f + 1).rev().collect(),
+                Role::LeaderFront | Role::Front | Role::Strike | Role::Flank => (0..d - f + 1).collect(),
+                Role::Support => (1..d - f + 1).chain(0..1).collect(),
+                Role::Ranged | Role::LeaderBack => (0..d - f + 1).rev().collect(),
             };
+            let ranks: Vec<i32> = ranks.into_iter().chain(d - f + 1..ZONE - f + 1).collect();
             let cols: Vec<i32> = ranks.iter().map(|&k| if side == 0 { ZONE - f - k } else { W - ZONE + k }).collect();
+            // rows from the middle outwards, those of the block first, then the rest of the zone's height
             let mid = (H - f) / 2;
             let mut rows = vec![mid];
             for k in 1..H {
@@ -319,8 +342,11 @@ impl Battle {
                     }
                 }
             }
-            if r == Role::Flank {                       // from the edges inwards, top and bottom in turn
-                rows.sort_by_key(|&y| (y.min(H - f - y), y > H - f - y));
+            let in_block = |y: i32| y >= top && y + f <= bottom;
+            rows.sort_by_key(|&y| !in_block(y));
+            if r == Role::Flank {                       // from the block's edges inwards, top and bottom in turn
+                let (a, b) = (top, bottom - f);
+                rows.sort_by_key(|&y| (!in_block(y), (y - a).min(b - y), y - a > b - y));
             }
             let mut placed = false;
             'outer: for &x in &cols {

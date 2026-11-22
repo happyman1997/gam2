@@ -1,5 +1,6 @@
 //! The camera over the field, for the window and for the video: it holds the clash — the units hit in the coming
-//! second and a half (and those biting them from close by) — zooming from the whole field up to half as close again;
+//! second and a half (and those biting them from close by) — zooming from the whole field (twice the screen's art
+//! each way: at 1080p pixel for pixel) up to as close as the player's level lets it;
 //! with no blows near, it takes in every standing unit. The picture is put together at the output's own size: the
 //! field sampled sharp-bilinear (each art pixel a solid block, only its edges blended, so any zoom shows neither
 //! blur nor pixels of uneven size), the interface laid over it at a whole factor.
@@ -19,14 +20,21 @@ pub struct Cam {
     pub z: f32,
 }
 
-/// The output the camera fills: its size, the zoom range, the rows the interface's wing covers at the top, and
-/// how the interface is laid on (its whole factor and left edge).
+/// The output the camera fills: its size, the picture under the camera (a screen's background, or the battlefield,
+/// bigger), the zoom range, the rows the interface's wing covers at the top, and how the interface is laid on (its
+/// whole factor and left edge).
 #[derive(Clone, Copy)]
 pub struct Frame {
     pub w: i32,
     pub h: i32,
+    /// The picture under the camera, in art pixels.
+    pub fw: i32,
+    pub fh: i32,
+    /// Output pixels per art pixel: the whole picture at `zmin`; `zbase` — the interface's canvas filling the output
+    /// (the camera's levels are counted in it).
     pub zmin: f32,
     pub zmax: f32,
+    pub zbase: f32,
     pub wing: f32,
     pub hud_scale: i32,
     pub hud_x0: i32,
@@ -38,7 +46,17 @@ impl Frame {
     pub fn fit(w: i32, h: i32) -> Frame {
         let base = (w as f32 / W as f32).max(h as f32 / H as f32);
         let s = ((w / W).min(h / H)).max(1);
-        Frame { w, h, zmin: base, zmax: base * 1.5, wing: 34.0 * s as f32, hud_scale: s, hud_x0: (w - W * s) / 2 }
+        Frame { w, h, fw: W, fh: H, zmin: base, zmax: base * 1.5, zbase: base, wing: 34.0 * s as f32, hud_scale: s, hud_x0: (w - W * s) / 2 }
+    }
+
+    /// The same output over a picture of fw×fh (the battlefield): the whole of it at the widest, the closest as
+    /// close as over the interface's own canvas.
+    pub fn over(mut self, fw: i32, fh: i32) -> Frame {
+        self.fw = fw;
+        self.fh = fh;
+        self.zmin = (self.w as f32 / fw as f32).max(self.h as f32 / fh as f32);
+        self.zmax = (self.zbase * 1.5).max(self.zmin);
+        self
     }
 
     /// Where an output pixel falls on the interface's own 960×540 canvas.
@@ -49,7 +67,7 @@ impl Frame {
 
 /// The whole field, as wide as the output allows.
 pub fn whole(fr: &Frame) -> Cam {
-    clamp(Cam { cx: W as f32 / 2.0, cy: H as f32 / 2.0, z: fr.zmin }, fr)
+    clamp(Cam { cx: fr.fw as f32 / 2.0, cy: fr.fh as f32 / 2.0, z: fr.zmin }, fr)
 }
 
 /// Where the camera wants to be at frame `ff`.
@@ -97,12 +115,12 @@ pub fn target(rec: &Record, ff: f32, fr: &Frame) -> Cam {
 }
 
 /// Where the battle's camera wants to be at frame `ff` with the player's level: 0 — the whole field, else the clash
-/// with the camera coming at most `zooms[level]` times as close as the whole field.
+/// with the camera coming at most `zooms[level]` times as close as the interface's canvas filling the output.
 pub fn at_level(rec: &Record, ff: f32, fr: &Frame, level: u8, zooms: &[f32]) -> Cam {
     match zooms.get(level as usize) {
         Some(&k) if level > 0 => {
             let mut f = *fr;
-            f.zmax = f.zmin * k;
+            f.zmax = (f.zbase * k).max(f.zmin);
             target(rec, ff.min((rec.frames() - 1) as f32), &f)
         }
         _ => whole(fr),
@@ -112,8 +130,9 @@ pub fn at_level(rec: &Record, ff: f32, fr: &Frame, level: u8, zooms: &[f32]) -> 
 /// Kept inside the field: no edge of the output looks past it.
 pub fn clamp(c: Cam, fr: &Frame) -> Cam {
     let (hw, hh) = (fr.w as f32 / 2.0 / c.z, fr.h as f32 / 2.0 / c.z);
-    let cx = if hw * 2.0 >= W as f32 { W as f32 / 2.0 } else { c.cx.clamp(hw, W as f32 - hw) };
-    let cy = if hh * 2.0 >= H as f32 { H as f32 / 2.0 } else { c.cy.clamp(hh, H as f32 - hh) };
+    let (fw, fh) = (fr.fw as f32, fr.fh as f32);
+    let cx = if hw * 2.0 >= fw { fw / 2.0 } else { c.cx.clamp(hw, fw - hw) };
+    let cy = if hh * 2.0 >= fh { fh / 2.0 } else { c.cy.clamp(hh, fh - hh) };
     Cam { cx, cy, z: c.z }
 }
 

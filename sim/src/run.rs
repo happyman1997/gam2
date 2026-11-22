@@ -119,6 +119,9 @@ impl Artifact {
 /// a golem its footprint's cells): three quarters of it, the rest is the room the formation needs.
 pub const ROOM: i32 = crate::battle::ZONE * crate::battle::H * 4 * 3 / 4;
 
+/// How many steps an enemy's ladder has: enough to fill its zone with the smallest of them.
+const LADDER: usize = (ROOM / 3) as usize;
+
 pub fn room_cost(t: &Template) -> i32 {
     let f = crate::battle::footprint(t.size);
     match t.size {
@@ -707,7 +710,7 @@ impl Run {
         let mut best: Option<(f32, Vec<Vec<Template>>)> = None;
         for _ in 0..4 {
             let mut l = ladder.clone();
-            l.extend(self.ladder(kind, 28));
+            l.extend(self.ladder(kind, LADDER));
             let mut first = base.clone();
             if base.is_empty() || lead_steps == 0 {
                 first.extend(l[0].iter().cloned());
@@ -743,8 +746,20 @@ impl Run {
             }
             a
         };
-        // the smallest army is one step (a boss: its own army); find the longest prefix still beaten often enough
+        // the smallest army is one step (a boss: its own army); find the longest prefix still beaten often enough —
+        // first by doubling (a small army is never measured against hundreds), then by halving what is left
         let (mut lo, mut hi) = (if base.is_empty() { 1 } else { 0 }, ladder.len());
+        let mut step = 1;
+        while lo < hi {
+            let n = (lo + step).min(hi);
+            if self.win_rate(&with(n), 24) >= target {
+                lo = n;
+                step *= 2;
+            } else {
+                hi = n - 1;
+                break;
+            }
+        }
         while lo < hi {
             let mid = (lo + hi).div_ceil(2);
             if self.win_rate(&with(mid), 24) >= target {

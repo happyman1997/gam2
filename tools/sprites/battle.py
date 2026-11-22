@@ -16,37 +16,46 @@ GK = {4: 1.15, 5: 1.6, 6: 2.2}          # golem scale per size
 CELLS = {4: 1, 5: 2, 6: 3}
 
 
-def ground(sc):
+def ground(sc, ww=WW, hh=HH, cols=18, rows=14, zone=None, x0=X0, y0=Y0):
+    """The battlefield's ground: earth in four close tones, a trodden strip down the no man's land, tufts of grass,
+    specks; the corners of the cells marked faintly in each side's colour over its deployment zone. The defaults are
+    the old 960x540 field (its marks over 8 columns a side); the game's field passes its own size."""
     yy, xx = sc.yy, sc.xx
     th = BAYER[yy % 4, xx % 4]
-    n1 = value_noise(WW, HH, 20, 1) * 0.5 + value_noise(WW, HH, 6, 2) * 0.5
-    cols = [hexc(c) for c in ("#262030", "#2a2334", "#2e2638", "#32293c")]
+    n1 = value_noise(ww, hh, 20, 1) * 0.5 + value_noise(ww, hh, 6, 2) * 0.5
+    cols_c = [hexc(c) for c in ("#262030", "#2a2334", "#2e2638", "#32293c")]
     lv = np.clip(np.floor(n1 * 4 + (th - 0.5) * 1.2), 0, 3).astype(int)
-    for i, c in enumerate(cols):
+    for i, c in enumerate(cols_c):
         sc.rgb[lv == i] = c
-    n2 = value_noise(WW, HH, 24, 3) * 0.6 + value_noise(WW, HH, 6, 4) * 0.4
-    centre = np.exp(-((xx - 440 - 30 * np.sin(yy / 60.0)) / 110.0) ** 2)
+    n2 = value_noise(ww, hh, 24, 3) * 0.6 + value_noise(ww, hh, 6, 4) * 0.4
+    mid = x0 + cols * CW / 2 - 40
+    centre = np.exp(-((xx - mid - 30 * np.sin(yy / 60.0)) / 110.0) ** 2)
     dirt = (n2 * 0.8 + centre * 0.5 + (th - 0.5) * 0.15) > 0.8
     sc.rgb[dirt] = sc.rgb[dirt] * 0.82 + hexc("#2a1e22") * 0.18
     rnd = random.Random(3)
-    for _ in range(2200):
-        x, y = rnd.randrange(1, WW - 1), rnd.randrange(3, HH)
+    area = ww * hh / (960 * 540)
+    for _ in range(int(2200 * area)):
+        x, y = rnd.randrange(1, ww - 1), rnd.randrange(3, hh)
         if dirt[y, x]:
             continue
         col = hexc(rnd.choice(("#2c3a3a", "#33443f", "#283432", "#3a4a44")))
         for k in range(rnd.randint(1, 3)):
             sc.rgb[y - k, x + (rnd.choice((-1, 0, 1)) if k else 0)] = col
-    for _ in range(4000):
-        x, y = rnd.randrange(WW), rnd.randrange(HH)
+    for _ in range(int(4000 * area)):
+        x, y = rnd.randrange(ww), rnd.randrange(hh)
         sc.rgb[y, x] *= rnd.choice((0.88, 1.12))
-    for c in range(19):
-        for r in range(15):
-            x, y = X0 + c * CW, Y0 + r * CH
-            if c in (8, 9, 10) or not (0 <= x < WW and 0 <= y < HH):
+    for c in range(cols + 1):
+        for r in range(rows + 1):
+            x, y = x0 + c * CW, y0 + r * CH
+            if zone is None:
+                left, right = c < 8, c > 10
+            else:
+                left, right = c <= zone, c >= cols - zone
+            if not (left or right) or not (0 <= x < ww and 0 <= y < hh):
                 continue
-            col = hexc("#c9b27a") if c < 8 else hexc("#9a8ab8")
+            col = hexc("#c9b27a") if left else hexc("#9a8ab8")
             for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)):
-                if 0 <= x + dx < WW and 0 <= y + dy < HH:
+                if 0 <= x + dx < ww and 0 <= y + dy < hh:
                     sc.rgb[y + dy, x + dx] = sc.rgb[y + dy, x + dx] * 0.75 + col * 0.25
 
 

@@ -34,8 +34,13 @@ struct App {
     game: Game,
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
+    /// The picture under the camera: the battlefield (render::FW×FH) in a battle, a screen's background (W×H) else.
     field: gfx::Image,
+    bg: gfx::Image,
+    /// A battle was on at the last picture (its first one puts the camera straight where it wants to be).
+    was_battle: bool,
     size: (u32, u32),
+    /// The output over the interface's canvas; over the battlefield it is `frame.over(FW, FH)`.
     frame: Frame,
     cam: Cam,
     /// The mouse wheel's scroll not yet a whole step (a touchpad's).
@@ -93,10 +98,11 @@ impl App {
         }
         self.size = (w, h);
         // the camera keeps its place and how close it is, as a share of the new window
-        let old = self.frame;
+        let old = self.under();
         self.frame = frame_for(w, h, self.game.settings.ui_scale);
-        self.cam.z *= self.frame.zmin / old.zmin;
-        self.cam = camera::clamp(self.cam, &self.frame);
+        let new = self.under();
+        self.cam.z *= new.zmin / old.zmin;
+        self.cam = camera::clamp(self.cam, &new);
     }
 
     /// Borderless over the whole screen, or a window: the largest whole multiple of 960×540 that leaves room for the
@@ -123,6 +129,15 @@ impl App {
         self.game.settings.fullscreen = full;
         self.game.settings.save();
         self.set_fullscreen(full);
+    }
+
+    /// The output over what the camera looks at now: the battlefield in a battle, a background else.
+    fn under(&self) -> Frame {
+        if self.was_battle {
+            self.frame.over(render::FW, render::FH)
+        } else {
+            self.frame
+        }
     }
 
     /// Where the mouse is on the interface's canvas.
@@ -166,28 +181,32 @@ impl App {
             ff = d.view.frame;
             d.view.frame = tick;
         } else {
-            self.game.draw_bg(&mut self.field);
+            self.game.draw_bg(&mut self.bg);
         }
+        let started = battle && !self.was_battle;
+        self.was_battle = battle;
+        let fr = self.under();
         // where the mouse is on the battlefield (through the camera), for a click on a fighter
-        let (w, h) = (self.frame.w as f32, self.frame.h as f32);
+        let (w, h) = (fr.w as f32, fr.h as f32);
         self.game.field_mouse = Some((self.cam.cx + (self.cursor.0 - w / 2.0) / self.cam.z, self.cam.cy + (self.cursor.1 - h / 2.0) / self.cam.z));
         self.game.draw_ui(&mut hud);
         self.game.ui.end(dt);
         // the camera's level: how close it may come to the clash (0 — the whole field)
         let level = self.game.settings.cam_level();
         let want = if battle {
-            camera::at_level(&self.game.demo.rec, ff, &self.frame, level, &crate::game::ZOOMS)
+            camera::at_level(&self.game.demo.rec, ff, &fr, level, &crate::game::ZOOMS)
         } else {
-            camera::whole(&self.frame)
+            camera::whole(&fr)
         };
-        if battle {
-            camera::follow(&mut self.cam, want, dt, &self.frame);
+        if battle && !started {
+            camera::follow(&mut self.cam, want, dt, &fr);
         } else {
             self.cam = want;
         }
         let light = self.game.light();
         if let Some(p) = &mut self.pixels {
-            camera::compose(&self.field, &hud, self.cam, light, p.frame_mut(), &self.frame, 4);
+            let under = if battle { &self.field } else { &self.bg };
+            camera::compose(under, &hud, self.cam, light, p.frame_mut(), &fr, 4);
             if let Err(e) = p.render() {
                 crate::fatal(&format!("Картинка перестала выводиться: {e}"));
             }
@@ -352,7 +371,9 @@ pub fn run(mut demo: Demo) {
         game,
         window: None,
         pixels: None,
-        field: gfx::Image::new(render::W, render::H),
+        field: gfx::Image::new(render::FW, render::FH),
+        bg: gfx::Image::new(render::W, render::H),
+        was_battle: false,
         size: (render::W as u32 * 2, render::H as u32 * 2),
         frame: Frame::fit(render::W * 2, render::H * 2),
         cam: Cam { cx: render::W as f32 / 2.0, cy: render::H as f32 / 2.0, z: 2.0 },

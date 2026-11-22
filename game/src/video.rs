@@ -4,7 +4,7 @@
 
 use crate::camera::{self, Frame};
 use crate::gfx::Image;
-use crate::render::{self, H, W};
+use crate::render::{self, FH, FW, H, W};
 use crate::Demo;
 use std::io::Write;
 
@@ -15,8 +15,8 @@ const HOLD: f32 = 96.0; // game frames the end plate stays before the next battl
 const FADE: f32 = 12.0; // game frames of the fade from and to black around a battle
 const WING: f32 = 68.0; // video rows the interface's wing covers (34 px of art at 2×)
 
-/// The video's output: 1920×1080, the field from 2× (all of it) to 3×, the interface at 2×.
-const FRAME: Frame = Frame { w: OW, h: OH, zmin: 2.0, zmax: 3.0, wing: WING, hud_scale: 2, hud_x0: 0 };
+/// The video's output: 1920×1080, the field from 1× (all of it) to 3×, the interface at 2×.
+const FRAME: Frame = Frame { w: OW, h: OH, fw: FW, fh: FH, zmin: 1.0, zmax: 3.0, zbase: 2.0, wing: WING, hud_scale: 2, hud_x0: 0 };
 
 /// The battles of `seeds` one after another as raw 1920×1080 RGB frames to stdout; the sounds to `sound_path`.
 pub fn run(demo: &mut Demo, seeds: &[u64], sound_path: &str) {
@@ -44,7 +44,7 @@ pub fn run(demo: &mut Demo, seeds: &[u64], sound_path: &str) {
             let want = camera::target(&demo.rec, ff.min(total - 1.0), &FRAME);
             camera::follow(&mut cam, want, 1.0 / FPS, &FRAME);
             demo.view.frame = ff.min(total + 24.0);
-            let mut field = Image::new(W, H);
+            let mut field = Image::new(FW, FH);
             render::draw_field(&mut field, &demo.assets, &demo.rec, &demo.sparks, &demo.view);
             let mut hud = Image::clear(W, H);
             render::draw_hud(&mut hud, &demo.assets, &demo.rec, &demo.view);

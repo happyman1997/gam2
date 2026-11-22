@@ -11,7 +11,8 @@ pub const FR: i32 = 30; // frames a round takes at ×1 (24 fps)
 pub const MOVE: i32 = 10; // of them, walking
 pub const CW: f32 = 50.0;
 pub const CH: f32 = 34.0;
-pub const X0: f32 = 30.0;
+/// Where cell (0, 0) begins on the field's picture (render::FW×FH): the 36×30 cells in the middle of its width.
+pub const X0: f32 = 60.0;
 pub const Y0: f32 = 46.0;
 
 #[derive(Clone)]

@@ -39,6 +39,27 @@ fn snap_n(g: &mut Game, dir: &str, name: &str, mouse: (i32, i32), frames: usize)
     println!("{dir}/{name}.png");
 }
 
+/// A battle on the field: `rec` at frame `f`, the camera at `level` (0 — the whole field), at 1080p.
+fn snap_battle(g: &mut Game, dir: &str, name: &str, rec: crate::playback::Record, f: f32, level: u8) {
+    use crate::render::{self, FH, FW};
+    g.demo.load(rec);
+    g.demo.view.frame = f;
+    let mut field = Image::new(FW, FH);
+    render::draw_field(&mut field, &g.demo.assets, &g.demo.rec, &g.demo.sparks, &g.demo.view);
+    let mut hud = Image::clear(W, H);
+    render::draw_hud(&mut hud, &g.demo.assets, &g.demo.rec, &g.demo.view);
+    let fr = Frame::fit(1920, 1080).over(FW, FH);
+    let cam = camera::at_level(&g.demo.rec, f, &fr, level, &crate::game::ZOOMS);
+    let mut buf = vec![0u8; 1920 * 1080 * 3];
+    camera::compose(&field, &hud, cam, 1.0, &mut buf, &fr, 3);
+    let mut img = Image::new(1920, 1080);
+    for (i, p) in img.px.iter_mut().enumerate() {
+        *p = [buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2], 255];
+    }
+    img.save(&Path::new(dir).join(format!("{name}.png"))).expect("save");
+    println!("{dir}/{name}.png");
+}
+
 fn set(g: &mut Game, s: Screen) {
     g.screen = s;
     g.overlays.clear();
@@ -252,4 +273,20 @@ pub fn run(demo: Demo, dir: &str) {
     g.fade = 0.0;
     g.ui.entered = g.ui.t;
     snap_n(&mut g, dir, "32_rising", (0, 0), 2);
+    // the battlefield: a start army against another as the camera follows it, the same battle whole, and a battle of
+    // hundreds — 600 workers and soldiers against 60 golems — whole
+    use sim::data;
+    let rec = crate::playback::record_of(184, &data::start_otets(), &data::start_matka());
+    snap_battle(&mut g, dir, "50_battle", rec, 200.0, 2);
+    let rec = crate::playback::record_of(184, &data::start_otets(), &data::start_matka());
+    snap_battle(&mut g, dir, "51_battle_whole", rec, 200.0, 0);
+    let mut swarm = vec![];
+    for k in 0..600 {
+        let form = data::FORMS[k % data::FORMS.len()];
+        swarm.push(data::swarm(if k % 6 == 5 { data::Caste::Soldier } else { data::Caste::Worker }, form));
+    }
+    let golems: Vec<_> = (0..60).map(|k| [data::strazh(), data::mudrets(), data::gorn(), data::orudie(), data::mekhanik()][k % 5].clone()).collect();
+    let rec = crate::playback::record_of(7, &golems, &swarm);
+    snap_battle(&mut g, dir, "52_battle_hundreds", rec, 60.0, 0);
+
 }

@@ -241,7 +241,7 @@ mod tests {
             data::start_otets(), data::start_izobretatel(), data::start_manyak(), data::start_zodchiy(),
             data::start_matka(), data::start_razum(), data::start_pozhiratel(), data::start_kukushka(),
         ];
-        let fr = camera::Frame::fit(1366, 768);
+        let fr = camera::Frame::fit(1366, 768).over(render::FW, render::FH);
         for (i, a) in armies.iter().enumerate() {
             for (j, b) in armies.iter().enumerate() {
                 for seed in 0..deep.max(2) {
@@ -289,7 +289,7 @@ mod flow {
     }
 
     fn frame(g: &mut Game) {
-        let mut field = gfx::Image::new(render::W, render::H);
+        let mut field = if g.in_battle() { gfx::Image::new(render::FW, render::FH) } else { gfx::Image::new(render::W, render::H) };
         let mut hud = gfx::Image::clear(render::W, render::H);
         if g.in_battle() {
             let d = &g.demo;
@@ -870,12 +870,15 @@ mod flow {
         g.overlays.clear();
         // each level no closer than its limit, the farthest the whole field
         let rec = &g.demo.rec;
-        let fr = Frame::fit(1920, 1080);
+        let fr = Frame::fit(1920, 1080).over(crate::render::FW, crate::render::FH);
+        // at 1080p the whole field is pixel for pixel; «обычно» as close as before the field grew (×3)
+        assert_eq!(fr.zmin, 1.0);
+        assert_eq!(fr.zbase * ZOOMS[2], 3.0);
         for f in (0..rec.frames()).step_by(7) {
             assert_eq!(camera::at_level(rec, f as f32, &fr, 0, &ZOOMS).z, fr.zmin);
             for l in 1..=4u8 {
                 let c = camera::at_level(rec, f as f32, &fr, l, &ZOOMS);
-                assert!(c.z >= fr.zmin - 1e-3 && c.z <= fr.zmin * ZOOMS[l as usize] + 1e-3, "level {l}: z {}", c.z);
+                assert!(c.z >= fr.zmin - 1e-3 && c.z <= fr.zbase * ZOOMS[l as usize] + 1e-3, "level {l}: z {}", c.z);
             }
         }
         let _ = std::fs::remove_dir_all(&tmp);
@@ -1218,7 +1221,7 @@ mod bench {
         use crate::{camera, gfx, render};
         use std::time::Instant;
         let demo = crate::Demo::new(184).unwrap();
-        let mut field = gfx::Image::new(render::W, render::H);
+        let mut field = gfx::Image::new(render::FW, render::FH);
         let (mut tf, mut th) = (0.0, 0.0);
         for k in 0..30 {
             let v = render::View { frame: 300.0 + k as f32, speed: 1, paused: false, hover: None, end: None };
@@ -1233,7 +1236,7 @@ mod bench {
         println!("field {:.1} ms, hud {:.1} ms", tf * 1000.0 / 30.0, th * 1000.0 / 30.0);
         let hud = gfx::Image::clear(render::W, render::H);
         for (w, h) in [(1920, 1080), (2560, 1440), (3840, 2160)] {
-            let fr = camera::Frame::fit(w, h);
+            let fr = camera::Frame::fit(w, h).over(render::FW, render::FH);
             let mut buf = vec![0u8; (w * h * 4) as usize];
             let cam = camera::target(&demo.rec, 300.0, &fr);
             let t = Instant::now();
@@ -1249,7 +1252,7 @@ mod bench {
             render::draw_hud(&mut hud, &demo.assets, &demo.rec, &v);
             let mut n = 0;
             for (w, h) in [(1920, 1080), (2560, 1440), (1366, 768), (1000, 700)] {
-                let fr = camera::Frame::fit(w, h);
+                let fr = camera::Frame::fit(w, h).over(render::FW, render::FH);
                 for f in [0.0, 150.0, 300.0, 333.3] {
                     let mut cam = camera::target(&demo.rec, f, &fr);
                     cam.cx += 0.37;

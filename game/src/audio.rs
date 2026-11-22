@@ -96,7 +96,7 @@ impl Audio {
         }
     }
 
-    /// A battle's sound: `gain` in dB on top of the sound's own level; `x` — where on the 960-wide field, for the
+    /// A battle's sound: `gain` in dB on top of the sound's own level; `x` — where on the field (render::FW wide), for the
     /// panning.
     pub fn play(&mut self, name: &str, gain: f32, x: f32) {
         self.sound(name, gain + self.battle_db, x);
@@ -104,7 +104,7 @@ impl Audio {
 
     /// The interface's sound (a click, a toggle), in the middle.
     pub fn play_ui(&mut self, name: &str) {
-        self.sound(name, self.ui_db, 480.0);
+        self.sound(name, self.ui_db, crate::render::FW as f32 / 2.0);
     }
 
     fn sound(&mut self, name: &str, gain: f32, x: f32) {
@@ -114,7 +114,7 @@ impl Audio {
         let data = v[(r1 * v.len() as f32) as usize % v.len()]
             .volume(Decibels(gain + HEADROOM))
             .playback_rate(PlaybackRate(0.94 + 0.12 * r2 as f64))
-            .panning(Panning(((x / 960.0) * 2.0 - 1.0).clamp(-1.0, 1.0) * 0.6));
+            .panning(Panning(((x / crate::render::FW as f32) * 2.0 - 1.0).clamp(-1.0, 1.0) * 0.6));
         let _ = self.mgr.play(data);
     }
 }

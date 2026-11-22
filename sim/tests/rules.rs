@@ -134,3 +134,34 @@ fn a_crowd_goes_round_to_the_back() {
     }
     assert!(reached * 2 >= battles, "the back reached in only {reached} of {battles} battles");
 }
+
+/// The field holds hundreds: 600 of the swarm and 60 golems all stand on it, each in its own side's zone; an army of
+/// the usual size stands as it always did — in a block of 6×14 in the middle of the field's height, at the front of
+/// its zone — and a big one plays to its end.
+#[test]
+fn the_field_holds_hundreds() {
+    use sim::battle::{BLOCK, H, W, ZONE};
+    let swarm: Vec<_> = (0..600).map(|k| swarm(if k % 6 == 5 { Caste::Soldier } else { Caste::Worker }, FORMS[k % FORMS.len()])).collect();
+    let golems: Vec<_> = (0..60).map(|k| [strazh(), mudrets(), gorn(), orudie(), mekhanik()][k % 5].clone()).collect();
+    let mut bt = Battle::new(5);
+    bt.add_armies(&golems, &swarm);
+    assert_eq!(bt.units.iter().filter(|u| u.side == 0).count(), 60, "golems left out");
+    assert_eq!(bt.units.iter().filter(|u| u.side == 1).count(), 600, "the swarm left out");
+    for u in &bt.units {
+        let f = sim::battle::footprint(u.t.size);
+        let zone = if u.side == 0 { 0..ZONE } else { W - ZONE..W };
+        assert!(zone.contains(&u.x) && zone.contains(&(u.x + f - 1)), "{} out of its zone at {}", u.t.name, u.x);
+    }
+    let o = bt.run();
+    assert!(o.rounds > 0);
+    // the usual: a start army in the old zone's block, middle rows, front columns
+    let mut bt = Battle::new(5);
+    bt.add_armies(&start_zodchiy(), &start_matka());
+    let (top, bottom) = ((H - BLOCK.1) / 2, (H - BLOCK.1) / 2 + BLOCK.1);
+    for u in &bt.units {
+        let f = sim::battle::footprint(u.t.size);
+        assert!(u.y >= top && u.y + f <= bottom, "{} at row {} — out of the block {top}..{bottom}", u.t.name, u.y);
+        let depth = if u.side == 0 { ZONE - u.x } else { u.x + f - (W - ZONE) };
+        assert!(depth <= BLOCK.0, "{} {depth} deep — out of the block", u.t.name);
+    }
+}

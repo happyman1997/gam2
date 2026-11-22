@@ -60,8 +60,9 @@ impl Default for Settings {
     }
 }
 
-/// The camera's levels: 0 — the whole field, then how close it may come (as many times the whole field).
-pub const ZOOMS: [f32; 5] = [1.0, 1.2, 1.5, 1.85, 2.25];
+/// The camera's levels: 0 — the whole field (half the screen's scale: the field is twice the screen's art each way),
+/// then how close it may come, as many times the screen's own scale (the interface's canvas filling the window).
+pub const ZOOMS: [f32; 5] = [0.5, 0.9, 1.5, 1.85, 2.25];
 const ZOOM_DEFAULT: u8 = 2;
 
 fn zoom_default() -> u8 {

@@ -113,9 +113,13 @@ def units():
         save_sprite(f"{key}_dead", flip_dead(SL.build(name, "idle", 1.0), 0.3))
 
 
+# the game's battlefield (sim/src/battle.rs W, H, ZONE; game/src/playback.rs X0, Y0): 1920x1080 art pixels
+FIELD = dict(ww=1920, hh=1080, cols=36, rows=30, zone=15, x0=60, y0=46)
+
+
 def ground():
-    sc = Scene(BT.WW, BT.HH)
-    BT.ground(sc)
+    sc = Scene(FIELD["ww"], FIELD["hh"])
+    BT.ground(sc, **FIELD)
     Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8), "RGB").save(os.path.join(DST, "ground.png"))
 
 

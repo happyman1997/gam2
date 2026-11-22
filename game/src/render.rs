@@ -7,8 +7,13 @@ use crate::gfx::Image;
 use crate::playback::{Effect, Number, NumStyle, Pose, Record, FR};
 use sim::Event;
 
+/// The interface's canvas (and a screen's background).
 pub const W: i32 = 960;
 pub const H: i32 = 540;
+/// The battlefield's: twice the interface's each way (sim::battle's 36×30 cells, 50×34 pixels each), so at 1080p
+/// the whole field is shown pixel for pixel and the camera comes as close as before.
+pub const FW: i32 = 1920;
+pub const FH: i32 = 1080;
 
 pub struct View {
     pub frame: f32,
@@ -470,8 +475,19 @@ fn meter(cv: &mut Image, cx: i32, y: i32, lit: i32, swarm: bool) {
     cv.fill(c0, y + 1, 7, 1, [130, 82, 20, 255]);
 }
 
+/// The whole battle on one 960×540 canvas (the debug pictures: --shot, --strip, --frames): the whole field, halved
+/// (each pixel the mean of four), the interface over it.
 pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec<Effect>), view: &View) {
-    draw_field(cv, a, rec, sparks, view);
+    let mut field = Image::new(FW, FH);
+    draw_field(&mut field, a, rec, sparks, view);
+    for y in 0..cv.h.min(FH / 2) {
+        for x in 0..cv.w.min(FW / 2) {
+            let p = |dx: i32, dy: i32| field.px[((2 * y + dy) * FW + 2 * x + dx) as usize];
+            let q = [p(0, 0), p(1, 0), p(0, 1), p(1, 1)];
+            let m = |k: usize| ((q[0][k] as u32 + q[1][k] as u32 + q[2][k] as u32 + q[3][k] as u32 + 2) / 4) as u8;
+            cv.px[(y * cv.w + x) as usize] = [m(0), m(1), m(2), 255];
+        }
+    }
     draw_hud(cv, a, rec, view);
 }
 
@@ -479,7 +495,12 @@ pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec
 pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec<Effect>), view: &View) {
     let total = rec.frames();
     let f = (view.frame as i32).min(total - 1);
-    cv.blit(&a.ground, 0, 0, false, 1.0);
+    // the ground, opaque and the field's own size: copied whole (a blend of two million pixels is most of a frame)
+    if (cv.w, cv.h) == (a.ground.w, a.ground.h) {
+        cv.px.copy_from_slice(&a.ground.px);
+    } else {
+        cv.blit(&a.ground, 0, 0, false, 1.0);
+    }
     // the units, in depth order. The small ones of a cell stand as one pack: no more than three bodies show — one in
     // front, two peeking out from behind it — with one shadow, and a row of dots under the pack when there are more
     // (a dot a body, no number to translate); a hidden one's swing or hit is shown by the body standing for it. The
@@ -622,7 +643,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             let top = sprite(a, rec, id, s.pose, f).map(|(sp, _)| sp.oy).unwrap_or(40);
             let lit = ((st.hp.max(0) * 10 + info.max_hp - 1) / info.max_hp.max(1)).clamp(0, 10);
             // over his head; at the very edge it slides just enough to stay on the screen
-            let (cx, cy) = ((s.x as i32).clamp(32, W - 22), (s.y as i32 - top - 8).max(44));
+            let (cx, cy) = ((s.x as i32).clamp(32, FW - 22), (s.y as i32 - top - 8).max(44));
             meter(cv, cx, cy, lit, !info.machine);
             bars.push((cx - 32, cy - 5, cx + 22, cy + 5));
         }
@@ -646,7 +667,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     }
     let end = view.frame as i32 - (total - 1);
     if end > 0 {
-        cv.dim(0, 0, W, H, 1.0 - 0.5 * (end as f32 / 12.0).min(1.0));
+        cv.dim(0, 0, cv.w, cv.h, 1.0 - 0.5 * (end as f32 / 12.0).min(1.0));
     }
 }
 
