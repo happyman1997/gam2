@@ -164,6 +164,11 @@ pub struct Game {
     pub targeting: Option<Targeting>,
     /// When the camera's level was last changed in battle (its note shows for a moment).
     pub cam_note: Option<f32>,
+    /// The army's view: the row picked (its sheet shown), the first row of the list on screen.
+    pub army_sel: usize,
+    pub army_top: usize,
+    /// How far down the picked body's sheet is scrolled (lines).
+    pub sheet_top: usize,
 }
 
 impl Game {
@@ -182,6 +187,9 @@ impl Game {
             quit: false,
             want_fullscreen: None,
             cam_note: None,
+            army_sel: 0,
+            army_top: 0,
+            sheet_top: 0,
             saved,
             money_seen: None,
             floats: vec![],

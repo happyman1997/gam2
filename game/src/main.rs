@@ -717,6 +717,81 @@ mod flow {
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
+    /// The army as in the strategy games of old: every body in the list (a swarm's kind a row, how many of it), a
+    /// click picks one and shows its sheet, the wheel goes down a long list and down a long sheet; every trait and
+    /// ability has its words.
+    #[test]
+    fn every_body_of_the_army_can_be_seen() {
+        use crate::screens::{ability_line, army_rows, sheet_lines, trait_words, ARMY_ROWS};
+        use sim::model::{Ability, Dmg, Trait};
+        use sim::run::{Find, Offer, Run};
+        // the words: none left as its key
+        let traits = [
+            Trait::Zaslon, Trait::Probivnoy, Trait::Caster, Trait::Pitanie, Trait::Zamykanie, Trait::ZharGorna, Trait::Navodka,
+            Trait::Naladka, Trait::NoAttack, Trait::FireResist75, Trait::Mindless, Trait::PoisonImmune, Trait::Unstoppable,
+            Trait::Fear { die: 8, radius: 2 }, Trait::Leader, Trait::Staya, Trait::Devour, Trait::Stroy, Trait::Flyer,
+            Trait::Venom { die: 4 }, Trait::BurstAcid { die: 4 }, Trait::Charge, Trait::Thorns { die: 3 }, Trait::CurlUp, Trait::Leap,
+            Trait::TwinBlades, Trait::Glow, Trait::HiveMind, Trait::Grows, Trait::Infects, Trait::Changeling, Trait::Viviparous,
+            Trait::Spitter,
+        ];
+        for tr in &traits {
+            let (n, l) = trait_words(tr);
+            assert!(!n.starts_with("tr.") && !l.starts_with("tr.") && !l.contains('{'), "{tr:?}: «{n}» «{l}»");
+        }
+        let abilities = [
+            Ability::Volley { every: 3, die: 6, bonus: 1, dmg: Dmg::Fire }, Ability::Repair { every: 2, amount: 3 },
+            Ability::Bolt { every: 2, die: 6, bonus: 0, dmg: Dmg::Shock, range: 1 }, Ability::Flail, Ability::Plates(3), Ability::PointBlank,
+            Ability::Intercept, Ability::Flash { every: 3 }, Ability::Spit { every: 3, die: 4 }, Ability::Brood { every: 3, n: 2 },
+            Ability::Mark { every: 2 }, Ability::Overload { every: 2 }, Ability::Fireball { every: 3, die: 4, bonus: 0, range: 5 },
+            Ability::Quake { every: 3, die: 8, bonus: 2, radius: 1 }, Ability::Augment, Ability::Tinker { every: 3 },
+        ];
+        for ab in &abilities {
+            let l = ability_line(ab);
+            assert!(!l.starts_with("ab.") && !l.contains('{'), "{ab:?}: «{l}»");
+        }
+        // a swarm of many kinds: more rows than the list shows
+        let tmp = std::env::temp_dir().join(format!("gam2-army-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        let mut run = Run::new(Class::Swarm, 0, 3);
+        let bodies = sim::data::FORMS.iter().flat_map(|f| [sim::data::swarm(sim::data::Caste::Worker, *f), sim::data::swarm(sim::data::Caste::Soldier, *f)]).collect();
+        run.recruit(&Offer { key: "x".into(), units: bodies, price: 0, find: Find::Units });
+        let rows = army_rows(&run);
+        assert!(rows.len() > ARMY_ROWS);
+        assert_eq!(rows.iter().map(|r| r.1).sum::<usize>(), run.army.len(), "a body missing from the list");
+        g.run = Some(run);
+        g.screen = Screen::Fork;
+        g.apply(Act::Army);
+        for _ in 0..12 {
+            frame(&mut g);
+        }
+        // the second row clicked: its sheet
+        g.ui.mx = 24 + 18 + 100;
+        g.ui.my = 24 + 54 + 40 + 18;
+        frame(&mut g);
+        g.ui.mouse_down();
+        g.ui.mouse_up();
+        frame(&mut g);
+        assert_eq!(g.army_sel, 1);
+        // the wheel over the list: down to its end and no farther
+        for _ in 0..40 {
+            g.ui.wheel = -1;
+            frame(&mut g);
+        }
+        assert_eq!(g.army_top, rows.len() - ARMY_ROWS);
+        // the wheel over the sheet: down its lines, no farther than its last
+        let r = g.run.as_ref().unwrap();
+        let lines = sheet_lines(r, &r.army[rows[1].0]).len();
+        g.ui.mx = 600;
+        g.ui.my = 300;
+        for _ in 0..20 {
+            g.ui.wheel = -1;
+            frame(&mut g);
+        }
+        assert_eq!(g.sheet_top, lines.saturating_sub(1));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
     /// A run of each class walked through every kind of screen by the screens' own acts — roads, battles, spoils,
     /// the find, the trader, events, the camp — each screen drawn on the way, to its end.
     #[test]

@@ -30,6 +30,11 @@ pub enum Act {
     OpenFind(usize),
     /// The camp's workshop opened (the Foundry).
     Workshop,
+    /// A body of the army picked to see its sheet (its row); the army's list scrolled (rows).
+    ArmySel(usize),
+    ArmyScroll(i32),
+    /// The picked body's sheet scrolled (lines).
+    SheetScroll(i32),
     /// The swarm's evolutions opened; a form evolved: (form, evolution).
     Evolution,
     Evolve(String, String),
@@ -670,6 +675,7 @@ impl Game {
         // the overlays: only the uppermost answers
         let n = self.overlays.len();
         let battle = self.in_battle();
+        let army_at = (self.army_sel, self.army_top, self.sheet_top);
         for (i, ov) in self.overlays.clone().into_iter().enumerate() {
             self.ui.blocked = i + 1 < n || busy;
             cv.fill(0, 0, 960, 540, [6, 4, 8, 150]);
@@ -679,7 +685,7 @@ impl Game {
             let r = match ov {
                 Overlay::Pause => pause(ui, cv, a, cls, self.run.as_ref(), battle),
                 Overlay::Settings => settings(ui, cv, a, cls, &self.settings),
-                Overlay::Army => self.run.as_ref().and_then(|r| army(ui, cv, a, r)),
+                Overlay::Army => self.run.as_ref().and_then(|r| army(ui, cv, a, r, army_at.0, army_at.1, army_at.2)),
                 Overlay::About => about(ui, cv, a, cls),
                 Overlay::Evolution => self.run.as_ref().and_then(|r| evolution(ui, cv, a, r)),
             };
@@ -733,6 +739,22 @@ impl Game {
             Act::Army => {
                 self.overlays.push(Overlay::Army);
                 self.ui.opened = self.ui.t;
+                self.army_sel = 0;
+                self.army_top = 0;
+                self.sheet_top = 0;
+            }
+            Act::ArmySel(k) => {
+                self.army_sel = k;
+                self.sheet_top = 0;
+                self.demo.ui_sound("toggle");
+            }
+            Act::ArmyScroll(d) => {
+                let rows = self.run.as_ref().map(|r| army_rows(r).len()).unwrap_or(0);
+                self.army_top = (self.army_top as i32 + d).clamp(0, rows.saturating_sub(ARMY_ROWS) as i32) as usize;
+            }
+            Act::SheetScroll(d) => {
+                let n = self.run.as_ref().and_then(|r| army_rows(r).get(self.army_sel).map(|&(i, _)| sheet_lines(r, &r.army[i]).len())).unwrap_or(0);
+                self.sheet_top = (self.sheet_top as i32 + d).clamp(0, n.saturating_sub(1) as i32) as usize;
             }
             Act::Evolution => {
                 self.overlays.push(Overlay::Evolution);
@@ -2137,55 +2159,329 @@ fn arrow(ui: &mut Ui, cv: &mut Image, a: &Assets, id: &str, x: i32, y: i32, left
     hit
 }
 
-fn army(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
-    let cls = run.class;
-    let r = Rect::new(40, 40, 880, 460);
-    plate(ui, cv, a, cls, r);
-    heading(cv, a, &t("army.title"), 480, r.y + 16, 24, cols(cls), Align::Center);
-    // a card a golem (with its modules), a card a kind of the swarm (with its breed's mutations); the numbers as
-    // they go into battle
+// ---------------------------------------------------------------- the army: every body, its full sheet
+
+/// A damage type's word and glyph.
+fn dmg_word(d: Dmg) -> (String, &'static str) {
+    match d {
+        Dmg::Pierce => (t("dmg.pierce"), "glyph/dmg:кол"),
+        Dmg::Slash => (t("dmg.slash"), "glyph/dmg:руб"),
+        Dmg::Blunt => (t("dmg.blunt"), "glyph/dmg:дроб"),
+        Dmg::Fire => (t("dmg.fire"), "glyph/dmg:огонь"),
+        Dmg::Cold => (t("dmg.cold"), "glyph/dmg:холод"),
+        Dmg::Shock => (t("dmg.shock"), "glyph/dmg:молния"),
+        Dmg::Poison => (t("dmg.poison"), "glyph/dmg:яд"),
+        Dmg::Acid => (t("dmg.acid"), "glyph/dmg:кисл"),
+    }
+}
+
+/// An armor type's word.
+fn armor_word(a: sim::model::ArmorType) -> String {
+    use sim::model::ArmorType as A;
+    t(match a {
+        A::None => "at.none",
+        A::Soft => "at.soft",
+        A::Leather => "at.leather",
+        A::Chain => "at.chain",
+        A::Plate => "at.plate",
+        A::Cast => "at.cast",
+        A::Chitin => "at.chitin",
+        A::HeavyChitin => "at.heavychitin",
+        A::Bone => "at.bone",
+        A::Wood => "at.wood",
+        A::Stone => "at.stone",
+        A::Iron => "at.iron",
+        A::Flame => "at.flame",
+    })
+}
+
+/// «+2», «−1» or nothing: a blow's bonus as the sheet writes it.
+fn plus(b: i32) -> String {
+    match b {
+        0 => String::new(),
+        b if b > 0 => format!("+{b}"),
+        b => format!("-{}", -b),
+    }
+}
+
+/// A trait's name and what it does, its numbers in.
+pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
+    use sim::model::Trait as T;
+    let n = |k: &str, l: &str| (t(k), t(l));
+    match *tr {
+        T::Zaslon => n("tr.zaslon", "tr.zaslon.l"),
+        T::Probivnoy => n("tr.probivnoy", "tr.probivnoy.l"),
+        T::Caster => n("tr.caster", "tr.caster.l"),
+        T::Pitanie => n("tr.pitanie", "tr.pitanie.l"),
+        T::Zamykanie => n("tr.zamykanie", "tr.zamykanie.l"),
+        T::ZharGorna => n("tr.zhar", "tr.zhar.l"),
+        T::Navodka => n("tr.navodka", "tr.navodka.l"),
+        T::Naladka => n("tr.naladka", "tr.naladka.l"),
+        T::NoAttack => n("tr.noattack", "tr.noattack.l"),
+        T::FireResist75 => n("tr.fireresist", "tr.fireresist.l"),
+        T::Mindless => n("tr.mindless", "tr.mindless.l"),
+        T::PoisonImmune => n("tr.poisonimmune", "tr.poisonimmune.l"),
+        T::Unstoppable => n("tr.unstoppable", "tr.unstoppable.l"),
+        T::Fear { die, radius } => (t("tr.fear"), tf("tr.fear.l", &[("d", &die), ("r", &radius)])),
+        T::Leader => n("tr.leader", "tr.leader.l"),
+        T::Staya => n("tr.staya", "tr.staya.l"),
+        T::Devour => n("tr.devour", "tr.devour.l"),
+        T::Stroy => n("tr.stroy", "tr.stroy.l"),
+        T::Flyer => n("tr.flyer", "tr.flyer.l"),
+        T::Venom { die } => (t("tr.venom"), tf("tr.venom.l", &[("d", &die)])),
+        T::BurstAcid { die } => (t("tr.burstacid"), tf("tr.burstacid.l", &[("d", &die)])),
+        T::Charge => n("tr.charge", "tr.charge.l"),
+        T::Thorns { die } => (t("tr.thorns"), tf("tr.thorns.l", &[("d", &die)])),
+        T::CurlUp => n("tr.curlup", "tr.curlup.l"),
+        T::Leap => n("tr.leap", "tr.leap.l"),
+        T::TwinBlades => n("tr.twinblades", "tr.twinblades.l"),
+        T::Glow => n("tr.glow", "tr.glow.l"),
+        T::HiveMind => n("tr.hivemind", "tr.hivemind.l"),
+        T::Grows => n("tr.grows", "tr.grows.l"),
+        T::Infects => n("tr.infects", "tr.infects.l"),
+        T::Changeling => n("tr.changeling", "tr.changeling.l"),
+        T::Viviparous => n("tr.viviparous", "tr.viviparous.l"),
+        T::Spitter => n("tr.spitter", "tr.spitter.l"),
+    }
+}
+
+/// What an ability does, its numbers in.
+pub fn ability_line(ab: &Ability) -> String {
+    let hit = |die: u32, bonus: i32| format!("1–{die}{}", plus(bonus));
+    match *ab {
+        Ability::Volley { every, die, bonus, dmg } => tf("ab.volley.l", &[("e", &every), ("h", &hit(die, bonus)), ("t", &dmg_word(dmg).0)]),
+        Ability::Repair { every, amount } => tf("ab.repair.l", &[("e", &every), ("n", &amount)]),
+        Ability::Bolt { every, die, bonus, dmg, range } => tf("ab.bolt.l", &[("e", &every), ("h", &hit(die, bonus)), ("t", &dmg_word(dmg).0), ("r", &range)]),
+        Ability::Flail => t("ab.flail.l"),
+        Ability::Plates(n) => tf("ab.plates.l", &[("n", &n)]),
+        Ability::PointBlank => t("ab.pointblank.l"),
+        Ability::Intercept => t("ab.intercept.l"),
+        Ability::Flash { every } => tf("ab.flash.l", &[("e", &every)]),
+        Ability::Spit { every, die } => tf("ab.spit.l", &[("e", &every), ("d", &die)]),
+        Ability::Brood { every, n } => tf("ab.brood.l", &[("e", &every), ("n", &n)]),
+        Ability::Mark { every } => tf("ab.mark.l", &[("e", &every)]),
+        Ability::Overload { every } => tf("ab.overload.l", &[("e", &every)]),
+        Ability::Fireball { every, die, bonus, range } => tf("ab.fireball.l", &[("e", &every), ("h", &hit(die, bonus)), ("r", &range)]),
+        Ability::Quake { every, die, bonus, .. } => tf("ab.quake.l", &[("e", &every), ("h", &hit(die, bonus))]),
+        Ability::Augment => t("ab.augment.l"),
+        Ability::Tinker { every } => tf("ab.tinker.l", &[("e", &every)]),
+    }
+}
+
+/// The army's rows: a golem (or the leader) a row; the swarm a row a kind (how many of it) — broken ones apart.
+pub fn army_rows(run: &Run) -> Vec<(usize, usize)> {
     let mut gs: Vec<(usize, usize)> = vec![];
     for (i, m) in run.army.iter().enumerate() {
-        if cls == Class::Swarm {
-            if let Some(g) = gs.iter_mut().find(|(j, _)| run.army[*j].t.name == m.t.name && run.army[*j].broken == m.broken) {
+        if run.class == Class::Swarm && !run.is_leader(m) {
+            if let Some(g) = gs.iter_mut().find(|(j, _)| run.army[*j].t.name == m.t.name && run.army[*j].broken == m.broken && !run.is_leader(&run.army[*j])) {
                 g.1 += 1;
                 continue;
             }
         }
         gs.push((i, 1));
     }
-    let (cw, ch, gap) = (130, 170, 10);
-    if gs.len() > 12 {
-        let more: usize = gs[12..].iter().map(|g| g.1).sum();
-        text(cv, a, &tf("army.more", &[("n", &more)]), r.x + r.w - 30, r.y + 30, MUTED, Align::Right);
+    gs
+}
+
+/// How many rows of the army's list show at once.
+pub const ARMY_ROWS: usize = 9;
+
+/// The army, as in the strategy games of old: every body down the left (the wheel scrolls), the one picked —
+/// its whole sheet on the right: how it goes into battle, its numbers, what it does, what it carries.
+#[allow(clippy::too_many_arguments)]
+fn army(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, sel: usize, top: usize, sheet_top: usize) -> Option<Act> {
+    let cls = run.class;
+    let r = Rect::new(24, 24, 912, 492);
+    plate(ui, cv, a, cls, r);
+    heading(cv, a, &t("army.title"), 480, r.y + 10, 24, cols(cls), Align::Center);
+    let mut act = None;
+    let rows = army_rows(run);
+    let sel = sel.min(rows.len().saturating_sub(1));
+    let font = &a.fonts["text16"];
+    // the list
+    let list = Rect::new(r.x + 18, r.y + 54, 286, ARMY_ROWS as i32 * 40);
+    let (over_list, _) = ui.hot("armylist", list);
+    if over_list && ui.wheel != 0 {
+        act = Some(Act::ArmyScroll(-ui.wheel));
     }
-    for (j, &(i, n)) in gs.iter().enumerate().take(12) {
+    let top = top.min(rows.len().saturating_sub(ARMY_ROWS));
+    for (k, &(i, n)) in rows.iter().enumerate().skip(top).take(ARMY_ROWS) {
         let m = &run.army[i];
-        let (col, row) = (j % 6, j / 6);
-        let rc = Rect::new(r.x + 30 + col as i32 * (cw + gap), r.y + 56 + row as i32 * (ch + gap), cw, ch);
-        unit_card(ui, cv, a, cls, &format!("ar{j}"), rc, &run.body(m), n, if m.broken { "broken" } else { "normal" }, !m.broken);
-        marks(ui, cv, a, run, rc, m);
-        if m.broken {
-            text(cv, a, &t("card.broken"), rc.cx(), rc.y + 26, RED, Align::Center);
+        let row = Rect::new(list.x, list.y + (k - top) as i32 * 40, list.w, 36);
+        let (over, kk) = ui.hot(&format!("arow{k}"), row);
+        let picked = k == sel;
+        cell(ui, cv, a, cls, row, if picked { "hover" } else { "normal" });
+        if kk > 0.01 || picked {
+            cv.glow(row.cx() as f32, row.cy() as f32, 120.0, if cls == Class::Foundry { [255, 190, 110] } else { [150, 230, 70] }, if picked { 0.12 } else { 0.06 * kk });
+        }
+        let mut pic = Image::clear(44, 34);
+        small(&mut pic, a, &m.t, 22, 32, false, m.broken);
+        cv.blit(&pic, row.x + 4, row.y + 1, false, 1.0);
+        let name = if run.is_leader(m) { format!("{} · {}", m.t.name, t("sheet.leader")) } else { m.t.name.to_string() };
+        let col = if m.broken { MUTED } else if picked { GOLD } else { INK };
+        let w = row.w - 110;
+        let shown = font.wrap(&name, w).into_iter().next().unwrap_or_default();
+        font.draw(cv, &shown, row.x + 52, row.y + 10, col, Some(EDGE), Align::Left, 1.0);
+        let right = if m.broken { t("card.broken") } else if n > 1 { tf("card.count", &[("n", &n)]) } else { String::new() };
+        font.draw(cv, &right, row.x + row.w - 8, row.y + 10, if m.broken { RED } else { GOLD }, Some(EDGE), Align::Right, 1.0);
+        if over && ui.clicked(row) {
+            act = Some(Act::ArmySel(k));
         }
     }
-    let ay = r.y + r.h - 40;
-    text(cv, a, &t("army.artifacts"), r.x + 30, ay, MUTED, Align::Left);
+    // where the list stands, and the way along it
+    if rows.len() > ARMY_ROWS {
+        let bar = Rect::new(list.x + list.w + 6, list.y, 6, list.h);
+        cv.fill(bar.x, bar.y, bar.w, bar.h, [20, 16, 22, 200]);
+        let h = (bar.h as usize * ARMY_ROWS / rows.len()).max(16) as i32;
+        let y = bar.y + ((bar.h - h) as usize * top / (rows.len() - ARMY_ROWS)) as i32;
+        cv.fill(bar.x, y, bar.w, h, [200, 170, 110, 255]);
+        text(cv, a, &tf("army.count", &[("n", &run.army.len())]), list.x, list.y + list.h + 4, MUTED, Align::Left);
+    }
+    // the artifacts under the list
+    let ay = r.y + r.h - 44;
+    text(cv, a, &t("army.artifacts"), list.x, ay + 8, MUTED, Align::Left);
     if run.artifacts.is_empty() {
-        text(cv, a, &t("army.none"), r.x + 150, ay, PALE, Align::Left);
+        text(cv, a, &t("army.none"), list.x + 120, ay + 8, PALE, Align::Left);
     }
     for (i, art) in run.artifacts.iter().enumerate() {
-        let (x, y) = (r.x + 150 + i as i32 * 36, ay - 8);
+        let (x, y) = (list.x + 120 + i as i32 * 36, ay);
         artifact_icon(ui, cv, a, *art, x, y, 2);
         if ui.hot(&format!("aa{i}"), Rect::new(x, y, 32, 32)).0 {
             ui.tooltip(artifact_tip(*art));
         }
     }
-    let close = ui.minor(cv, a, cls, "close", r.x + r.w - 190, r.y + r.h - 50, &t("army.close"), true);
-    if close {
-        Some(Act::CloseOverlay)
+    // the sheet of the one picked; the wheel over it goes down its lines
+    if let Some(&(i, n)) = rows.get(sel) {
+        let sr = Rect::new(r.x + 330, r.y + 50, r.w - 348, r.h - 104);
+        sheet(ui, cv, a, run, &run.army[i], n, sr, sheet_top);
+        if ui.hot("armysheet", sr).0 && ui.wheel != 0 {
+            act = Some(Act::SheetScroll(-ui.wheel));
+        }
+    }
+    if ui.minor(cv, a, cls, "close", r.x + r.w - 190, r.y + r.h - 44, &t("army.close"), true) {
+        act = Some(Act::CloseOverlay);
+    }
+    act
+}
+
+/// The lines of a body's sheet: its abilities, its traits, its modules (with their levels) or its breed's
+/// mutations — (name, what it does, its icon).
+pub fn sheet_lines(run: &Run, m: &sim::run::Member) -> Vec<(String, String, Option<String>)> {
+    let b = run.body(m);
+    let mut lines = vec![];
+    for ab in &b.abilities {
+        lines.push((ability_name(ab), ability_line(ab), None));
+    }
+    for tr in &b.traits {
+        let (nm, l) = trait_words(tr);
+        lines.push((nm, l, None));
+    }
+    if run.class == Class::Foundry {
+        for (j, k) in m.mods.iter().enumerate() {
+            let lv = t(&format!("lvl.{}", m.level(j)));
+            lines.push((format!("{} {lv}", t(&format!("find.{k}"))), t(&format!("find.{k}.l")), Some(format!("module/{k}"))));
+        }
     } else {
-        None
+        let f = form_of(&m.t);
+        for (_, k) in run.breeds.iter().filter(|(x, _)| x == f) {
+            lines.push((t(&format!("find.{k}")), t(&format!("find.{k}.l")), Some(format!("swarm/{k}"))));
+        }
+    }
+    lines
+}
+
+/// One body's whole sheet: its picture, name and kind; its numbers as it goes into battle (modules, mutations and
+/// artifacts in); what it does; what it carries.
+#[allow(clippy::too_many_arguments)]
+fn sheet(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, m: &sim::run::Member, n: usize, r: Rect, skip: usize) {
+    let cls = run.class;
+    let font = &a.fonts["text16"];
+    let b = run.body(m);
+    cv.fill(r.x, r.y, r.w, r.h, [10, 8, 12, 110]);
+    // the picture, cut to its frame
+    let pr = Rect::new(r.x + 8, r.y + 8, 132, 132);
+    cv.fill(pr.x, pr.y, pr.w, pr.h, [16, 12, 18, 255]);
+    cv.shadow(pr.cx() as f32, (pr.y + pr.h - 14) as f32, 50.0, 8.0);
+    let mut pic = Image::clear(pr.w, pr.h);
+    portrait(ui, &mut pic, a, &b, pr.w / 2, pr.h - 12, if m.broken { 0.5 } else { 1.0 }, false);
+    cv.blit(&pic, pr.x, pr.y, false, 1.0);
+    // name and kind
+    let title = if cls == Class::Foundry { [255, 214, 150] } else { ACID2 };
+    a.fonts["title16"].draw(cv, &b.name, r.x + 152, r.y + 12, title, Some(EDGE), Align::Left, 1.0);
+    let kind = if run.is_leader(m) {
+        t("sheet.leader")
+    } else if m.t.golem {
+        t("sheet.golem")
+    } else {
+        t("sheet.creature")
+    };
+    let mut sub = format!("{kind} · {}", armor_word(b.armor_type));
+    if n > 1 {
+        sub = format!("{sub} · {}", tf("card.count", &[("n", &n)]));
+    }
+    if m.broken {
+        sub = format!("{sub} · {}", t("card.broken"));
+    }
+    font.draw(cv, &sub, r.x + 152, r.y + 34, if m.broken { RED } else { MUTED }, Some(EDGE), Align::Left, 1.0);
+    // the numbers: a glyph, a word, the number
+    let (dw, dg) = dmg_word(b.dmg);
+    let blow = if b.die == 0 || b.has(sim::model::Trait::NoAttack) { t("card.nohit") } else { format!("1–{}{} · {dw}", b.die, plus(b.bonus)) };
+    let morale = if b.has(sim::model::Trait::Mindless) { "—".to_string() } else { b.morale.to_string() };
+    let stats: [(&str, String, String); 8] = [
+        ("glyph/здоровье", t("sheet.hp"), b.hp.to_string()),
+        ("glyph/броня", t("sheet.armor"), b.armor.to_string()),
+        (dg, t("sheet.hit"), blow),
+        ("glyph/дальность", t("sheet.range"), b.range.to_string()),
+        ("glyph/скорость", t("sheet.speed"), b.speed.to_string()),
+        ("glyph/инициатива", t("sheet.init"), b.init.to_string()),
+        ("glyph/дух", t("sheet.morale"), morale),
+        ("glyph/размер", t("sheet.size"), b.size.to_string()),
+    ];
+    for (k, (g, word, v)) in stats.iter().enumerate() {
+        let (col, row) = ((k % 2) as i32, (k / 2) as i32);
+        let x = r.x + 152 + col * 196;
+        let y = r.y + 58 + row * 22;
+        ui.icon(cv, a, g, x, y, 1, 1.0);
+        font.draw(cv, word, x + 22, y, MUTED, Some(EDGE), Align::Left, 1.0);
+        font.draw(cv, v, x + 190, y, INK, Some(EDGE), Align::Right, 1.0);
+    }
+    // what it does and what it carries: a line each, the name gold, the rest after it
+    let lines = sheet_lines(run, m);
+    let mut y = r.y + 152;
+    font.draw(cv, &t("sheet.does"), r.x + 10, y, cols(cls).0, Some(EDGE), Align::Left, 1.0);
+    y += 22;
+    if lines.is_empty() {
+        font.draw(cv, &t("sheet.nothing"), r.x + 10, y, PALE, Some(EDGE), Align::Left, 1.0);
+    }
+    let bottom = r.y + r.h - 6;
+    let skip = skip.min(lines.len().saturating_sub(1));
+    if skip > 0 {
+        font.draw(cv, &tf("sheet.above", &[("n", &skip)]), r.x + r.w - 10, y - 22, MUTED, Some(EDGE), Align::Right, 1.0);
+    }
+    for (k, (nm, l, icon)) in lines.iter().enumerate().skip(skip) {
+        if y + 18 > bottom {
+            font.draw(cv, &tf("sheet.below", &[("n", &(lines.len() - k))]), r.x + r.w - 10, bottom - 16, MUTED, Some(EDGE), Align::Right, 1.0);
+            break;
+        }
+        let mut x = r.x + 10;
+        if let Some(ic) = icon {
+            ui.icon(cv, a, ic, x, y, 1, 1.0);
+            x += 22;
+        }
+        let nw = font.width(nm);
+        font.draw(cv, nm, x, y, GOLD, Some(EDGE), Align::Left, 1.0);
+        let rest = r.x + r.w - 10 - (x + nw + 12);
+        let parts = font.wrap(l, rest.max(80));
+        for (p, part) in parts.iter().enumerate() {
+            if y + 18 > bottom {
+                break;
+            }
+            font.draw(cv, part, x + nw + 12, y, INK, Some(EDGE), Align::Left, 1.0);
+            if p + 1 < parts.len() {
+                y += 18;
+            }
+        }
+        y += 20;
     }
 }
 
