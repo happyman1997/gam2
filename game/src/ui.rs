@@ -81,6 +81,9 @@ pub struct Ui {
     pub my: i32,
     pub down: bool,
     press: Option<(i32, i32)>,
+    /// The right button: where it went down, and whether it came up this frame (a click to look closer).
+    rpress: Option<(i32, i32)>,
+    rreleased: bool,
     pub pressed: bool,
     pub released: bool,
     pub keys: Vec<Key>,
@@ -118,6 +121,8 @@ impl Ui {
             my: -1,
             down: false,
             press: None,
+            rpress: None,
+            rreleased: false,
             pressed: false,
             released: false,
             keys: vec![],
@@ -147,6 +152,28 @@ impl Ui {
         self.released = true;
     }
 
+    pub fn rmouse_down(&mut self) {
+        self.rpress = Some((self.mx, self.my));
+    }
+
+    pub fn rmouse_up(&mut self) {
+        self.rreleased = true;
+    }
+
+    /// The right button came up this frame (anywhere).
+    pub fn rreleased_at(&self) -> bool {
+        self.rreleased && !self.blocked
+    }
+
+    /// A right click on `r` (to look closer at what is there): pressed and let go on it.
+    pub fn rclicked(&mut self, r: Rect) -> bool {
+        let hit = !self.blocked && self.rreleased && r.contains(self.mx, self.my) && self.rpress.is_some_and(|(x, y)| r.contains(x, y));
+        if hit {
+            self.rpress = None;
+        }
+        hit
+    }
+
     /// The frame's input has been read by the screens: the clicks and keys are spent, the controls not drawn this
     /// frame ease back out of their hover.
     pub fn end(&mut self, dt: f32) {
@@ -161,6 +188,10 @@ impl Ui {
         self.released = false;
         self.keys.clear();
         self.wheel = 0;
+        if self.rreleased {
+            self.rpress = None;
+        }
+        self.rreleased = false;
     }
 
     /// Whether the mouse is on `r`, and how far this control has eased into its hover (0..1).

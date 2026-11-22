@@ -8,7 +8,7 @@
 //! applied when the frame is drawn.
 
 use crate::assets::{Align, Assets};
-use crate::game::{CampStage, From, Game, Overlay, Screen, Targeting};
+use crate::game::{Ask, CampStage, From, Game, Overlay, Screen, Targeting};
 use crate::gfx::Image;
 use crate::text::{t, tf};
 use crate::ui::{self, cell, heading, para, plate, text, Key, Rect, Ui, ACID, ACID2, BLUE, BRASS, EDGE, GOLD, INK, MUTED, PALE, RED, TITLE_F, TITLE_S, VIOLET};
@@ -30,6 +30,11 @@ pub enum Act {
     OpenFind(usize),
     /// The camp's workshop opened (the Foundry).
     Workshop,
+    /// A roster opened to look at: its title, its rows, the row picked first.
+    Inspect(String, Vec<SheetItem>, usize),
+    /// «Are you sure?» asked; the answer yes.
+    Ask(Ask),
+    Confirmed(Ask),
     /// A body of the army picked to see its sheet (its row); the army's list scrolled (rows).
     ArmySel(usize),
     ArmyScroll(i32),
@@ -56,7 +61,6 @@ pub enum Act {
     CloseFind,
     Resume,
     Army,
-    Surrender,
     CloseOverlay,
     Volume(i32),
     Fullscreen,
@@ -676,6 +680,7 @@ impl Game {
         let n = self.overlays.len();
         let battle = self.in_battle();
         let army_at = (self.army_sel, self.army_top, self.sheet_top);
+        let inspect = self.inspect.clone();
         for (i, ov) in self.overlays.clone().into_iter().enumerate() {
             self.ui.blocked = i + 1 < n || busy;
             cv.fill(0, 0, 960, 540, [6, 4, 8, 150]);
@@ -685,7 +690,9 @@ impl Game {
             let r = match ov {
                 Overlay::Pause => pause(ui, cv, a, cls, self.run.as_ref(), battle),
                 Overlay::Settings => settings(ui, cv, a, cls, &self.settings),
-                Overlay::Army => self.run.as_ref().and_then(|r| army(ui, cv, a, r, army_at.0, army_at.1, army_at.2)),
+                Overlay::Army => self.run.as_ref().and_then(|r| roster(ui, cv, a, cls, &t("army.title"), &army_items(r), army_at.0, army_at.1, army_at.2, Some(r))),
+                Overlay::Inspect => inspect.as_ref().and_then(|(title, items)| roster(ui, cv, a, cls, title, items, army_at.0, army_at.1, army_at.2, None)),
+                Overlay::Confirm(q) => confirm(ui, cv, a, cls, q),
                 Overlay::About => about(ui, cv, a, cls),
                 Overlay::Evolution => self.run.as_ref().and_then(|r| evolution(ui, cv, a, r)),
             };
@@ -749,12 +756,30 @@ impl Game {
                 self.demo.ui_sound("toggle");
             }
             Act::ArmyScroll(d) => {
-                let rows = self.run.as_ref().map(|r| army_rows(r).len()).unwrap_or(0);
+                let rows = self.roster_items().len();
                 self.army_top = (self.army_top as i32 + d).clamp(0, rows.saturating_sub(ARMY_ROWS) as i32) as usize;
             }
             Act::SheetScroll(d) => {
-                let n = self.run.as_ref().and_then(|r| army_rows(r).get(self.army_sel).map(|&(i, _)| sheet_lines(r, &r.army[i]).len())).unwrap_or(0);
+                let n = self.roster_items().get(self.army_sel).map(|it| it.lines().len()).unwrap_or(0);
                 self.sheet_top = (self.sheet_top as i32 + d).clamp(0, n.saturating_sub(1) as i32) as usize;
+            }
+            Act::Inspect(title, items, sel) => {
+                if !items.is_empty() {
+                    self.demo.ui_sound("toggle");
+                    self.open_inspect(title, items, sel);
+                }
+            }
+            Act::Ask(q) => {
+                self.overlays.push(Overlay::Confirm(q));
+                self.ui.opened = self.ui.t;
+            }
+            Act::Confirmed(q) => {
+                self.overlays.pop();
+                match q {
+                    Ask::Surrender => self.surrender(),
+                    Ask::ToMenu => self.back_to_menu(),
+                    Ask::Quit => self.quit = true,
+                }
             }
             Act::Evolution => {
                 self.overlays.push(Overlay::Evolution);
@@ -948,7 +973,6 @@ impl Game {
             Act::Resume | Act::CloseOverlay => {
                 self.overlays.pop();
             }
-            Act::Surrender => self.surrender(),
             Act::Volume(d) => {
                 self.settings.volume = (self.settings.volume as i32 + d).clamp(0, 10) as u8;
                 self.settings.save();
@@ -1109,6 +1133,13 @@ fn leaders(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, chosen: &mut usi
                 }
             }
         }
+        // a right click: the leader and its army to start with, sheet by sheet
+        if ui.rclicked(rect) {
+            let army = sim::data::army(cls.leaders()[i]);
+            let mut items = grouped(&army, false);
+            items.sort_by_key(|it| !it.t.has(sim::model::Trait::Leader));
+            act = Some(Act::Inspect(t(&format!("leader.{c}.{i}.name")), items, 0));
+        }
         if over && ui.clicked(rect) {
             *chosen = i;
             ui.sound("toggle");
@@ -1142,6 +1173,7 @@ fn leaders(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, chosen: &mut usi
             }
         }
     }
+    rmb_hint(ui, cv, a, "hint.rmb.leader", 480, 504, Align::Center);
     act
 }
 
@@ -1307,6 +1339,9 @@ fn fork(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
             }
             _ => {}
         }
+        if node.kind.is_battle() && ui.rclicked(r) {
+            act = Some(Act::Inspect(t("inspect.enemy"), grouped(&node.enemy, true), 0));
+        }
         if hit || ui.key(Key::Digit(i as u8 + 1)) {
             act = Some(Act::Road(i));
         }
@@ -1316,6 +1351,7 @@ fn fork(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
     if ui.minor(cv, a, cls, "army", 14, 484, &t("bar.army"), true) {
         act = Some(Act::Army);
     }
+    rmb_hint(ui, cv, a, "hint.rmb.road", 948, 500, Align::Right);
     act
 }
 
@@ -1416,6 +1452,9 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
             cv.fill(0, 44, 960, 424, [6, 4, 8, 120]);
             heading(cv, a, &t("pick.title"), 480, 58, 24, cols(cls), Align::Center);
             text(cv, a, &t("pick.sub"), 480, 92, MUTED, Align::Center);
+            if offers.iter().any(|o| o.find == Find::Units) {
+                rmb_hint(ui, cv, a, "hint.rmb.body", 480, 108, Align::Center);
+            }
             let n = offers.len() as i32;
             let (cw, gap) = (220, 34);
             let x0 = (960 - n * cw - (n - 1) * gap) / 2;
@@ -1424,6 +1463,9 @@ fn rewards(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, list: &mut [(Rewa
                 let (_, hit) = offer_card(ui, cv, a, run, &format!("pick{j}"), r, o, "new", true);
                 if hit || ui.key(Key::Digit(j as u8 + 1)) {
                     act = Some(Act::Pick(i, Some(j)));
+                }
+                if o.find == Find::Units && ui.rclicked(r) {
+                    act = Some(Act::Inspect(t("inspect.offer"), grouped(&o.units, false), 0));
                 }
             }
             if ui.minor(cv, a, cls, "skip", 380, 452, &tf("pick.skip", &[("cur", &t(&format!("cur.gen.{c}")))]), true) {
@@ -1473,11 +1515,15 @@ fn shop_screen(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, shop: &sim::r
     }
     let mut act = None;
     heading(cv, a, &t("shop.recruits"), 60, 56, 16, cols(cls), Align::Left);
+    rmb_hint(ui, cv, a, "hint.rmb.body", 900, 58, Align::Right);
     let (cw, gap) = (196, 18);
     for (i, (o, sold)) in shop.offers.iter().enumerate() {
         let r = Rect::new(60 + i as i32 * (cw + gap), 74 + ui.rise(i), cw, 226);
         let can = !sold && run.money >= o.price;
         let (_, hit) = offer_card(ui, cv, a, run, &format!("off{i}"), r, o, "normal", !sold);
+        if o.find == Find::Units && ui.rclicked(r) {
+            act = Some(Act::Inspect(t("inspect.offer"), grouped(&o.units, false), 0));
+        }
         if *sold {
             sold_stamp(ui, cv, a, r);
         } else {
@@ -2064,13 +2110,13 @@ fn pause(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, run: Option<&Run>,
     let items: [(&str, &str, Act); 5] = [
         ("pause.settings", "steel", Act::Settings),
         ("pause.army", "steel", Act::Army),
-        ("pause.surrender", "rust", Act::Surrender),
-        ("pause.menu", "steel", Act::ToMenu),
-        ("pause.quit", "dull", Act::Quit),
+        ("pause.surrender", "rust", Act::Ask(Ask::Surrender)),
+        ("pause.menu", "steel", Act::Ask(Ask::ToMenu)),
+        ("pause.quit", "dull", Act::Ask(Ask::Quit)),
     ];
     let mut y = r.y + 160;
     for (k, kind, a2) in items {
-        let on = run.is_some() || !matches!(a2, Act::Surrender | Act::Army);
+        let on = run.is_some() || !matches!(a2, Act::Ask(Ask::Surrender) | Act::Army);
         let hit = match cls {
             Class::Foundry => ui.tag(cv, a, k, x + 10, y, &t(k), if kind == "dull" { "steel" } else { kind }, on),
             Class::Swarm => ui.chitin(cv, a, k, Rect::new(x + 10, y + 2, r.w - 72, 36), &t(k), if kind == "rust" { "blood" } else { "chitin" }, on, false),
@@ -2083,6 +2129,65 @@ fn pause(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, run: Option<&Run>,
     let _ = battle;
     text(cv, a, &t("pause.esc"), 480, r.y + r.h - 28, PALE, Align::Center);
     act
+}
+
+/// «Right click — look closer»: the mouse's right button glyph and the words, `align`ed at (x, y).
+fn rmb_hint(ui: &mut Ui, cv: &mut Image, a: &Assets, key: &str, x: i32, y: i32, align: Align) {
+    let s = t(key);
+    let w = a.fonts["text16"].width(&s) + 22;
+    let x0 = match align {
+        Align::Left => x,
+        Align::Center => x - w / 2,
+        Align::Right => x - w,
+    };
+    ui.icon(cv, a, "glyph/пкм", x0, y, 1, 0.9);
+    text(cv, a, &s, x0 + 22, y, PALE, Align::Left);
+}
+
+/// «Are you sure?»: what will happen, yes or no (Enter — yes, Esc — no).
+fn confirm(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, q: Ask) -> Option<Act> {
+    let r = Rect::new(270, 170, 420, 200);
+    plate(ui, cv, a, cls, r);
+    heading(cv, a, &t("ask.title"), 480, r.y + 18, 24, cols(cls), Align::Center);
+    let key = match q {
+        Ask::Surrender => "ask.surrender",
+        Ask::ToMenu => "ask.menu",
+        Ask::Quit => "ask.quit",
+    };
+    let mut y = r.y + 64;
+    for l in a.fonts["text16"].wrap(&t(key), r.w - 48) {
+        text(cv, a, &l, r.cx(), y, INK, Align::Center);
+        y += 20;
+    }
+    let mut act = None;
+    let (yes, no) = match cls {
+        Class::Foundry => (
+            ui.tag(cv, a, "askyes", r.x + 40, r.y + r.h - 54, &t("ask.yes"), "rust", true),
+            ui.tag(cv, a, "askno", r.x + r.w - 170, r.y + r.h - 54, &t("ask.no"), "steel", true),
+        ),
+        Class::Swarm => (
+            ui.chitin(cv, a, "askyes", Rect::new(r.x + 30, r.y + r.h - 56, 160, 38), &t("ask.yes"), "blood", true, false),
+            ui.chitin(cv, a, "askno", Rect::new(r.x + r.w - 190, r.y + r.h - 56, 160, 38), &t("ask.no"), "chitin", true, false),
+        ),
+    };
+    if yes || ui.key(Key::Enter) {
+        act = Some(Act::Confirmed(q));
+    } else if no {
+        act = Some(Act::CloseOverlay);
+    }
+    act
+}
+
+impl Game {
+    /// The rows of the roster on top: the Inspect overlay's, else the army's.
+    pub fn roster_items(&self) -> Vec<SheetItem> {
+        if self.overlays.last() == Some(&Overlay::Inspect) {
+            if let Some((_, items)) = &self.inspect {
+                return items.clone();
+            }
+        }
+        self.run.as_ref().map(army_items).unwrap_or_default()
+    }
 }
 
 fn settings(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, s: &crate::game::Settings) -> Option<Act> {
@@ -2268,6 +2373,62 @@ pub fn ability_line(ab: &Ability) -> String {
     }
 }
 
+/// One row of a roster and its sheet: a body as it goes into battle, how many of it, what it is, what it does and
+/// carries; in battle — how it stands now.
+#[derive(Clone)]
+pub struct SheetItem {
+    pub t: Template,
+    pub n: usize,
+    pub kind: String,
+    pub broken: bool,
+    /// Its modules (with levels) or its breed's mutations: (name, what it does, icon).
+    pub carried: Vec<(String, String, Option<String>)>,
+    /// How it stands in the battle now (health left, fallen), if seen in a battle.
+    pub state: Option<(String, [u8; 3])>,
+    /// Its side in a battle (0 — ours), for the list's colour.
+    pub foe: bool,
+}
+
+impl SheetItem {
+    /// A body seen from outside a run (an enemy, a recruit, a leader's start): its kind from what it is.
+    pub fn of(body: &Template, n: usize, foe: bool) -> SheetItem {
+        let kind = if body.has(sim::model::Trait::Leader) {
+            t("sheet.leader")
+        } else if body.golem {
+            t("sheet.golem")
+        } else {
+            t("sheet.creature")
+        };
+        SheetItem { t: body.clone(), n, kind, broken: false, carried: vec![], state: None, foe }
+    }
+
+    /// Every line of the sheet: abilities, traits, then what it carries.
+    pub fn lines(&self) -> Vec<(String, String, Option<String>)> {
+        let mut lines = vec![];
+        for ab in &self.t.abilities {
+            lines.push((ability_name(ab), ability_line(ab), None));
+        }
+        for tr in &self.t.traits {
+            let (nm, l) = trait_words(tr);
+            lines.push((nm, l, None));
+        }
+        lines.extend(self.carried.iter().cloned());
+        lines
+    }
+}
+
+/// Bodies grouped by name for a roster: the same body once, with how many.
+pub fn grouped(ts: &[Template], foe: bool) -> Vec<SheetItem> {
+    let mut out: Vec<SheetItem> = vec![];
+    for t in ts {
+        match out.iter_mut().find(|it| it.t.name == t.name && it.t.hp == t.hp) {
+            Some(it) => it.n += 1,
+            None => out.push(SheetItem::of(t, 1, foe)),
+        }
+    }
+    out
+}
+
 /// The army's rows: a golem (or the leader) a row; the swarm a row a kind (how many of it) — broken ones apart.
 pub fn army_rows(run: &Run) -> Vec<(usize, usize)> {
     let mut gs: Vec<(usize, usize)> = vec![];
@@ -2283,99 +2444,28 @@ pub fn army_rows(run: &Run) -> Vec<(usize, usize)> {
     gs
 }
 
-/// How many rows of the army's list show at once.
-pub const ARMY_ROWS: usize = 9;
-
-/// The army, as in the strategy games of old: every body down the left (the wheel scrolls), the one picked —
-/// its whole sheet on the right: how it goes into battle, its numbers, what it does, what it carries.
-#[allow(clippy::too_many_arguments)]
-fn army(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, sel: usize, top: usize, sheet_top: usize) -> Option<Act> {
-    let cls = run.class;
-    let r = Rect::new(24, 24, 912, 492);
-    plate(ui, cv, a, cls, r);
-    heading(cv, a, &t("army.title"), 480, r.y + 10, 24, cols(cls), Align::Center);
-    let mut act = None;
-    let rows = army_rows(run);
-    let sel = sel.min(rows.len().saturating_sub(1));
-    let font = &a.fonts["text16"];
-    // the list
-    let list = Rect::new(r.x + 18, r.y + 54, 286, ARMY_ROWS as i32 * 40);
-    let (over_list, _) = ui.hot("armylist", list);
-    if over_list && ui.wheel != 0 {
-        act = Some(Act::ArmyScroll(-ui.wheel));
-    }
-    let top = top.min(rows.len().saturating_sub(ARMY_ROWS));
-    for (k, &(i, n)) in rows.iter().enumerate().skip(top).take(ARMY_ROWS) {
-        let m = &run.army[i];
-        let row = Rect::new(list.x, list.y + (k - top) as i32 * 40, list.w, 36);
-        let (over, kk) = ui.hot(&format!("arow{k}"), row);
-        let picked = k == sel;
-        cell(ui, cv, a, cls, row, if picked { "hover" } else { "normal" });
-        if kk > 0.01 || picked {
-            cv.glow(row.cx() as f32, row.cy() as f32, 120.0, if cls == Class::Foundry { [255, 190, 110] } else { [150, 230, 70] }, if picked { 0.12 } else { 0.06 * kk });
-        }
-        let mut pic = Image::clear(44, 34);
-        small(&mut pic, a, &m.t, 22, 32, false, m.broken);
-        cv.blit(&pic, row.x + 4, row.y + 1, false, 1.0);
-        let name = if run.is_leader(m) { format!("{} · {}", m.t.name, t("sheet.leader")) } else { m.t.name.to_string() };
-        let col = if m.broken { MUTED } else if picked { GOLD } else { INK };
-        let w = row.w - 110;
-        let shown = font.wrap(&name, w).into_iter().next().unwrap_or_default();
-        font.draw(cv, &shown, row.x + 52, row.y + 10, col, Some(EDGE), Align::Left, 1.0);
-        let right = if m.broken { t("card.broken") } else if n > 1 { tf("card.count", &[("n", &n)]) } else { String::new() };
-        font.draw(cv, &right, row.x + row.w - 8, row.y + 10, if m.broken { RED } else { GOLD }, Some(EDGE), Align::Right, 1.0);
-        if over && ui.clicked(row) {
-            act = Some(Act::ArmySel(k));
-        }
-    }
-    // where the list stands, and the way along it
-    if rows.len() > ARMY_ROWS {
-        let bar = Rect::new(list.x + list.w + 6, list.y, 6, list.h);
-        cv.fill(bar.x, bar.y, bar.w, bar.h, [20, 16, 22, 200]);
-        let h = (bar.h as usize * ARMY_ROWS / rows.len()).max(16) as i32;
-        let y = bar.y + ((bar.h - h) as usize * top / (rows.len() - ARMY_ROWS)) as i32;
-        cv.fill(bar.x, y, bar.w, h, [200, 170, 110, 255]);
-        text(cv, a, &tf("army.count", &[("n", &run.army.len())]), list.x, list.y + list.h + 4, MUTED, Align::Left);
-    }
-    // the artifacts under the list
-    let ay = r.y + r.h - 44;
-    text(cv, a, &t("army.artifacts"), list.x, ay + 8, MUTED, Align::Left);
-    if run.artifacts.is_empty() {
-        text(cv, a, &t("army.none"), list.x + 120, ay + 8, PALE, Align::Left);
-    }
-    for (i, art) in run.artifacts.iter().enumerate() {
-        let (x, y) = (list.x + 120 + i as i32 * 36, ay);
-        artifact_icon(ui, cv, a, *art, x, y, 2);
-        if ui.hot(&format!("aa{i}"), Rect::new(x, y, 32, 32)).0 {
-            ui.tooltip(artifact_tip(*art));
-        }
-    }
-    // the sheet of the one picked; the wheel over it goes down its lines
-    if let Some(&(i, n)) = rows.get(sel) {
-        let sr = Rect::new(r.x + 330, r.y + 50, r.w - 348, r.h - 104);
-        sheet(ui, cv, a, run, &run.army[i], n, sr, sheet_top);
-        if ui.hot("armysheet", sr).0 && ui.wheel != 0 {
-            act = Some(Act::SheetScroll(-ui.wheel));
-        }
-    }
-    if ui.minor(cv, a, cls, "close", r.x + r.w - 190, r.y + r.h - 44, &t("army.close"), true) {
-        act = Some(Act::CloseOverlay);
-    }
-    act
+/// The army as a roster: each row's body as it goes into battle, with its modules or its breed's mutations.
+pub fn army_items(run: &Run) -> Vec<SheetItem> {
+    army_rows(run)
+        .into_iter()
+        .map(|(i, n)| {
+            let m = &run.army[i];
+            let b = run.body(m);
+            let kind = if run.is_leader(m) {
+                t("sheet.leader")
+            } else if m.t.golem {
+                t("sheet.golem")
+            } else {
+                t("sheet.creature")
+            };
+            SheetItem { t: b, n, kind, broken: m.broken, carried: sheet_lines(run, m), state: None, foe: false }
+        })
+        .collect()
 }
 
-/// The lines of a body's sheet: its abilities, its traits, its modules (with their levels) or its breed's
-/// mutations — (name, what it does, its icon).
+/// What a member carries: its modules (with levels) or its breed's mutations.
 pub fn sheet_lines(run: &Run, m: &sim::run::Member) -> Vec<(String, String, Option<String>)> {
-    let b = run.body(m);
     let mut lines = vec![];
-    for ab in &b.abilities {
-        lines.push((ability_name(ab), ability_line(ab), None));
-    }
-    for tr in &b.traits {
-        let (nm, l) = trait_words(tr);
-        lines.push((nm, l, None));
-    }
     if run.class == Class::Foundry {
         for (j, k) in m.mods.iter().enumerate() {
             let lv = t(&format!("lvl.{}", m.level(j)));
@@ -2390,40 +2480,119 @@ pub fn sheet_lines(run: &Run, m: &sim::run::Member) -> Vec<(String, String, Opti
     lines
 }
 
-/// One body's whole sheet: its picture, name and kind; its numbers as it goes into battle (modules, mutations and
-/// artifacts in); what it does; what it carries.
+/// How many rows of a roster's list show at once.
+pub const ARMY_ROWS: usize = 9;
+
+/// A roster, as in the strategy games of old: every body down the left (the wheel scrolls), the one picked — its
+/// whole sheet on the right. The army's own adds its artifacts under the list.
 #[allow(clippy::too_many_arguments)]
-fn sheet(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, m: &sim::run::Member, n: usize, r: Rect, skip: usize) {
-    let cls = run.class;
+fn roster(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, title: &str, items: &[SheetItem], sel: usize, top: usize, sheet_top: usize, run: Option<&Run>) -> Option<Act> {
+    let r = Rect::new(24, 24, 912, 492);
+    plate(ui, cv, a, cls, r);
+    heading(cv, a, title, 480, r.y + 10, 24, cols(cls), Align::Center);
+    let mut act = None;
+    let sel = sel.min(items.len().saturating_sub(1));
     let font = &a.fonts["text16"];
-    let b = run.body(m);
+    let list = Rect::new(r.x + 18, r.y + 54, 286, ARMY_ROWS as i32 * 40);
+    let (over_list, _) = ui.hot("armylist", list);
+    if over_list && ui.wheel != 0 {
+        act = Some(Act::ArmyScroll(-ui.wheel));
+    }
+    let top = top.min(items.len().saturating_sub(ARMY_ROWS));
+    for (k, it) in items.iter().enumerate().skip(top).take(ARMY_ROWS) {
+        let row = Rect::new(list.x, list.y + (k - top) as i32 * 40, list.w, 36);
+        let (over, kk) = ui.hot(&format!("arow{k}"), row);
+        let picked = k == sel;
+        cell(ui, cv, a, cls, row, if picked { "hover" } else { "normal" });
+        if kk > 0.01 || picked {
+            cv.glow(row.cx() as f32, row.cy() as f32, 120.0, if cls == Class::Foundry { [255, 190, 110] } else { [150, 230, 70] }, if picked { 0.12 } else { 0.06 * kk });
+        }
+        let mut pic = Image::clear(44, 34);
+        small(&mut pic, a, &it.t, 22, 32, it.foe, it.broken);
+        cv.blit(&pic, row.x + 4, row.y + 1, false, 1.0);
+        let name = if it.t.has(sim::model::Trait::Leader) { format!("{} · {}", it.t.name, t("sheet.leader")) } else { it.t.name.to_string() };
+        let col = if it.broken || it.state.as_ref().is_some_and(|s| s.1 == RED) {
+            MUTED
+        } else if it.foe {
+            [240, 150, 130]
+        } else if picked {
+            GOLD
+        } else {
+            INK
+        };
+        let shown = font.wrap(&name, row.w - 110).into_iter().next().unwrap_or_default();
+        font.draw(cv, &shown, row.x + 52, row.y + 10, col, Some(EDGE), Align::Left, 1.0);
+        let right = if it.broken { t("card.broken") } else if it.n > 1 { tf("card.count", &[("n", &it.n)]) } else { String::new() };
+        font.draw(cv, &right, row.x + row.w - 8, row.y + 10, if it.broken { RED } else { GOLD }, Some(EDGE), Align::Right, 1.0);
+        if over && ui.clicked(row) {
+            act = Some(Act::ArmySel(k));
+        }
+    }
+    if items.len() > ARMY_ROWS {
+        let bar = Rect::new(list.x + list.w + 6, list.y, 6, list.h);
+        cv.fill(bar.x, bar.y, bar.w, bar.h, [20, 16, 22, 200]);
+        let h = (bar.h as usize * ARMY_ROWS / items.len()).max(16) as i32;
+        let y = bar.y + ((bar.h - h) as usize * top / (items.len() - ARMY_ROWS)) as i32;
+        cv.fill(bar.x, y, bar.w, h, [200, 170, 110, 255]);
+        let total: usize = items.iter().map(|i| i.n).sum();
+        text(cv, a, &tf("army.count", &[("n", &total)]), list.x, list.y + list.h + 4, MUTED, Align::Left);
+    }
+    // the army's artifacts under the list
+    if let Some(run) = run {
+        let ay = r.y + r.h - 44;
+        text(cv, a, &t("army.artifacts"), list.x, ay + 8, MUTED, Align::Left);
+        if run.artifacts.is_empty() {
+            text(cv, a, &t("army.none"), list.x + 120, ay + 8, PALE, Align::Left);
+        }
+        for (i, art) in run.artifacts.iter().enumerate() {
+            let (x, y) = (list.x + 120 + i as i32 * 36, ay);
+            artifact_icon(ui, cv, a, *art, x, y, 2);
+            if ui.hot(&format!("aa{i}"), Rect::new(x, y, 32, 32)).0 {
+                ui.tooltip(artifact_tip(*art));
+            }
+        }
+    }
+    if let Some(it) = items.get(sel) {
+        let sr = Rect::new(r.x + 330, r.y + 50, r.w - 348, r.h - 104);
+        sheet(ui, cv, a, cls, it, sr, sheet_top);
+        if ui.hot("armysheet", sr).0 && ui.wheel != 0 {
+            act = Some(Act::SheetScroll(-ui.wheel));
+        }
+    }
+    if ui.minor(cv, a, cls, "close", r.x + r.w - 190, r.y + r.h - 44, &t("army.close"), true) {
+        act = Some(Act::CloseOverlay);
+    }
+    act
+}
+
+/// One body's whole sheet: its picture, name and kind; its numbers (as it goes into battle); in battle how it stands
+/// now; everything it does and carries (the wheel goes down a long one).
+fn sheet(ui: &mut Ui, cv: &mut Image, a: &Assets, cls: Class, it: &SheetItem, r: Rect, skip: usize) {
+    let font = &a.fonts["text16"];
+    let b = &it.t;
     cv.fill(r.x, r.y, r.w, r.h, [10, 8, 12, 110]);
-    // the picture, cut to its frame
     let pr = Rect::new(r.x + 8, r.y + 8, 132, 132);
     cv.fill(pr.x, pr.y, pr.w, pr.h, [16, 12, 18, 255]);
     cv.shadow(pr.cx() as f32, (pr.y + pr.h - 14) as f32, 50.0, 8.0);
     let mut pic = Image::clear(pr.w, pr.h);
-    portrait(ui, &mut pic, a, &b, pr.w / 2, pr.h - 12, if m.broken { 0.5 } else { 1.0 }, false);
+    portrait(ui, &mut pic, a, b, pr.w / 2, pr.h - 12, if it.broken { 0.5 } else { 1.0 }, it.foe);
     cv.blit(&pic, pr.x, pr.y, false, 1.0);
-    // name and kind
-    let title = if cls == Class::Foundry { [255, 214, 150] } else { ACID2 };
-    a.fonts["title16"].draw(cv, &b.name, r.x + 152, r.y + 12, title, Some(EDGE), Align::Left, 1.0);
-    let kind = if run.is_leader(m) {
-        t("sheet.leader")
-    } else if m.t.golem {
-        t("sheet.golem")
+    let title = if it.foe {
+        [240, 150, 130]
+    } else if cls == Class::Foundry {
+        [255, 214, 150]
     } else {
-        t("sheet.creature")
+        ACID2
     };
-    let mut sub = format!("{kind} · {}", armor_word(b.armor_type));
-    if n > 1 {
-        sub = format!("{sub} · {}", tf("card.count", &[("n", &n)]));
+    a.fonts["title16"].draw(cv, &b.name, r.x + 152, r.y + 12, title, Some(EDGE), Align::Left, 1.0);
+    let mut sub = format!("{} · {}", it.kind, armor_word(b.armor_type));
+    if it.n > 1 {
+        sub = format!("{sub} · {}", tf("card.count", &[("n", &it.n)]));
     }
-    if m.broken {
+    if it.broken {
         sub = format!("{sub} · {}", t("card.broken"));
     }
-    font.draw(cv, &sub, r.x + 152, r.y + 34, if m.broken { RED } else { MUTED }, Some(EDGE), Align::Left, 1.0);
-    // the numbers: a glyph, a word, the number
+    font.draw(cv, &sub, r.x + 152, r.y + 34, if it.broken { RED } else { MUTED }, Some(EDGE), Align::Left, 1.0);
     let (dw, dg) = dmg_word(b.dmg);
     let blow = if b.die == 0 || b.has(sim::model::Trait::NoAttack) { t("card.nohit") } else { format!("1–{}{} · {dw}", b.die, plus(b.bonus)) };
     let morale = if b.has(sim::model::Trait::Mindless) { "—".to_string() } else { b.morale.to_string() };
@@ -2445,10 +2614,13 @@ fn sheet(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, m: &sim::run::Membe
         font.draw(cv, word, x + 22, y, MUTED, Some(EDGE), Align::Left, 1.0);
         font.draw(cv, v, x + 190, y, INK, Some(EDGE), Align::Right, 1.0);
     }
-    // what it does and what it carries: a line each, the name gold, the rest after it
-    let lines = sheet_lines(run, m);
+    let lines = it.lines();
     let mut y = r.y + 152;
-    font.draw(cv, &t("sheet.does"), r.x + 10, y, cols(cls).0, Some(EDGE), Align::Left, 1.0);
+    match &it.state {
+        // in battle: how it stands now, where «what it does» would begin
+        Some((s, c)) => font.draw(cv, s, r.x + 10, y, *c, Some(EDGE), Align::Left, 1.0),
+        None => font.draw(cv, &t("sheet.does"), r.x + 10, y, cols(cls).0, Some(EDGE), Align::Left, 1.0),
+    }
     y += 22;
     if lines.is_empty() {
         font.draw(cv, &t("sheet.nothing"), r.x + 10, y, PALE, Some(EDGE), Align::Left, 1.0);

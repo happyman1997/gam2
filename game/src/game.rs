@@ -136,6 +136,18 @@ pub enum Overlay {
     About,
     /// The swarm's evolutions of its forms, for biomass (from the spoils and the Hive).
     Evolution,
+    /// A roster to look at (an enemy, a recruit, a leader's start, the battle's fighters): `Game::inspect`.
+    Inspect,
+    /// «Are you sure?» before something that cannot be undone.
+    Confirm(Ask),
+}
+
+/// What is asked about before it is done.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Ask {
+    Surrender,
+    ToMenu,
+    Quit,
 }
 
 pub struct Game {
@@ -167,6 +179,12 @@ pub struct Game {
     /// The army's view: the row picked (its sheet shown), the first row of the list on screen.
     pub army_sel: usize,
     pub army_top: usize,
+    /// What the Inspect overlay shows: its title and rows.
+    pub inspect: Option<(String, Vec<crate::screens::SheetItem>)>,
+    /// Where the mouse is on the battlefield, in its art pixels (the window works it out through the camera).
+    pub field_mouse: Option<(f32, f32)>,
+    /// The bodies of the battle being watched, in its units' order (ours, then the enemy's).
+    pub battle_bodies: Vec<sim::model::Template>,
     /// How far down the picked body's sheet is scrolled (lines).
     pub sheet_top: usize,
 }
@@ -189,6 +207,9 @@ impl Game {
             cam_note: None,
             army_sel: 0,
             army_top: 0,
+            inspect: None,
+            field_mouse: None,
+            battle_bodies: vec![],
             sheet_top: 0,
             saved,
             money_seen: None,
@@ -324,6 +345,7 @@ impl Game {
         let (me, _) = run.fighters();
         let seed = run.battle_seed();
         let rec = playback::record_of(seed, &me, &node.enemy);
+        self.battle_bodies = me.iter().chain(node.enemy.iter()).cloned().collect();
         self.demo.load(rec);
         self.demo.view.speed = self.settings.speed.max(1);
         let won = self.demo.rec.outcome.winner == Some(0);
@@ -454,6 +476,70 @@ impl Game {
         }
     }
 
+    /// A roster opened to look at: its title, its rows, the one picked first.
+    pub fn open_inspect(&mut self, title: String, items: Vec<crate::screens::SheetItem>, sel: usize) {
+        self.army_sel = sel.min(items.len().saturating_sub(1));
+        self.army_top = self.army_sel.saturating_sub(crate::screens::ARMY_ROWS / 2);
+        self.sheet_top = 0;
+        self.inspect = Some((title, items));
+        self.overlays.push(Overlay::Inspect);
+        self.ui.opened = self.ui.t;
+    }
+
+    /// The fighter under the mouse on the battlefield, if there is one standing there.
+    fn fighter_at(&self) -> Option<usize> {
+        let (fx, fy) = self.field_mouse?;
+        let rec = &self.demo.rec;
+        let shown = rec.shown(self.demo.view.frame.min((rec.frames() - 1) as f32));
+        shown
+            .iter()
+            .filter(|s| s.pose != playback::Pose::Dead && s.id < rec.units.len())
+            .filter(|s| {
+                let u = &rec.units[s.id];
+                let (hw, top) = if u.fp >= 2 || u.leader { (40.0, 90.0) } else { (16.0, 40.0) };
+                fx >= s.x - hw && fx <= s.x + hw && fy >= s.y - top && fy <= s.y + 6.0
+            })
+            .min_by(|a, b| {
+                let d = |s: &&playback::Shown| (s.x - fx).powi(2) + (s.y - 20.0 - fy).powi(2);
+                d(a).total_cmp(&d(b))
+            })
+            .map(|s| s.id)
+    }
+
+    /// Every fighter of the battle as a roster (ours first, the enemy's after; the fallen last of each), each with
+    /// how it stands now; and the row of `pick`.
+    fn battle_items(&self, pick: usize) -> (Vec<crate::screens::SheetItem>, usize) {
+        use crate::text::{t, tf};
+        let rec = &self.demo.rec;
+        let f = (self.demo.view.frame as i32).clamp(0, rec.frames() - 1);
+        let round = &rec.rounds[(f / playback::FR) as usize];
+        let mut rows: Vec<(usize, crate::screens::SheetItem, bool)> = vec![];
+        for (id, u) in rec.units.iter().enumerate() {
+            let body = self.battle_bodies.get(id).cloned().unwrap_or_else(|| {
+                // one hatched in the battle: a larva
+                let mut l = sim::data::rabochaya();
+                l.name = u.name.clone().into();
+                l
+            });
+            let st = round.before.get(id).copied().unwrap_or_default();
+            let present = st.present;
+            if !present && st.alive {
+                continue; // not on the field (yet, or any more)
+            }
+            let mut it = crate::screens::SheetItem::of(&body, 1, u.side == 1);
+            let fallen = !st.alive;
+            it.state = Some(if fallen {
+                (t("sheet.fallen"), crate::ui::RED)
+            } else {
+                (tf("sheet.now", &[("hp", &st.hp.max(0)), ("max", &body.hp)]), if st.hp * 3 < body.hp { crate::ui::RED } else { crate::ui::INK })
+            });
+            rows.push((id, it, fallen));
+        }
+        rows.sort_by_key(|(id, it, fallen)| (it.foe, *fallen, *id));
+        let sel = rows.iter().position(|(id, _, _)| *id == pick).unwrap_or(0);
+        (rows.into_iter().map(|(_, it, _)| it).collect(), sel)
+    }
+
     /// The battle's own controls (its speed buttons, the end plate's button, its keys).
     pub fn battle_input(&mut self) {
         if !self.overlays.is_empty() || self.next.is_some() {
@@ -499,6 +585,18 @@ impl Game {
             self.cam_note = Some(self.ui.t);
             if want != now {
                 self.demo.ui_sound("toggle");
+            }
+        }
+        // a click on a fighter (not on a button): its sheet, and every fighter of the battle beside it
+        let on_field = b.is_none() && my > 34;
+        let left = self.ui.released && on_field;
+        let right = self.ui.rreleased_at() && on_field;
+        if left || right {
+            if let Some(id) = self.fighter_at() {
+                let (items, sel) = self.battle_items(id);
+                self.demo.ui_sound("toggle");
+                self.open_inspect(crate::text::t("inspect.battle"), items, sel);
+                return;
             }
         }
         if ended && (clicked == Some(render::Button::NewBattle) || key(self, Key::Enter) || key(self, Key::R)) {

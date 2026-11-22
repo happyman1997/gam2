@@ -168,6 +168,9 @@ impl App {
         } else {
             self.game.draw_bg(&mut self.field);
         }
+        // where the mouse is on the battlefield (through the camera), for a click on a fighter
+        let (w, h) = (self.frame.w as f32, self.frame.h as f32);
+        self.game.field_mouse = Some((self.cam.cx + (self.cursor.0 - w / 2.0) / self.cam.z, self.cam.cy + (self.cursor.1 - h / 2.0) / self.cam.z));
         self.game.draw_ui(&mut hud);
         self.game.ui.end(dt);
         // the camera's level: how close it may come to the clash (0 — the whole field)
@@ -240,6 +243,10 @@ impl ApplicationHandler for App {
             WindowEvent::MouseInput { state, button: MouseButton::Left, .. } => match state {
                 ElementState::Pressed => self.game.ui.mouse_down(),
                 ElementState::Released => self.game.ui.mouse_up(),
+            },
+            WindowEvent::MouseInput { state, button: MouseButton::Right, .. } => match state {
+                ElementState::Pressed => self.game.ui.rmouse_down(),
+                ElementState::Released => self.game.ui.rmouse_up(),
             },
             // the wheel: a notch a step; a touchpad's smooth scroll gathered into steps of 40 pixels
             WindowEvent::MouseWheel { delta, .. } => {

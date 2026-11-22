@@ -184,6 +184,16 @@ pub fn run(demo: Demo, dir: &str) {
         g.overlays.clear();
         g.overlays.push(Overlay::Army);
         snap(&mut g, dir, &format!("22_{tag}_army"), (200, 200));
+        // a road's enemy looked at closer; «Сдаться?»
+        g.overlays.clear();
+        if let Some(node) = run.path.iter().find(|n| n.kind.is_battle()) {
+            g.open_inspect(crate::text::t("inspect.enemy"), crate::screens::grouped(&node.enemy, true), 0);
+            snap(&mut g, dir, &format!("23_{tag}_enemy"), (200, 200));
+        }
+        g.overlays.clear();
+        g.overlays.push(Overlay::Confirm(crate::game::Ask::Surrender));
+        snap(&mut g, dir, &format!("24_{tag}_confirm"), (330, 330));
+        g.overlays.clear();
     }
     // crowded: a workshop of twelve golems, the evolutions of every form
     {

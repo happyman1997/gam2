@@ -722,7 +722,7 @@ mod flow {
     /// ability has its words.
     #[test]
     fn every_body_of_the_army_can_be_seen() {
-        use crate::screens::{ability_line, army_rows, sheet_lines, trait_words, ARMY_ROWS};
+        use crate::screens::{ability_line, army_rows, trait_words, ARMY_ROWS};
         use sim::model::{Ability, Dmg, Trait};
         use sim::run::{Find, Offer, Run};
         // the words: none left as its key
@@ -780,8 +780,7 @@ mod flow {
         }
         assert_eq!(g.army_top, rows.len() - ARMY_ROWS);
         // the wheel over the sheet: down its lines, no farther than its last
-        let r = g.run.as_ref().unwrap();
-        let lines = sheet_lines(r, &r.army[rows[1].0]).len();
+        let lines = crate::screens::army_items(g.run.as_ref().unwrap())[1].lines().len();
         g.ui.mx = 600;
         g.ui.my = 300;
         for _ in 0..20 {
@@ -789,6 +788,88 @@ mod flow {
             frame(&mut g);
         }
         assert_eq!(g.sheet_top, lines.saturating_sub(1));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// Every body can be looked at closer: a right click on a road shows its enemy, on a leader — the leader and its
+    /// army, on a recruit — the recruit; a click on a fighter in battle — every fighter with how it stands now (the
+    /// battle waits under it); «Сдаться» and «В меню» ask first.
+    #[test]
+    fn everything_can_be_looked_at() {
+        use crate::game::{Ask, Overlay};
+        use sim::run::Run;
+        let tmp = std::env::temp_dir().join(format!("gam2-look-{}", std::process::id()));
+        std::env::set_var("APPDATA", &tmp);
+        let mut g = Game::new(crate::Demo::new(184).unwrap());
+        let rclick = |g: &mut Game, x: i32, y: i32| {
+            g.ui.mx = x;
+            g.ui.my = y;
+            frame(g);
+            g.ui.rmouse_down();
+            g.ui.rmouse_up();
+            frame(g);
+        };
+        // a leader and its army
+        g.screen = Screen::Leaders { class: Class::Foundry, chosen: 0 };
+        for _ in 0..10 {
+            frame(&mut g);
+        }
+        rclick(&mut g, 14 + 236 + 100, 250);
+        assert_eq!(g.overlays.last(), Some(&Overlay::Inspect), "no leader's sheet");
+        let (title, items) = g.inspect.clone().unwrap();
+        assert_eq!(title, crate::text::t("leader.0.1.name"));
+        assert!(items[0].t.has(sim::model::Trait::Leader), "the leader not first");
+        g.apply(Act::CloseOverlay);
+        // a road's enemy
+        let run = Run::new(Class::Foundry, 1, 3);
+        let first = run.path.iter().position(|n| n.kind.is_battle()).unwrap();
+        let enemy_n = run.path[first].enemy.len();
+        g.run = Some(run);
+        g.screen = Screen::Fork;
+        for _ in 0..12 {
+            frame(&mut g);
+        }
+        let n = g.run.as_ref().unwrap().path.len() as i32;
+        let (cw, gap) = (262, 26);
+        let x0 = (960 - n * cw - (n - 1) * gap) / 2;
+        rclick(&mut g, x0 + first as i32 * (cw + gap) + cw / 2, 300);
+        assert_eq!(g.overlays.last(), Some(&Overlay::Inspect), "no enemy's sheet");
+        let (_, items) = g.inspect.clone().unwrap();
+        assert!(items.iter().all(|i| i.foe));
+        assert_eq!(items.iter().map(|i| i.n).sum::<usize>(), enemy_n);
+        g.apply(Act::CloseOverlay);
+        // a fighter in battle
+        g.apply(Act::Road(first));
+        settle(&mut g);
+        frame(&mut g);
+        assert!(g.in_battle());
+        g.demo.view.frame = 40.0;
+        let s = g.demo.rec.shown(40.0).into_iter().find(|s| s.pose != crate::playback::Pose::Dead).unwrap();
+        g.field_mouse = Some((s.x, s.y - 10.0));
+        g.ui.mx = 480;
+        g.ui.my = 300;
+        frame(&mut g);
+        g.ui.mouse_down();
+        g.ui.mouse_up();
+        frame(&mut g);
+        assert_eq!(g.overlays.last(), Some(&Overlay::Inspect), "no fighter's sheet");
+        let (_, items) = g.inspect.clone().unwrap();
+        let it = &items[g.army_sel];
+        assert_eq!(it.t.name, g.demo.rec.units[s.id].name, "another fighter picked");
+        assert!(it.state.is_some(), "no state in battle");
+        // the battle waits
+        let f = g.demo.view.frame;
+        g.tick();
+        assert_eq!(g.demo.view.frame, f);
+        g.apply(Act::CloseOverlay);
+        // to the menu asks first
+        g.apply(Act::Ask(Ask::ToMenu));
+        assert!(matches!(g.overlays.last(), Some(Overlay::Confirm(Ask::ToMenu))));
+        frame(&mut g);
+        g.key(crate::ui::Key::Enter);
+        frame(&mut g);
+        settle(&mut g);
+        assert!(matches!(g.screen, Screen::Menu), "«yes» did not go to the menu");
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
@@ -922,7 +1003,13 @@ mod flow {
             assert!(matches!(g.screen, Screen::Fork), "«Продолжить» brings the fork back");
             assert_eq!(g.run.as_ref().unwrap().next_fight(), fight);
             frame(&mut g);
-            g.apply(Act::Surrender);
+            // «Сдаться» asks first: no, then yes
+            g.apply(Act::Ask(crate::game::Ask::Surrender));
+            assert!(matches!(g.overlays.last(), Some(crate::game::Overlay::Confirm(_))), "giving up without asking");
+            g.apply(Act::CloseOverlay);
+            assert!(g.run.as_ref().unwrap().over.is_none(), "«no» gave the run up");
+            g.apply(Act::Ask(crate::game::Ask::Surrender));
+            g.apply(Act::Confirmed(crate::game::Ask::Surrender));
             settle(&mut g);
             assert!(matches!(g.screen, Screen::End { victory: false }) && g.saved.is_none(), "giving up ends the run and forgets it");
             frame(&mut g);
