@@ -7,7 +7,7 @@
     // battles 1..15 (the 5th, 10th and 15th are bosses): about two thirds of what an army of the class that takes
     // its finds brings by then (a start is worth about 3 Forges / 115 points)
     foundry: [2.26, 2.43, 2.54, 2.71, 2.89, 3.35, 3.47, 3.69, 3.81, 3.99, 4.50, 4.62, 4.85, 4.97, 5.09],
-    swarm: [80.0, 92.0, 106.0, 120.0, 135.0, 174.0, 192.0, 211.0, 231.0, 252.0, 304.0, 328.0, 353.0, 378.0, 405.0],
+    swarm: [80.0, 98.0, 118.0, 140.0, 163.0, 216.0, 245.0, 275.0, 306.0, 340.0, 416.0, 455.0, 495.0, 537.0, 581.0],
     // on top of the battle's own: a dangerous road, an elite, a boss
     danger: 1.15,
     elite: 1.2,
