@@ -92,7 +92,7 @@ fn the_web_holds_and_burns() {
     // a clump of spinners at a forge: the forge's heat sets one alight, the web carries it to the others
     let mut bt = Battle::new(4);
     bt.place(1, gorn(), 10, 10);
-    let ws: Vec<usize> = (0..6).map(|k| bt.place(0, with(rabochaya(), Trait::Spinner), 8, 9 + k as i32 / 2)).collect();
+    let ws: Vec<usize> = (0..6).map(|k| bt.place(0, with(rabochaya(), Trait::Spinner), 8, 9 + k / 2)).collect();
     bt.step();
     let burning = ws.iter().filter(|&&k| bt.units[k].burn > 0 || !bt.units[k].alive).count();
     assert!(burning >= 3, "the fire did not run along the web: {burning} of {}", ws.len());
@@ -115,7 +115,7 @@ fn honey_mends_and_floods() {
     let mut bt = Battle::new(6);
     bt.add_armies(&many(with(rabochaya(), Trait::Honey), 12), &[strazh()]);
     bt.run();
-    assert!(bt.honey().iter().any(|&s| s == 0), "the fallen left no honey");
+    assert!(bt.honey().contains(&0), "the fallen left no honey");
     let _ = b;
 }
 

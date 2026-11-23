@@ -165,8 +165,9 @@ pub enum Trait {
     /// The midge cloud itself: stings through any armor, enemy shooters next to it see nothing to shoot, fire burns it
     /// threefold; it thins out after a few rounds and does not count as an army.
     Cloud,
-    /// Паутина: every third round, instead of a blow, spins a web on its cells and around them; an enemy on the web is
-    /// stuck — it stops walking and spends its next action tearing free; fire runs along the web.
+    /// Паутина: every fourth round, instead of a blow, spins a web on its cells and around them (when an enemy beside it
+    /// is out of the web, or it has nothing to strike anyway); an enemy on the web is stuck — it stops walking, spends
+    /// two actions tearing free and takes blows half as hard again; fire runs along the web.
     Spinner,
     /// Медовые соты: a wounded body next to its own mends a point a round; a dying one floods its cell and the cells
     /// round it with honey — enemies standing in it strike weaker.
@@ -176,11 +177,11 @@ pub enum Trait {
     /// Почкование: wounded for the first time, it splits — a bud with half the health left steps out beside it.
     Buds,
     /// Единый разум: never flees, walks for the target its Hive Mind marked if it is within six cells, and strikes it
-    /// twice as hard.
+    /// past its armor.
     OneMind,
     /// Ржавчина: every blow that lands eats at the armor as acid does (a point a round at most), whatever its kind.
     Corrodes,
-    /// Стрекот: every third round an enemy with three or more of these beside it loses its blow (the chirr shakes it;
+    /// Стрекот: every second round an enemy with three or more of these beside it loses its blow (the chirr shakes it;
     /// machines ring with it too).
     Chirr,
     /// Кормовое безумие: it smells blood — +2 to its blows at an enemy below half its health.

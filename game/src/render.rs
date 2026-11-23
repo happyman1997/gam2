@@ -71,11 +71,14 @@ fn web_pixels(kind: u32) -> &'static [(i32, i32, f32)] {
     })[kind as usize % 8]
 }
 
+/// A pixel to lay on the field: where, its colour, how strongly.
+type Px = (i32, i32, [u8; 3], f32);
+
 /// The honey of a round as pixels of the field: one pool over all its cells (each cell a soft blob, the blobs summed
 /// and cut at a level — neighbouring cells run into one pool, a lone one is a puddle), its outline lumpy, a darker
 /// rim along its lower edge, a sheen and a glint or two. Made once a round and kept.
-fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<(i32, i32, [u8; 3], f32)>> {
-    type Layer = (u64, std::rc::Rc<Vec<(i32, i32, [u8; 3], f32)>>);
+fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<Px>> {
+    type Layer = (u64, std::rc::Rc<Vec<Px>>);
     thread_local!(static KEPT: std::cell::RefCell<Option<Layer>> = const { std::cell::RefCell::new(None) });
     // kept by what is flooded (a new battle in the same place must not see the old one's honey)
     let key = rec.rounds[r].honey.iter().enumerate().filter(|(_, &s)| s != -1).fold(1469598103934665603u64, |h, (c, _)| (h ^ c as u64).wrapping_mul(1099511628211));
@@ -118,7 +121,7 @@ fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<(i32, i32, [u8; 3], f3
                 let top_edge = at(x, y - 1) < level;
                 // the gloss: a band a few pixels in from the upper-left of the pool, where the light falls on the bulge
                 let gloss = at(x - 4, y - 4) < level && at(x, y - 2) >= level;
-                let glint = v > 1.5 && cell_hash((x / 2 * 31 + y * 17) as usize) % 61 == 0;
+                let glint = v > 1.5 && cell_hash((x / 2 * 31 + y * 17) as usize).is_multiple_of(61);
                 let (c, a) = if glint {
                     ([255, 248, 210], 0.9)
                 } else if top_edge {
@@ -176,7 +179,7 @@ fn midges(cv: &mut Image, x: f32, y: f32, ff: f32, id: usize, k: f32) {
         let (col, al) = if i % 5 == 0 { ([170, 162, 196, 255], 0.8) } else { ([26, 20, 34, 255], 0.95) };
         cv.blend_px(px.round() as i32, py.round() as i32, col, al * k);
         // a wing beat: every other speck a pixel longer now and then
-        if i % 2 == 1 && ((ff * 0.5) as usize + i) % 3 == 0 {
+        if i % 2 == 1 && ((ff * 0.5) as usize + i).is_multiple_of(3) {
             cv.blend_px(px.round() as i32 + 1, py.round() as i32, col, al * k * 0.7);
         }
     }

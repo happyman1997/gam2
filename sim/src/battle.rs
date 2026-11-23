@@ -261,6 +261,8 @@ struct Hit {
     ignite: bool,
     /// The blow stuns: the target skips its next attack (not the unstoppable).
     stun: bool,
+    /// Past any armor and what the target is made of (a midge cloud's sting, one mind at the mark).
+    through: bool,
 }
 
 pub struct Battle {
@@ -1007,9 +1009,9 @@ impl Battle {
         if self.units[i].silenced_until >= round {
             return; // Замыкание: the windings are shorted
         }
-        // a spinner spins every third round: to catch an enemy beside it not in the web yet, or when it has nothing to
+        // a spinner spins every fourth round: to catch an enemy beside it not in the web yet, or when it has nothing to
         // strike at anyway (a shooter with a target in range shoots, one beside webbed enemies strikes them)
-        if self.units[i].t.has(Trait::Spinner) && round % 3 == 1 {
+        if self.units[i].t.has(Trait::Spinner) && round % 4 == 1 {
             let adj = self.adjacent_enemies(i);
             let fresh = adj.iter().any(|&j| !self.on_enemy(j, &self.web));
             let idle = adj.is_empty() && (self.units[i].t.range <= 1 || self.ranged_target(i, self.units[i].t.range).is_none());
@@ -1117,9 +1119,18 @@ impl Battle {
                         self.spawn(side, larva, x, y);
                     }
                 }
-                Ability::Mark { every } if round.is_multiple_of(every) => {
+                Ability::Mark { every } if round.is_multiple_of(every) || self.one_mind(i) => {
                     let side = self.units[i].side as usize;
-                    let target = self.enemies_of(i).max_by_key(|&j| {
+                    // one mind: the Hive Mind sees with the swarm's eyes — every round, the most dangerous enemy the
+                    // swarm is at (within two cells of a body of it), not the most dangerous on the field
+                    let near: Vec<usize> = if self.one_mind(i) {
+                        let mine: Vec<usize> = (0..self.units.len()).filter(|&k| self.units[k].side as usize == side && self.units[k].present() && self.units[k].t.has(Trait::OneMind)).collect();
+                        self.enemies_of(i).filter(|&j| mine.iter().any(|&k| self.dist(k, j) <= 2)).collect()
+                    } else {
+                        vec![]
+                    };
+                    let pool: Vec<usize> = if near.is_empty() { self.enemies_of(i).collect() } else { near };
+                    let target = pool.into_iter().max_by_key(|&j| {
                         let t = &self.units[j].t;
                         (t.die as i32 + 2 * t.bonus, Reverse(j))
                     });
@@ -1145,10 +1156,16 @@ impl Battle {
         self.normal_attack(i, hits);
     }
 
-    /// Стрекот: every third round an enemy with three or more chirring bodies beside it shakes with their chirr (metal
+    /// Whether the side of `i` fights as one mind (Единый разум on its bodies).
+    fn one_mind(&self, i: usize) -> bool {
+        let side = self.units[i].side;
+        self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::OneMind))
+    }
+
+    /// Стрекот: every second round an enemy with three or more chirring bodies beside it shakes with their chirr (metal
     /// rings with it) and loses its blow.
     fn resonates(&self, i: usize) -> bool {
-        if !self.round.is_multiple_of(3) {
+        if !self.round.is_multiple_of(2) {
             return false;
         }
         let side = self.units[i].side;
@@ -1359,10 +1376,6 @@ impl Battle {
             if charge {
                 raw = raw * 3 / 2;
             }
-            // one mind: the swarm strikes the mark as one, twice as hard
-            if Some(v) == self.mark[self.units[i].side as usize] && self.units[i].t.has(Trait::OneMind) {
-                raw *= 2;
-            }
             // a blow in the back, or at one caught in its web: half as hard again
             if self.behind(i, v) {
                 raw = raw * 3 / 2;
@@ -1370,7 +1383,9 @@ impl Battle {
             } else if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
                 raw = raw * 3 / 2;
             }
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false, stun: false });
+            // one mind: the Hive Mind shows the swarm the chink in the mark's armor
+            let through = Some(v) == self.mark[self.units[i].side as usize] && self.units[i].t.has(Trait::OneMind);
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false, stun: false, through });
         }
     }
 
@@ -1425,7 +1440,7 @@ impl Battle {
             raw -= raw / 2;
         }
         // a midge cloud stings past any armor and anything it is made of
-        let mut d = if self.units[h.attacker].t.has(Trait::Cloud) && !self.units[t].t.armor_type.immune(h.dmg) {
+        let mut d = if (h.through || self.units[h.attacker].t.has(Trait::Cloud)) && !self.units[t].t.armor_type.immune(h.dmg) {
             raw
         } else {
             self.calc(t, raw, h.dmg, h.probivnoy)
@@ -1482,7 +1497,7 @@ impl Battle {
             if self.units[t].t.has(Trait::Buds) && !self.units[t].budded {
                 let side = self.units[t].side as usize % 2;
                 self.buds[side] += 1;
-                if self.buds[side] % 2 == 0 {
+                if self.buds[side].is_multiple_of(2) {
                     self.bud(t, self.units[t].t.hp / 4);
                 }
             }
@@ -1680,7 +1695,7 @@ impl Battle {
         if self.units[t].t.has(Trait::Midges) && self.units[t].burn == 0 {
             let c = &mut self.clouds[side as usize % 2];
             *c += 1;
-            if *c % 2 == 0 {
+            if c.is_multiple_of(2) {
                 self.spawn(side, crate::data::unit("moshkara"), x, y);
             }
         }
@@ -1692,7 +1707,7 @@ impl Battle {
         if self.units[t].t.has(Trait::Viviparous) {
             let b = &mut self.births[side as usize % 2];
             *b += 1;
-            if *b % 3 == 0 {
+            if b.is_multiple_of(3) {
                 let mut larva = crate::data::rabochaya();
                 larva.name = "Личинка".into();
                 self.spawn(side, larva, x, y);
