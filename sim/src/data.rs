@@ -135,6 +135,8 @@ pub struct Give {
     pub bonus: i32,
     pub range: i32,
     pub speed: i32,
+    /// More (or less) initiative: who strikes first in a round.
+    pub init: i32,
     pub dmg: Option<Dmg>,
 }
 
@@ -161,6 +163,7 @@ impl Give {
         t.bonus += self.bonus;
         t.range = (t.range as i32 + self.range).max(1) as u32;
         t.speed = (t.speed as i32 + self.speed).max(1) as u32;
+        t.init = (t.init as i32 + self.init).max(0) as u32;
         if let Some(d) = self.dmg {
             t.dmg = d;
         }
@@ -230,6 +233,8 @@ pub struct RunRules {
     pub limit_boss: u32,
     pub clutch: usize,
     pub eaten_per_biomass: u32,
+    /// How many mutations the swarm's genome holds.
+    pub genome: usize,
 }
 
 #[derive(Debug, Deserialize)]

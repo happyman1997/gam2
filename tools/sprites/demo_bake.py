@@ -219,6 +219,10 @@ def kits():
         for name, v in j["icons"].items():
             cx, cy = v["cell"]
             MANIFEST["icons"][f"{key}/{name}"] = dict(atlas=f"icons/{png}", rect=[cx * cell, cy * cell, cell, cell], name=v.get("name", ""))
+    # the swarm's doctrines drawn by an icon of an older name: the glue swarm by the slime, rust by the acid gland, the
+    # one mind by the resonator
+    for new, old, title in (("m_glue", "slime", "Клеевой рой"), ("m_rust", "acid", "Ржавчина"), ("m_onemind", "m_psi_reson", "Единый разум")):
+        MANIFEST["icons"][f"swarm/{new}"] = dict(MANIFEST["icons"][f"swarm/{old}"], name=title)
     g = json.load(open(os.path.join(HERE, "assets", "ui_kit", "foundry", "glyphs.json")))
     shutil.copy(os.path.join(HERE, "assets", "ui_kit", "foundry", g["image"]), os.path.join(DST, "icons", "glyphs.png"))
     for name, v in g["glyphs"].items():

@@ -241,17 +241,21 @@ fn modules_level_move_and_melt() {
 }
 
 /// The swarm: evolutions are a form's own and bought with biomass, dearer each time, never found; a leader's own
-/// mutations come only with that leader, the common ones with any.
+/// mutations come only with that leader, the common ones with any; a mutation is offered seldom — one among the finds
+/// after an elite or a boss, none among the ordinary ones, none once the genome is full.
 #[test]
 fn evolutions_and_leader_pools() {
-    use sim::run::{Find, EVO_PRICE, EVO_STEP};
+    use sim::run::{Find, Offer, Target, EVO_PRICE, EVO_STEP, SWARM};
     // every leader of the swarm: what its finds offer, over many
     let mut seen: Vec<Vec<String>> = vec![];
     for leader in 0..4 {
         let mut r = Run::new(Class::Swarm, leader, 4);
         let mut keys = vec![];
         for _ in 0..200 {
-            for o in r.find(3, false) {
+            assert!(r.find(3, false).iter().all(|o| !matches!(o.find, Find::Mutation(_))), "a mutation among the ordinary finds");
+            let rare = r.find(3, true);
+            assert!(rare.iter().filter(|o| matches!(o.find, Find::Mutation(_))).count() <= 1, "more than one mutation in a find");
+            for o in rare {
                 if let Find::Mutation(k) = o.find {
                     keys.push(k);
                 }
@@ -266,6 +270,18 @@ fn evolutions_and_leader_pools() {
             assert!(m.leader.as_deref().is_none_or(|l| l == own), "{k}: another leader's mutation with {own}");
         }
         assert!(keys.iter().any(|k| sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.as_deref() == Some(own.as_str()))), "{own}: its own pool never offered");
+        // the genome full: no mutation is offered, found or sold, and none can be taken
+        let full = sim::data::rules().genome;
+        for k in keys.iter().take(full) {
+            r.breeds.push((SWARM.to_string(), k.clone()));
+        }
+        assert!(r.genome_full());
+        for _ in 0..50 {
+            assert!(r.find(3, true).iter().all(|o| !matches!(o.find, Find::Mutation(_))), "a mutation offered to a full genome");
+            assert!(r.shop().offers.iter().all(|(o, _)| !matches!(o.find, Find::Mutation(_))), "a mutation sold to a full genome");
+        }
+        let more = Offer { key: keys[full].clone(), units: vec![], price: 0, find: Find::Mutation(keys[full].clone()) };
+        assert!(!r.take_find(&more, Some(&Target::Form(SWARM.to_string()))), "a fifth mutation taken");
         seen.push(keys);
     }
     // evolutions: the ant's, bought dearer each time; another form's not for the ant; no biomass, no evolution

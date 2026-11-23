@@ -899,7 +899,8 @@ mod flow {
             Trait::Fear { die: 8, radius: 2 }, Trait::Leader, Trait::Staya, Trait::Devour, Trait::Stroy, Trait::Flyer,
             Trait::Venom { die: 4 }, Trait::BurstAcid { die: 4 }, Trait::Charge, Trait::Thorns { die: 3 }, Trait::CurlUp, Trait::Leap,
             Trait::TwinBlades, Trait::Glow, Trait::HiveMind, Trait::Grows, Trait::Infects, Trait::Changeling, Trait::Viviparous,
-            Trait::Spitter,
+            Trait::Spitter, Trait::GlueBurst, Trait::Midges, Trait::Cloud, Trait::Spinner, Trait::Honey, Trait::SoftBody,
+            Trait::Buds, Trait::OneMind, Trait::Corrodes, Trait::Frenzy, Trait::Chirr,
         ];
         for tr in &traits {
             let (n, l) = trait_words(tr);

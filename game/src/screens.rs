@@ -332,10 +332,12 @@ fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: R
         font.draw(cv, &l, r.cx(), y, if on { title_col } else { MUTED }, Some(EDGE), Align::Center, 1.0);
         y += 18;
     }
+    // a mutation tells how full the genome is: it holds a few, and they are offered seldom
+    let genome = tf("find.genome", &[("n", &run.genome()), ("max", &sim::data::rules().genome)]);
     let kind = match &o.find {
         Find::Module(k) => format!("{} · {}", t("find.module"), module_for(k)),
-        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.is_some()) => t("find.pool"),
-        _ => t("find.mutation"),
+        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.is_some()) => format!("{} · {genome}", t("find.pool")),
+        _ => format!("{} · {genome}", t("find.mutation")),
     };
     for l in font.wrap(&kind, r.w - 16).into_iter().take(2) {
         font.draw(cv, &l, r.cx(), y, if on { MUTED } else { PALE }, Some(EDGE), Align::Center, 1.0);
@@ -2671,6 +2673,17 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Changeling => n("tr.changeling", "tr.changeling.l"),
         T::Viviparous => n("tr.viviparous", "tr.viviparous.l"),
         T::Spitter => n("tr.spitter", "tr.spitter.l"),
+        T::GlueBurst => n("tr.glueburst", "tr.glueburst.l"),
+        T::Midges => n("tr.midges", "tr.midges.l"),
+        T::Cloud => n("tr.cloud", "tr.cloud.l"),
+        T::Spinner => n("tr.spinner", "tr.spinner.l"),
+        T::Honey => n("tr.honey", "tr.honey.l"),
+        T::SoftBody => n("tr.softbody", "tr.softbody.l"),
+        T::Buds => n("tr.buds", "tr.buds.l"),
+        T::OneMind => n("tr.onemind", "tr.onemind.l"),
+        T::Corrodes => n("tr.corrodes", "tr.corrodes.l"),
+        T::Frenzy => n("tr.frenzy", "tr.frenzy.l"),
+        T::Chirr => n("tr.chirr", "tr.chirr.l"),
     }
 }
 

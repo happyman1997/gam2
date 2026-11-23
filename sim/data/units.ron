@@ -192,6 +192,25 @@
         traits: [],
         abilities: [],
     ),
+    // облако мошкары (мутация «Мошкара»): из павшей особи; жалит сквозь любую броню, слепит стрелков рядом, огонь
+    // сжигает его втрое, через несколько ходов рассеивается
+    "moshkara": (
+        name: "Мошкара",
+        size: 1,
+        hp: 3,
+        die: 1,
+        bonus: 0,
+        dmg: Pierce,
+        init: 9,
+        armor: 0,
+        morale: 99,
+        speed: 3,
+        range: 1,
+        armor_type: Soft,
+        golem: false,
+        traits: [Cloud, Flyer, Mindless],
+        abilities: [],
+    ),
     "soldat": (
         name: "Солдат",
         size: 2,

@@ -44,20 +44,38 @@
         (key: "evo_lime", form: "Мокрица", give: (armor: 1)),
         (key: "evo_farjump", form: "Кузнечик", give: (traits: [Leap])),
         (key: "evo_saws", form: "Богомол", give: (traits: [TwinBlades], hp: -2)),
+        // мутации — доктрины роя (CONCEPT.md, «Мутации»): каждая на весь рой и меняет, чем он воюет, у каждой цена;
+        // геном держит 4, предлагают их редко — после элиты и босса и в Улье
         // общий пул: у любого лидера
-        (key: "m_regen", give: (hp: 2)),
-        (key: "m_cutters", give: (bonus: 1)),
-        (key: "m_exploder", give: (traits: [BurstAcid(die: 2)])),
-        // без потери скорости: медленный рой не окружает, и −1 к скорости делал мутацию вредной
-        (key: "iron", give: (armor: 1)),
+        // Крылатый рой: все летают — через строй к стрелкам и лидеру, летящих не растоптать и не стряхнуть
+        // сотрясением; цена — рой бросает строй
+        (key: "m_flight", give: (traits: [Flyer])),
+        // Клеевой рой: раненая ниже половины или павшая лопается клеем — соседние враги не ходят и теряют удар (не
+        // чаще раза в два хода); лопнувшая гибнет
+        (key: "m_glue", give: (traits: [GlueBurst])),
+        // Мошкара: каждая вторая павшая рассыпается облаком на 2 хода (жалит сквозь броню, слепит стрелков); огонь его
+        // сжигает
+        (key: "m_midge", give: (traits: [Midges])),
+        // Паутина: раз в три хода сеть вместо удара; враг в сети два хода бьётся, удары по нему ×1,5; огонь бежит по
+        // сети
+        (key: "m_spinner", give: (traits: [Spinner])),
+        // Медовые соты: раненые рядом со своими заживают по 2, павшие заливают клетки мёдом — враг в нём бьёт вдвое
+        // слабее
+        (key: "m_honey", give: (traits: [Honey])),
+        // Ржавчина: каждый укус точит броню, как кислота; цена — мягкое тело: своя броня не в счёт, огонь вдвое
+        (key: "m_rust", give: (traits: [Corrodes, SoftBody])),
         // пулы лидеров (leader — ключ лидера в units.ron): только у него, поверх общих
+        // Матка — размножение
         (key: "m_vivi", leader: "matka", give: (traits: [Viviparous])),
-        (key: "m_dominant", leader: "matka", give: (hp: 1, bonus: 1)),
-        (key: "m_strider", leader: "razum", give: (traits: [Fear(die: 6, radius: 2)], speed: 1)),
-        (key: "m_psi_gland", leader: "razum", give: (traits: [Probivnoy])),
-        (key: "m_frenzy", leader: "pozhiratel", give: (traits: [Devour], bonus: 1)),
-        (key: "m_devblood", leader: "pozhiratel", give: (traits: [Grows], hp: 1)),
-        (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects], hp: 1)),
+        (key: "m_bud", leader: "matka", give: (traits: [Buds])),
+        // Разум улья — стрекот (резонанс: машину, обсаженную роем, трясёт) и единый разум (удар по цели Разума вдвое)
+        (key: "m_strider", leader: "razum", give: (traits: [Chirr], speed: 1)),
+        (key: "m_onemind", leader: "razum", give: (traits: [OneMind])),
+        // Пожиратель — пожирание
+        (key: "m_frenzy", leader: "pozhiratel", give: (traits: [Frenzy])),
+        (key: "m_devblood", leader: "pozhiratel", give: (traits: [Grows])),
+        // Чума — заражение
+        (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects])),
         (key: "m_spores", leader: "kukushka", give: (traits: [Venom(die: 3), Probivnoy])),
     ],
 )

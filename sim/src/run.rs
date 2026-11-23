@@ -588,6 +588,16 @@ impl Run {
         self.breeds.iter().filter(move |(f, _)| f == SWARM || f == form).map(|(_, k)| k)
     }
 
+    /// The swarm's mutations: what its genome holds.
+    pub fn genome(&self) -> usize {
+        self.breeds.iter().filter(|(f, _)| f == SWARM).count()
+    }
+
+    /// Whether the genome holds no more.
+    pub fn genome_full(&self) -> bool {
+        self.genome() >= data::rules().genome
+    }
+
     /// Whether the whole swarm has a mutation.
     pub fn has_mutation(&self, key: &str) -> bool {
         self.breeds.iter().any(|(f, k)| f == SWARM && k == key)
@@ -665,7 +675,7 @@ impl Run {
                     .map(Target::Form)
                     .collect(),
                 // a found mutation: the whole swarm at once, nothing to choose
-                None if !self.has_mutation(k) => vec![Target::Form(SWARM.to_string())],
+                None if !self.has_mutation(k) && !self.genome_full() => vec![Target::Form(SWARM.to_string())],
                 None => vec![],
             },
         }
@@ -1185,9 +1195,13 @@ impl Run {
         let mut guard = 0;
         while out.len() < n && guard < 60 {
             guard += 1;
-            // bodies only if the Foundry's leadership has room for the cheapest golem
+            // bodies only if the Foundry's leadership has room for the cheapest golem; the swarm finds a mutation
+            // seldom — one, after an elite or a boss — and bodies of its forms otherwise
             let room = self.class == Class::Swarm || self.lead_cap() >= self.lead_used() + 3;
-            let want_part = out.len() % 3 != 2 || !room;
+            let want_part = match self.class {
+                Class::Foundry => out.len() % 3 != 2 || !room,
+                Class::Swarm => rare && out.is_empty(),
+            };
             // a part, if there is a new one to offer; else bodies
             let part = if want_part { self.part().filter(|p| out.iter().all(|x| x.key != p.key)) } else { None };
             let o = part.unwrap_or_else(|| self.offer(rare));
@@ -1221,7 +1235,7 @@ impl Run {
                     .filter(|m| !self.has_mutation(&m.key))
                     .map(|m| m.key.as_str())
                     .collect();
-                if fit.is_empty() {
+                if fit.is_empty() || self.genome_full() {
                     return None;
                 }
                 let k = fit[self.roll(fit.len())].to_string();
@@ -1260,7 +1274,12 @@ impl Run {
             if offers.len() >= 4 {
                 break;
             }
-            let part = if offers.len() >= 2 { self.part().filter(|p| offers.iter().all(|(x, _)| x.key != p.key)) } else { None };
+            // the Foundry's modules in the last two places; the Hive sells one mutation at most
+            let wants = match self.class {
+                Class::Foundry => offers.len() >= 2,
+                Class::Swarm => offers.len() == 2,
+            };
+            let part = if wants { self.part().filter(|p| offers.iter().all(|(x, _)| x.key != p.key)) } else { None };
             let o = part.unwrap_or_else(|| self.offer(false));
             if offers.iter().all(|(x, _)| x.key != o.key) {
                 offers.push((o, false));
@@ -1460,6 +1479,6 @@ pub fn play(me: &[Template], enemy: &[Template], seed: u64) -> BattleResult {
 /// What a finished battle did: who of side 0's army (by its index in the army) was killed, how many of side 1 fell.
 pub fn result_of(bt: &Battle, winner: Option<u8>) -> BattleResult {
     let dead = bt.units.iter().filter(|u| u.side == 0 && !u.alive).filter_map(|u| u.src).collect();
-    let kills = bt.units.iter().filter(|u| u.side == 1 && !u.alive).count() as u32;
+    let kills = bt.units.iter().filter(|u| u.side == 1 && !u.alive && !u.t.has(Trait::Cloud)).count() as u32;
     BattleResult { won: winner == Some(0), dead, kills }
 }

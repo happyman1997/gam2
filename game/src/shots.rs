@@ -288,5 +288,13 @@ pub fn run(demo: Demo, dir: &str) {
     let golems: Vec<_> = (0..60).map(|k| [data::strazh(), data::mudrets(), data::gorn(), data::orudie(), data::mekhanik()][k % 5].clone()).collect();
     let rec = crate::playback::record_of(7, &golems, &swarm);
     snap_battle(&mut g, dir, "52_battle_hundreds", rec, 60.0, 0);
+    // the swarm's doctrines on the field: the web it spins, the honey of its fallen, the midge clouds they become
+    let mut r = Run::new(Class::Swarm, 0, 5);
+    for k in ["m_spinner", "m_honey", "m_midge"] {
+        r.breeds.push((sim::run::SWARM.to_string(), k.to_string()));
+    }
+    let foe = Run::new(Class::Swarm, 0, 513).enemy_of(Kind::Fight, 150.0).0;
+    let rec = crate::playback::record_of(11, &foe, &r.fighters().0);
+    snap_battle(&mut g, dir, "53_battle_doctrines", rec, 6.0 * crate::playback::FR as f32 + 22.0, 2);
 
 }

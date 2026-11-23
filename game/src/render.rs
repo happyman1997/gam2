@@ -4,8 +4,183 @@
 
 use crate::assets::{Align, Assets, Font};
 use crate::gfx::Image;
-use crate::playback::{Effect, Number, NumStyle, Pose, Record, FR};
+use crate::playback::{Effect, Number, NumStyle, Pose, Record, CH, CW, FR, X0, Y0};
 use sim::Event;
+use std::sync::OnceLock;
+
+/// A line of pixels from (x0, y0) to (x1, y1), each once.
+fn px_line(out: &mut Vec<(i32, i32)>, x0: i32, y0: i32, x1: i32, y1: i32) {
+    let n = (x1 - x0).abs().max((y1 - y0).abs()).max(1);
+    for k in 0..=n {
+        let p = (x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n);
+        if out.last() != Some(&p) {
+            out.push(p);
+        }
+    }
+}
+
+/// A small hash of a cell, for the look of what lies on it to differ from cell to cell.
+fn cell_hash(c: usize) -> u32 {
+    let mut h = (c as u32).wrapping_mul(0x9E37_79B9) ^ 0x5bd1_e995;
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x2c1b_3c6d);
+    h ^ (h >> 12)
+}
+
+/// Webs on a cell (50×34), eight kinds: a few threads from a knot somewhere off the middle out to the edges (so webs of
+/// neighbouring cells run into one another), one or two sagging rings between them — (x, y, strength) of each pixel.
+fn web_pixels(kind: u32) -> &'static [(i32, i32, f32)] {
+    static P: OnceLock<Vec<Vec<(i32, i32, f32)>>> = OnceLock::new();
+    &P.get_or_init(|| {
+        (0..8u32)
+            .map(|v| {
+                let h = cell_hash(v as usize * 7919 + 13);
+                let (cx, cy) = (20 + (h % 11) as i32, 13 + ((h >> 4) % 9) as i32);
+                let ends = [(0, 0), (24, 0), (49, 0), (49, 16), (49, 33), (26, 33), (0, 33), (0, 18)];
+                // five to eight threads: the ones whose bit is clear are missing
+                let keep: Vec<usize> = (0..8).filter(|&k| (h >> (8 + k)) & 1 == 1 || k % 3 == 0).collect();
+                let mut spokes = vec![];
+                for &k in &keep {
+                    px_line(&mut spokes, cx, cy, ends[k].0, ends[k].1);
+                }
+                let mut rings = vec![];
+                let fs: &[f32] = if (h >> 20) & 1 == 1 { &[0.36, 0.7] } else { &[0.5] };
+                for &f in fs {
+                    let pts: Vec<(i32, i32)> = keep
+                        .iter()
+                        .enumerate()
+                        .map(|(n, &k)| {
+                            let g = if n % 2 == 1 { f * 0.84 } else { f };
+                            ((cx as f32 + (ends[k].0 - cx) as f32 * g).round() as i32, (cy as f32 + (ends[k].1 - cy) as f32 * g).round() as i32)
+                        })
+                        .collect();
+                    for n in 0..pts.len() {
+                        // a strand here and there is broken
+                        if (h >> (n % 12)) & 7 == 0 {
+                            continue;
+                        }
+                        let (a, b) = (pts[n], pts[(n + 1) % pts.len()]);
+                        px_line(&mut rings, a.0, a.1, b.0, b.1);
+                    }
+                }
+                let mut out: Vec<(i32, i32, f32)> = spokes.into_iter().map(|(x, y)| (x, y, 0.22)).collect();
+                out.extend(rings.into_iter().map(|(x, y)| (x, y, 0.3)));
+                out
+            })
+            .collect()
+    })[kind as usize % 8]
+}
+
+/// The honey of a round as pixels of the field: one pool over all its cells (each cell a soft blob, the blobs summed
+/// and cut at a level — neighbouring cells run into one pool, a lone one is a puddle), its outline lumpy, a darker
+/// rim along its lower edge, a sheen and a glint or two. Made once a round and kept.
+fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<(i32, i32, [u8; 3], f32)>> {
+    type Layer = (u64, std::rc::Rc<Vec<(i32, i32, [u8; 3], f32)>>);
+    thread_local!(static KEPT: std::cell::RefCell<Option<Layer>> = const { std::cell::RefCell::new(None) });
+    // kept by what is flooded (a new battle in the same place must not see the old one's honey)
+    let key = rec.rounds[r].honey.iter().enumerate().filter(|(_, &s)| s != -1).fold(1469598103934665603u64, |h, (c, _)| (h ^ c as u64).wrapping_mul(1099511628211));
+    if let Some(l) = KEPT.with(|k| k.borrow().as_ref().filter(|l| l.0 == key).map(|l| l.1.clone())) {
+        return l;
+    }
+    let cols = sim::battle::W;
+    let cells: Vec<(f32, f32)> = rec.rounds[r]
+        .honey
+        .iter()
+        .enumerate()
+        .filter(|(_, &s)| s != -1)
+        .map(|(c, _)| (X0 + ((c as i32 % cols) as f32 + 0.5) * CW, Y0 + ((c as i32 / cols) as f32 + 0.5) * CH))
+        .collect();
+    let mut out = vec![];
+    if !cells.is_empty() {
+        let (x0, x1) = (cells.iter().map(|c| c.0).fold(f32::MAX, f32::min) as i32 - 40, cells.iter().map(|c| c.0).fold(f32::MIN, f32::max) as i32 + 40);
+        let (y0, y1) = (cells.iter().map(|c| c.1).fold(f32::MAX, f32::min) as i32 - 30, cells.iter().map(|c| c.1).fold(f32::MIN, f32::max) as i32 + 30);
+        let (w, h) = (x1 - x0 + 1, y1 - y0 + 1);
+        let mut f = vec![0f32; (w * h) as usize];
+        for &(cx, cy) in &cells {
+            for y in (cy as i32 - 40).max(y0)..=(cy as i32 + 40).min(y1) {
+                for x in (cx as i32 - 56).max(x0)..=(cx as i32 + 56).min(x1) {
+                    let (dx, dy) = ((x as f32 - cx) / 28.0, (y as f32 - cy) / 19.0);
+                    f[((y - y0) * w + x - x0) as usize] += (-(dx * dx + dy * dy)).exp();
+                }
+            }
+        }
+        let at = |x: i32, y: i32| if x < x0 || y < y0 || x > x1 || y > y1 { 0.0 } else { f[((y - y0) * w + x - x0) as usize] };
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                let v = at(x, y);
+                // the outline lumpy: the level wanders a little, in blocks of three pixels (a pixel-art edge)
+                let n = (cell_hash(((x / 3) * 7919 + (y / 3) * 104_729) as usize) % 100) as f32 / 100.0;
+                let level = 0.72 + 0.12 * n;
+                if v < level {
+                    continue;
+                }
+                let lower_edge = at(x, y + 3) < level;
+                let top_edge = at(x, y - 1) < level;
+                // the gloss: a band a few pixels in from the upper-left of the pool, where the light falls on the bulge
+                let gloss = at(x - 4, y - 4) < level && at(x, y - 2) >= level;
+                let glint = v > 1.5 && cell_hash((x / 2 * 31 + y * 17) as usize) % 61 == 0;
+                let (c, a) = if glint {
+                    ([255, 248, 210], 0.9)
+                } else if top_edge {
+                    ([255, 226, 140], 0.7)
+                } else if lower_edge {
+                    ([96, 52, 8], 0.5)
+                } else if gloss {
+                    ([255, 190, 60], 0.45)
+                } else {
+                    ([178, 104, 14], 0.34)
+                };
+                out.push((x, y, c, a));
+            }
+        }
+    }
+    let l = std::rc::Rc::new(out);
+    KEPT.with(|k| *k.borrow_mut() = Some((key, l.clone())));
+    l
+}
+
+/// What lies on the field's ground at round `r`: the swarm's honey, then its web over it.
+fn ground_layers(cv: &mut Image, rec: &Record, r: usize) {
+    let round = &rec.rounds[r];
+    let cols = sim::battle::W;
+    for &(x, y, col, a) in honey_layer(rec, r).iter() {
+        cv.blend_px(x, y, [col[0], col[1], col[2], 255], a);
+    }
+    for (c, _) in round.web.iter().enumerate().filter(|(_, &s)| s != -1) {
+        let (x0, y0) = ((X0 + (c as i32 % cols) as f32 * CW) as i32, (Y0 + (c as i32 / cols) as f32 * CH) as i32);
+        for &(x, y, a) in web_pixels(cell_hash(c) >> 3) {
+            cv.blend_px(x0 + x, y0 + y, [232, 224, 208, 255], a);
+        }
+    }
+}
+
+/// A midge cloud: a faint dark haze, and in it a swirl of specks, each on its own small orbit, a few pale wings
+/// catching the light; it thins as it fades (`k` 1 → 0).
+fn midges(cv: &mut Image, x: f32, y: f32, ff: f32, id: usize, k: f32) {
+    let (cx, cy) = (x, y - 16.0);
+    for py in -8..=8i32 {
+        for px in -14..=14i32 {
+            let d = (px as f32 / 14.0).powi(2) + (py as f32 / 8.0).powi(2);
+            if d <= 1.0 {
+                cv.blend_px(cx as i32 + px, cy as i32 + py, [30, 24, 40, 255], 0.16 * (1.0 - d) * k);
+            }
+        }
+    }
+    let n = 30;
+    for i in 0..n {
+        let h = ((id * 31 + i * 17) % 97) as f32;
+        let a = h * 0.61 + ff * (0.1 + (i % 5) as f32 * 0.03) * if i % 2 == 0 { 1.0 } else { -1.0 };
+        let r = 0.25 + 0.75 * ((h * 0.37).sin() * 0.5 + 0.5);
+        let px = cx + a.cos() * 13.0 * r;
+        let py = cy + a.sin() * 8.0 * r + (ff * 0.3 + h).sin() * 1.5;
+        let (col, al) = if i % 5 == 0 { ([170, 162, 196, 255], 0.8) } else { ([26, 20, 34, 255], 0.95) };
+        cv.blend_px(px.round() as i32, py.round() as i32, col, al * k);
+        // a wing beat: every other speck a pixel longer now and then
+        if i % 2 == 1 && ((ff * 0.5) as usize + i) % 3 == 0 {
+            cv.blend_px(px.round() as i32 + 1, py.round() as i32, col, al * k * 0.7);
+        }
+    }
+}
 
 /// The interface's canvas (and a screen's background).
 pub const W: i32 = 960;
@@ -501,6 +676,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     } else {
         cv.blit(&a.ground, 0, 0, false, 1.0);
     }
+    ground_layers(cv, rec, (f / FR) as usize);
     // the units, in depth order. The small ones of a cell stand as one pack: no more than three bodies show — one in
     // front, two peeking out from behind it — with one shadow, and a row of dots under the pack when there are more
     // (a dot a body, no number to translate); a hidden one's swing or hit is shown by the body standing for it. The
@@ -509,7 +685,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let shown = rec.shown(ff);
     let ms = rec.moments((f / FR) as usize);
     let lying_of = |o: &crate::playback::Shown| o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
-    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader;
+    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader && !rec.units[id].cloud;
     // a pack: the small ones of one side, one size, in one cell (big ones never stand among small ones)
     type PackKey = ((i32, i32), u8, u32);
     let key = |id: usize, cell: (i32, i32)| -> PackKey { (cell, rec.units[id].side, rec.units[id].size) };
@@ -584,6 +760,18 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
                 anim.dy = other.dy;
             }
             anim.flash = anim.flash.max(other.flash);
+        }
+        if info.cloud {
+            // no body: a swirl of specks, thinning as it is killed
+            let k = match s.dead_at {
+                Some(d) => (1.0 - (ff - d as f32) / 6.0).clamp(0.0, 1.0),
+                None if lying => 0.0,
+                None => 1.0,
+            };
+            if k > 0.0 {
+                midges(cv, x, y, ff, s.id, k);
+            }
+            continue;
         }
         let Some((spr, name)) = sprite(a, rec, s.id, anim.pose, f) else { continue };
         // a body that has no broken pose lies as it stood, dark (the drawing below darkens the dead)
@@ -678,14 +866,15 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     let f = (view.frame as i32).min(total - 1);
     // the wing: the swarm against the Foundry, the turn, the speed
     cv.blit(&a.ui["wing_battle_960"].img, 0, 0, false, 1.0);
-    let alive = |side: u8| rec.units.iter().enumerate().filter(|(i, u)| u.side == side && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count();
+    // a midge cloud is no body of the army
+    let alive = |side: u8| rec.units.iter().enumerate().filter(|(i, u)| u.side == side && !u.cloud && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count();
     // the swarm's count on the left, the Foundry's leader and its golems on the right, whichever side each is on
     let swarm = if rec.units.iter().any(|u| u.side == 1 && !u.machine) { 1 } else { 0 };
     let forge = 1 - swarm;
     let hp = |side: u8| -> f32 {
         let (mut now, mut all) = (0.0, 0.0);
         for (i, u) in rec.units.iter().enumerate() {
-            if u.side == side {
+            if u.side == side && !u.cloud {
                 all += u.max_hp as f32;
                 let s = rec.state_at(i, f);
                 if s.alive && s.present {

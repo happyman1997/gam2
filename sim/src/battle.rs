@@ -130,6 +130,14 @@ pub struct Unit {
     pub overloaded: u32,
     /// Glued to its cell: cannot walk up to and including this round (Плевок паука).
     pub glued_until: u32,
+    /// Has split once already (Почкование): a body buds only the first time it is wounded.
+    pub budded: bool,
+    /// The round glue last froze its blow: glue stops a blow one round in three at most.
+    pub glue_round: u32,
+    /// Half torn out of the enemy's web: the next action frees it.
+    pub struggling: bool,
+    /// Damage it has bitten out of the enemy this battle (Кровь Пожирателя: a body grows on what it eats).
+    pub fed: i32,
 }
 
 impl Unit {
@@ -269,11 +277,56 @@ pub struct Battle {
     first: Vec<(i32, i32)>,
     /// Bodies that died live-bearing, per side: every third gives a larva (a whole swarm of them would double itself).
     births: [u32; 2],
+    /// Midge bodies fallen, per side: every second becomes a cloud.
+    clouds: [u32; 2],
+    /// Budding bodies killed by their first wound, per side: every second lets a bud away.
+    buds: [u32; 2],
+    /// The web on each cell: the side that spun it, -1 none (Паутина).
+    web: Vec<i8>,
+    /// The honey on each cell: the side whose dead flooded it, -1 none (Медовые соты).
+    honey: Vec<i8>,
 }
 
 impl Battle {
     pub fn new(seed: u64) -> Self {
-        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None, mark: [None, None], aim: vec![], first: vec![], births: [0, 0] }
+        let n = (W * H) as usize;
+        Battle {
+            units: vec![],
+            grid: Grid::new(),
+            rng: Rng::new(seed),
+            round: 0,
+            log: None,
+            mark: [None, None],
+            aim: vec![],
+            first: vec![],
+            births: [0, 0],
+            clouds: [0, 0],
+            buds: [0, 0],
+            web: vec![-1; n],
+            honey: vec![-1; n],
+        }
+    }
+
+    /// The web on the field, cell by cell (`y * W + x`): the side that spun it, -1 none.
+    pub fn web(&self) -> &[i8] {
+        &self.web
+    }
+
+    /// The honey on the field, cell by cell: the side whose dead flooded it, -1 none.
+    pub fn honey(&self) -> &[i8] {
+        &self.honey
+    }
+
+    /// The cells a unit stands on.
+    fn cells_of(&self, i: usize) -> impl Iterator<Item = usize> {
+        let (x, y, f) = (self.units[i].x, self.units[i].y, self.units[i].fp());
+        (y..y + f).flat_map(move |yy| (x..x + f).map(move |xx| Grid::idx(xx, yy)))
+    }
+
+    /// Whether a unit stands on something of its enemy's (web or honey) in `layer`.
+    fn on_enemy(&self, i: usize, layer: &[i8]) -> bool {
+        let side = self.units[i].side as i8;
+        self.cells_of(i).any(|c| layer[c] != -1 && layer[c] != side)
     }
 
     pub fn with_log(mut self) -> Self {
@@ -418,6 +471,10 @@ impl Battle {
             silenced_until: 0,
             overloaded: 0,
             glued_until: 0,
+            budded: false,
+            glue_round: 0,
+            struggling: false,
+            fed: 0,
         });
         id
     }
@@ -515,7 +572,7 @@ impl Battle {
     fn outcome(&self, winner: Option<u8>) -> Outcome {
         let mut left = [0f32; 2];
         let mut total = [0f32; 2];
-        for u in &self.units {
+        for u in self.units.iter().filter(|u| !u.t.has(Trait::Cloud)) {
             total[u.side as usize] += u.t.hp as f32;
             if u.alive {
                 left[u.side as usize] += u.hp.max(0) as f32;
@@ -530,7 +587,8 @@ impl Battle {
 
     fn check_end(&self) -> Option<Outcome> {
         let mut present = [0; 2];
-        for u in &self.units {
+        // a midge cloud is no army: a side of clouds alone has lost
+        for u in self.units.iter().filter(|u| !u.t.has(Trait::Cloud)) {
             if u.present() {
                 present[u.side as usize] += 1;
             }
@@ -673,10 +731,17 @@ impl Battle {
             self.grid.add(side, size, x, y);
             return;
         }
-        let Some((tj, d)) = self.nearest_enemy(i) else { return };
+        let Some((mut tj, mut d)) = self.nearest_enemy(i) else { return };
         let reach = self.units[i].t.range.max(1) as i32;
         if d <= reach {
             return;
+        }
+        // one mind: no enemy in reach, so it goes for the one its Hive Mind marked
+        let mark = self.mark[side as usize].filter(|&m| self.units[m].present() && self.dist(i, m) <= 6);
+        let focus = self.units[i].t.has(Trait::OneMind) && mark.is_some();
+        if let Some(m) = mark.filter(|_| focus) {
+            tj = m;
+            d = self.dist(i, m);
         }
         // a leader who stands at the back is no tank: he stays behind his army while it stands, steps out only to
         // meet an enemy that has come within two cells, or when no one of his is left
@@ -693,8 +758,14 @@ impl Battle {
             (t.x, t.y, t.fp())
         };
         self.grid.sub(size, x, y);
+        if focus {
+            if let Some((nx, ny)) = self.way_round(i, x, y, &[tj], reach, 16) {
+                self.move_to(i, nx, ny);
+                return;
+            }
+        }
         // a flanker (fast, on the wings) goes round the line for the archers and the leader behind it
-        if role(&self.units[i].t) == Role::Flank && d > reach {
+        if !focus && role(&self.units[i].t) == Role::Flank && d > reach {
             let back: Vec<usize> = self.enemies_of(i).filter(|&j| self.units[j].t.range > 1 || self.units[j].t.has(Trait::Leader)).collect();
             if let Some((nx, ny)) = self.way_round(i, x, y, &back, reach, 16) {
                 self.move_to(i, nx, ny);
@@ -703,7 +774,7 @@ impl Battle {
         }
         // close to the fight, a melee fighter picks where to strike from: round the enemy's flank or to its back when
         // that is not much longer than straight into its front
-        if reach == 1 && d <= 4 && !self.units[i].fleeing {
+        if !focus && reach == 1 && d <= 4 && !self.units[i].fleeing {
             let all: Vec<usize> = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 8).collect();
             if let Some((nx, ny)) = self.way_round(i, x, y, &all, reach, 8) {
                 self.move_to(i, nx, ny);
@@ -723,7 +794,7 @@ impl Battle {
         }
         // the way ahead shut (its own in front, the enemy's line too thick): round them to the flank — the
         // shortest way to a free place next to any enemy
-        if best.0 >= d {
+        if best.0 >= d && !focus {
             let all: Vec<usize> = self.enemies_of(i).collect();
             if let Some((nx, ny)) = self.way_round(i, x, y, &all, reach, 12) {
                 self.move_to(i, nx, ny);
@@ -823,6 +894,10 @@ impl Battle {
         self.units[i].y = y;
         self.grid.add(side, size, x, y);
         self.ev(Event::Move { u: i, x, y });
+        // walked into the enemy's web: stuck, no farther this round (and it tears free instead of its next blow)
+        if self.on_enemy(i, &self.web) {
+            self.units[i].glued_until = self.units[i].glued_until.max(self.round);
+        }
     }
 
     // ---------------------------------------------------------------- fear
@@ -841,7 +916,7 @@ impl Battle {
 
     fn fear_check(&mut self, j: usize, die: u32) {
         let u = &self.units[j];
-        if !u.present() || u.fleeing {
+        if !u.present() || u.fleeing || u.t.has(Trait::OneMind) {
             return;
         }
         let morale = self.morale_of(j);
@@ -891,6 +966,25 @@ impl Battle {
                 if (u.born == self.round && self.round > 0) || u.blind_until >= self.round || u.curled {
                     continue;
                 }
+                if self.resonates(i) {
+                    continue; // the swarm's chirr shakes it: no blow this round
+                }
+                if self.on_enemy(i, &self.web) {
+                    // stuck in the enemy's web: two actions go on tearing free
+                    if !self.units[i].struggling {
+                        self.units[i].struggling = true;
+                        continue;
+                    }
+                    self.units[i].struggling = false;
+                    let side = self.units[i].side as i8;
+                    let cells: Vec<usize> = self.cells_of(i).collect();
+                    for c in cells {
+                        if self.web[c] != side {
+                            self.web[c] = -1;
+                        }
+                    }
+                    continue;
+                }
                 self.act(i, &mut hits);
             }
             for h in hits {
@@ -912,6 +1006,17 @@ impl Battle {
         let round = self.round;
         if self.units[i].silenced_until >= round {
             return; // Замыкание: the windings are shorted
+        }
+        // a spinner spins every third round: to catch an enemy beside it not in the web yet, or when it has nothing to
+        // strike at anyway (a shooter with a target in range shoots, one beside webbed enemies strikes them)
+        if self.units[i].t.has(Trait::Spinner) && round % 3 == 1 {
+            let adj = self.adjacent_enemies(i);
+            let fresh = adj.iter().any(|&j| !self.on_enemy(j, &self.web));
+            let idle = adj.is_empty() && (self.units[i].t.range <= 1 || self.ranged_target(i, self.units[i].t.range).is_none());
+            if fresh || idle {
+                self.spin(i);
+                return;
+            }
         }
         let powered = self.powered(i);
         let every_of = |every: u32, dmg: Dmg| if powered && matches!(dmg, Dmg::Fire | Dmg::Shock) { (every - 1).max(1) } else { every };
@@ -945,7 +1050,8 @@ impl Battle {
                     }
                 }
                 Ability::Quake { every, die, bonus, radius } if round.is_multiple_of(every) => {
-                    let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(i, v) <= radius as i32).collect();
+                    // the ground shakes: those in the air feel nothing
+                    let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(i, v) <= radius as i32 && !self.units[v].t.has(Trait::Flyer)).collect();
                     if !victims.is_empty() {
                         for v in victims {
                             let raw = self.rng.damage(die, bonus);
@@ -1039,6 +1145,69 @@ impl Battle {
         self.normal_attack(i, hits);
     }
 
+    /// Стрекот: every third round an enemy with three or more chirring bodies beside it shakes with their chirr (metal
+    /// rings with it) and loses its blow.
+    fn resonates(&self, i: usize) -> bool {
+        if !self.round.is_multiple_of(3) {
+            return false;
+        }
+        let side = self.units[i].side;
+        (0..self.units.len())
+            .filter(|&k| self.units[k].side != side && self.units[k].present() && self.units[k].t.has(Trait::Chirr) && self.dist(i, k) <= 1)
+            .take(3)
+            .count()
+            >= 3
+    }
+
+    /// Паутина: a web on the unit's cells and every cell round them, the enemy's too (who stands there is stuck).
+    fn spin(&mut self, i: usize) {
+        let (x, y, f, side) = (self.units[i].x, self.units[i].y, self.units[i].fp(), self.units[i].side as i8);
+        for yy in (y - 1).max(0)..(y + f + 1).min(H) {
+            for xx in (x - 1).max(0)..(x + f + 1).min(W) {
+                self.web[Grid::idx(xx, yy)] = side;
+            }
+        }
+    }
+
+    /// Fire on a unit standing in a web: the web flares up and the fire runs along it, two cells at most, setting
+    /// alight everyone on the burning threads, the spinners too.
+    fn web_fire(&mut self, t: usize) {
+        let seeds: Vec<usize> = self.cells_of(t).filter(|&c| self.web[c] != -1).collect();
+        if seeds.is_empty() {
+            return;
+        }
+        let mut burnt = vec![false; self.web.len()];
+        let mut queue: VecDeque<(usize, u32)> = VecDeque::new();
+        for c in seeds {
+            burnt[c] = true;
+            self.web[c] = -1;
+            queue.push_back((c, 0));
+        }
+        while let Some((c, depth)) = queue.pop_front() {
+            if depth >= 2 {
+                continue;
+            }
+            let (cx, cy) = ((c as i32) % W, (c as i32) / W);
+            for (dx, dy) in DIRS {
+                let (nx, ny) = (cx + dx, cy + dy);
+                if nx < 0 || ny < 0 || nx >= W || ny >= H {
+                    continue;
+                }
+                let k = Grid::idx(nx, ny);
+                if self.web[k] != -1 && !burnt[k] {
+                    burnt[k] = true;
+                    self.web[k] = -1;
+                    queue.push_back((k, depth + 1));
+                }
+            }
+        }
+        for k in 0..self.units.len() {
+            if self.units[k].present() && !self.units[k].t.armor_type.immune(Dmg::Fire) && self.cells_of(k).any(|c| burnt[c]) {
+                self.units[k].burn = self.units[k].burn.max(3);
+            }
+        }
+    }
+
     fn adjacent_enemies(&self, i: usize) -> Vec<usize> {
         let mut v: Vec<usize> = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 1).collect();
         v.sort_by_key(|&j| (self.units[j].hp, j));
@@ -1058,6 +1227,10 @@ impl Battle {
     }
 
     fn ranged_target(&self, i: usize, range: u32) -> Option<usize> {
+        // a midge cloud on the shooter: it sees nothing to aim at
+        if self.enemies_of(i).any(|j| self.units[j].t.has(Trait::Cloud) && self.dist(i, j) <= 1) {
+            return None;
+        }
         let far = self.units[i].t.has(Trait::Navodka);
         self.enemies_of(i)
             .map(|j| (j, self.dist(i, j)))
@@ -1117,7 +1290,10 @@ impl Battle {
             // a heavy shot (blunt, from one bigger by 2+) lands on the whole cell of small ones, as a trampling does
             if dmg == Dmg::Blunt && self.units[i].t.size >= self.units[j].t.size + 2 && self.units[j].fp() == 1 {
                 let (cx, cy) = (self.units[j].x, self.units[j].y);
-                let more: Vec<usize> = self.enemies_of(i).filter(|&v| v != j && self.units[v].fp() == 1 && self.units[v].x == cx && self.units[v].y == cy).collect();
+                let more: Vec<usize> = self
+                    .enemies_of(i)
+                    .filter(|&v| v != j && self.units[v].fp() == 1 && self.units[v].x == cx && self.units[v].y == cy && !self.units[v].t.has(Trait::Flyer))
+                    .collect();
                 for v in more {
                     hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, ..Default::default() });
                 }
@@ -1154,9 +1330,12 @@ impl Battle {
         };
         let probivnoy = self.units[i].t.has(Trait::Probivnoy);
         let tj = &self.units[j];
+        // a flyer is not trampled: it is over the blow, not under the foot
         let victims: Vec<usize> = if size >= tj.t.size + 2 && tj.fp() == 1 {
             let (cx, cy) = (tj.x, tj.y);
-            self.enemies_of(i).filter(|&v| self.units[v].fp() == 1 && self.units[v].x == cx && self.units[v].y == cy).collect()
+            self.enemies_of(i)
+                .filter(|&v| v == j || (self.units[v].fp() == 1 && self.units[v].x == cx && self.units[v].y == cy && !self.units[v].t.has(Trait::Flyer)))
+                .collect()
         } else {
             vec![j]
         };
@@ -1167,6 +1346,10 @@ impl Battle {
         if Some(j) == self.mark[self.units[i].side as usize] {
             extra += 1;
         }
+        // feeding frenzy: it smells blood — an enemy below half its health is bitten harder
+        if self.units[i].t.has(Trait::Frenzy) && self.units[j].hp * 2 < self.units[j].t.hp {
+            extra += 2;
+        }
         extra += 2 * self.units[i].growth as i32;
         let charge = self.units[i].t.has(Trait::Charge) && !self.units[i].charged;
         self.units[i].charged = true;
@@ -1176,10 +1359,16 @@ impl Battle {
             if charge {
                 raw = raw * 3 / 2;
             }
-            // a blow in the back: half as hard again
+            // one mind: the swarm strikes the mark as one, twice as hard
+            if Some(v) == self.mark[self.units[i].side as usize] && self.units[i].t.has(Trait::OneMind) {
+                raw *= 2;
+            }
+            // a blow in the back, or at one caught in its web: half as hard again
             if self.behind(i, v) {
                 raw = raw * 3 / 2;
                 self.ev(Event::Rear { t: v });
+            } else if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
+                raw = raw * 3 / 2;
             }
             hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false, stun: false });
         }
@@ -1230,8 +1419,17 @@ impl Battle {
                 t = k;
             }
         }
-        let raw = if self.units[h.attacker].overloaded == self.round { h.raw * 2 } else { h.raw };
-        let mut d = self.calc(t, raw, h.dmg, h.probivnoy);
+        let mut raw = if self.units[h.attacker].overloaded == self.round { h.raw * 2 } else { h.raw };
+        // standing in the enemy's honey: the blow sticks and lands weaker
+        if self.on_enemy(h.attacker, &self.honey) {
+            raw -= raw / 2;
+        }
+        // a midge cloud stings past any armor and anything it is made of
+        let mut d = if self.units[h.attacker].t.has(Trait::Cloud) && !self.units[t].t.armor_type.immune(h.dmg) {
+            raw
+        } else {
+            self.calc(t, raw, h.dmg, h.probivnoy)
+        };
         if d > 0 && self.units[t].plates > 0 {
             self.units[t].plates -= 1;
             d = 0;
@@ -1240,24 +1438,29 @@ impl Battle {
         if h.dmg == Dmg::Acid {
             self.corrode(t);
             self.short_circuit(t);
+        } else if d > 0 && self.units[h.attacker].t.has(Trait::Corrodes) {
+            self.corrode(t);
         }
         if h.ignite && !self.units[t].t.armor_type.immune(Dmg::Fire) {
             self.units[t].burn = 3;
         }
+        if h.dmg == Dmg::Fire || h.ignite {
+            self.web_fire(t);
+        }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
+        self.feed(h.attacker, d);
         if h.stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
             self.units[t].stunned = true;
             self.ev(Event::Stun { t });
         }
         let a = h.attacker;
-        if d > 0 && !self.units[t].t.has(Trait::PoisonImmune) {
-            if h.venom > 0 {
-                self.units[t].poison += self.rng.die(h.venom) as i32;
-            }
-            if h.infect {
-                self.units[t].infected = Some(self.units[a].side);
-            }
+        if d > 0 && h.venom > 0 && !self.units[t].t.has(Trait::PoisonImmune) {
+            self.units[t].poison += self.rng.die(h.venom) as i32;
+        }
+        // a parasite takes in a machine too: it nests in the works
+        if d > 0 && h.infect && self.units[t].infected.is_none() {
+            self.units[t].infected = Some(self.units[a].side);
         }
         if h.melee && self.units[a].present() {
             if let Some(die) = self.units[t].t.traits.iter().find_map(|x| if let Trait::Thorns { die } = x { Some(*die) } else { None }) {
@@ -1272,6 +1475,17 @@ impl Battle {
         }
         let crushing = d * 2 > self.units[t].t.hp;
         if self.units[t].hp <= 0 {
+            if self.units[t].t.has(Trait::GlueBurst) {
+                self.glue_burst(t);
+            }
+            // killed by its first wound: every second one still lets a small bud away, with a quarter of the health
+            if self.units[t].t.has(Trait::Buds) && !self.units[t].budded {
+                let side = self.units[t].side as usize % 2;
+                self.buds[side] += 1;
+                if self.buds[side] % 2 == 0 {
+                    self.bud(t, self.units[t].t.hp / 4);
+                }
+            }
             self.kill(t);
             self.on_kill(a);
         } else {
@@ -1284,6 +1498,9 @@ impl Battle {
                 self.units[t].curled = true;
                 self.units[t].armor += 3;
             }
+            if d > 0 {
+                self.wounded(t);
+            }
         }
         if crushing {
             let side = self.units[t].side;
@@ -1293,6 +1510,75 @@ impl Battle {
             for k in neighbours {
                 self.fear_check(k, 7);
             }
+        }
+    }
+
+    /// Кровь Пожирателя in a breed: a body grows on the damage it has bitten out — six for the first growth, twelve for
+    /// the second (a body seldom kills: golems are few and hard).
+    fn feed(&mut self, a: usize, d: i32) {
+        let u = &mut self.units[a];
+        if d <= 0 || !u.t.has(Trait::Grows) || u.t.has(Trait::Leader) || !u.present() {
+            return;
+        }
+        u.fed += d;
+        if u.growth < 2 && u.fed >= 6 * (u.growth as i32 + 1) {
+            u.growth += 1;
+            let gain = u.t.hp * 2 / 5;
+            u.t.hp += gain;
+            u.hp += gain;
+        }
+    }
+
+    /// What a wound does to a body that lives through it: a glue body bursts, a budding one splits.
+    fn wounded(&mut self, t: usize) {
+        let u = &self.units[t];
+        if !u.present() {
+            return;
+        }
+        if u.t.has(Trait::GlueBurst) && u.hp * 2 < u.t.hp {
+            self.glue_burst(t);
+            self.kill(t);
+            return;
+        }
+        if u.t.has(Trait::Buds) && !u.budded && u.hp >= 2 {
+            let half = self.units[t].hp / 2;
+            if self.bud(t, half) {
+                self.units[t].hp -= half;
+            }
+        }
+    }
+
+    /// Glue bursts over the enemies beside the body: they can't walk next round, and their next blow is lost — one
+    /// blow in two at most (a swarm bursting all round a golem must not hold it still all battle).
+    fn glue_burst(&mut self, t: usize) {
+        let near: Vec<usize> = self.enemies_of(t).filter(|&k| self.dist(k, t) <= 1).collect();
+        let round = self.round;
+        for k in near {
+            self.units[k].glued_until = self.units[k].glued_until.max(round + 1);
+            if !self.units[k].t.has(Trait::Unstoppable) && round >= self.units[k].glue_round + 2 {
+                self.units[k].glue_round = round;
+                self.units[k].stunned = true;
+            }
+            self.ev(Event::Glue { t: k });
+        }
+    }
+
+    /// Почкование: a bud with `hp` steps out beside the body; neither buds again. False if there is no room.
+    fn bud(&mut self, t: usize, hp: i32) -> bool {
+        self.units[t].budded = true;
+        if hp < 1 {
+            return false;
+        }
+        let mut bud = self.units[t].t.clone();
+        bud.traits.retain(|x| *x != Trait::Buds);
+        let (side, x, y) = (self.units[t].side, self.units[t].x, self.units[t].y);
+        match self.spawn(side, bud, x, y) {
+            Some(b) => {
+                self.units[b].hp = hp;
+                self.units[b].budded = true;
+                true
+            }
+            None => false,
         }
     }
 
@@ -1343,14 +1629,13 @@ impl Battle {
         if u.t.has(Trait::Devour) {
             u.hp = (u.hp + (u.t.hp / 4).max(1)).min(u.t.hp);
         }
-        if u.t.has(Trait::Grows) {
-            u.kills += 1;
-            if u.kills.is_multiple_of(2) && u.growth < 2 {
-                u.growth += 1;
-                let gain = u.t.hp * 2 / 5;
-                u.t.hp += gain;
-                u.hp += gain;
-            }
+        u.kills += 1;
+        // the Devourer grows on every second kill (its blood in a breed grows on what it bites: `feed`)
+        if u.t.has(Trait::Grows) && u.t.has(Trait::Leader) && u.kills.is_multiple_of(2) && u.growth < 2 {
+            u.growth += 1;
+            let gain = u.t.hp * 2 / 5;
+            u.t.hp += gain;
+            u.hp += gain;
         }
     }
 
@@ -1381,6 +1666,27 @@ impl Battle {
                     self.kill(k);
                 }
             }
+        }
+        // a honey body floods its cells and the cells round them
+        if self.units[t].t.has(Trait::Honey) {
+            let f = footprint(size);
+            for yy in (y - 1).max(0)..(y + f + 1).min(H) {
+                for xx in (x - 1).max(0)..(x + f + 1).min(W) {
+                    self.honey[Grid::idx(xx, yy)] = side as i8;
+                }
+            }
+        }
+        // every second midge body that falls crumbles into a cloud, unless it burnt
+        if self.units[t].t.has(Trait::Midges) && self.units[t].burn == 0 {
+            let c = &mut self.clouds[side as usize % 2];
+            *c += 1;
+            if *c % 2 == 0 {
+                self.spawn(side, crate::data::unit("moshkara"), x, y);
+            }
+        }
+        // a cloud leaves nothing behind
+        if self.units[t].t.has(Trait::Cloud) {
+            self.units[t].on_field = false;
         }
         // a viviparous body lets out one larva of its own side
         if self.units[t].t.has(Trait::Viviparous) {
@@ -1445,6 +1751,7 @@ impl Battle {
         let n = self.units.len();
         for j in 0..n {
             if self.units[j].present() && self.units[j].burn > 0 {
+                self.web_fire(j);
                 self.units[j].burn -= 1;
                 let d = self.calc(j, 3, Dmg::Fire, false);
                 self.units[j].hp -= d;
@@ -1452,6 +1759,40 @@ impl Battle {
                 if self.units[j].hp <= 0 {
                     self.kill(j);
                 }
+            }
+        }
+        // a parasite grows in its host: every third round a larva of its side crawls out of it
+        if self.round.is_multiple_of(3) {
+            let hosts: Vec<(usize, u8)> = (0..n).filter(|&i| self.units[i].present()).filter_map(|i| self.units[i].infected.map(|by| (i, by))).collect();
+            for (i, by) in hosts {
+                let mut larva = crate::data::rabochaya();
+                larva.name = "Личинка".into();
+                let (x, y) = (self.units[i].x, self.units[i].y);
+                self.spawn(by, larva, x, y);
+            }
+        }
+        // honey: a wounded body next to its own mends a point
+        let mending: Vec<usize> = (0..n)
+            .filter(|&i| {
+                let u = &self.units[i];
+                u.present() && u.t.has(Trait::Honey) && u.hp < u.t.hp
+            })
+            .filter(|&i| {
+                let side = self.units[i].side;
+                (0..n).any(|k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.has(Trait::Honey) && self.dist(i, k) <= 1)
+            })
+            .collect();
+        for i in mending {
+            self.units[i].hp = (self.units[i].hp + 2).min(self.units[i].t.hp);
+        }
+        // a midge cloud thins out after two rounds
+        for i in 0..n {
+            if self.units[i].present() && self.units[i].t.has(Trait::Cloud) && self.round >= self.units[i].born + 2 {
+                let (size, x, y) = (self.units[i].t.size, self.units[i].x, self.units[i].y);
+                self.grid.sub(size, x, y);
+                self.units[i].alive = false;
+                self.units[i].on_field = false;
+                self.ev(Event::Left { t: i });
             }
         }
         for i in 0..n {

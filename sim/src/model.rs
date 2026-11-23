@@ -144,7 +144,8 @@ pub enum Trait {
     Glow,
     /// Hive Mind: every ally has the full «Стая» bonus.
     HiveMind,
-    /// Devourer: every 2nd kill — ×1.4 health and +2 to the blow, up to twice; the leader starves without kills.
+    /// Devourer: every 2nd kill — ×1.4 health and +2 to the blow, up to twice; the leader starves without kills. Its
+    /// blood in a breed (Кровь Пожирателя): a body grows on the damage it bites out, 6 and then 12.
     Grows,
     /// Cuckoo: a blow that gets through infects; an infected enemy that dies hatches 2 larvae
     /// (not mechanisms).
@@ -156,6 +157,34 @@ pub enum Trait {
     Viviparous,
     /// Spitter: no shot between its spits; whoever reaches it gets only a weak bite («слабый укус»).
     Spitter,
+    /// Клеевой рой: wounded below half, the body bursts with glue — it dies, the enemies beside it are stuck for a
+    /// round (they neither walk nor strike).
+    GlueBurst,
+    /// Мошкара: a killed body (not burnt) crumbles into a midge cloud of its side.
+    Midges,
+    /// The midge cloud itself: stings through any armor, enemy shooters next to it see nothing to shoot, fire burns it
+    /// threefold; it thins out after a few rounds and does not count as an army.
+    Cloud,
+    /// Паутина: every third round, instead of a blow, spins a web on its cells and around them; an enemy on the web is
+    /// stuck — it stops walking and spends its next action tearing free; fire runs along the web.
+    Spinner,
+    /// Медовые соты: a wounded body next to its own mends a point a round; a dying one floods its cell and the cells
+    /// round it with honey — enemies standing in it strike weaker.
+    Honey,
+    /// Soft body (Ржавчина's price): no armor counts, fire burns double.
+    SoftBody,
+    /// Почкование: wounded for the first time, it splits — a bud with half the health left steps out beside it.
+    Buds,
+    /// Единый разум: never flees, walks for the target its Hive Mind marked if it is within six cells, and strikes it
+    /// twice as hard.
+    OneMind,
+    /// Ржавчина: every blow that lands eats at the armor as acid does (a point a round at most), whatever its kind.
+    Corrodes,
+    /// Стрекот: every third round an enemy with three or more of these beside it loses its blow (the chirr shakes it;
+    /// machines ring with it too).
+    Chirr,
+    /// Кормовое безумие: it smells blood — +2 to its blows at an enemy below half its health.
+    Frenzy,
 }
 
 /// Abilities with a condition.
@@ -332,7 +361,13 @@ pub fn mitigate(raw: i32, dmg: Dmg, t: &Template, armor_now: i32, stunned: bool,
     if stunned {
         d += 1;
     }
-    if dmg != Dmg::Fire && dmg != Dmg::Poison {
+    if dmg == Dmg::Fire && t.has(Trait::SoftBody) {
+        d *= 2;
+    }
+    if dmg == Dmg::Fire && t.has(Trait::Cloud) {
+        d *= 3;
+    }
+    if dmg != Dmg::Fire && dmg != Dmg::Poison && !t.has(Trait::SoftBody) {
         let mut arm = armor_now.max(0);
         if probivnoy {
             arm /= 2;

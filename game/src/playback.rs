@@ -26,6 +26,8 @@ pub struct UnitInfo {
     pub leader: bool,
     /// A body of the Foundry (a golem, a leader of the forge), not of the swarm: it walks heavily, rings, breaks.
     pub machine: bool,
+    /// A midge cloud (Мошкара): no body, no corpse, not counted as the army.
+    pub cloud: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -42,6 +44,10 @@ pub struct Round {
     pub before: Vec<State>,
     pub after: Vec<State>,
     pub events: Vec<Event>,
+    /// The web and the honey on the field as the round ends, cell by cell (`y * W + x`): whose, -1 none; empty when
+    /// the field has none.
+    pub web: Vec<i8>,
+    pub honey: Vec<i8>,
 }
 
 pub struct Record {
@@ -77,6 +83,7 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
             // the leaders; the Foundry's human leaders also by name, as older records may lack the trait
             leader: u.t.has(Trait::Leader) || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
             machine: u.t.golem || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
+            cloud: u.t.has(Trait::Cloud),
         })
         .collect()
 }
@@ -103,7 +110,8 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
             before.push(s);
         }
         let events = bt.log.as_ref().map(|l| l[n0..].to_vec()).unwrap_or_default();
-        rounds.push(Round { before, after, events });
+        let layer = |l: &[i8]| if l.iter().any(|&c| c != -1) { l.to_vec() } else { vec![] };
+        rounds.push(Round { before, after, events, web: layer(bt.web()), honey: layer(bt.honey()) });
         if let Some(o) = done {
             break o;
         }

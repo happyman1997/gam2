@@ -13234,6 +13234,36 @@
     11
    ],
    "name": "пси"
+  },
+  "swarm/m_glue": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    112,
+    16,
+    16,
+    16
+   ],
+   "name": "Клеевой рой"
+  },
+  "swarm/m_rust": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    48,
+    0,
+    16,
+    16
+   ],
+   "name": "Ржавчина"
+  },
+  "swarm/m_onemind": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    16,
+    128,
+    16,
+    16
+   ],
+   "name": "Единый разум"
   }
  },
  "bg": {
