@@ -578,6 +578,15 @@ impl Run {
         eaten
     }
 
+    /// How many of a breed's nests its found mutations fill (evolutions, bought with biomass, are not in them).
+    pub fn nests_used(&self, form: &str) -> u32 {
+        let finds = data::finds();
+        self.breeds
+            .iter()
+            .filter(|(f, k)| f == form && finds.mutations.iter().any(|m| &m.key == k && m.form.is_none()))
+            .count() as u32
+    }
+
     /// The leader's key in units.ron.
     pub fn leader_key(&self) -> &'static str {
         self.army.iter().find(|m| self.is_leader(m)).and_then(|m| data::unit_key(&m.t.name)).unwrap_or("")
@@ -642,9 +651,12 @@ impl Run {
             Find::Module(k) => (0..self.army.len()).filter(|&i| self.fits(i, k) || self.raises(i, k)).map(Target::Member).collect(),
             Find::Mutation(k) => {
                 let only = data::finds().mutations.iter().find(|m| &m.key == k).and_then(|m| m.form.clone());
+                // an evolution goes onto its own form; a found mutation into a free nest of a breed
+                let evolution = only.is_some();
                 self.forms()
                     .into_iter()
                     .filter(|f| only.as_ref().is_none_or(|o| o == f) && !self.breeds.iter().any(|(x, y)| x == f && y == k))
+                    .filter(|f| evolution || self.nests_used(f) < data::rules().nests)
                     .map(Target::Form)
                     .collect()
             }
@@ -1199,7 +1211,7 @@ impl Run {
                     .mutations
                     .iter()
                     .filter(|m| m.form.is_none() && m.leader.as_deref().is_none_or(|l| l == leader))
-                    .filter(|m| forms.iter().any(|f| !self.breeds.iter().any(|(x, y)| x == f && *y == m.key)))
+                    .filter(|m| forms.iter().any(|f| self.nests_used(f) < data::rules().nests && !self.breeds.iter().any(|(x, y)| x == f && *y == m.key)))
                     .map(|m| m.key.as_str())
                     .collect();
                 if fit.is_empty() {
