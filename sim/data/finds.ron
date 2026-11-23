@@ -58,6 +58,6 @@
         (key: "m_frenzy", leader: "pozhiratel", give: (traits: [Devour], bonus: 1)),
         (key: "m_devblood", leader: "pozhiratel", give: (traits: [Grows], hp: 1)),
         (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects], hp: 1)),
-        (key: "m_spores", leader: "kukushka", give: (traits: [Venom(die: 3)], dmg: Acid)),
+        (key: "m_spores", leader: "kukushka", give: (traits: [Venom(die: 3), Probivnoy])),
     ],
 )
