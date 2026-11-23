@@ -47,7 +47,7 @@
         // общий пул: у любого лидера
         (key: "m_regen", give: (hp: 2)),
         (key: "m_cutters", give: (bonus: 1)),
-        (key: "m_exploder", give: (traits: [BurstAcid(die: 4)])),
+        (key: "m_exploder", give: (traits: [BurstAcid(die: 2)])),
         // без потери скорости: медленный рой не окружает, и −1 к скорости делал мутацию вредной
         (key: "iron", give: (armor: 1)),
         // пулы лидеров (leader — ключ лидера в units.ron): только у него, поверх общих

@@ -574,7 +574,7 @@
  "find.m_cutters": "Кусачки",
  "find.m_cutters.l": "+1 к удару",
  "find.m_exploder": "Взрывной муравей",
- "find.m_exploder.l": "гибнет — кислота 1–4 по соседям",
+ "find.m_exploder.l": "гибнет — кислота 1–2 по врагам рядом",
  "find.evo_dive": "Пикирование",
  "find.evo_dive.l": "первый удар ×1,5 и отбрасывает",
  "find.evo_farspit": "Дальний плевок",
