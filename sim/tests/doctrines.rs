@@ -200,7 +200,7 @@ fn devourer_blood_grows_on_what_it_eats() {
     let _ = g;
 }
 
-/// Стрекот: every third round an enemy with three chirring bodies beside it — a machine too — loses its blow.
+/// Стрекот: every second round an enemy with three chirring bodies beside it — a machine too — loses its blow.
 #[test]
 fn the_chirr_shakes_the_surrounded() {
     let mut bt = Battle::new(5).with_log();
@@ -211,9 +211,10 @@ fn the_chirr_shakes_the_surrounded() {
         bt.units[k].t.hp = 999;
     }
     bt.step();
-    bt.step();
     let before = hits_by(&bt, g);
     assert!(before > 0, "the Guard never struck");
-    bt.step(); // round 3: it shakes
+    bt.step(); // round 2: it shakes
     assert_eq!(hits_by(&bt, g), before, "the Guard struck through the chirr");
+    bt.step(); // round 3: free of it
+    assert!(hits_by(&bt, g) > before, "the Guard stayed shaken");
 }
