@@ -79,6 +79,11 @@ pub enum Act {
     Lang,
 }
 
+/// A find that goes onto the whole swarm at once (a found mutation): no place to choose.
+fn whole_swarm(run: &Run, o: &Offer) -> bool {
+    matches!(o.find, Find::Mutation(_)) && matches!(run.targets(o).as_slice(), [sim::run::Target::Form(f)] if f == sim::run::SWARM)
+}
+
 fn cols(c: Class) -> ([u8; 3], [u8; 3]) {
     match c {
         Class::Foundry => TITLE_F,
@@ -395,7 +400,7 @@ fn marks(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, r: Rect, m: &sim::r
         }
         Class::Swarm => {
             let f = form_of(&m.t);
-            icons.extend(run.breeds.iter().filter(|(x, _)| x == f).map(|(_, k)| format!("swarm/{k}")));
+            icons.extend(run.mutations_of(f).map(|k| format!("swarm/{k}")));
         }
     }
     let n = (icons.len() + empty) as i32;
@@ -916,7 +921,14 @@ impl Game {
                     }
                     if let Some((Reward::Find(offers), taken)) = list.get_mut(i) {
                         match card.and_then(|c| offers.get(c)) {
-                            // a module or a mutation: where it goes is asked next
+                            // a mutation of the whole swarm: taken at once, there is nowhere to choose
+                            Some(o) if whole_swarm(run, o) => {
+                                let to = run.targets(o)[0].clone();
+                                if !run.take_find(o, Some(&to)) {
+                                    return;
+                                }
+                            }
+                            // a module or an evolution: where it goes is asked next
                             Some(o) if o.find != Find::Units => {
                                 if !run.targets(o).is_empty() {
                                     self.targeting = Some(Targeting { offer: o.clone(), from: From::Reward(i) });
@@ -945,7 +957,12 @@ impl Game {
             Act::BuyOffer(i) => {
                 if let (Some(run), Screen::Shop(shop)) = (&mut self.run, &mut self.screen) {
                     let Some((o, sold)) = shop.offers.get(i).cloned() else { return };
-                    if o.find != Find::Units {
+                    if whole_swarm(run, &o) {
+                        let to = run.targets(&o)[0].clone();
+                        if run.buy_offer(shop, i, Some(&to)) {
+                            self.demo.ui_sound("toggle");
+                        }
+                    } else if o.find != Find::Units {
                         if !sold && run.money >= o.price && !run.targets(&o).is_empty() {
                             self.targeting = Some(Targeting { offer: o, from: From::Shop(i) });
                             self.ui.opened = self.ui.t;
@@ -2780,7 +2797,7 @@ pub fn sheet_lines(run: &Run, m: &sim::run::Member) -> Vec<(String, String, Opti
         }
     } else {
         let f = form_of(&m.t);
-        for (_, k) in run.breeds.iter().filter(|(x, _)| x == f) {
+        for k in run.mutations_of(f) {
             lines.push((t(&format!("find.{k}")), t(&format!("find.{k}.l")), Some(format!("swarm/{k}"))));
         }
     }

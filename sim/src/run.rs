@@ -19,6 +19,8 @@ use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 
 pub const FIGHTS: u32 = 15;
+/// The «form» a mutation of the whole swarm is kept under (`Run::breeds`).
+pub const SWARM: &str = "*";
 pub const BOSS_EVERY: u32 = 5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -336,7 +338,9 @@ pub struct Run {
     /// The leader's member id: it always comes back from a battle and is never given away.
     pub leader_id: u32,
     pub artifacts: Vec<Artifact>,
-    /// The swarm's breeds and their mutations: (form, mutation key); every body of the form has them.
+    /// The swarm's mutations: (form, mutation key). A found mutation goes onto the whole swarm — form `SWARM`, every
+    /// body of every form and every brood after; an evolution (bought) onto its own form. (A save from before has
+    /// found ones on a form: they stay there.)
     #[serde(default)]
     pub breeds: Vec<(String, String)>,
     /// How the leader has grown after the bosses (keys of growth.ron).
@@ -461,9 +465,10 @@ impl Run {
                 }
             }
         }
-        let form = form_of(&m.t).to_string();
-        for (f, key) in &self.breeds {
-            if *f == form {
+        // the swarm's mutations onto every body of it (not the leader), a form's evolutions onto that form
+        if self.class == Class::Swarm && !self.is_leader(m) {
+            let form = form_of(&m.t).to_string();
+            for key in self.mutations_of(&form) {
                 if let Some(mu) = finds.mutations.iter().find(|x| &x.key == key) {
                     mu.give.apply(&mut t);
                 }
@@ -578,13 +583,14 @@ impl Run {
         eaten
     }
 
-    /// How many of a breed's nests its found mutations fill (evolutions, bought with biomass, are not in them).
-    pub fn nests_used(&self, form: &str) -> u32 {
-        let finds = data::finds();
-        self.breeds
-            .iter()
-            .filter(|(f, k)| f == form && finds.mutations.iter().any(|m| &m.key == k && m.form.is_none()))
-            .count() as u32
+    /// The mutations a form's bodies carry: the whole swarm's, then its own (evolutions).
+    pub fn mutations_of<'a>(&'a self, form: &'a str) -> impl Iterator<Item = &'a String> + 'a {
+        self.breeds.iter().filter(move |(f, _)| f == SWARM || f == form).map(|(_, k)| k)
+    }
+
+    /// Whether the whole swarm has a mutation.
+    pub fn has_mutation(&self, key: &str) -> bool {
+        self.breeds.iter().any(|(f, k)| f == SWARM && k == key)
     }
 
     /// The leader's key in units.ron.
@@ -638,7 +644,8 @@ impl Run {
         out
     }
 
-    /// Where a find can go: the golems a module fits, the breeds without this mutation; none for bodies (they join).
+    /// Where a find can go: the golems a module fits; a found mutation the whole swarm (`SWARM`, one target — nothing to
+    /// pick), an evolution its form; none for bodies (they join).
     /// Whether a module can be raised a level on a member: it is on it, below III (taking it again is the upgrade).
     pub fn raises(&self, i: usize, key: &str) -> bool {
         let m = &self.army[i];
@@ -649,17 +656,18 @@ impl Run {
         match &o.find {
             Find::Units => vec![],
             Find::Module(k) => (0..self.army.len()).filter(|&i| self.fits(i, k) || self.raises(i, k)).map(Target::Member).collect(),
-            Find::Mutation(k) => {
-                let only = data::finds().mutations.iter().find(|m| &m.key == k).and_then(|m| m.form.clone());
-                // an evolution goes onto its own form; a found mutation into a free nest of a breed
-                let evolution = only.is_some();
-                self.forms()
+            Find::Mutation(k) => match data::finds().mutations.iter().find(|m| &m.key == k).and_then(|m| m.form.clone()) {
+                // an evolution: its own form, if the swarm has it and not this one yet
+                Some(only) => self
+                    .forms()
                     .into_iter()
-                    .filter(|f| only.as_ref().is_none_or(|o| o == f) && !self.breeds.iter().any(|(x, y)| x == f && y == k))
-                    .filter(|f| evolution || self.nests_used(f) < data::rules().nests)
+                    .filter(|f| *f == only && !self.breeds.iter().any(|(x, y)| x == f && y == k))
                     .map(Target::Form)
-                    .collect()
-            }
+                    .collect(),
+                // a found mutation: the whole swarm at once, nothing to choose
+                None if !self.has_mutation(k) => vec![Target::Form(SWARM.to_string())],
+                None => vec![],
+            },
         }
     }
 
@@ -1204,14 +1212,13 @@ impl Run {
                 Some(Offer { key: k.clone(), units: vec![], price: 10 + self.roll(5) as i32, find: Find::Module(k) })
             }
             Class::Swarm => {
-                let forms = self.forms();
                 let leader = self.leader_key();
                 // the common pool and the leader's own; evolutions are bought, not found
                 let fit: Vec<&str> = finds
                     .mutations
                     .iter()
                     .filter(|m| m.form.is_none() && m.leader.as_deref().is_none_or(|l| l == leader))
-                    .filter(|m| forms.iter().any(|f| self.nests_used(f) < data::rules().nests && !self.breeds.iter().any(|(x, y)| x == f && *y == m.key)))
+                    .filter(|m| !self.has_mutation(&m.key))
                     .map(|m| m.key.as_str())
                     .collect();
                 if fit.is_empty() {

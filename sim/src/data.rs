@@ -229,7 +229,6 @@ pub struct RunRules {
     pub limit_fight: u32,
     pub limit_boss: u32,
     pub clutch: usize,
-    pub nests: u32,
     pub eaten_per_biomass: u32,
 }
 
