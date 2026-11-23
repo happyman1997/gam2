@@ -53,11 +53,11 @@
         // пулы лидеров (leader — ключ лидера в units.ron): только у него, поверх общих
         (key: "m_vivi", leader: "matka", give: (traits: [Viviparous])),
         (key: "m_dominant", leader: "matka", give: (hp: 1, bonus: 1)),
-        (key: "m_strider", leader: "razum", give: (traits: [Fear(die: 6, radius: 2)])),
+        (key: "m_strider", leader: "razum", give: (traits: [Fear(die: 6, radius: 2)], speed: 1)),
         (key: "m_psi_gland", leader: "razum", give: (traits: [Probivnoy])),
         (key: "m_frenzy", leader: "pozhiratel", give: (traits: [Devour], bonus: 1)),
-        (key: "m_devblood", leader: "pozhiratel", give: (traits: [Grows])),
-        (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects])),
-        (key: "m_spores", leader: "kukushka", give: (traits: [Venom(die: 3)])),
+        (key: "m_devblood", leader: "pozhiratel", give: (traits: [Grows], hp: 1)),
+        (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects], hp: 1)),
+        (key: "m_spores", leader: "kukushka", give: (traits: [Venom(die: 3)], dmg: Acid)),
     ],
 )

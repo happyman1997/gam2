@@ -267,11 +267,13 @@ pub struct Battle {
     /// first step of the way to each place.
     aim: Vec<u8>,
     first: Vec<(i32, i32)>,
+    /// Bodies that died live-bearing, per side: every third gives a larva (a whole swarm of them would double itself).
+    births: [u32; 2],
 }
 
 impl Battle {
     pub fn new(seed: u64) -> Self {
-        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None, mark: [None, None], aim: vec![], first: vec![] }
+        Battle { units: vec![], grid: Grid::new(), rng: Rng::new(seed), round: 0, log: None, mark: [None, None], aim: vec![], first: vec![], births: [0, 0] }
     }
 
     pub fn with_log(mut self) -> Self {
@@ -1369,8 +1371,9 @@ impl Battle {
             let near: Vec<usize> = self.enemies_of(t).filter(|&k| self.dist(k, t) <= 1).collect();
             for k in near {
                 let raw = self.rng.damage(die, 0);
+                // a splash: it burns, but does not eat at the armor — that is the barrel's spit (a whole swarm that
+                // bursts stripped every golem bare)
                 let d = self.calc(k, raw, Dmg::Acid, false);
-                self.corrode(k);
                 self.short_circuit(k);
                 self.units[k].hp -= d;
                 self.ev(Event::Hit { a: t, t: k, dmg: d });
@@ -1381,9 +1384,13 @@ impl Battle {
         }
         // a viviparous body lets out one larva of its own side
         if self.units[t].t.has(Trait::Viviparous) {
-            let mut larva = crate::data::rabochaya();
-            larva.name = "Личинка".into();
-            self.spawn(side, larva, x, y);
+            let b = &mut self.births[side as usize % 2];
+            *b += 1;
+            if *b % 3 == 0 {
+                let mut larva = crate::data::rabochaya();
+                larva.name = "Личинка".into();
+                self.spawn(side, larva, x, y);
+            }
         }
         // larvae hatch from an infected body
         if let Some(by) = self.units[t].infected {
