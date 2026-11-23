@@ -216,6 +216,22 @@ pub struct Curve {
     pub boss: f32,
 }
 
+/// The run's rules that hold each class to its idea (run.ron): the Foundry's leadership — few golems, each strong;
+/// the swarm's limit in points — a crowd, the brood overflowing it and the extra eaten.
+#[derive(Debug, Deserialize)]
+pub struct RunRules {
+    pub lead_start: BTreeMap<String, u32>,
+    pub lead_fixed: Vec<String>,
+    pub lead_fight: u32,
+    pub lead_boss: u32,
+    pub lead_cost: BTreeMap<String, u32>,
+    pub limit_start: BTreeMap<String, u32>,
+    pub limit_fight: u32,
+    pub limit_boss: u32,
+    pub clutch: usize,
+    pub eaten_per_biomass: u32,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Finds {
     pub modules: Vec<ModuleFind>,
@@ -230,6 +246,7 @@ struct Data {
     finds: Finds,
     growth: BTreeMap<String, Vec<Growth>>,
     curve: Curve,
+    rules: RunRules,
 }
 
 fn parse<T: serde::de::DeserializeOwned>(file: &str, text: &str) -> T {
@@ -244,11 +261,17 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     finds: parse("finds.ron", include_str!("../data/finds.ron")),
     growth: parse("growth.ron", include_str!("../data/growth.ron")),
     curve: parse("curve.ron", include_str!("../data/curve.ron")),
+    rules: parse("run.ron", include_str!("../data/run.ron")),
 });
 
 /// The run's finds: the Foundry's modules, the swarm's mutations.
 pub fn finds() -> &'static Finds {
     &DATA.finds
+}
+
+/// The run's rules: leadership, the swarm's limit, the brood.
+pub fn rules() -> &'static RunRules {
+    &DATA.rules
 }
 
 /// The difficulty curve.

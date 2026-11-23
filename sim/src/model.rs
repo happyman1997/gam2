@@ -77,13 +77,10 @@ impl ArmorType {
         matches!(self, ArmorType::Chain | ArmorType::Plate | ArmorType::Cast | ArmorType::Iron)
     }
 
-    /// Armor taken off by one acid hit.
+    /// Armor taken off by one acid hit: one, whatever the armor (twice that for cast metal was a hard counter — a
+    /// crowd of barrels stripped any golem bare in two rounds).
     pub fn acid_strip(self) -> i32 {
-        if matches!(self, ArmorType::Cast | ArmorType::Iron) {
-            2
-        } else {
-            1
-        }
+        1
     }
 }
 
@@ -305,11 +302,10 @@ impl Template {
         self
     }
 
-    /// The Inventor's frames: one size smaller, ×0.7 durability, −2 to the damage bonus.
+    /// The Inventor's frames: one size smaller (a leadership point cheaper), −1 to the damage bonus.
     pub fn smaller(mut self) -> Self {
         self.size -= 1;
-        self.hp = self.hp * 7 / 10;
-        self.bonus -= 2;
+        self.bonus -= 1;
         self
     }
 

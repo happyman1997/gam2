@@ -304,3 +304,63 @@ fn growth_cells_go_where_they_say() {
     let after: Vec<usize> = r.army.iter().filter(|m| m.t.golem).map(|m| r.cells(m)).collect();
     assert!(before.iter().zip(&after).all(|(b, a)| a == &(b + 1)));
 }
+
+/// The classes' rules: the Foundry's leadership holds the army to few golems — a body it cannot hold is refused, the
+/// leadership grows with battles won and more with bosses; the swarm takes every body and eats what overflows its
+/// limit (workers first, the commonest kind first), the eaten paid out as biomass. The numbers from run.ron.
+#[test]
+fn leadership_and_the_limit() {
+    use sim::data;
+    use sim::run::Offer;
+    let rules = data::rules();
+    // the Inventor: his start army inside his leadership, a Guard past what is left
+    let mut r = Run::new(Class::Foundry, 1, 5);
+    let start = rules.lead_start["izobretatel"];
+    assert_eq!(r.lead_cap(), start);
+    assert!(r.lead_used() <= start, "the start army past its own leadership");
+    let guard = Offer { key: "strazh".into(), units: vec![data::unit("strazh")], price: 0, find: run::Find::Units };
+    assert!(start - r.lead_used() < Run::lead_cost(&guard.units[0]), "the test needs a Guard that does not fit");
+    assert!(!r.can_recruit(&guard.units));
+    let n = r.army.len();
+    assert!(!r.take_find(&guard, None), "a golem past the leadership joined");
+    assert_eq!(r.army.len(), n);
+    // battles won and a boss
+    r.fight = 3;
+    assert_eq!(r.lead_cap(), start + 3 * rules.lead_fight);
+    r.fight = 5;
+    assert_eq!(r.lead_cap(), start + 5 * rules.lead_fight + rules.lead_boss);
+    // small frames are a point cheaper
+    let small = data::unit("mudrets").smaller();
+    assert_eq!(Run::lead_cost(&small) + 1, Run::lead_cost(&data::unit("mudrets")));
+    // the swarm: its start army fills the start limit
+    let mut s = Run::new(Class::Swarm, 0, 5);
+    let start = rules.limit_start["matka"];
+    assert_eq!(s.limit(), start);
+    assert_eq!(s.points_used(), start, "the Brood Mother's start is not her limit");
+    let money = s.money;
+    // twelve scorpion workers: twelve of the commonest workers (ants) eaten to make room, paid as biomass
+    let scorpions = Offer { key: "x".into(), units: (0..12).map(|_| data::swarm(data::Caste::Worker, data::Form::Scorpion)).collect(), price: 0, find: run::Find::Units };
+    let ants = |r: &Run| r.army.iter().filter(|m| &*m.t.name == "Муравей (рабочая)").count();
+    let before = ants(&s);
+    assert!(s.take_find(&scorpions, None));
+    assert_eq!(s.points_used(), start);
+    assert_eq!(ants(&s), before - 12, "not the ants eaten");
+    assert_eq!(s.money, money + (12 / rules.eaten_per_biomass) as i32);
+    // a battle won: the limit grows
+    s.fight = 1;
+    assert_eq!(s.limit(), start + rules.limit_fight);
+}
+
+/// The curve's measure: a class's reference army grows with its budget — Forges for the Foundry (a part of one by
+/// health), points of ants for the swarm.
+#[test]
+fn reference_armies() {
+    let f = Run::reference(Class::Foundry, 2.5);
+    assert_eq!(f.len(), 3);
+    assert!(f.iter().all(|t| &*t.name == "Горн"));
+    assert!(f[2].hp < f[0].hp, "the half Forge as strong as a whole one");
+    let s = Run::reference(Class::Swarm, 70.0);
+    let pts: u32 = s.iter().map(Run::points).sum();
+    assert!((70..=72).contains(&pts), "{pts} points for 70");
+    assert!(s.iter().any(|t| t.size == 2), "no soldier among them");
+}

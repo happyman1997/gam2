@@ -50,7 +50,7 @@
     // заражает и яд скорпионов; чумная кровь стае; панцирь
     "kukushka": [
         (key: "plague_venom", leader: (traits: [Venom(die: 6)])),
-        (key: "plague_blood", army: (hp: 2)),
+        (key: "plague_blood", army: (hp: 1)),
         (key: "plague_shell", leader: (hp: 12, armor: 1)),
     ],
 }

@@ -486,6 +486,98 @@ impl Run {
         }
     }
 
+    // ---------------------------------------------------------------- leadership and the swarm's limit
+
+    /// Bosses beaten so far.
+    fn bosses_won(&self) -> u32 {
+        self.fight / BOSS_EVERY
+    }
+
+    /// The Foundry's leadership: how much the army may hold — the leader's own at the start, more with every battle
+    /// won and every boss (the Father of the Colossus's stays as it is).
+    pub fn lead_cap(&self) -> u32 {
+        let r = data::rules();
+        let key = self.leader_key();
+        let start = r.lead_start.get(key).copied().unwrap_or(10);
+        if r.lead_fixed.iter().any(|k| k == key) {
+            return start;
+        }
+        start + r.lead_fight * self.fight + r.lead_boss * self.bosses_won()
+    }
+
+    /// What a body costs in leadership: a golem by its kind, a smaller frame one less; leaders and summons nothing.
+    pub fn lead_cost(t: &Template) -> u32 {
+        let Some(key) = data::unit_key(&t.name) else { return 0 };
+        let Some(&c) = data::rules().lead_cost.get(key) else { return 0 };
+        c.saturating_sub(data::unit(key).size.saturating_sub(t.size))
+    }
+
+    /// The leadership the army holds now (the broken too: they are still the army's).
+    pub fn lead_used(&self) -> u32 {
+        self.army.iter().filter(|m| !self.is_leader(m)).map(|m| Self::lead_cost(&m.t)).sum()
+    }
+
+    /// The swarm's limit in points: the leader's own at the start, more with every battle won and every boss.
+    pub fn limit(&self) -> u32 {
+        let r = data::rules();
+        let start = r.limit_start.get(self.leader_key()).copied().unwrap_or(100);
+        start + r.limit_fight * self.fight + r.limit_boss * self.bosses_won()
+    }
+
+    /// What a body of the swarm costs of its limit: a worker 1, a soldier 3, a giant soldier 6.
+    pub fn points(t: &Template) -> u32 {
+        match t.size {
+            0 | 1 => 1,
+            2 => 3,
+            3 => 6,
+            _ => 10,
+        }
+    }
+
+    /// The points the swarm holds now (its leader is free).
+    pub fn points_used(&self) -> u32 {
+        self.army.iter().filter(|m| !self.is_leader(m)).map(|m| Self::points(&m.t)).sum()
+    }
+
+    /// Whether these bodies can join: the Foundry's leadership must hold them; the swarm takes everything (and eats
+    /// the extra — `trim`).
+    pub fn can_recruit(&self, units: &[Template]) -> bool {
+        match self.class {
+            Class::Foundry => self.lead_used() + units.iter().map(Self::lead_cost).sum::<u32>() <= self.lead_cap(),
+            Class::Swarm => true,
+        }
+    }
+
+    /// The swarm over its limit eats the extra: workers before soldiers, the commonest kind first, the youngest of it
+    /// first (CONCEPT.md, «Выводок», the selection), every `eaten_per_biomass` points a unit of biomass. How many
+    /// were eaten.
+    pub fn trim(&mut self) -> usize {
+        if self.class != Class::Swarm {
+            return 0;
+        }
+        let limit = self.limit();
+        let mut used = self.points_used();
+        let mut eaten = 0;
+        let mut pts = 0;
+        while used > limit {
+            // the kind to eat from: the cheapest, then the commonest
+            let mut count: std::collections::BTreeMap<(u32, &str), usize> = Default::default();
+            for m in self.army.iter().filter(|m| !self.is_leader(m)) {
+                *count.entry((Self::points(&m.t), &*m.t.name)).or_default() += 1;
+            }
+            let Some(((_, name), _)) = count.iter().min_by_key(|((p, _), n)| (*p, std::cmp::Reverse(**n))) else { break };
+            let name = name.to_string();
+            let Some(i) = (0..self.army.len()).rev().find(|&i| !self.is_leader(&self.army[i]) && *self.army[i].t.name == *name) else { break };
+            let p = Self::points(&self.army[i].t);
+            self.army.remove(i);
+            used -= p;
+            pts += p;
+            eaten += 1;
+        }
+        self.earn((pts / data::rules().eaten_per_biomass.max(1)) as i32);
+        eaten
+    }
+
     /// The leader's key in units.ron.
     pub fn leader_key(&self) -> &'static str {
         self.army.iter().find(|m| self.is_leader(m)).and_then(|m| data::unit_key(&m.t.name)).unwrap_or("")
@@ -564,6 +656,9 @@ impl Run {
     pub fn take_find(&mut self, o: &Offer, to: Option<&Target>) -> bool {
         match (&o.find, to) {
             (Find::Units, _) => {
+                if !self.can_recruit(&o.units) {
+                    return false;
+                }
                 self.recruit(o);
                 true
             }
@@ -653,21 +748,34 @@ impl Run {
         self.army.iter().filter(|m| m.broken).count()
     }
 
-    /// The share of `tries` battles `a` wins against `b` (each on a seed of the run's own).
-    fn share(&mut self, a: &[Template], b: &[Template], tries: u32) -> f32 {
+    /// Whether `a` wins at least half of up to `tries` battles against `b` (each on a seed of the run's own). The
+    /// battles go eight at a time on every core, and stop as soon as one side is clearly ahead — a big army measured
+    /// against a small one is not played forty times; the same seeds, the same answer.
+    fn holds(&mut self, a: &[Template], b: &[Template], tries: u32) -> bool {
+        use rayon::prelude::*;
         let base = self.rng.next_u64();
-        let mut won = 0;
-        for k in 0..tries {
-            let mut bt = Battle::new(base.wrapping_add(k as u64 * 7919));
-            bt.add_armies(a, b);
-            if bt.run().winner == Some(0) {
-                won += 1;
+        let (mut won, mut played) = (0u32, 0u32);
+        while played < tries {
+            let n = (tries - played).min(8);
+            won += (played..played + n)
+                .into_par_iter()
+                .map(|k| {
+                    let mut bt = Battle::new(base.wrapping_add(k as u64 * 7919));
+                    bt.add_armies(a, b);
+                    u32::from(bt.run().winner == Some(0))
+                })
+                .sum::<u32>();
+            played += n;
+            let lost = played - won;
+            if won.abs_diff(lost) > 6 {
+                break;
             }
         }
-        won as f32 / tries as f32
+        won * 2 >= played
     }
 
-    /// How strong the enemy of a battle is, in reference fighters: the difficulty curve of the player's class
+    /// How strong the enemy of a battle is, in the class's reference army (golems / swarm points): the difficulty
+    /// curve of the player's class
     /// (curve.ron) by the battle's number, with a dangerous road, an elite or a boss on top. The same in every run —
     /// the player's army has no say.
     pub fn budget(class: Class, fight: u32, kind: Kind, danger: u8) -> f32 {
@@ -686,16 +794,48 @@ impl Run {
     }
 
     /// The enemy for a battle of `kind`: a base (a leader's army for a boss) and a ladder of additions; the longest
-    /// prefix that the curve's number of reference fighters still beats half the time — as strong as the curve
-    /// says, whatever the player brings.
+    /// prefix that the class's reference army of the curve's size still beats half the time — as strong as the
+    /// curve says, whatever the player brings.
     fn enemy(&mut self, kind: Kind, danger: u8) -> (Vec<Template>, String) {
         let b = Self::budget(self.class, self.next_fight(), kind, danger);
         self.enemy_of(kind, b)
     }
 
-    /// An enemy of `kind` as strong as `budget` reference fighters (the balance tools ask for one of any strength).
+    /// A class's own reference army of `budget` — the curve's measure, the army a run's enemy is held against: the
+    /// Foundry's, Forges (the golem in the middle of the class, no modules), a fraction of one as a Forge with that
+    /// share of its health; the swarm's, `budget` points of ants, a soldier in every seven bodies.
+    pub fn reference(class: Class, budget: f32) -> Vec<Template> {
+        match class {
+            Class::Foundry => {
+                // a Forge — the golem in the middle of the class — and a part of one: its health that share
+                let whole = budget.max(0.0).floor() as usize;
+                let mut out: Vec<Template> = (0..whole).map(|_| data::unit("gorn")).collect();
+                let part = budget - whole as f32;
+                if part > 0.05 || out.is_empty() {
+                    let mut g = data::unit("gorn");
+                    g.hp = ((g.hp as f32 * part.max(0.1)).round() as i32).max(5);
+                    out.push(g);
+                }
+                out
+            }
+            Class::Swarm => {
+                let want = budget.round().max(1.0) as u32;
+                let (mut out, mut pts) = (vec![], 0);
+                while pts < want {
+                    let soldier = out.len() % 7 == 6;
+                    let t = data::swarm(if soldier { Caste::Soldier } else { Caste::Worker }, Form::Ant);
+                    pts += Self::points(&t);
+                    out.push(t);
+                }
+                out
+            }
+        }
+    }
+
+    /// An enemy of `kind` as strong as `budget` of the class's reference army (the balance tools ask for one of
+    /// any strength).
     pub fn enemy_of(&mut self, kind: Kind, budget: f32) -> (Vec<Template>, String) {
-        let reference = data::etalon(budget.round().max(1.0) as usize);
+        let reference = Self::reference(self.class, budget);
         // a boss: the other class's leader, then its own army a step at a time, then more of its kind — fitted like
         // any enemy (a whole start army can be more than the curve asks for yet)
         let mut ladder: Vec<Vec<Template>> = vec![];
@@ -723,7 +863,20 @@ impl Run {
         } else {
             (vec![], if self.class == Class::Foundry { "swarm".to_string() } else { "golems".to_string() })
         };
-        ladder.extend(self.ladder(kind, LADDER));
+        // the ladder's first step is the weakest enemy there can be: if the reference cannot beat it (a Guard against
+        // ants that cannot get through its iron), a few other ladders are tried, the first one it can is kept
+        let lead_steps = ladder.len();
+        let mut tail = self.ladder(kind, LADDER);
+        for _ in 0..4 {
+            if lead_steps > 0 || !base.is_empty() {
+                break;
+            }
+            if self.holds(&reference, &tail[0], FIT_TRIES) {
+                break;
+            }
+            tail = self.ladder(kind, LADDER);
+        }
+        ladder.extend(tail);
         // no more than the deployment zone holds — those that find no room would not fight, and the fitting would
         // count them
         let mut used: i32 = base.iter().map(room_cost).sum();
@@ -750,7 +903,7 @@ impl Run {
         let mut step = 1;
         while lo < hi {
             let n = (lo + step).min(hi);
-            if self.share(&reference, &with(n), FIT_TRIES) >= 0.5 {
+            if self.holds(&reference, &with(n), FIT_TRIES) {
                 lo = n;
                 step *= 2;
             } else {
@@ -760,7 +913,7 @@ impl Run {
         }
         while lo < hi {
             let mid = (lo + hi).div_ceil(2);
-            if self.share(&reference, &with(mid), FIT_TRIES) >= 0.5 {
+            if self.holds(&reference, &with(mid), FIT_TRIES) {
                 lo = mid;
             } else {
                 hi = mid - 1;
@@ -814,6 +967,12 @@ impl Run {
             t = t.with(Ability::Intercept);
         }
         t
+    }
+
+    /// A golem of the pool the leadership still holds (a few draws), if there is room for one at all.
+    fn golem_fitting(&mut self, module: bool) -> Option<Template> {
+        let free = self.lead_cap().saturating_sub(self.lead_used());
+        (0..12).map(|_| self.golem(module)).find(|g| Self::lead_cost(g) <= free)
     }
 
     /// The roads of the next fork. Before a boss: the camp or the trader, then the boss alone. Otherwise two battles
@@ -911,10 +1070,15 @@ impl Run {
         match self.class {
             Class::Foundry if self.broken() > 0 => rewards.push(Reward::Repair(2 * self.broken() as i32)),
             Class::Swarm => {
-                // two of every three that fell hatch again, and at least four workers
-                let mut brood: Vec<Template> = fell.iter().enumerate().filter(|(i, _)| i % 3 != 2).map(|(_, t)| t.clone()).collect();
-                while brood.len() < 4 {
+                // everything hatches (CONCEPT.md, «Выводок»): the fallen again, of their own kind, and clutches of
+                // workers past the limit — the swarm overflows it and eats the extra (a body is nothing, the limit and
+                // the breed are everything)
+                let mut brood: Vec<Template> = fell.clone();
+                let mut pts: u32 = self.points_used() + brood.iter().map(Self::points).sum::<u32>();
+                let want = self.limit() + data::rules().clutch as u32;
+                while pts < want {
                     brood.push(data::swarm(Caste::Worker, Form::Ant));
+                    pts += 1;
                 }
                 rewards.push(Reward::Brood(brood));
             }
@@ -959,6 +1123,7 @@ impl Run {
                 for t in ts {
                     self.add(t.clone());
                 }
+                self.trim();
             }
             Reward::Artifact(a) => self.artifacts.push(*a),
             Reward::Find(_) | Reward::Growth(_) => {}
@@ -982,6 +1147,7 @@ impl Run {
         for t in &o.units {
             self.add(t.clone());
         }
+        self.trim();
     }
 
     fn new_artifact(&mut self) -> Artifact {
@@ -999,7 +1165,9 @@ impl Run {
         let mut guard = 0;
         while out.len() < n && guard < 60 {
             guard += 1;
-            let want_part = out.len() % 3 != 2;
+            // bodies only if the Foundry's leadership has room for the cheapest golem
+            let room = self.class == Class::Swarm || self.lead_cap() >= self.lead_used() + 3;
+            let want_part = out.len() % 3 != 2 || !room;
             // a part, if there is a new one to offer; else bodies
             let part = if want_part { self.part().filter(|p| out.iter().all(|x| x.key != p.key)) } else { None };
             let o = part.unwrap_or_else(|| self.offer(rare));
@@ -1047,7 +1215,10 @@ impl Run {
         match self.class {
             Class::Foundry => {
                 let module = rare || self.roll(3) == 0;
-                let g = self.golem(module);
+                let g = match self.golem_fitting(module) {
+                    Some(g) => g,
+                    None => self.golem(module),
+                };
                 let key = data::unit_key(&g.name).unwrap_or("golem").to_string();
                 let price = 8 + g.size as i32 + g.abilities.len() as i32 * 2;
                 Offer { key, units: vec![g], price, find: Find::Units }
@@ -1137,6 +1308,7 @@ impl Run {
                 for _ in 0..4 {
                     self.add(data::swarm(Caste::Worker, Form::Ant));
                 }
+                self.trim();
             }
         }
     }
@@ -1154,6 +1326,7 @@ impl Run {
                 for _ in 0..n {
                     self.add(data::swarm(Caste::Worker, Form::Ant));
                 }
+                self.trim();
                 n
             }
         }
@@ -1217,20 +1390,21 @@ impl Run {
                 }
             }
             Effect::Join => match self.class {
-                Class::Foundry => {
-                    let g = self.golem(false);
-                    self.add(g);
-                }
+                Class::Foundry => match self.golem_fitting(false) {
+                    Some(g) => self.add(g),
+                    None => self.earn(10),
+                },
                 Class::Swarm => self.service_effect(),
             },
             Effect::Recruit => match self.class {
-                Class::Foundry => {
-                    let g = self.golem(false);
-                    self.add(g);
-                }
+                Class::Foundry => match self.golem_fitting(false) {
+                    Some(g) => self.add(g),
+                    None => self.earn(10),
+                },
                 Class::Swarm => {
                     let form = data::FORMS[self.roll(data::FORMS.len())];
                     self.add(data::swarm(Caste::Soldier, form));
+                    self.trim();
                 }
             },
             Effect::Feast => {
@@ -1249,6 +1423,8 @@ impl Run {
             Effect::BuyArtifact(p) => self.money >= p,
             Effect::Money(n) => n >= 0 || self.money >= -n,
             Effect::TradeUnit => self.army.iter().any(|m| !self.is_leader(m)),
+            // a golem joins only if the leadership holds the cheapest one
+            Effect::Join | Effect::Recruit if self.class == Class::Foundry => self.lead_cap() >= self.lead_used() + 3,
             _ => true,
         }
     }

@@ -1,12 +1,15 @@
-// The difficulty curve: how strong the run's enemy is, by the battle's number, in reference fighters
-// (data::etalon — the enemy is the army that many of them beat half the time). The same for every run, whatever the
-// player's army: a stronger army wins more often. docs/BALANCE.md, «Кривая сложности».
+// The difficulty curve: how strong the run's enemy is, by the battle's number, in the player's class's own reference
+// army (run::Run::reference — the enemy is the army that reference beats half the time): Forges for the Foundry
+// (golems — fractions are a Forge with that share of its health), swarm points for the swarm (ants, a soldier in
+// every seven). The same for every run, whatever the player's army: a stronger army wins more often.
+// docs/BALANCE.md, «Кривая сложности».
 (
-    // battles 1..15 (the 5th, 10th and 15th are bosses), for a player of each class
-    foundry: [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0],
-    swarm: [10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 22.0, 23.0],
+    // battles 1..15 (the 5th, 10th and 15th are bosses): about two thirds of what an army of the class that takes
+    // its finds brings by then (a start is worth about 3 Forges / 115 points)
+    foundry: [2.26, 2.43, 2.54, 2.71, 2.89, 3.35, 3.47, 3.69, 3.81, 3.99, 4.50, 4.62, 4.85, 4.97, 5.09],
+    swarm: [80.0, 92.0, 106.0, 120.0, 135.0, 174.0, 192.0, 211.0, 231.0, 252.0, 304.0, 328.0, 353.0, 378.0, 405.0],
     // on top of the battle's own: a dangerous road, an elite, a boss
-    danger: 1.2,
-    elite: 1.3,
-    boss: 1.4,
+    danger: 1.15,
+    elite: 1.2,
+    boss: 1.25,
 )

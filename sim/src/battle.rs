@@ -111,6 +111,8 @@ pub struct Unit {
     pub poison: i32,
     /// Attacks miss up to and including this round (Вспышка светляка).
     pub blind_until: u32,
+    /// The round acid last ate at its armor (one point a round at most, however many hit it).
+    pub corroded: u32,
     /// Round the unit appeared in: summons do not act in it.
     pub born: u32,
     pub charged: bool,
@@ -402,6 +404,7 @@ impl Battle {
             intercept_used: false,
             poison: 0,
             blind_until: 0,
+            corroded: u32::MAX,
             born: self.round,
             charged: false,
             kills: 0,
@@ -977,9 +980,13 @@ impl Battle {
                 Ability::Flash { every } if round.is_multiple_of(every) => {
                     let adj = self.adjacent_enemies(i);
                     if !adj.is_empty() {
+                        // eyes dazzled once see again for a while: no one stays blind all battle under a cloud of
+                        // fireflies
                         for j in adj {
-                            self.units[j].blind_until = round + 1;
-                            self.ev(Event::Blind { t: j });
+                            if self.units[j].blind_until + 2 < round {
+                                self.units[j].blind_until = round + 1;
+                                self.ev(Event::Blind { t: j });
+                            }
                         }
                         return;
                     }
@@ -1071,6 +1078,12 @@ impl Battle {
             let Some(j) = self.ranged_target(i, range) else { return };
             let raw = self.rng.damage(die, bonus);
             hits.push(Hit { attacker: i, target: j, raw, dmg, ..Default::default() });
+            // lightning leaps on to two more enemies beside the target, at half its power (CONCEPT.md, «Молния»)
+            if dmg == Dmg::Shock {
+                for v in self.beside(i, j, 2) {
+                    hits.push(Hit { attacker: i, target: v, raw: (raw + 1) / 2, dmg, ..Default::default() });
+                }
+            }
             return;
         }
         if range > 1 {
@@ -1099,6 +1112,14 @@ impl Battle {
             }
             let (venom, infect) = self.blow_effects(i);
             hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy, venom, infect, ..Default::default() });
+            // a heavy shot (blunt, from one bigger by 2+) lands on the whole cell of small ones, as a trampling does
+            if dmg == Dmg::Blunt && self.units[i].t.size >= self.units[j].t.size + 2 && self.units[j].fp() == 1 {
+                let (cx, cy) = (self.units[j].x, self.units[j].y);
+                let more: Vec<usize> = self.enemies_of(i).filter(|&v| v != j && self.units[v].fp() == 1 && self.units[v].x == cx && self.units[v].y == cy).collect();
+                for v in more {
+                    hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, ..Default::default() });
+                }
+            }
             return;
         }
         let Some(j) = self.melee_target(i) else { return };
@@ -1112,6 +1133,15 @@ impl Battle {
                 self.melee_blow(i, j2, hits);
             }
         }
+    }
+
+    /// Up to `n` enemies of `i` standing right beside `j` (not `j`): where a leaping bolt goes on to.
+    fn beside(&self, i: usize, j: usize, n: usize) -> Vec<usize> {
+        let (jx, jy, jf) = (self.units[j].x, self.units[j].y, self.units[j].fp());
+        self.enemies_of(i)
+            .filter(|&v| v != j && rect_dist(jx, jy, jf, self.units[v].x, self.units[v].y, self.units[v].fp()) <= 1)
+            .take(n)
+            .collect()
     }
 
     /// A melee blow; trampling (size bigger by 2+) hits everyone in the target's cell.
@@ -1206,8 +1236,7 @@ impl Battle {
             self.ev(Event::Absorbed { t });
         }
         if h.dmg == Dmg::Acid {
-            let strip = self.units[t].t.armor_type.acid_strip();
-            self.units[t].armor = (self.units[t].armor - strip).max(0);
+            self.corrode(t);
             self.short_circuit(t);
         }
         if h.ignite && !self.units[t].t.armor_type.immune(Dmg::Fire) {
@@ -1262,6 +1291,16 @@ impl Battle {
             for k in neighbours {
                 self.fear_check(k, 7);
             }
+        }
+    }
+
+    /// Acid eats at the armor: a point a round at most, however many hit — a crowd of barrels wears a golem down,
+    /// it does not strip it bare at once.
+    fn corrode(&mut self, t: usize) {
+        if self.units[t].corroded != self.round {
+            self.units[t].corroded = self.round;
+            let strip = self.units[t].t.armor_type.acid_strip();
+            self.units[t].armor = (self.units[t].armor - strip).max(0);
         }
     }
 
@@ -1324,14 +1363,14 @@ impl Battle {
         }
         self.units[t].alive = false;
         self.ev(Event::Kill { t });
-        // a barrel bursts with acid on everyone adjacent
+        // a barrel bursts with acid on the enemies adjacent
         if let Some(die) = self.units[t].t.traits.iter().find_map(|x| if let Trait::BurstAcid { die } = x { Some(*die) } else { None }) {
-            let near: Vec<usize> = (0..self.units.len()).filter(|&k| k != t && self.units[k].present() && self.dist(k, t) <= 1).collect();
+            // on the enemies beside it only: a whole breed that bursts (a mutation) must not eat its own crowd
+            let near: Vec<usize> = self.enemies_of(t).filter(|&k| self.dist(k, t) <= 1).collect();
             for k in near {
                 let raw = self.rng.damage(die, 0);
                 let d = self.calc(k, raw, Dmg::Acid, false);
-                let strip = self.units[k].t.armor_type.acid_strip();
-                self.units[k].armor = (self.units[k].armor - strip).max(0);
+                self.corrode(k);
                 self.short_circuit(k);
                 self.units[k].hp -= d;
                 self.ev(Event::Hit { a: t, t: k, dmg: d });

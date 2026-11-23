@@ -1,7 +1,7 @@
 #![enable(implicit_some)]
 // Армии: стартовые армии лидеров и отряды для проверок баланса. Строка — боец из units.ron (unit) или особь роя
 // (swarm: (каста, форма) из swarm.ron); count — сколько таких (по умолчанию 1); smaller — на размер меньше
-// (малые фреймы Изобретателя: прочность ×0,7, удар −2); modules — модули из modules.ron; abilities — способности
+// (малые фреймы Изобретателя: размер −1, удар −1, лидерство −1); modules — модули из modules.ron; abilities — способности
 // прямо числами. Только то, что симуляция уже умеет.
 {
     // ---- Литейщик
@@ -32,35 +32,37 @@
         (unit: "zodchiy"),
     ],
 
-    // ---- Рой: лимит в очках — рабочая 1, солдат 3; старт — 30 очков и лидер
+    // ---- Рой — толпа: предел роя 100 очков (run.ron; рабочая 1, солдат 3) и лидер; те же пропорции форм, что в
+    // концепте, только тел втрое больше
     "start_matka": [
-        (swarm: (Worker, Ant), count: 12),
-        (swarm: (Worker, Wasp), count: 3),
-        (swarm: (Worker, Scorpion), count: 3),
-        (swarm: (Soldier, Ant), count: 2),
-        (swarm: (Soldier, Beetle)),
-        (swarm: (Soldier, Isopod)),
+        (swarm: (Worker, Ant), count: 40),
+        (swarm: (Worker, Wasp), count: 11),
+        (swarm: (Worker, Scorpion), count: 10),
+        (swarm: (Soldier, Ant), count: 6),
+        (swarm: (Soldier, Beetle), count: 3),
+        (swarm: (Soldier, Isopod), count: 4),
         (unit: "matka"),
     ],
     "start_razum": [
-        (swarm: (Worker, Ant), count: 9),
-        (swarm: (Worker, Firefly), count: 3),
-        (swarm: (Soldier, Ant), count: 3),
-        (swarm: (Soldier, Mantis), count: 2),
-        (swarm: (Soldier, Scorpion)),
+        (swarm: (Worker, Ant), count: 30),
+        (swarm: (Worker, Firefly), count: 10),
+        (swarm: (Soldier, Ant), count: 10),
+        (swarm: (Soldier, Mantis), count: 7),
+        (swarm: (Soldier, Scorpion), count: 3),
         (unit: "razum"),
     ],
+    // Пожиратель: муравьи и кузнечики, а против брони — жуки (дробящий укус): без них Страж один держит весь рой
     "start_pozhiratel": [
-        (swarm: (Worker, Ant), count: 15),
-        (swarm: (Worker, Grasshopper), count: 3),
-        (swarm: (Soldier, Ant), count: 2),
+        (swarm: (Worker, Ant), count: 64),
+        (swarm: (Worker, Grasshopper), count: 12),
+        (swarm: (Soldier, Beetle), count: 8),
         (unit: "pozhiratel"),
     ],
     "start_kukushka": [
-        (swarm: (Worker, Ant), count: 15),
-        (swarm: (Worker, Scorpion), count: 3),
-        (swarm: (Worker, Barrel), count: 3),
-        (swarm: (Soldier, Ant), count: 3),
+        (swarm: (Worker, Ant), count: 50),
+        (swarm: (Worker, Scorpion), count: 10),
+        (swarm: (Worker, Barrel), count: 10),
+        (swarm: (Soldier, Ant), count: 10),
         (unit: "kukushka"),
     ],
 

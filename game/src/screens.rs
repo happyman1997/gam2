@@ -295,7 +295,16 @@ fn module_for(key: &str) -> String {
 fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: Rect, o: &Offer, state: &str, on: bool) -> (bool, bool) {
     let cls = run.class;
     let Some((icon, key)) = part_icon(o) else {
-        return unit_card(ui, cv, a, cls, id, r, &o.units[0], o.units.len(), state, on);
+        // bodies: the Foundry's leadership must hold them (the swarm takes all and eats the extra)
+        let fits = run.can_recruit(&o.units);
+        let res = unit_card(ui, cv, a, cls, id, r, &o.units[0], o.units.len(), state, on && fits);
+        if on && !fits {
+            let need: u32 = o.units.iter().map(Run::lead_cost).sum();
+            let free = run.lead_cap().saturating_sub(run.lead_used());
+            let note = tf("find.no_lead", &[("n", &need), ("free", &free)]);
+            text(cv, a, &note, r.cx(), r.y + r.h - 26, [230, 120, 90], Align::Center);
+        }
+        return (res.0, res.1 && fits);
     };
     let room = !run.targets(o).is_empty();
     let on = on && room;
@@ -530,6 +539,18 @@ fn top(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, title: &str, sub: &st
     let fight = tf("bar.fight", &[("n", &run.next_fight().min(FIGHTS)), ("all", &FIGHTS)]);
     text(cv, a, &fight, x, 14, MUTED, Align::Right);
     x -= a.fonts["text16"].width(&fight) + 22;
+    // what holds the army's size: the Foundry's leadership, the swarm's limit — used of all
+    let (key, used, cap) = match cls {
+        Class::Foundry => ("bar.lead", run.lead_used(), run.lead_cap()),
+        Class::Swarm => ("bar.limit", run.points_used(), run.limit()),
+    };
+    let held = tf(key, &[("n", &used), ("all", &cap)]);
+    text(cv, a, &held, x, 14, if used >= cap { GOLD } else { MUTED }, Align::Right);
+    let r = Rect::new(x - a.fonts["text16"].width(&held), 8, a.fonts["text16"].width(&held), 28);
+    if ui.hot("held", r).0 {
+        ui.tooltip(vec![(t(&format!("{key}.tip")), INK)]);
+    }
+    x -= a.fonts["text16"].width(&held) + 22;
     let m = run.money.to_string();
     a.fonts["title16"].draw(cv, &m, x, 13, GOLD, Some(EDGE), Align::Right, 1.0);
     ui.money_at = (x - a.fonts["title16"].width(&m) / 2, 30);
@@ -904,7 +925,13 @@ impl Game {
                                 }
                                 return;
                             }
-                            Some(o) => run.recruit(o),
+                            Some(o) => {
+                                // a body the leadership does not hold stays where it is
+                                if !run.can_recruit(&o.units) {
+                                    return;
+                                }
+                                run.recruit(o);
+                            }
                             None => {
                                 run.pass_find();
                             }

@@ -154,9 +154,10 @@ fn the_field_holds_hundreds() {
     }
     let o = bt.run();
     assert!(o.rounds > 0);
-    // the usual: a start army in the old zone's block, middle rows, front columns
+    // the usual: small armies (two starts of the Foundry) in the old zone's block, middle rows, front columns; a start
+    // of the swarm is a crowd now and takes a bigger block
     let mut bt = Battle::new(5);
-    bt.add_armies(&start_zodchiy(), &start_matka());
+    bt.add_armies(&start_zodchiy(), &start_manyak());
     let (top, bottom) = ((H - BLOCK.1) / 2, (H - BLOCK.1) / 2 + BLOCK.1);
     for u in &bt.units {
         let f = sim::battle::footprint(u.t.size);

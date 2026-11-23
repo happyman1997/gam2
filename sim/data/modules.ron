@@ -8,8 +8,8 @@
     "grozovaya_katushka": Bolt(every: 2, die: 6, bonus: 0, dmg: Shock, range: 1),
     // Перегрузка: раз в 2 хода
     "peregruzka": Overload(every: 2),
-    // Огненный шар раз в 3 хода
-    "ognenny_shar": Fireball(every: 3, die: 4, bonus: 0, range: 5),
+    // Огненный шар раз в 3 хода: по цели и всем вокруг неё — ответ Литейщика толпе
+    "ognenny_shar": Fireball(every: 3, die: 6, bonus: 2, range: 5),
     // Голова-катапульта: бросок раз в 2 хода
     "golova_katapulta": Bolt(every: 2, die: 6, bonus: 2, dmg: Blunt, range: 3),
 }

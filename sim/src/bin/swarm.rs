@@ -1,5 +1,5 @@
 //! Strength of every Swarm form and caste in reference fighters; with `tune` suggests health to hit
-//! the price (a worker is 1 point ≈ 0.33 of a fighter, a soldier 3 points ≈ 1 fighter).
+//! the price (a worker is 1 point ≈ 0.2 of a fighter, a soldier 3 points ≈ 0.6 — the swarm is a crowd).
 //! `cargo run --release --bin swarm -- 300 [tune]`
 
 use rayon::prelude::*;
@@ -35,13 +35,13 @@ fn strength(group: &[Template], m: u64) -> f64 {
 fn main() {
     let m: u64 = std::env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(300);
     let tune = std::env::args().any(|a| a == "tune");
-    println!("| Форма | Рабочая, эталонов (цель 0,33) | Солдат, эталонов (цель 1,0) |");
+    println!("| Форма | Рабочая, эталонов (цель 0,2) | Солдат, эталонов (цель 0,6) |");
     println!("|---|---|---|");
     let mut hp = swarm_hp();
     for (fi, f) in FORMS.iter().enumerate() {
         let mut cells = vec![];
         for (ci, c) in [Caste::Worker, Caste::Soldier].iter().enumerate() {
-            let target = if ci == 0 { 0.33 } else { 1.0 };
+            let target = if ci == 0 { 0.2 } else { 0.6 };
             let k = if ci == 0 { 16 } else { 8 };
             let mut t = swarm(*c, *f);
             let mut s = strength(&vec![t.clone(); k], m) / k as f64;
