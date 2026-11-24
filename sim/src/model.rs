@@ -157,9 +157,6 @@ pub enum Trait {
     Viviparous,
     /// Spitter: no shot between its spits; whoever reaches it gets only a weak bite («слабый укус»).
     Spitter,
-    /// Клеевой рой: wounded below half, the body bursts with glue — it dies, the enemies beside it are stuck for a
-    /// round (they neither walk nor strike).
-    GlueBurst,
     /// Мошкара: a killed body (not burnt) crumbles into a midge cloud of its side.
     Midges,
     /// The midge cloud itself: stings through any armor, enemy shooters next to it see nothing to shoot, fire burns it
@@ -172,20 +169,30 @@ pub enum Trait {
     /// Медовые соты: a wounded body next to its own mends a point a round; a dying one floods its cell and the cells
     /// round it with honey — enemies standing in it strike weaker.
     Honey,
-    /// Soft body (Ржавчина's price): no armor counts, fire burns double.
-    SoftBody,
     /// Почкование: wounded for the first time, it splits — a bud with half the health left steps out beside it.
     Buds,
-    /// Единый разум: never flees, walks for the target its Hive Mind marked if it is within six cells, and strikes it
-    /// past its armor.
-    OneMind,
-    /// Ржавчина: every blow that lands eats at the armor as acid does (a point a round at most), whatever its kind.
-    Corrodes,
+    /// Мимикрия: the swarm takes up the weapon of every machine it breaks below half its health (or sees fall), till the
+    /// battle ends — a Sage's or the
+    /// Inventor's: the bite shocks; a Forge's: it sets alight, +1; a Guard's, a Mason's or the Architect's: the shell is
+    /// two points harder; a Gun's or the Father's: the bite is blunt; a Mechanic's: it mends two a round; the Maniac's: +2.
+    Mimic,
+    /// Пир: with no enemy beside it, a body eats a corpse beside it (its own or the enemy's, not a burnt one) instead of
+    /// striking, and a larva hatches from what it ate (two from a golem, three from a big one).
+    Feast,
+    /// Кукловод: its blows hook a machine (an infected one is hooked too); a hooked machine that falls rises for its side
+    /// with a quarter of its health, its modules silent —
+    /// larvae work its hull for two rounds, its own weapons turned on its own (then it falls apart, and the larvae come
+    /// out).
+    Puppeteer,
+    /// A fallen machine worked by larvae (Кукловод): no army, it falls apart after two rounds.
+    Puppet,
+    /// Мираж: as the battle begins, every second body of the swarm gets a ghost twin beside it.
+    Mirage,
+    /// A ghost of the Hive Mind's mirage: does not strike, melts away at the first blow, no army.
+    Ghost,
     /// Стрекот: every second round an enemy with three or more of these beside it loses its blow (the chirr shakes it;
     /// machines ring with it too).
     Chirr,
-    /// Кормовое безумие: it smells blood — +2 to its blows at an enemy below half its health.
-    Frenzy,
 }
 
 /// Abilities with a condition.
@@ -311,6 +318,12 @@ impl Template {
         self.traits.contains(&t)
     }
 
+    /// Whether it counts as its side's army: a midge cloud, a ghost of a mirage and a puppet machine do not (a side of
+    /// them alone has lost; they are not counted as fallen).
+    pub fn is_army(&self) -> bool {
+        !self.has(Trait::Cloud) && !self.has(Trait::Ghost) && !self.has(Trait::Puppet)
+    }
+
     pub fn fear(&self) -> Option<(u32, u32)> {
         self.traits.iter().find_map(|t| match t {
             Trait::Fear { die, radius } => Some((*die, *radius)),
@@ -362,13 +375,10 @@ pub fn mitigate(raw: i32, dmg: Dmg, t: &Template, armor_now: i32, stunned: bool,
     if stunned {
         d += 1;
     }
-    if dmg == Dmg::Fire && t.has(Trait::SoftBody) {
-        d *= 2;
-    }
     if dmg == Dmg::Fire && t.has(Trait::Cloud) {
         d *= 3;
     }
-    if dmg != Dmg::Fire && dmg != Dmg::Poison && !t.has(Trait::SoftBody) {
+    if dmg != Dmg::Fire && dmg != Dmg::Poison {
         let mut arm = armor_now.max(0);
         if probivnoy {
             arm /= 2;

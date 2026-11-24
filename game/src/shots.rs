@@ -296,5 +296,15 @@ pub fn run(demo: Demo, dir: &str) {
     let foe = Run::new(Class::Swarm, 0, 513).enemy_of(Kind::Fight, 150.0).0;
     let rec = crate::playback::record_of(11, &foe, &r.fighters().0);
     snap_battle(&mut g, dir, "53_battle_doctrines", rec, 6.0 * crate::playback::FR as f32 + 22.0, 2);
+    // the Hive Mind's mirage (ghost twins) and the Plague's puppets (fallen golems worked by larvae)
+    let mut r = Run::new(Class::Swarm, 1, 5);
+    r.breeds.push((sim::run::SWARM.to_string(), "m_mirage".to_string()));
+    let rec = crate::playback::record_of(11, &foe, &r.fighters().0);
+    snap_battle(&mut g, dir, "54_battle_mirage", rec, crate::playback::FR as f32 + 8.0, 1);
+    let mut r = Run::new(Class::Swarm, 3, 5);
+    r.breeds.push((sim::run::SWARM.to_string(), "m_puppet".to_string()));
+    let rec = crate::playback::record_of(11, &foe, &r.fighters().0);
+    let rise = rec.rounds.iter().position(|rd| rd.events.iter().any(|e| matches!(e, sim::Event::Summon { u } if rec.units[*u].puppet))).unwrap_or(5);
+    snap_battle(&mut g, dir, "55_battle_puppet", rec, (rise as f32 + 1.0) * crate::playback::FR as f32 + 22.0, 2);
 
 }

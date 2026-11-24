@@ -2673,17 +2673,18 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Changeling => n("tr.changeling", "tr.changeling.l"),
         T::Viviparous => n("tr.viviparous", "tr.viviparous.l"),
         T::Spitter => n("tr.spitter", "tr.spitter.l"),
-        T::GlueBurst => n("tr.glueburst", "tr.glueburst.l"),
         T::Midges => n("tr.midges", "tr.midges.l"),
         T::Cloud => n("tr.cloud", "tr.cloud.l"),
         T::Spinner => n("tr.spinner", "tr.spinner.l"),
         T::Honey => n("tr.honey", "tr.honey.l"),
-        T::SoftBody => n("tr.softbody", "tr.softbody.l"),
         T::Buds => n("tr.buds", "tr.buds.l"),
-        T::OneMind => n("tr.onemind", "tr.onemind.l"),
-        T::Corrodes => n("tr.corrodes", "tr.corrodes.l"),
-        T::Frenzy => n("tr.frenzy", "tr.frenzy.l"),
         T::Chirr => n("tr.chirr", "tr.chirr.l"),
+        T::Mimic => n("tr.mimic", "tr.mimic.l"),
+        T::Feast => n("tr.feast", "tr.feast.l"),
+        T::Puppeteer => n("tr.puppeteer", "tr.puppeteer.l"),
+        T::Puppet => n("tr.puppet", "tr.puppet.l"),
+        T::Mirage => n("tr.mirage", "tr.mirage.l"),
+        T::Ghost => n("tr.ghost", "tr.ghost.l"),
     }
 }
 

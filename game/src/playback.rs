@@ -28,6 +28,10 @@ pub struct UnitInfo {
     pub machine: bool,
     /// A midge cloud (Мошкара): no body, no corpse, not counted as the army.
     pub cloud: bool,
+    /// A ghost of the Hive Mind's mirage: see-through, not counted.
+    pub ghost: bool,
+    /// A fallen machine worked by larvae (Кукловод): sickly, not counted.
+    pub puppet: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -84,6 +88,8 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
             leader: u.t.has(Trait::Leader) || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
             machine: u.t.golem || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса"),
             cloud: u.t.has(Trait::Cloud),
+            ghost: u.t.has(Trait::Ghost),
+            puppet: u.t.has(Trait::Puppet),
         })
         .collect()
 }

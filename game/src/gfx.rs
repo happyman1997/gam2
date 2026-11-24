@@ -150,6 +150,22 @@ impl Image {
         }
     }
 
+    /// As `blit_tint`, faded by `alpha`: a ghost of the Hive Mind's mirage.
+    #[allow(clippy::too_many_arguments)]
+    pub fn blit_tint_faded(&mut self, src: &Image, x: i32, y: i32, flip: bool, col: [u8; 3], k: f32, alpha: f32) {
+        for j in 0..src.h {
+            for i in 0..src.w {
+                let si = if flip { src.w - 1 - i } else { i };
+                let c = src.get(si, j);
+                if c[3] == 0 {
+                    continue;
+                }
+                let m = |v: u8, t: u8| (v as f32 + (t as f32 - v as f32) * k) as u8;
+                self.blend_px(x + i, y + j, [m(c[0], col[0]), m(c[1], col[1]), m(c[2], col[2]), c[3]], alpha);
+            }
+        }
+    }
+
     /// Every covered pixel of the image lifted toward white by `k` (a button under the cursor).
     pub fn lighten(&mut self, k: f32) {
         for p in self.px.iter_mut().filter(|p| p[3] > 0) {

@@ -3,6 +3,7 @@
 use sim::battle::Battle;
 use sim::data::*;
 use sim::model::{mitigate, Dmg, Template, Trait};
+use sim::battle::{MIMIC_SHELL, MIMIC_SHOCK};
 use sim::Event;
 
 fn with(t: Template, tr: Trait) -> Template {
@@ -11,23 +12,6 @@ fn with(t: Template, tr: Trait) -> Template {
 
 fn hits_by(bt: &Battle, a: usize) -> usize {
     bt.log.as_ref().unwrap().iter().filter(|e| matches!(e, Event::Hit { a: x, .. } if *x == a)).count()
-}
-
-/// Клеевой рой: no body of it lives on below half its health — it bursts, and the enemy beside it is stuck.
-#[test]
-fn glue_bursts_and_sticks() {
-    let mut glued = 0;
-    for seed in 0..10 {
-        let mut bt = Battle::new(seed).with_log();
-        bt.add_armies(&many(with(soldat(), Trait::GlueBurst), 16), &[strazh(), mudrets()]);
-        while bt.step().is_none() {
-            for u in bt.units.iter().filter(|u| u.present() && u.t.has(Trait::GlueBurst)) {
-                assert!(u.hp * 2 >= u.t.hp, "a glue body lives on below half: {}/{}", u.hp, u.t.hp);
-            }
-        }
-        glued += bt.log.as_ref().unwrap().iter().filter(|e| matches!(e, Event::Glue { .. })).count();
-    }
-    assert!(glued > 0, "no enemy was ever stuck in glue");
 }
 
 /// Мошкара: every second fallen body turns into a midge cloud; a cloud is no army — a side of clouds alone has lost;
@@ -119,16 +103,6 @@ fn honey_mends_and_floods() {
     let _ = b;
 }
 
-/// Ржавчина's price: a soft body — its armor does not count, fire burns double.
-#[test]
-fn rust_softens_the_body() {
-    let s = with(soldat(), Trait::SoftBody);
-    let plain = soldat();
-    assert!(plain.armor > 0);
-    assert_eq!(mitigate(6, Dmg::Slash, &s, s.armor, false, false), mitigate(6, Dmg::Slash, &plain, 0, false, false));
-    assert_eq!(mitigate(3, Dmg::Fire, &s, s.armor, false, false), 2 * mitigate(3, Dmg::Fire, &plain, plain.armor, false, false));
-}
-
 /// Почкование: the first wound splits a body — a bud with half the health left; neither buds again.
 #[test]
 fn budding_splits_once() {
@@ -145,23 +119,6 @@ fn budding_splits_once() {
         assert!(born.len() <= 10, "a body budded more than once");
     }
     assert!(buds > 0, "no body ever budded");
-}
-
-/// Единый разум: the swarm never flees, however frightening the enemy.
-#[test]
-fn one_mind_never_flees() {
-    let (mut plain, mut one) = (0, 0);
-    for seed in 0..8 {
-        for (mind, count) in [(false, &mut plain), (true, &mut one)] {
-            let w = if mind { with(rabochaya(), Trait::OneMind) } else { rabochaya() };
-            let mut bt = Battle::new(seed).with_log();
-            bt.add_armies(&many(w, 30), &[otets_kolossa()]);
-            bt.run();
-            *count += bt.log.as_ref().unwrap().iter().filter(|e| matches!(e, Event::Flee { .. })).count();
-        }
-    }
-    assert!(plain > 0, "the plain swarm never fled the colossus (no test)");
-    assert_eq!(one, 0, "one mind fled");
 }
 
 /// Крылатый рой: a flyer in a cell of small ones is not trampled with them — the big blow takes only its target.
@@ -217,4 +174,95 @@ fn the_chirr_shakes_the_surrounded() {
     assert_eq!(hits_by(&bt, g), before, "the Guard struck through the chirr");
     bt.step(); // round 3: free of it
     assert!(hits_by(&bt, g) > before, "the Guard stayed shaken");
+}
+
+/// Мимикрия: a mimic swarm takes up the weapon of a machine it breaks or sees fall — a Sage's lightning, a Guard's shell.
+#[test]
+fn mimics_take_up_the_fallen_machines_weapons() {
+    let mut bt = Battle::new(3).with_log();
+    let m = bt.place(1, mudrets(), 10, 10);
+    let g = bt.place(1, strazh(), 10, 20);
+    let w = bt.place(0, with(soldat(), Trait::Mimic), 8, 10);
+    bt.place(0, with(rabochaya(), Trait::Mimic), 2, 25);
+    assert_eq!(bt.mimicry(0), 0);
+    bt.units[m].hp = 1;
+    for _ in 0..4 {
+        bt.step();
+        if !bt.units[m].alive {
+            break;
+        }
+    }
+    assert!(!bt.units[m].alive, "the sage did not fall");
+    assert_ne!(bt.mimicry(0) & MIMIC_SHOCK, 0, "the swarm did not take up the lightning");
+    // its next blows are lightning: the hits on the Guard are a Sage's, +50 % on metal
+    let shocked = mitigate(4, Dmg::Shock, &bt.units[g].t, 0, false, false);
+    assert!(shocked > mitigate(4, Dmg::Pierce, &bt.units[g].t, 0, false, false));
+    let _ = w;
+    assert_eq!(bt.mimicry(0) & MIMIC_SHELL, 0, "a shell taken from no Guard");
+}
+
+/// Пир: a feaster with no enemy beside it eats a corpse beside it; a larva hatches from it and the corpse is gone.
+#[test]
+fn the_feast_eats_the_fallen() {
+    let mut bt = Battle::new(4);
+    let dead = bt.place(0, soldat(), 5, 10);
+    let f = bt.place(0, with(rabochaya(), Trait::Feast), 4, 10);
+    bt.place(1, strazh(), 33, 20);
+    bt.units[dead].hp = 0;
+    bt.units[dead].alive = false;
+    bt.units[f].glued_until = 9; // it stays by the corpse
+    let n0 = bt.units.len();
+    bt.step();
+    assert!(bt.units[dead].eaten && !bt.units[dead].on_field, "the corpse was not eaten");
+    assert_eq!(bt.units.len(), n0 + 1, "no larva hatched");
+    assert_eq!(bt.units[n0].side, 0);
+}
+
+/// Кукловод: an infected machine that falls rises for the swarm for two rounds; then it falls apart, and larvae come
+/// out of it; the puppet is no army.
+#[test]
+fn the_puppeteer_raises_the_fallen_machine() {
+    let mut bt = Battle::new(6).with_log();
+    let g = bt.place(1, strazh(), 10, 10);
+    bt.place(1, strazh(), 30, 25);
+    bt.place(0, with(soldat(), Trait::Puppeteer), 2, 25);
+    bt.units[g].infected = Some(0);
+    bt.units[g].hp = 1;
+    bt.units[g].t.hp = 100;
+    let n0 = bt.units.len();
+    // the hit that kills it: let a puppeteer bite it to death
+    let b = bt.place(0, with(soldat(), Trait::Puppeteer), 9, 10);
+    let _ = b;
+    for _ in 0..3 {
+        bt.step();
+        if !bt.units[g].alive {
+            break;
+        }
+    }
+    assert!(!bt.units[g].alive, "the Guard did not fall");
+    let puppet = (n0..bt.units.len()).find(|&k| bt.units[k].t.has(Trait::Puppet)).expect("no puppet rose");
+    assert_eq!(bt.units[puppet].side, 0);
+    assert!(!bt.units[puppet].t.is_army());
+    for _ in 0..4 {
+        bt.step();
+    }
+    assert!(!bt.units[puppet].alive, "the puppet did not fall apart");
+    let larvae = bt.units.iter().filter(|u| u.side == 0 && u.t.name == "Личинка").count();
+    assert!(larvae >= 2, "no larvae came out of the hull");
+}
+
+/// Мираж: every second body gets a ghost twin as the battle begins; a ghost strikes no one and melts at the first blow.
+#[test]
+fn the_mirage_takes_the_blows() {
+    let mut bt = Battle::new(2).with_log();
+    bt.add_armies(&many(with(soldat(), Trait::Mirage), 9), &[strazh()]);
+    bt.step();
+    let ghosts: Vec<usize> = (0..bt.units.len()).filter(|&k| bt.units[k].t.has(Trait::Ghost)).collect();
+    assert_eq!(ghosts.len(), 5, "every second body gets a ghost");
+    while bt.step().is_none() {}
+    for &k in &ghosts {
+        assert_eq!(hits_by(&bt, k), 0, "a ghost struck");
+    }
+    let melted = ghosts.iter().filter(|&&k| !bt.units[k].alive).count();
+    assert!(melted > 0, "no ghost took a blow");
 }

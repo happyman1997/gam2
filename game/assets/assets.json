@@ -13235,35 +13235,45 @@
    ],
    "name": "пси"
   },
-  "swarm/m_glue": {
+  "swarm/m_mimic": {
    "atlas": "icons/swarm_icons.png",
    "rect": [
+    128,
     112,
-    16,
     16,
     16
    ],
-   "name": "Клеевой рой"
+   "name": "Мимикрия"
   },
-  "swarm/m_rust": {
+  "swarm/m_feast": {
    "atlas": "icons/swarm_icons.png",
    "rect": [
     48,
-    0,
+    144,
     16,
     16
    ],
-   "name": "Ржавчина"
+   "name": "Пир"
   },
-  "swarm/m_onemind": {
+  "swarm/m_puppet": {
    "atlas": "icons/swarm_icons.png",
    "rect": [
-    16,
+    112,
     128,
     16,
     16
    ],
-   "name": "Единый разум"
+   "name": "Кукловод"
+  },
+  "swarm/m_mirage": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    80,
+    128,
+    16,
+    16
+   ],
+   "name": "Мираж"
   }
  },
  "bg": {

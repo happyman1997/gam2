@@ -1479,6 +1479,6 @@ pub fn play(me: &[Template], enemy: &[Template], seed: u64) -> BattleResult {
 /// What a finished battle did: who of side 0's army (by its index in the army) was killed, how many of side 1 fell.
 pub fn result_of(bt: &Battle, winner: Option<u8>) -> BattleResult {
     let dead = bt.units.iter().filter(|u| u.side == 0 && !u.alive).filter_map(|u| u.src).collect();
-    let kills = bt.units.iter().filter(|u| u.side == 1 && !u.alive && !u.t.has(Trait::Cloud)).count() as u32;
+    let kills = bt.units.iter().filter(|u| u.side == 1 && !u.alive && u.t.is_army()).count() as u32;
     BattleResult { won: winner == Some(0), dead, kills }
 }

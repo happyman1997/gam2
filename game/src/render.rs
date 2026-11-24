@@ -688,7 +688,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let shown = rec.shown(ff);
     let ms = rec.moments((f / FR) as usize);
     let lying_of = |o: &crate::playback::Shown| o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
-    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader && !rec.units[id].cloud;
+    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader && !rec.units[id].cloud && !rec.units[id].ghost;
     // a pack: the small ones of one side, one size, in one cell (big ones never stand among small ones)
     type PackKey = ((i32, i32), u8, u32);
     let key = |id: usize, cell: (i32, i32)| -> PackKey { (cell, rec.units[id].side, rec.units[id].size) };
@@ -802,12 +802,19 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
                 _ => (0.42, 0.75, 0.55),
             };
             cv.blit_shade_to(&spr.img, sx, sy, flip, mul, grey, [42, 34, 50], sink);
+        } else if info.ghost {
+            // a ghost of the mirage: see-through and psi-violet, wavering
+            let waver = 0.42 + 0.12 * (ff * 0.4 + s.id as f32).sin();
+            cv.blit_tint_faded(&spr.img, sx, sy, flip, [196, 160, 255], 0.55, waver);
         } else if anim.flash > 0.0 {
             cv.blit_tint(&spr.img, sx, sy, flip, [255, 250, 236], anim.flash);
+        } else if info.puppet {
+            // a machine worked by larvae: a sickly green film over the metal
+            cv.blit_tint(&spr.img, sx, sy, flip, [130, 196, 70], 0.32);
         } else {
             cv.blit(&spr.img, sx, sy, flip, 1.0);
         }
-        if let Some(k) = s.dead_at {
+        if let Some(k) = s.dead_at.filter(|_| !info.ghost) {
             over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.machine, big, t: ff - k as f32, name });
         }
     }
@@ -870,14 +877,16 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     // the wing: the swarm against the Foundry, the turn, the speed
     cv.blit(&a.ui["wing_battle_960"].img, 0, 0, false, 1.0);
     // a midge cloud is no body of the army
-    let alive = |side: u8| rec.units.iter().enumerate().filter(|(i, u)| u.side == side && !u.cloud && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count();
+    let alive = |side: u8| {
+        rec.units.iter().enumerate().filter(|(i, u)| u.side == side && !u.cloud && !u.ghost && !u.puppet && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count()
+    };
     // the swarm's count on the left, the Foundry's leader and its golems on the right, whichever side each is on
     let swarm = if rec.units.iter().any(|u| u.side == 1 && !u.machine) { 1 } else { 0 };
     let forge = 1 - swarm;
     let hp = |side: u8| -> f32 {
         let (mut now, mut all) = (0.0, 0.0);
         for (i, u) in rec.units.iter().enumerate() {
-            if u.side == side && !u.cloud {
+            if u.side == side && !u.cloud && !u.ghost && !u.puppet {
                 all += u.max_hp as f32;
                 let s = rec.state_at(i, f);
                 if s.alive && s.present {

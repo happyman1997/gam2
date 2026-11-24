@@ -17,6 +17,14 @@ pub const ZONE: i32 = 15;
 /// widens it in the same proportions, up to the whole zone.
 pub const BLOCK: (i32, i32) = (6, 14);
 
+/// What a mimic swarm has taken up from the machines it saw fall (Мимикрия).
+pub const MIMIC_SHOCK: u8 = 1;
+pub const MIMIC_FIRE: u8 = 2;
+pub const MIMIC_SHELL: u8 = 4;
+pub const MIMIC_BLUNT: u8 = 8;
+pub const MIMIC_MEND: u8 = 16;
+pub const MIMIC_EDGE: u8 = 32;
+
 /// Side length of the square a unit occupies.
 pub fn footprint(size: u32) -> i32 {
     match size {
@@ -132,12 +140,14 @@ pub struct Unit {
     pub glued_until: u32,
     /// Has split once already (Почкование): a body buds only the first time it is wounded.
     pub budded: bool,
-    /// The round glue last froze its blow: glue stops a blow one round in three at most.
-    pub glue_round: u32,
     /// Half torn out of the enemy's web: the next action frees it.
     pub struggling: bool,
     /// Damage it has bitten out of the enemy this battle (Кровь Пожирателя: a body grows on what it eats).
     pub fed: i32,
+    /// Its corpse is eaten (Пир): gone from the field.
+    pub eaten: bool,
+    /// Marked by a puppeteer's blow (Кукловод): falling, it rises for that side.
+    pub hooked: Option<u8>,
 }
 
 impl Unit {
@@ -261,8 +271,6 @@ struct Hit {
     ignite: bool,
     /// The blow stuns: the target skips its next attack (not the unstoppable).
     stun: bool,
-    /// Past any armor and what the target is made of (a midge cloud's sting, one mind at the mark).
-    through: bool,
 }
 
 pub struct Battle {
@@ -283,6 +291,8 @@ pub struct Battle {
     clouds: [u32; 2],
     /// Budding bodies killed by their first wound, per side: every second lets a bud away.
     buds: [u32; 2],
+    /// What each side's mimics have taken up from the machines seen falling (Мимикрия): `MIMIC_*` bits.
+    mimicry: [u8; 2],
     /// The web on each cell: the side that spun it, -1 none (Паутина).
     web: Vec<i8>,
     /// The honey on each cell: the side whose dead flooded it, -1 none (Медовые соты).
@@ -304,6 +314,7 @@ impl Battle {
             births: [0, 0],
             clouds: [0, 0],
             buds: [0, 0],
+            mimicry: [0, 0],
             web: vec![-1; n],
             honey: vec![-1; n],
         }
@@ -317,6 +328,26 @@ impl Battle {
     /// The honey on the field, cell by cell: the side whose dead flooded it, -1 none.
     pub fn honey(&self) -> &[i8] {
         &self.honey
+    }
+
+    /// What side `side`'s mimics have taken up (`MIMIC_*` bits).
+    pub fn mimicry(&self, side: u8) -> u8 {
+        self.mimicry[side as usize % 2]
+    }
+
+    /// The kind of a mimic's blow: lightning taken up from a sage, a blunt blow from a gun, else its own.
+    fn mimic_dmg(&self, i: usize, dmg: Dmg) -> Dmg {
+        if !self.units[i].t.has(Trait::Mimic) {
+            return dmg;
+        }
+        let m = self.mimicry[self.units[i].side as usize % 2];
+        if m & MIMIC_SHOCK != 0 {
+            Dmg::Shock
+        } else if m & MIMIC_BLUNT != 0 {
+            Dmg::Blunt
+        } else {
+            dmg
+        }
     }
 
     /// The cells a unit stands on.
@@ -474,9 +505,10 @@ impl Battle {
             overloaded: 0,
             glued_until: 0,
             budded: false,
-            glue_round: 0,
             struggling: false,
             fed: 0,
+            eaten: false,
+            hooked: None,
         });
         id
     }
@@ -574,7 +606,7 @@ impl Battle {
     fn outcome(&self, winner: Option<u8>) -> Outcome {
         let mut left = [0f32; 2];
         let mut total = [0f32; 2];
-        for u in self.units.iter().filter(|u| !u.t.has(Trait::Cloud)) {
+        for u in self.units.iter().filter(|u| u.t.is_army()) {
             total[u.side as usize] += u.t.hp as f32;
             if u.alive {
                 left[u.side as usize] += u.hp.max(0) as f32;
@@ -589,8 +621,8 @@ impl Battle {
 
     fn check_end(&self) -> Option<Outcome> {
         let mut present = [0; 2];
-        // a midge cloud is no army: a side of clouds alone has lost
-        for u in self.units.iter().filter(|u| !u.t.has(Trait::Cloud)) {
+        // a midge cloud, a ghost, a puppet are no army: a side of them alone has lost
+        for u in self.units.iter().filter(|u| u.t.is_army()) {
             if u.present() {
                 present[u.side as usize] += 1;
             }
@@ -733,17 +765,10 @@ impl Battle {
             self.grid.add(side, size, x, y);
             return;
         }
-        let Some((mut tj, mut d)) = self.nearest_enemy(i) else { return };
+        let Some((tj, d)) = self.nearest_enemy(i) else { return };
         let reach = self.units[i].t.range.max(1) as i32;
         if d <= reach {
             return;
-        }
-        // one mind: no enemy in reach, so it goes for the one its Hive Mind marked
-        let mark = self.mark[side as usize].filter(|&m| self.units[m].present() && self.dist(i, m) <= 6);
-        let focus = self.units[i].t.has(Trait::OneMind) && mark.is_some();
-        if let Some(m) = mark.filter(|_| focus) {
-            tj = m;
-            d = self.dist(i, m);
         }
         // a leader who stands at the back is no tank: he stays behind his army while it stands, steps out only to
         // meet an enemy that has come within two cells, or when no one of his is left
@@ -760,14 +785,8 @@ impl Battle {
             (t.x, t.y, t.fp())
         };
         self.grid.sub(size, x, y);
-        if focus {
-            if let Some((nx, ny)) = self.way_round(i, x, y, &[tj], reach, 16) {
-                self.move_to(i, nx, ny);
-                return;
-            }
-        }
         // a flanker (fast, on the wings) goes round the line for the archers and the leader behind it
-        if !focus && role(&self.units[i].t) == Role::Flank && d > reach {
+        if role(&self.units[i].t) == Role::Flank && d > reach {
             let back: Vec<usize> = self.enemies_of(i).filter(|&j| self.units[j].t.range > 1 || self.units[j].t.has(Trait::Leader)).collect();
             if let Some((nx, ny)) = self.way_round(i, x, y, &back, reach, 16) {
                 self.move_to(i, nx, ny);
@@ -776,7 +795,7 @@ impl Battle {
         }
         // close to the fight, a melee fighter picks where to strike from: round the enemy's flank or to its back when
         // that is not much longer than straight into its front
-        if !focus && reach == 1 && d <= 4 && !self.units[i].fleeing {
+        if reach == 1 && d <= 4 && !self.units[i].fleeing {
             let all: Vec<usize> = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 8).collect();
             if let Some((nx, ny)) = self.way_round(i, x, y, &all, reach, 8) {
                 self.move_to(i, nx, ny);
@@ -796,7 +815,7 @@ impl Battle {
         }
         // the way ahead shut (its own in front, the enemy's line too thick): round them to the flank — the
         // shortest way to a free place next to any enemy
-        if best.0 >= d && !focus {
+        if best.0 >= d {
             let all: Vec<usize> = self.enemies_of(i).collect();
             if let Some((nx, ny)) = self.way_round(i, x, y, &all, reach, 12) {
                 self.move_to(i, nx, ny);
@@ -918,7 +937,7 @@ impl Battle {
 
     fn fear_check(&mut self, j: usize, die: u32) {
         let u = &self.units[j];
-        if !u.present() || u.fleeing || u.t.has(Trait::OneMind) {
+        if !u.present() || u.fleeing {
             return;
         }
         let morale = self.morale_of(j);
@@ -930,6 +949,20 @@ impl Battle {
 
     /// What happens as the battle begins, the armies stood: the Inventor's augments.
     fn battle_begins(&mut self) {
+        // the Hive Mind's mirage: every second body of the swarm gets a ghost twin beside it
+        let mirage: Vec<usize> = (0..self.units.len()).filter(|&i| self.units[i].present() && self.units[i].t.has(Trait::Mirage)).collect();
+        for (n, i) in mirage.into_iter().enumerate() {
+            if n % 2 != 0 {
+                continue;
+            }
+            let mut ghost = self.units[i].t.clone();
+            ghost.traits.retain(|t| matches!(t, Trait::Flyer | Trait::Leap));
+            ghost.traits.extend([Trait::Ghost, Trait::NoAttack, Trait::Mindless]);
+            ghost.abilities.clear();
+            ghost.hp = 1;
+            let (side, x, y) = (self.units[i].side, self.units[i].x, self.units[i].y);
+            self.spawn(side, ghost, x, y);
+        }
         for i in 0..self.units.len() {
             if !self.units[i].present() || !self.units[i].t.abilities.contains(&Ability::Augment) {
                 continue;
@@ -1008,6 +1041,10 @@ impl Battle {
         let round = self.round;
         if self.units[i].silenced_until >= round {
             return; // Замыкание: the windings are shorted
+        }
+        // a feaster with no enemy beside it eats a corpse beside it, and a larva hatches from what it ate
+        if self.units[i].t.has(Trait::Feast) && self.adjacent_enemies(i).is_empty() && self.feast(i) {
+            return;
         }
         // a spinner spins every fourth round: to catch an enemy beside it not in the web yet, or when it has nothing to
         // strike at anyway (a shooter with a target in range shoots, one beside webbed enemies strikes them)
@@ -1119,18 +1156,9 @@ impl Battle {
                         self.spawn(side, larva, x, y);
                     }
                 }
-                Ability::Mark { every } if round.is_multiple_of(every) || self.one_mind(i) => {
+                Ability::Mark { every } if round.is_multiple_of(every) => {
                     let side = self.units[i].side as usize;
-                    // one mind: the Hive Mind sees with the swarm's eyes — every round, the most dangerous enemy the
-                    // swarm is at (within two cells of a body of it), not the most dangerous on the field
-                    let near: Vec<usize> = if self.one_mind(i) {
-                        let mine: Vec<usize> = (0..self.units.len()).filter(|&k| self.units[k].side as usize == side && self.units[k].present() && self.units[k].t.has(Trait::OneMind)).collect();
-                        self.enemies_of(i).filter(|&j| mine.iter().any(|&k| self.dist(k, j) <= 2)).collect()
-                    } else {
-                        vec![]
-                    };
-                    let pool: Vec<usize> = if near.is_empty() { self.enemies_of(i).collect() } else { near };
-                    let target = pool.into_iter().max_by_key(|&j| {
+                    let target = self.enemies_of(i).max_by_key(|&j| {
                         let t = &self.units[j].t;
                         (t.die as i32 + 2 * t.bonus, Reverse(j))
                     });
@@ -1156,10 +1184,50 @@ impl Battle {
         self.normal_attack(i, hits);
     }
 
-    /// Whether the side of `i` fights as one mind (Единый разум on its bodies).
-    fn one_mind(&self, i: usize) -> bool {
-        let side = self.units[i].side;
-        self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::OneMind))
+    /// Мимикрия: a machine broken below half its health or fallen — its enemy's mimics take up its weapon.
+    fn take_apart(&mut self, t: usize) {
+        let u = &self.units[t];
+        if !(u.t.golem || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса")) || u.t.has(Trait::Puppet) {
+            return;
+        }
+        let took = match crate::data::unit_key(&u.t.name) {
+            Some("mudrets" | "izobretatel") => MIMIC_SHOCK,
+            Some("gorn") => MIMIC_FIRE,
+            Some("strazh" | "kamenshchik" | "zodchiy") => MIMIC_SHELL,
+            Some("orudie" | "otets_kolossa") => MIMIC_BLUNT,
+            Some("mekhanik") => MIMIC_MEND,
+            Some("manyak") => MIMIC_EDGE,
+            _ => 0,
+        };
+        self.mimicry[1 - u.side as usize % 2] |= took;
+    }
+
+    /// Пир: eats the nearest corpse beside it (its own or the enemy's, not a burnt one, not a cloud's or a ghost's);
+    /// a larva of its side hatches from it, two from a golem, three from a big one. False if there is none to eat.
+    fn feast(&mut self, i: usize) -> bool {
+        let Some(c) = (0..self.units.len())
+            .filter(|&k| {
+                let u = &self.units[k];
+                !u.alive && u.on_field && !u.eaten && u.burn == 0 && u.t.is_army()
+            })
+            .find(|&k| self.dist(i, k) <= 1)
+        else {
+            return false;
+        };
+        self.units[c].eaten = true;
+        self.units[c].on_field = false;
+        let n = match self.units[c].t.size {
+            0..=2 => 1,
+            3..=4 => 2,
+            _ => 3,
+        };
+        let (side, x, y) = (self.units[i].side, self.units[c].x, self.units[c].y);
+        for _ in 0..n {
+            let mut larva = crate::data::rabochaya();
+            larva.name = "Личинка".into();
+            self.spawn(side, larva, x, y);
+        }
+        true
     }
 
     /// Стрекот: every second round an enemy with three or more chirring bodies beside it shakes with their chirr (metal
@@ -1261,6 +1329,7 @@ impl Battle {
             let t = &self.units[i].t;
             (t.die, t.bonus, t.dmg, t.range)
         };
+        let dmg = self.mimic_dmg(i, dmg);
         let probivnoy = self.units[i].t.has(Trait::Probivnoy);
         if self.units[i].t.has(Trait::Caster) {
             // a spell: no secondary weapon; in melee it goes off one time in four; full power at any range
@@ -1345,6 +1414,8 @@ impl Battle {
             let t = &self.units[i].t;
             (t.die, t.bonus, t.dmg, t.size)
         };
+        let dmg = self.mimic_dmg(i, dmg);
+        let mimic = if self.units[i].t.has(Trait::Mimic) { self.mimicry[self.units[i].side as usize % 2] } else { 0 };
         let probivnoy = self.units[i].t.has(Trait::Probivnoy);
         let tj = &self.units[j];
         // a flyer is not trampled: it is over the blow, not under the foot
@@ -1363,11 +1434,14 @@ impl Battle {
         if Some(j) == self.mark[self.units[i].side as usize] {
             extra += 1;
         }
-        // feeding frenzy: it smells blood — an enemy below half its health is bitten harder
-        if self.units[i].t.has(Trait::Frenzy) && self.units[j].hp * 2 < self.units[j].t.hp {
+        extra += 2 * self.units[i].growth as i32;
+        // the Maniac's edge +2; a Forge's fire: it sets alight and +1
+        if mimic & MIMIC_EDGE != 0 {
             extra += 2;
         }
-        extra += 2 * self.units[i].growth as i32;
+        if mimic & MIMIC_FIRE != 0 {
+            extra += 1;
+        }
         let charge = self.units[i].t.has(Trait::Charge) && !self.units[i].charged;
         self.units[i].charged = true;
         let (venom, infect) = self.blow_effects(i);
@@ -1383,9 +1457,7 @@ impl Battle {
             } else if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
                 raw = raw * 3 / 2;
             }
-            // one mind: the Hive Mind shows the swarm the chink in the mark's armor
-            let through = Some(v) == self.mark[self.units[i].side as usize] && self.units[i].t.has(Trait::OneMind);
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: false, stun: false, through });
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: mimic & MIMIC_FIRE != 0, stun: false });
         }
     }
 
@@ -1411,13 +1483,21 @@ impl Battle {
     /// Damage after vulnerability, stun, armor, resistance and elemental resistance.
     pub fn calc(&self, target: usize, raw: i32, dmg: Dmg, probivnoy: bool) -> i32 {
         let t = &self.units[target];
-        crate::model::mitigate(raw, dmg, &t.t, t.armor, t.stunned, probivnoy)
+        // a mimic that broke a Guard: its shell two points harder
+        let shell = 2 * (t.t.has(Trait::Mimic) && self.mimicry[t.side as usize % 2] & MIMIC_SHELL != 0) as i32;
+        crate::model::mitigate(raw, dmg, &t.t, t.armor + shell, t.stunned, probivnoy)
     }
 
     fn apply(&mut self, h: Hit) {
         let mut t = h.target;
         if !self.units[t].present() {
             return; // already dead: the blow is wasted
+        }
+        if self.units[t].t.has(Trait::Ghost) {
+            // a ghost of the mirage: the blow goes through it, and it melts away
+            self.ev(Event::Hit { a: h.attacker, t, dmg: 0 });
+            self.kill(t);
+            return;
         }
         if self.units[t].t.golem {
             let side = self.units[t].side;
@@ -1440,7 +1520,7 @@ impl Battle {
             raw -= raw / 2;
         }
         // a midge cloud stings past any armor and anything it is made of
-        let mut d = if (h.through || self.units[h.attacker].t.has(Trait::Cloud)) && !self.units[t].t.armor_type.immune(h.dmg) {
+        let mut d = if self.units[h.attacker].t.has(Trait::Cloud) && !self.units[t].t.armor_type.immune(h.dmg) {
             raw
         } else {
             self.calc(t, raw, h.dmg, h.probivnoy)
@@ -1453,8 +1533,6 @@ impl Battle {
         if h.dmg == Dmg::Acid {
             self.corrode(t);
             self.short_circuit(t);
-        } else if d > 0 && self.units[h.attacker].t.has(Trait::Corrodes) {
-            self.corrode(t);
         }
         if h.ignite && !self.units[t].t.armor_type.immune(Dmg::Fire) {
             self.units[t].burn = 3;
@@ -1477,6 +1555,10 @@ impl Battle {
         if d > 0 && h.infect && self.units[t].infected.is_none() {
             self.units[t].infected = Some(self.units[a].side);
         }
+        // a puppeteer's blow hooks it: falling, it rises for the puppeteers
+        if d > 0 && self.units[a].t.has(Trait::Puppeteer) {
+            self.units[t].hooked = Some(self.units[a].side);
+        }
         if h.melee && self.units[a].present() {
             if let Some(die) = self.units[t].t.traits.iter().find_map(|x| if let Trait::Thorns { die } = x { Some(*die) } else { None }) {
                 let raw = self.rng.damage(die, 0);
@@ -1489,10 +1571,10 @@ impl Battle {
             }
         }
         let crushing = d * 2 > self.units[t].t.hp;
+        if self.units[t].hp * 2 < self.units[t].t.hp {
+            self.take_apart(t);
+        }
         if self.units[t].hp <= 0 {
-            if self.units[t].t.has(Trait::GlueBurst) {
-                self.glue_burst(t);
-            }
             // killed by its first wound: every second one still lets a small bud away, with a quarter of the health
             if self.units[t].t.has(Trait::Buds) && !self.units[t].budded {
                 let side = self.units[t].side as usize % 2;
@@ -1544,15 +1626,10 @@ impl Battle {
         }
     }
 
-    /// What a wound does to a body that lives through it: a glue body bursts, a budding one splits.
+    /// What a wound does to a body that lives through it: a budding one splits.
     fn wounded(&mut self, t: usize) {
         let u = &self.units[t];
         if !u.present() {
-            return;
-        }
-        if u.t.has(Trait::GlueBurst) && u.hp * 2 < u.t.hp {
-            self.glue_burst(t);
-            self.kill(t);
             return;
         }
         if u.t.has(Trait::Buds) && !u.budded && u.hp >= 2 {
@@ -1560,21 +1637,6 @@ impl Battle {
             if self.bud(t, half) {
                 self.units[t].hp -= half;
             }
-        }
-    }
-
-    /// Glue bursts over the enemies beside the body: they can't walk next round, and their next blow is lost — one
-    /// blow in two at most (a swarm bursting all round a golem must not hold it still all battle).
-    fn glue_burst(&mut self, t: usize) {
-        let near: Vec<usize> = self.enemies_of(t).filter(|&k| self.dist(k, t) <= 1).collect();
-        let round = self.round;
-        for k in near {
-            self.units[k].glued_until = self.units[k].glued_until.max(round + 1);
-            if !self.units[k].t.has(Trait::Unstoppable) && round >= self.units[k].glue_round + 2 {
-                self.units[k].glue_round = round;
-                self.units[k].stunned = true;
-            }
-            self.ev(Event::Glue { t: k });
         }
     }
 
@@ -1699,10 +1761,12 @@ impl Battle {
                 self.spawn(side, crate::data::unit("moshkara"), x, y);
             }
         }
-        // a cloud leaves nothing behind
-        if self.units[t].t.has(Trait::Cloud) {
+        // a cloud and a ghost leave nothing behind
+        if self.units[t].t.has(Trait::Cloud) || self.units[t].t.has(Trait::Ghost) {
             self.units[t].on_field = false;
         }
+        // a mimic swarm takes up the weapon of a machine it sees fall
+        self.take_apart(t);
         // a viviparous body lets out one larva of its own side
         if self.units[t].t.has(Trait::Viviparous) {
             let b = &mut self.births[side as usize % 2];
@@ -1711,6 +1775,23 @@ impl Battle {
                 let mut larva = crate::data::rabochaya();
                 larva.name = "Личинка".into();
                 self.spawn(side, larva, x, y);
+            }
+        }
+        // an infected machine rises for the puppeteers: larvae work its hull, a quarter of its health left (it falls
+        // apart in two rounds, and only then do the larvae come out)
+        if let Some(by) = self.units[t].hooked.or(self.units[t].infected) {
+            let puppeteers = self.units.iter().any(|u| u.side == by && u.present() && u.t.has(Trait::Puppeteer));
+            if puppeteers && self.units[t].t.golem && !self.units[t].t.has(Trait::Puppet) {
+                let mut hull = self.units[t].t.clone();
+                hull.traits.push(Trait::Puppet);
+                hull.abilities.clear(); // larvae work the hull and its weapon, not its modules
+                let quarter = (hull.hp / 4).max(1);
+                if let Some(p) = self.spawn(by, hull, x, y) {
+                    self.units[p].hp = quarter;
+                    self.units[p].infected = Some(by);
+                    self.units[t].eaten = true; // the hull walked off: no corpse to eat
+                    return;
+                }
             }
         }
         // larvae hatch from an infected body
@@ -1799,6 +1880,19 @@ impl Battle {
             .collect();
         for i in mending {
             self.units[i].hp = (self.units[i].hp + 2).min(self.units[i].t.hp);
+        }
+        // a puppet machine falls apart after two rounds
+        for i in 0..n {
+            if self.units[i].present() && self.units[i].t.has(Trait::Puppet) && self.round >= self.units[i].born + 2 {
+                self.kill(i);
+            }
+        }
+        // mimics that broke a Mechanic mend two points
+        for i in 0..n {
+            let u = &self.units[i];
+            if u.present() && u.t.has(Trait::Mimic) && self.mimicry[u.side as usize % 2] & MIMIC_MEND != 0 && u.hp < u.t.hp {
+                self.units[i].hp = (u.hp + 2).min(u.t.hp);
+            }
         }
         // a midge cloud thins out after two rounds
         for i in 0..n {
