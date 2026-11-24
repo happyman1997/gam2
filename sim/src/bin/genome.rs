@@ -2,7 +2,7 @@
 //! with one mutation against Foundry armies of a growing budget (12 steps from 80, ×1.12 each; 6 armies, 16 seeds
 //! each): the budget it wins half its battles at, and its mean win rate over the whole ladder (a mutation that shows
 //! in the hard fights moves the second more) — each against the army without mutations. A leader's own pool only with
-//! that leader. With `--late`: a swarm of the run's second half (the start's bodies three times over) against armies
+//! that leader. Changes are printed to the nearest 5 % (the stand's noise is 5–10 %). With `--late`: a swarm of the run's second half (the start's bodies three times over) against armies
 //! from 300 (6 steps, ×1.15; 4 armies, 8 seeds) — a mutation that grows with the swarm shows there, not at the start.
 //! `cargo run --release --bin genome -- <leader 0–3> [--late] [keys…]`
 
@@ -27,6 +27,11 @@ fn half(me: &[sim::model::Template], enemies: &[(f32, Vec<Vec<sim::model::Templa
     }
     (if rates[0].1 < 0.5 { rates[0].0 } else { rates[rates.len() - 1].0 }, mean)
 }
+/// A change in per cent to the nearest 5: the stand's noise is 5–10 %, finer figures mean nothing.
+fn round5(p: f32) -> i32 {
+    (p / 5.0).round() as i32 * 5
+}
+
 /// The army that goes into battle: the start's, or with `late` its bodies three times over (the leader once).
 fn army(r: &Run, late: bool) -> Vec<sim::model::Template> {
     let f = r.fighters().0;
@@ -68,6 +73,6 @@ fn main() {
         let mut r = Run::new(Class::Swarm, leader, 1);
         r.breeds.push((SWARM.to_string(), k.clone()));
         let (h, m) = half(&army(&r, late), &enemies, seeds);
-        println!("{k}: {:.0} ({:+.0}%), побед {:.2} ({:+.0}%)", h, 100.0 * (h / h0 - 1.0), m, 100.0 * (m / m0 - 1.0));
+        println!("{k}: {:.0} ({:+}%), побед {:.2} ({:+}%)", h, round5(100.0 * (h / h0 - 1.0)), m, round5(100.0 * (m / m0 - 1.0)));
     }
 }
