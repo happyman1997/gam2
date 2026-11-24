@@ -1624,7 +1624,7 @@ impl Battle {
         u.fed += d;
         if u.growth < 2 && u.fed >= 6 * (u.growth as i32 + 1) {
             u.growth += 1;
-            let gain = u.t.hp * 2 / 5;
+            let gain = u.t.hp / 2;
             u.t.hp += gain;
             u.hp += gain;
         }
@@ -1714,7 +1714,7 @@ impl Battle {
         // the Devourer grows on every second kill (its blood in a breed grows on what it bites: `feed`)
         if u.t.has(Trait::Grows) && u.t.has(Trait::Leader) && u.kills.is_multiple_of(2) && u.growth < 2 {
             u.growth += 1;
-            let gain = u.t.hp * 2 / 5;
+            let gain = u.t.hp / 2;
             u.t.hp += gain;
             u.hp += gain;
         }

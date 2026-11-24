@@ -144,7 +144,7 @@ pub enum Trait {
     Glow,
     /// Hive Mind: every ally has the full «Стая» bonus.
     HiveMind,
-    /// Devourer: every 2nd kill — ×1.4 health and +2 to the blow, up to twice; the leader starves without kills. Its
+    /// Devourer: every 2nd kill — ×1.5 health and +2 to the blow, up to twice; the leader starves without kills. Its
     /// blood in a breed (Кровь Пожирателя): a body grows on the damage it bites out, 6 and then 12.
     Grows,
     /// Cuckoo: a blow that gets through infects; an infected enemy that dies hatches 2 larvae
