@@ -157,7 +157,7 @@ pub enum Trait {
     Viviparous,
     /// Spitter: no shot between its spits; whoever reaches it gets only a weak bite («слабый укус»).
     Spitter,
-    /// Мошкара: a killed body (not burnt) crumbles into a midge cloud of its side.
+    /// Мошкара: every third body that falls (not burnt) crumbles into a midge cloud of its side.
     Midges,
     /// The midge cloud itself: stings through any armor, enemy shooters next to it see nothing to shoot, fire burns it
     /// threefold; it thins out after a few rounds and does not count as an army.
@@ -190,7 +190,7 @@ pub enum Trait {
     Mirage,
     /// A ghost of the Hive Mind's mirage: does not strike, melts away at the first blow, no army.
     Ghost,
-    /// Стрекот: every second round an enemy with three or more of these beside it loses its blow (the chirr shakes it;
+    /// Стрекот: every second round an enemy with four or more of these beside it loses its blow (the chirr shakes it;
     /// machines ring with it too).
     Chirr,
 }

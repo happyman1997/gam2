@@ -14,12 +14,12 @@ fn hits_by(bt: &Battle, a: usize) -> usize {
     bt.log.as_ref().unwrap().iter().filter(|e| matches!(e, Event::Hit { a: x, .. } if *x == a)).count()
 }
 
-/// Мошкара: every second fallen body turns into a midge cloud; a cloud is no army — a side of clouds alone has lost;
+/// Мошкара: every third fallen body turns into a midge cloud; a cloud is no army — a side of clouds alone has lost;
 /// it thins out after two rounds.
 #[test]
 fn midges_rise_from_the_fallen() {
     let mut bt = Battle::new(3).with_log();
-    bt.add_armies(&many(with(rabochaya(), Trait::Midges), 2), &[strazh()]);
+    bt.add_armies(&many(with(rabochaya(), Trait::Midges), 3), &[strazh()]);
     let o = bt.run();
     let cloud = bt.units.iter().position(|u| u.t.has(Trait::Cloud));
     assert!(cloud.is_some(), "the fallen body left no cloud");
@@ -157,12 +157,12 @@ fn devourer_blood_grows_on_what_it_eats() {
     let _ = g;
 }
 
-/// Стрекот: every second round an enemy with three chirring bodies beside it — a machine too — loses its blow.
+/// Стрекот: every second round an enemy with four chirring bodies beside it — a machine too — loses its blow.
 #[test]
 fn the_chirr_shakes_the_surrounded() {
     let mut bt = Battle::new(5).with_log();
     let g = bt.place(1, strazh(), 10, 10);
-    for (x, y) in [(9, 10), (9, 11), (12, 10)] {
+    for (x, y) in [(9, 10), (9, 11), (12, 10), (12, 11)] {
         let k = bt.place(0, with(soldat(), Trait::Chirr), x, y);
         bt.units[k].hp = 999; // they must outlive the Guard's blows
         bt.units[k].t.hp = 999;

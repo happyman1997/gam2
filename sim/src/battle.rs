@@ -287,9 +287,9 @@ pub struct Battle {
     first: Vec<(i32, i32)>,
     /// Bodies that died live-bearing, per side: every third gives a larva (a whole swarm of them would double itself).
     births: [u32; 2],
-    /// Midge bodies fallen, per side: every second becomes a cloud.
+    /// Midge bodies fallen, per side: every third becomes a cloud.
     clouds: [u32; 2],
-    /// Budding bodies killed by their first wound, per side: every second lets a bud away.
+    /// Budding bodies killed by their first wound, per side: every third lets a bud away.
     buds: [u32; 2],
     /// What each side's mimics have taken up from the last machine they broke (Мимикрия): one of `MIMIC_*`.
     mimicry: [u8; 2],
@@ -1234,7 +1234,7 @@ impl Battle {
         true
     }
 
-    /// Стрекот: every second round an enemy with three or more chirring bodies beside it shakes with their chirr (metal
+    /// Стрекот: every second round an enemy with four or more chirring bodies beside it shakes with their chirr (metal
     /// rings with it) and loses its blow.
     fn resonates(&self, i: usize) -> bool {
         if !self.round.is_multiple_of(2) {
@@ -1243,9 +1243,9 @@ impl Battle {
         let side = self.units[i].side;
         (0..self.units.len())
             .filter(|&k| self.units[k].side != side && self.units[k].present() && self.units[k].t.has(Trait::Chirr) && self.dist(i, k) <= 1)
-            .take(3)
+            .take(4)
             .count()
-            >= 3
+            >= 4
     }
 
     /// Паутина: a web on the unit's cells and every cell round them, the enemy's too (who stands there is stuck).
@@ -1579,11 +1579,11 @@ impl Battle {
             self.take_apart(t);
         }
         if self.units[t].hp <= 0 {
-            // killed by its first wound: every second one still lets a small bud away, with a quarter of the health
+            // killed by its first wound: every third one still lets a small bud away, with a quarter of the health
             if self.units[t].t.has(Trait::Buds) && !self.units[t].budded {
                 let side = self.units[t].side as usize % 2;
                 self.buds[side] += 1;
-                if self.buds[side].is_multiple_of(2) {
+                if self.buds[side].is_multiple_of(3) {
                     self.bud(t, self.units[t].t.hp / 4);
                 }
             }
@@ -1757,11 +1757,11 @@ impl Battle {
                 }
             }
         }
-        // every second midge body that falls crumbles into a cloud, unless it burnt
+        // every third midge body that falls crumbles into a cloud, unless it burnt
         if self.units[t].t.has(Trait::Midges) && self.units[t].burn == 0 {
             let c = &mut self.clouds[side as usize % 2];
             *c += 1;
-            if c.is_multiple_of(2) {
+            if c.is_multiple_of(3) {
                 self.spawn(side, crate::data::unit("moshkara"), x, y);
             }
         }
