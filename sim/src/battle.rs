@@ -291,7 +291,7 @@ pub struct Battle {
     clouds: [u32; 2],
     /// Budding bodies killed by their first wound, per side: every second lets a bud away.
     buds: [u32; 2],
-    /// What each side's mimics have taken up from the machines seen falling (Мимикрия): `MIMIC_*` bits.
+    /// What each side's mimics have taken up from the last machine they broke (Мимикрия): one of `MIMIC_*`.
     mimicry: [u8; 2],
     /// The web on each cell: the side that spun it, -1 none (Паутина).
     web: Vec<i8>,
@@ -1184,7 +1184,8 @@ impl Battle {
         self.normal_attack(i, hits);
     }
 
-    /// Мимикрия: a machine broken below half its health or fallen — its enemy's mimics take up its weapon.
+    /// Мимикрия: a machine broken below half its health or fallen — its enemy's mimics take up its weapon, in place of
+    /// the one they had.
     fn take_apart(&mut self, t: usize) {
         let u = &self.units[t];
         if !(u.t.golem || matches!(u.t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса")) || u.t.has(Trait::Puppet) {
@@ -1199,7 +1200,10 @@ impl Battle {
             Some("manyak") => MIMIC_EDGE,
             _ => 0,
         };
-        self.mimicry[1 - u.side as usize % 2] |= took;
+        // one weapon at a time: the last machine broken (a mimic copies, it does not hoard)
+        if took != 0 {
+            self.mimicry[1 - u.side as usize % 2] = took;
+        }
     }
 
     /// Пир: eats the nearest corpse beside it (its own or the enemy's, not a burnt one, not a cloud's or a ghost's);

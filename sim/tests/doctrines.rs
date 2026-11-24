@@ -199,6 +199,18 @@ fn mimics_take_up_the_fallen_machines_weapons() {
     assert!(shocked > mitigate(4, Dmg::Pierce, &bt.units[g].t, 0, false, false));
     let _ = w;
     assert_eq!(bt.mimicry(0) & MIMIC_SHELL, 0, "a shell taken from no Guard");
+    // one weapon at a time: a Guard broken next, the lightning gives way to its shell
+    bt.units[g].hp = 1;
+    bt.units[g].t.hp = 100;
+    let k = bt.place(0, with(soldat(), Trait::Mimic), 9, 20);
+    let _ = k;
+    for _ in 0..4 {
+        bt.step();
+        if bt.units[g].hp * 2 < bt.units[g].t.hp && bt.mimicry(0) & MIMIC_SHELL != 0 {
+            break;
+        }
+    }
+    assert_eq!(bt.mimicry(0), MIMIC_SHELL, "the lightning stayed beside the shell");
 }
 
 /// Пир: a feaster with no enemy beside it eats a corpse beside it; a larva hatches from it and the corpse is gone.

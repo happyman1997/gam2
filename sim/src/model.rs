@@ -171,8 +171,8 @@ pub enum Trait {
     Honey,
     /// Почкование: wounded for the first time, it splits — a bud with half the health left steps out beside it.
     Buds,
-    /// Мимикрия: the swarm takes up the weapon of every machine it breaks below half its health (or sees fall), till the
-    /// battle ends — a Sage's or the
+    /// Мимикрия: the swarm takes up the weapon of the last machine it broke below half its health (or saw fall), one at a
+    /// time — a Sage's or the
     /// Inventor's: the bite shocks; a Forge's: it sets alight, +1; a Guard's, a Mason's or the Architect's: the shell is
     /// two points harder; a Gun's or the Father's: the bite is blunt; a Mechanic's: it mends two a round; the Maniac's: +2.
     Mimic,
