@@ -375,6 +375,9 @@ pub fn run(demo: Demo, dir: &str) {
     }
     let rec = crate::playback::record_of(31, &kit, &bugs);
     snap_battle(&mut g, dir, "62_battle_modules", rec, 4.0, 2);
+    // the same golems on the right, as the swarm's player meets them: mirrored, their modules with them
+    let rec = crate::playback::record_of(31, &bugs, &kit);
+    snap_battle(&mut g, dir, "63_battle_modules_right", rec, 4.0, 2);
     for (name, want, after) in [("58_battle_fireball", sim::Cast::Fireball, 5), ("59_battle_quake", sim::Cast::Quake, 6), ("60_battle_spit", sim::Cast::Spit, 9),
                                 ("61_battle_grapeshot", sim::Cast::PointBlank, 4)] {
         if let Some(f) = first(want) {
