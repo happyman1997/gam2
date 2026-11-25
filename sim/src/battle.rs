@@ -208,6 +208,8 @@ pub enum Cast {
     Devour,
     /// The Devourer at its third stage tramples all small ones beside it with one blow.
     Trample,
+    /// Жар горна: the Forge's heat sets an enemy beside it alight.
+    Kindle,
 }
 
 #[derive(Clone, Debug)]
@@ -1857,6 +1859,9 @@ impl Battle {
                 // one adjacent enemy per round: the first that is not burning yet
                 let adj = self.adjacent_enemies(i);
                 if let Some(&j) = adj.iter().find(|&&j| self.units[j].burn == 0).or(adj.first()) {
+                    if self.units[j].burn == 0 {
+                        self.ev(Event::Cast { u: i, kind: Cast::Kindle, t: j });
+                    }
                     self.units[j].burn = 3;
                 }
             }

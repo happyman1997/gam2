@@ -66,8 +66,9 @@ pub type Icon = (String, [i32; 4]);
 
 pub struct Assets {
     pub ground: Image,
-    /// The ground of an elite's battle and a boss's (`ground` is an ordinary fight's); `Record::ground` picks.
-    pub grounds: Vec<Image>,
+    /// The ground of an elite's battle and a boss's (`ground` is an ordinary fight's); `Record::ground` picks; one
+    /// missing from an older asset folder is fought on the ordinary one.
+    pub grounds: [Option<Image>; 2],
     pub sprites: HashMap<String, Sprite>,
     pub fx: HashMap<String, Fx>,
     pub fonts: HashMap<String, Font>,
@@ -155,7 +156,7 @@ impl Assets {
         }
         let ground = Image::load(&root.join("ground.png"))?;
         // an elite's and a boss's ground; an older asset folder without them fights on the ordinary one
-        let grounds = ["ground_elite.png", "ground_boss.png"].iter().filter_map(|f| Image::load(&root.join(f)).ok()).collect();
+        let grounds = ["ground_elite.png", "ground_boss.png"].map(|f| Image::load(&root.join(f)).ok());
         Ok(Assets { ground, grounds, sprites, fx, fonts, ui, bg, icons, atlases })
     }
 }

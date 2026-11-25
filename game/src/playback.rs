@@ -182,7 +182,9 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
         }
         let events = bt.log.as_ref().map(|l| l[n0..].to_vec()).unwrap_or_default();
         let layer = |l: &[i8]| if l.iter().any(|&c| c != -1) { l.to_vec() } else { vec![] };
-        rounds.push(Round { before, after, events, web: layer(bt.web()), honey: layer(bt.honey()), mimic: [bt.mimicry(0), bt.mimicry(1)] });
+        // the battle notes what any side would take up from a machine; only a side with Мимикрия does
+        let mimic = |side: u8| if bt.units.iter().any(|u| u.side == side && u.t.has(Trait::Mimic)) { bt.mimicry(side) } else { 0 };
+        rounds.push(Round { before, after, events, web: layer(bt.web()), honey: layer(bt.honey()), mimic: [mimic(0), mimic(1)] });
         if let Some(o) = done {
             break o;
         }
@@ -507,16 +509,6 @@ impl Record {
                             continue;
                         }
                         let name: &'static str = match att.name.as_str() {
-                            "Горн" if dmg > 0 => {
-                                // the forge breathes its flame at whom it burns: one breath for all it reaches
-                                if last_volley.map(|(v, fr)| v == a && (m.frame - fr) < 10).unwrap_or(false) {
-                                    continue;
-                                }
-                                last_volley = Some((a, m.frame));
-                                let (sx, sy) = Self::spot(after[a].x, after[a].y, self.units[a].fp);
-                                fx.push(Effect { name: "fire-breath", x: sx, y: sy - 34.0, start: m.frame - 2, link: None, flip: x < sx, from: None });
-                                continue;
-                            }
                             "Мудрец" | "Изобретатель" => {
                                 fx.push(Effect { name: "bolt", x, y, start: m.frame, link: Some((a, t)), flip: false, from: None });
                                 "zap-hit"
@@ -530,14 +522,18 @@ impl Record {
                                 "small-explosion"
                             }
                             // the swarm with a Sage's or an Inventor's current in its bite (Мимикрия): its bites crackle
-                            _ if !att.machine && self.rounds[r].mimic[att.side as usize % 2] & sim::battle::MIMIC_SHOCK != 0 => "zap-hit",
+                            _ if !att.machine && self.rounds[r].mimic[att.side as usize % 2] & sim::battle::MIMIC_SHOCK != 0 && (a + t) % 3 == 0 => "zap-hit",
                             _ => "hit-spark",
                         };
                         fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame, link: None, flip: false, from: None });
                     }
                     Event::Cast { u, kind, t } => {
                         use sim::Cast;
-                        cast_by.push(u);
+                        // what the cast's own effect shows in place of a spark a blow (a fireball's burst, a shell's,
+                        // the quake's, a bolt, the grapeshot, the trample); the rest go off besides its blows
+                        if matches!(kind, Cast::Fireball | Cast::Volley | Cast::Quake | Cast::Bolt | Cast::PointBlank | Cast::Trample) {
+                            cast_by.push(u);
+                        }
                         let (tx, ty) = at(t);
                         let (ux, uy) = at(u);
                         let left = tx < ux;
@@ -573,6 +569,8 @@ impl Record {
                             Cast::Devour => fx.push(fx_at("devour-splash", tx, ty, m.frame + 2, false)),
                             // its third stage: one blow, and all the small ones round it are under its feet
                             Cast::Trample => fx.push(fx_at("ground-slam", ux, uy, m.frame, false)),
+                            // the Forge breathes its heat on the one it sets alight
+                            Cast::Kindle => fx.push(fx_at("fire-breath", ux, uy - 34.0, m.frame, left)),
                         }
                     }
                     Event::Heal { t, amount, .. } => {
@@ -612,5 +610,41 @@ impl Record {
             nums[i].k = (0..).find(|k| !busy.contains(k)).unwrap_or(0);
         }
         (nums, fx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sim::data;
+
+    /// A swarm without Мимикрия takes nothing up from the machines it breaks: no weapon under its count, no crackle in
+    /// its bites; with it, it does.
+    #[test]
+    fn mimicry_only_for_a_swarm_that_has_it() {
+        let forges: Vec<Template> = (0..4).map(|_| data::gorn()).collect();
+        let plain = record_of(5, &forges, &data::start_matka());
+        assert!(plain.rounds.iter().all(|r| r.mimic == [0, 0]), "a swarm without Мимикрия took a weapon up");
+        let mut mimics = data::start_matka();
+        for t in &mut mimics {
+            if !t.has(Trait::Leader) {
+                t.traits.push(Trait::Mimic);
+            }
+        }
+        let with = record_of(5, &forges, &mimics);
+        assert!(with.rounds.iter().any(|r| r.mimic[1] != 0), "the swarm with Мимикрия took nothing up from the forges");
+    }
+
+    /// The Forge's flame is shown when its heat sets someone alight, once each time — not on its every punch.
+    #[test]
+    fn the_forge_breathes_when_it_kindles() {
+        let forges: Vec<Template> = (0..3).map(|_| data::gorn()).collect();
+        let rec = record_of(9, &forges, &data::start_matka());
+        let kindles = rec.rounds.iter().flat_map(|r| r.events.iter()).filter(|e| matches!(e, Event::Cast { kind: sim::Cast::Kindle, .. })).count();
+        let punches = rec.rounds.iter().flat_map(|r| r.events.iter()).filter(|e| matches!(e, Event::Hit { a, .. } if rec.units[*a].name == "Горн")).count();
+        let (_, fx) = rec.sparks();
+        let breaths = fx.iter().filter(|e| e.name == "fire-breath").count();
+        assert!(kindles > 0 && punches > kindles, "kindles {kindles}, punches {punches}");
+        assert_eq!(breaths, kindles, "a breath for each kindling, not for each of {punches} punches");
     }
 }

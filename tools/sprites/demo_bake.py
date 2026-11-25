@@ -252,13 +252,14 @@ def main():
     fonts()
     ui()
     kits()
-    import battle_bake
-    battle_bake.bake(MANIFEST)
     import bake_screens
     bake_screens.DST = DST
     bake_screens.main(write_manifest=False)
     MANIFEST["bg"] = bake_screens.MANIFEST["bg"]
     MANIFEST["ui"].update(bake_screens.MANIFEST["ui"])
+    # after the screens: the camp's scenes take the anvil they bake
+    import battle_bake
+    battle_bake.bake(MANIFEST)
     json.dump(MANIFEST, open(os.path.join(DST, "assets.json"), "w"), ensure_ascii=False, indent=1)
     print("sprites", len(MANIFEST["sprites"]), "fx", len(MANIFEST["fx"]), "fonts", len(MANIFEST["fonts"]),
           "ui", len(MANIFEST["ui"]), "icons", len(MANIFEST["icons"]), "bg", len(MANIFEST["bg"]))

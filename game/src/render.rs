@@ -731,7 +731,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let f = (view.frame as i32).min(total - 1);
     // the ground (an ordinary fight's, an elite's, a boss's), opaque and the field's own size: copied whole (a blend
     // of two million pixels is most of a frame)
-    let ground = rec.ground.checked_sub(1).and_then(|k| a.grounds.get(k)).unwrap_or(&a.ground);
+    let ground = rec.ground.checked_sub(1).and_then(|k| a.grounds.get(k)).and_then(|g| g.as_ref()).unwrap_or(&a.ground);
     if (cv.w, cv.h) == (ground.w, ground.h) {
         cv.px.copy_from_slice(&ground.px);
     } else {
@@ -911,8 +911,10 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         } else if !lying && anim.pose != Pose::Dead && !info.ghost {
             let body = p.stands_for.iter().fold(0, |m, &id| m | rec.state_at(id, f).flags);
             let pack = small(s.id).then(|| packs.get(&key(s.id, s.cell))).flatten();
+            // a pack's row goes over its first living body (the one in front may be falling)
+            let bearer = pack.and_then(|v| v.iter().copied().find(|&i| shown.iter().any(|o| o.id == i && o.dead_at.is_none())));
             let (row, all) = match pack {
-                Some(v) if v.first() == Some(&s.id) => (true, v.iter().fold(0, |m, &id| m | rec.state_at(id, f).flags)),
+                Some(v) if bearer == Some(s.id) => (true, v.iter().fold(0, |m, &id| m | rec.state_at(id, f).flags)),
                 Some(_) => (false, 0),
                 None => (true, body),
             };

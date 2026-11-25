@@ -1209,6 +1209,46 @@ mod finds {
             }
         }
     }
+
+    /// Everything the battle draws on and over its bodies is baked: each state's glyph, the body fire, every effect a
+    /// cast or a blow shows, the Devourer at each stage in each pose, the elite's and the boss's ground, the camp's
+    /// scenes; and each module a golem can wear has its layer over each pose its frame is drawn in.
+    #[test]
+    fn the_battle_art_is_all_there() {
+        let a = crate::assets::Assets::load().unwrap();
+        for (_, k) in crate::playback::STATUS_GLYPHS {
+            assert!(a.icons.contains_key(k), "no glyph {k}");
+        }
+        for fx in ["burn-body", "fireball", "fire-breath", "ground-slam", "muzzle-shotgun", "acid-splash", "mana-burst", "devour-splash",
+                   "small-explosion", "hit-spark", "zap-hit", "heal"] {
+            assert!(a.fx.contains_key(fx), "no effect {fx}");
+        }
+        for stage in 0..4 {
+            for pose in ["idle", "attack", "walk0", "walk1", "dead"] {
+                assert!(a.sprites.contains_key(&format!("Пожиратель_{stage}_{pose}")), "no Devourer {stage} {pose}");
+            }
+        }
+        assert!(a.grounds.iter().all(|g| g.is_some()), "an elite's or a boss's ground is missing");
+        for c in 0..2 {
+            for k in ["rest", "up"] {
+                assert!(a.ui.contains_key(&format!("camp_{k}_{c}")), "no camp scene {k} {c}");
+            }
+        }
+        // the modules drawn on frames: at rest, at each level, on each size of the frame
+        for (frame, keys) in [("Мудрец", &["overload", "fireball"][..]), ("Орудие", &["mortar", "canister", "long"]), ("Механик", &["repair"]),
+                              ("Страж", &["intercept", "plates", "tower", "counter"])] {
+            let sizes: Vec<String> = a.sprites.keys().filter_map(|n| n.strip_prefix(&format!("{frame}_")).and_then(|r| r.strip_suffix("_idle")).map(String::from)).collect();
+            assert!(!sizes.is_empty(), "no {frame} at all");
+            for size in &sizes {
+                for key in keys {
+                    for lvl in 1..=3 {
+                        let n = format!("mod/{frame}_{size}_{key}_{lvl}_idle");
+                        assert!(a.sprites.contains_key(&n), "no layer {n}");
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
