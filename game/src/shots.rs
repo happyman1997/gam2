@@ -320,5 +320,52 @@ pub fn run(demo: Demo, dir: &str) {
     let rec = crate::playback::record_of(11, &foe, &r.fighters().0);
     let rise = rec.rounds.iter().position(|rd| rd.events.iter().any(|e| matches!(e, sim::Event::Summon { u } if rec.units[*u].puppet))).unwrap_or(5);
     snap_battle(&mut g, dir, "55_battle_puppet", rec, (rise as f32 + 1.0) * crate::playback::FR as f32 + 22.0, 2);
+    // what is on the bodies: the Plague's swarm with webs and midges against forges — fire on the burning, the
+    // glyphs of the infected, the webbed, the blinded, the marked over their heads; the round with the most kinds
+    let mut r = Run::new(Class::Swarm, 3, 5);
+    for k in ["m_spinner", "m_midge"] {
+        r.breeds.push((sim::run::SWARM.to_string(), k.to_string()));
+    }
+    let forges: Vec<_> = (0..10).map(|k| [data::gorn(), data::gorn(), data::strazh(), data::mudrets(), data::orudie()][k % 5].clone()).collect();
+    let mut rec = crate::playback::record_of(17, &forges, &r.fighters().0);
+    rec.ground = 1; // on an elite's ground
+    let kinds = |k: usize| rec.rounds[k].after.iter().filter(|s| s.alive).fold(0u16, |m, s| m | s.flags).count_ones() * 100
+        + rec.rounds[k].after.iter().filter(|s| s.alive && s.flags != 0).count() as u32;
+    let busy = (0..rec.rounds.len()).max_by_key(|&k| kinds(k)).unwrap_or(0);
+    snap_battle(&mut g, dir, "56_battle_states", rec, busy as f32 * crate::playback::FR as f32 + 20.0, 2);
+    // fire against the swarm: the Mother's swarm meets six forges; the round with the most of it burning
+    let gorns: Vec<_> = (0..6).map(|_| data::gorn()).collect();
+    let mut rec = crate::playback::record_of(23, &gorns, &data::start_matka());
+    rec.ground = 2; // on a boss's ground
+    let lit = |k: usize| rec.rounds[k].after.iter().filter(|s| s.alive && s.flags & crate::playback::S_BURN != 0).count();
+    let busy = (0..rec.rounds.len()).max_by_key(|&k| lit(k)).unwrap_or(0);
+    snap_battle(&mut g, dir, "57_battle_fire", rec, busy as f32 * crate::playback::FR as f32 + 30.0, 2);
+    // what goes off: the Colossus shakes the ground, the Sage's fireball flies, the Gun's grapeshot, the forges'
+    // flame; the swarm's spitters' gobs and fireflies' flashes — each at the first moment it goes off
+    use sim::model::Ability;
+    let mut sage = data::mudrets();
+    sage.abilities.push(Ability::Fireball { every: 2, die: 6, bonus: 2, range: 5 });
+    let mut gun = data::orudie();
+    gun.abilities.push(Ability::PointBlank);
+    let mut colossus = data::otets_kolossa();
+    colossus.abilities.retain(|a| !matches!(a, Ability::Quake { .. }));
+    colossus.abilities.push(Ability::Quake { every: 2, die: 8, bonus: 2, radius: 1 }); // grown: every second round
+    let foundry = vec![colossus, sage.clone(), sage, gun.clone(), gun, data::gorn(), data::gorn(), data::strazh()];
+    let mut bugs = vec![];
+    for k in 0..48 {
+        let form = [data::Form::Ant, data::Form::Spitter, data::Form::Firefly, data::Form::Ant][k % 4];
+        bugs.push(data::swarm(data::Caste::Worker, form));
+    }
+    let rec = crate::playback::record_of(29, &foundry, &bugs);
+    let first = |want: sim::Cast| {
+        (0..rec.rounds.len()).flat_map(|r| rec.moments(r)).find(|m| matches!(m.ev, sim::Event::Cast { kind, .. } if kind == want)).map(|m| m.frame)
+    };
+    for (name, want, after) in [("58_battle_fireball", sim::Cast::Fireball, 5), ("59_battle_quake", sim::Cast::Quake, 6), ("60_battle_spit", sim::Cast::Spit, 9),
+                                ("61_battle_grapeshot", sim::Cast::PointBlank, 4)] {
+        if let Some(f) = first(want) {
+            let rec = crate::playback::record_of(29, &foundry, &bugs);
+            snap_battle(&mut g, dir, name, rec, (f + after) as f32, 2);
+        }
+    }
 
 }

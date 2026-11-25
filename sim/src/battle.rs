@@ -178,6 +178,32 @@ pub enum Event {
     Stun { t: usize },
     /// A melee blow from behind the target (its back, away from the enemy it faces): half as hard again.
     Rear { t: usize },
+    /// A module or a form's gift goes off: who, which, and on whom (an enemy it aims at, an ally it serves, or itself
+    /// for what spreads round it). Only for the picture: its hits, heals and states come as their own events.
+    Cast { u: usize, kind: Cast, t: usize },
+}
+
+/// What goes off in an `Event::Cast`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cast {
+    /// Перегрузка: the ally hits twice as hard this round.
+    Overload,
+    /// Огненный шар: on the target's cell and round it.
+    Fireball,
+    /// Сотрясение: the ground round the caster.
+    Quake,
+    /// Маньяк: a module bolted on an ally.
+    Tinker,
+    /// Мортира: a shell on the target's cell and round it.
+    Volley,
+    /// Светляк: a flash round itself.
+    Flash,
+    /// Паук-плевун: a gob on the target.
+    Spit,
+    /// Грозовая катушка, Голова-катапульта: one bolt or stone at the target.
+    Bolt,
+    /// Картечь: a blast at the enemies beside it.
+    PointBlank,
 }
 
 #[derive(Clone, Debug)]
@@ -331,6 +357,20 @@ impl Battle {
     /// What side `side`'s mimics have taken up (`MIMIC_*` bits).
     pub fn mimicry(&self, side: u8) -> u8 {
         self.mimicry[side as usize % 2]
+    }
+
+    /// Whether the Hive Mind of either side has marked this unit.
+    pub fn marked(&self, i: usize) -> bool {
+        self.mark.contains(&Some(i))
+    }
+
+    /// Whether this Devourer starves now: no meal for 3 rounds (hungry at the start of a run: 2) — it loses health
+    /// each round until it eats.
+    pub fn starving(&self, j: usize) -> bool {
+        let u = &self.units[j];
+        let hungry = u.t.traits.iter().any(|x| matches!(x, Trait::Hungry { .. }));
+        let after = if hungry { 2 } else { 3 };
+        u.present() && u.t.has(Trait::Grows) && u.t.has(Trait::Leader) && self.round >= u.last_meal + after
     }
 
     /// The kind of a mimic's blow: lightning taken up from a sage, a blunt blow from a gun, else its own.
@@ -1063,11 +1103,13 @@ impl Battle {
                         .max_by_key(|&k| (self.units[k].t.die as i32 + 2 * self.units[k].t.bonus, Reverse(k)));
                     if let Some(k) = ally {
                         self.units[k].overloaded = round;
+                        self.ev(Event::Cast { u: i, kind: Cast::Overload, t: k });
                         return;
                     }
                 }
                 Ability::Fireball { every, die, bonus, range } if round.is_multiple_of(every_of(every, Dmg::Fire)) => {
                     if let Some(tj) = self.ranged_target(i, range) {
+                        self.ev(Event::Cast { u: i, kind: Cast::Fireball, t: tj });
                         let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
                         for v in victims {
                             let raw = self.rng.damage(die, bonus);
@@ -1085,6 +1127,7 @@ impl Battle {
                     // the ground shakes: those in the air feel nothing
                     let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(i, v) <= radius as i32 && !self.units[v].t.has(Trait::Flyer)).collect();
                     if !victims.is_empty() {
+                        self.ev(Event::Cast { u: i, kind: Cast::Quake, t: i });
                         for v in victims {
                             let raw = self.rng.damage(die, bonus);
                             let stun = self.units[v].t.size <= 2;
@@ -1099,6 +1142,7 @@ impl Battle {
                         (0..self.units.len()).filter(|&k| k != i && self.units[k].side == side && self.units[k].present() && self.units[k].t.golem && self.dist(i, k) <= 2).collect();
                     if !near.is_empty() {
                         let k = near[self.rng.die(near.len() as u32) as usize - 1];
+                        self.ev(Event::Cast { u: i, kind: Cast::Tinker, t: k });
                         match self.rng.die(4) {
                             1 => self.units[k].t.abilities.push(Ability::Flail),
                             2 => self.units[k].t.abilities.push(Ability::Bolt { every: 2, die: 6, bonus: 2, dmg: Dmg::Blunt, range: 3 }),
@@ -1109,6 +1153,7 @@ impl Battle {
                 }
                 Ability::Volley { every, die, bonus, dmg } if round.is_multiple_of(every_of(every, dmg)) => {
                     if let Some(tj) = self.ranged_target(i, self.units[i].t.range) {
+                        self.ev(Event::Cast { u: i, kind: Cast::Volley, t: tj });
                         let victims: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(v, tj) <= 1).collect();
                         for v in victims {
                             let raw = self.rng.damage(die, bonus);
@@ -1120,6 +1165,7 @@ impl Battle {
                 Ability::Flash { every } if round.is_multiple_of(every) => {
                     let adj = self.adjacent_enemies(i);
                     if !adj.is_empty() {
+                        self.ev(Event::Cast { u: i, kind: Cast::Flash, t: i });
                         // eyes dazzled once see again for a while: no one stays blind all battle under a cloud of
                         // fireflies
                         for j in adj {
@@ -1133,6 +1179,7 @@ impl Battle {
                 }
                 Ability::Spit { every, die } if round.is_multiple_of(every) => {
                     if let Some(tj) = self.ranged_target(i, self.units[i].t.range) {
+                        self.ev(Event::Cast { u: i, kind: Cast::Spit, t: tj });
                         self.units[tj].glued_until = round + 1;
                         if !self.units[tj].t.has(Trait::PoisonImmune) {
                             self.units[tj].poison += self.rng.die(die) as i32;
@@ -1163,6 +1210,7 @@ impl Battle {
                 Ability::Bolt { every, die, bonus, dmg, range } if round.is_multiple_of(every_of(every, dmg)) => {
                     let target = if range <= 1 { self.melee_target(i) } else { self.ranged_target(i, range) };
                     if let Some(tj) = target {
+                        self.ev(Event::Cast { u: i, kind: Cast::Bolt, t: tj });
                         let raw = self.rng.damage(die, bonus);
                         hits.push(Hit { attacker: i, target: tj, raw, dmg, ..Default::default() });
                         return;
@@ -1320,6 +1368,7 @@ impl Battle {
             let adj = self.adjacent_enemies(i);
             if !adj.is_empty() {
                 if self.units[i].t.has_ability(|a| *a == Ability::PointBlank) {
+                    self.ev(Event::Cast { u: i, kind: Cast::PointBlank, t: adj[0] });
                     for &j in adj.iter().take(3) {
                         let raw = self.rng.damage(die, bonus);
                         hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy, melee: true, ..Default::default() });
@@ -1817,8 +1866,8 @@ impl Battle {
             // the Devourer starves without a meal for 3 rounds, a tenth of its health a round; hungry at the start of a
             // run, from the 2nd round and a fifth
             let hungry = self.units[j].t.traits.iter().any(|x| matches!(x, Trait::Hungry { .. }));
-            let (after, part) = if hungry { (2, 5) } else { (3, 10) };
-            if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.units[j].t.has(Trait::Leader) && self.round >= self.units[j].last_meal + after {
+            let part = if hungry { 5 } else { 10 };
+            if self.starving(j) {
                 let loss = (self.units[j].t.hp / part).max(1);
                 self.units[j].hp -= loss;
                 if self.units[j].hp <= 0 {

@@ -4019,6 +4019,83 @@
     92
    ],
    "fps": 15.0
+  },
+  "burn-body": {
+   "file": "fx/burn-body.png",
+   "w": 14,
+   "h": 20,
+   "frames": 8,
+   "pivot": [
+    7,
+    19
+   ],
+   "fps": 12.0
+  },
+  "fireball": {
+   "file": "fx/fireball.png",
+   "w": 136,
+   "h": 56,
+   "frames": 18,
+   "pivot": [
+    112,
+    28
+   ],
+   "fps": 15.0
+  },
+  "fire-breath": {
+   "file": "fx/fire-breath.png",
+   "w": 160,
+   "h": 116,
+   "frames": 12,
+   "pivot": [
+    12,
+    72
+   ],
+   "fps": 15.0
+  },
+  "ground-slam": {
+   "file": "fx/ground-slam.png",
+   "w": 288,
+   "h": 208,
+   "frames": 22,
+   "pivot": [
+    144,
+    164
+   ],
+   "fps": 10.0
+  },
+  "muzzle-shotgun": {
+   "file": "fx/muzzle-shotgun.png",
+   "w": 160,
+   "h": 88,
+   "frames": 25,
+   "pivot": [
+    44,
+    82
+   ],
+   "fps": 15.0
+  },
+  "acid-splash": {
+   "file": "fx/acid-splash.png",
+   "w": 184,
+   "h": 116,
+   "frames": 25,
+   "pivot": [
+    92,
+    100
+   ],
+   "fps": 10.0
+  },
+  "mana-burst": {
+   "file": "fx/mana-burst.png",
+   "w": 208,
+   "h": 150,
+   "frames": 28,
+   "pivot": [
+    104,
+    124
+   ],
+   "fps": 15.0
   }
  },
  "fonts": {
@@ -13274,6 +13351,136 @@
     16
    ],
    "name": "Третья ступень"
+  },
+  "status/hunger": {
+   "atlas": "icons/status.png",
+   "rect": [
+    0,
+    0,
+    18,
+    14
+   ],
+   "name": "Голод"
+  },
+  "status/burn": {
+   "atlas": "icons/status.png",
+   "rect": [
+    24,
+    0,
+    16,
+    18
+   ],
+   "name": "Горит"
+  },
+  "status/stun": {
+   "atlas": "icons/status.png",
+   "rect": [
+    48,
+    0,
+    14,
+    14
+   ],
+   "name": "Оглушён"
+  },
+  "status/fear": {
+   "atlas": "icons/status.png",
+   "rect": [
+    72,
+    0,
+    16,
+    16
+   ],
+   "name": "Испуг"
+  },
+  "status/mark": {
+   "atlas": "icons/status.png",
+   "rect": [
+    96,
+    0,
+    18,
+    14
+   ],
+   "name": "Метка Разума"
+  },
+  "status/hook": {
+   "atlas": "icons/status.png",
+   "rect": [
+    120,
+    0,
+    14,
+    16
+   ],
+   "name": "Зацеплен"
+  },
+  "status/infected": {
+   "atlas": "icons/status.png",
+   "rect": [
+    144,
+    0,
+    18,
+    18
+   ],
+   "name": "Заражён"
+  },
+  "status/poison": {
+   "atlas": "icons/status.png",
+   "rect": [
+    168,
+    0,
+    18,
+    16
+   ],
+   "name": "Яд"
+  },
+  "status/blind": {
+   "atlas": "icons/status.png",
+   "rect": [
+    192,
+    0,
+    18,
+    10
+   ],
+   "name": "Ослеплён"
+  },
+  "status/glued": {
+   "atlas": "icons/status.png",
+   "rect": [
+    216,
+    0,
+    18,
+    18
+   ],
+   "name": "Склеен"
+  },
+  "status/web": {
+   "atlas": "icons/status.png",
+   "rect": [
+    240,
+    0,
+    18,
+    14
+   ],
+   "name": "В паутине"
+  },
+  "status/stall": {
+   "atlas": "icons/status.png",
+   "rect": [
+    264,
+    0,
+    14,
+    16
+   ],
+   "name": "Сбой"
+  },
+  "status/shred": {
+   "atlas": "icons/status.png",
+   "rect": [
+    288,
+    0,
+    14,
+    14
+   ],
+   "name": "Броня разъедена"
   }
  },
  "bg": {

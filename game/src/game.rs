@@ -410,7 +410,12 @@ impl Game {
         let Some(run) = &mut self.run else { return };
         let (me, _) = run.fighters();
         let seed = run.battle_seed();
-        let rec = playback::record_of(seed, &me, &node.enemy);
+        let mut rec = playback::record_of(seed, &me, &node.enemy);
+        rec.ground = match node.kind {
+            run::Kind::Elite => 1,
+            run::Kind::Boss => 2,
+            _ => 0,
+        };
         self.battle_bodies = me.iter().chain(node.enemy.iter()).cloned().collect();
         self.demo.load(rec);
         self.demo.view.speed = self.settings.speed.max(1);

@@ -118,9 +118,7 @@ FIELD = dict(ww=1920, hh=1080, cols=36, rows=30, zone=15, x0=60, y0=46)
 
 
 def ground():
-    sc = Scene(FIELD["ww"], FIELD["hh"])
-    BT.ground(sc, **FIELD)
-    Image.fromarray(np.clip(sc.rgb, 0, 255).astype(np.uint8), "RGB").save(os.path.join(DST, "ground.png"))
+    """The grounds and the rest of the battle's own pieces: tools/sprites/battle_bake.py (called from main)."""
 
 
 def fx():
@@ -259,6 +257,8 @@ def main():
     fonts()
     ui()
     kits()
+    import battle_bake
+    battle_bake.bake(MANIFEST)
     import bake_screens
     bake_screens.DST = DST
     bake_screens.main(write_manifest=False)

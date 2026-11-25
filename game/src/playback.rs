@@ -42,7 +42,39 @@ pub struct State {
     pub alive: bool,
     pub hp: i32,
     pub growth: u32,
+    /// What is on it now, `S_*` bits: burning, poisoned, stunned… (drawn as glyphs over its head, fire on its body).
+    pub flags: u16,
 }
+
+pub const S_BURN: u16 = 1;
+pub const S_POISON: u16 = 1 << 1;
+pub const S_STUN: u16 = 1 << 2;
+pub const S_FEAR: u16 = 1 << 3;
+pub const S_MARK: u16 = 1 << 4;
+pub const S_INFECT: u16 = 1 << 5;
+pub const S_HOOK: u16 = 1 << 6;
+pub const S_BLIND: u16 = 1 << 7;
+pub const S_GLUE: u16 = 1 << 8;
+pub const S_WEB: u16 = 1 << 9;
+pub const S_SHRED: u16 = 1 << 10;
+pub const S_STALL: u16 = 1 << 11;
+pub const S_HUNGRY: u16 = 1 << 12;
+/// The glyph of each state, in the order they stand in a row over a head (the worst first).
+pub const STATUS_GLYPHS: [(u16, &str); 13] = [
+    (S_HUNGRY, "status/hunger"),
+    (S_BURN, "status/burn"),
+    (S_STUN, "status/stun"),
+    (S_FEAR, "status/fear"),
+    (S_MARK, "status/mark"),
+    (S_HOOK, "status/hook"),
+    (S_INFECT, "status/infected"),
+    (S_POISON, "status/poison"),
+    (S_BLIND, "status/blind"),
+    (S_GLUE, "status/glued"),
+    (S_WEB, "status/web"),
+    (S_STALL, "status/stall"),
+    (S_SHRED, "status/shred"),
+];
 
 pub struct Round {
     pub before: Vec<State>,
@@ -52,6 +84,8 @@ pub struct Round {
     /// the field has none.
     pub web: Vec<i8>,
     pub honey: Vec<i8>,
+    /// What each side's swarm has taken up from the machines it broke (Мимикрия), `sim::battle::MIMIC_*`.
+    pub mimic: [u8; 2],
 }
 
 pub struct Record {
@@ -66,12 +100,40 @@ pub struct Record {
     pub kills1: u32,
     /// How many each unit killed in the battle (for its summary).
     pub kills: Vec<u32>,
+    /// The ground it is fought on: 0 an ordinary fight's, 1 an elite's, 2 a boss's.
+    pub ground: usize,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
+    let r = bt.round;
     bt.units
         .iter()
-        .map(|u| State { x: u.x, y: u.y, present: u.on_field, alive: u.alive, hp: u.hp, growth: u.growth })
+        .enumerate()
+        .map(|(i, u)| {
+            let mut flags = 0;
+            for (on, bit) in [
+                (u.burn > 0, S_BURN),
+                (u.poison > 0, S_POISON),
+                (u.stunned, S_STUN),
+                (u.fleeing, S_FEAR),
+                (bt.marked(i), S_MARK),
+                (u.infected.is_some(), S_INFECT),
+                (u.hooked.is_some(), S_HOOK),
+                // the timed ones hold through the round they were set for (0: never set)
+                (u.blind_until >= r && u.blind_until > 0, S_BLIND),
+                (u.glued_until >= r && u.glued_until > 0, S_GLUE),
+                (u.struggling, S_WEB),
+                // corrosion is for the rest of the battle: the round it last bit, MAX if never
+                (u.corroded != u32::MAX, S_SHRED),
+                (u.silenced_until >= r && u.silenced_until > 0, S_STALL),
+                (bt.starving(i), S_HUNGRY),
+            ] {
+                if on && u.alive {
+                    flags |= bit;
+                }
+            }
+            State { x: u.x, y: u.y, present: u.on_field, alive: u.alive, hp: u.hp, growth: u.growth, flags }
+        })
         .collect()
 }
 
@@ -117,7 +179,7 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
         }
         let events = bt.log.as_ref().map(|l| l[n0..].to_vec()).unwrap_or_default();
         let layer = |l: &[i8]| if l.iter().any(|&c| c != -1) { l.to_vec() } else { vec![] };
-        rounds.push(Round { before, after, events, web: layer(bt.web()), honey: layer(bt.honey()) });
+        rounds.push(Round { before, after, events, web: layer(bt.web()), honey: layer(bt.honey()), mimic: [bt.mimicry(0), bt.mimicry(1)] });
         if let Some(o) = done {
             break o;
         }
@@ -129,7 +191,7 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
     }
     let res = sim::run::result_of(&bt, outcome.winner);
     let kills = bt.units.iter().map(|u| u.kills).collect();
-    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![], dead0: res.dead, kills1: res.kills, kills };
+    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![], dead0: res.dead, kills1: res.kills, kills, ground: 0 };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
         for m in rec.moments(r) {
@@ -211,7 +273,14 @@ pub struct Effect {
     pub start: i32,
     /// A bolt: from whom to whom (drawn from the attacker's emit point to the target's body, not a sheet).
     pub link: Option<(usize, usize)>,
+    /// Faces left (a sheet drawn facing right, mirrored).
+    pub flip: bool,
+    /// A missile: it flies from here to (x, y) over `FLY` frames from `start` (the fireball, the gob, the stone).
+    pub from: Option<(f32, f32)>,
 }
+
+/// Frames a missile is in the air.
+pub const FLY: i32 = 8;
 
 impl Record {
     pub fn frames(&self) -> i32 {
@@ -388,6 +457,8 @@ impl Record {
         for r in 0..self.rounds.len() {
             let after = &self.rounds[r].after;
             let mut last_volley: Option<(usize, i32)> = None;
+            // who cast something this round: its hits are shown by the cast's own effect, not a spark each
+            let mut cast_by: Vec<usize> = vec![];
             for m in self.moments(r) {
                 let at = |id: usize| {
                     let s = after[id];
@@ -429,9 +500,22 @@ impl Record {
                             _ => format!("{value}"),
                         };
                         nums.push(Number { text, style, x, y, start: m.frame, t, k: 0, value, end: i32::MAX });
+                        if cast_by.contains(&a) {
+                            continue;
+                        }
                         let name: &'static str = match att.name.as_str() {
+                            "Горн" if dmg > 0 => {
+                                // the forge breathes its flame at whom it burns: one breath for all it reaches
+                                if last_volley.map(|(v, fr)| v == a && (m.frame - fr) < 10).unwrap_or(false) {
+                                    continue;
+                                }
+                                last_volley = Some((a, m.frame));
+                                let (sx, sy) = Self::spot(after[a].x, after[a].y, self.units[a].fp);
+                                fx.push(Effect { name: "fire-breath", x: sx, y: sy - 34.0, start: m.frame - 2, link: None, flip: x < sx, from: None });
+                                continue;
+                            }
                             "Мудрец" | "Изобретатель" => {
-                                fx.push(Effect { name: "bolt", x, y, start: m.frame, link: Some((a, t)) });
+                                fx.push(Effect { name: "bolt", x, y, start: m.frame, link: Some((a, t)), flip: false, from: None });
                                 "zap-hit"
                             }
                             "Орудие" => {
@@ -444,12 +528,48 @@ impl Record {
                             }
                             _ => "hit-spark",
                         };
-                        fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame, link: None });
+                        fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame, link: None, flip: false, from: None });
+                    }
+                    Event::Cast { u, kind, t } => {
+                        use sim::Cast;
+                        cast_by.push(u);
+                        let (tx, ty) = at(t);
+                        let (ux, uy) = at(u);
+                        let left = tx < ux;
+                        let fx_at = |name, x, y, start, flip| Effect { name, x, y, start, link: None, flip, from: None };
+                        match kind {
+                            Cast::Fireball => {
+                                fx.push(Effect { name: "fireball", x: tx, y: ty - 16.0, start: m.frame, link: None, flip: left, from: Some((ux, uy - 40.0)) });
+                                fx.push(fx_at("small-explosion", tx, ty, m.frame + FLY, false));
+                            }
+                            Cast::Volley => fx.push(fx_at("small-explosion", tx, ty, m.frame + 2, false)),
+                            Cast::Quake => fx.push(fx_at("ground-slam", ux, uy, m.frame, false)),
+                            Cast::Overload | Cast::Tinker => {
+                                fx.push(Effect { name: "bolt", x: tx, y: ty, start: m.frame, link: Some((u, t)), flip: false, from: None });
+                                fx.push(fx_at("zap-hit", tx, ty - 20.0, m.frame, false));
+                            }
+                            Cast::Flash => fx.push(fx_at("mana-burst", ux, uy, m.frame, false)),
+                            Cast::Spit => {
+                                fx.push(Effect { name: "gob", x: tx, y: ty - 8.0, start: m.frame, link: None, flip: left, from: Some((ux, uy - 10.0)) });
+                                fx.push(fx_at("acid-splash", tx, ty, m.frame + FLY, false));
+                            }
+                            Cast::Bolt => {
+                                if (tx - ux).abs() + (ty - uy).abs() > 1.6 * CW {
+                                    // the catapult's stone, thrown in an arc
+                                    fx.push(Effect { name: "stone", x: tx, y: ty - 10.0, start: m.frame, link: None, flip: left, from: Some((ux, uy - 50.0)) });
+                                    fx.push(fx_at("hit-spark", tx, ty - 14.0, m.frame + FLY, false));
+                                } else {
+                                    fx.push(Effect { name: "bolt", x: tx, y: ty, start: m.frame, link: Some((u, t)), flip: false, from: None });
+                                    fx.push(fx_at("zap-hit", tx, ty - 20.0, m.frame, false));
+                                }
+                            }
+                            Cast::PointBlank => fx.push(fx_at("muzzle-shotgun", ux, uy - 6.0, m.frame, left)),
+                        }
                     }
                     Event::Heal { t, amount, .. } => {
                         let (x, y) = at(t);
                         nums.push(Number { text: format!("+{amount}"), style: NumStyle::Heal, x, y, start: m.frame, t, k: 0, value: amount, end: i32::MAX });
-                        fx.push(Effect { name: "heal", x, y, start: m.frame, link: None });
+                        fx.push(Effect { name: "heal", x, y, start: m.frame, link: None, flip: false, from: None });
                     }
                     Event::Poison { t, dmg } | Event::Burn { t, dmg } => {
                         let (x, y) = at(t);

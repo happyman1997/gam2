@@ -8,4 +8,4 @@ pub mod power;
 pub mod rng;
 pub mod run;
 
-pub use battle::{fight, Battle, Event, Outcome};
+pub use battle::{fight, Battle, Cast, Event, Outcome};

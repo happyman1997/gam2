@@ -4,7 +4,7 @@
 
 use crate::assets::{Align, Assets, Font};
 use crate::gfx::Image;
-use crate::playback::{Effect, Number, NumStyle, Pose, Record, CH, CW, FR, X0, Y0};
+use crate::playback::{Effect, Number, NumStyle, Pose, Record, CH, CW, FLY, FR, S_BURN, STATUS_GLYPHS, X0, Y0};
 use sim::Event;
 use std::sync::OnceLock;
 
@@ -367,6 +367,19 @@ fn animate(rec: &Record, ms: &[crate::playback::Moment], s: &crate::playback::Sh
     an
 }
 
+/// A standing body as drawn, for what is drawn on and over it: its middle, the top of its picture, its feet, the
+/// picture's height, the states of all it stands for, the states its glyph row shows (0: none over it).
+struct Marks {
+    x: f32,
+    top: f32,
+    foot: f32,
+    h: i32,
+    body: u16,
+    row: u16,
+    leader: bool,
+    id: usize,
+}
+
 /// A body killed this round, drawn once more over the effects: where its sprite went, its flash, where it fell,
 /// how long ago.
 struct Dying {
@@ -583,7 +596,11 @@ fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
     if e.link.is_some() {
         return; // a bolt, drawn by bolt()
     }
-    let fx = &a.fx[e.name];
+    if let Some(from) = e.from {
+        missile(cv, a, e, from, f);
+        return;
+    }
+    let Some(fx) = a.fx.get(e.name) else { return };
     let per = 24.0 / fx.fps; // game frames per effect frame
     let k = ((f - e.start) as f32 / per.max(0.01)) as i32;
     if f < e.start || k >= fx.frames {
@@ -592,7 +609,46 @@ fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
     // the tail of an effect (an explosion's smoke) thins out, so what happens inside it is not hidden for long
     let half = fx.frames as f32 * 0.45;
     let alpha = if (k as f32) < half { 1.0 } else { 1.0 - 0.75 * (k as f32 - half) / (fx.frames as f32 - half) };
-    cv.blit_region(&fx.img, k * fx.w, 0, fx.w, fx.h, e.x as i32 - fx.pivot.0, e.y as i32 - fx.pivot.1, false, alpha);
+    // a sheet drawn facing right, mirrored to face left: its pivot mirrored with it
+    let px = if e.flip { fx.w - 1 - fx.pivot.0 } else { fx.pivot.0 };
+    cv.blit_region(&fx.img, k * fx.w, 0, fx.w, fx.h, e.x as i32 - px, e.y as i32 - fx.pivot.1, e.flip, alpha);
+}
+
+/// Something thrown or shot, on its way from `from` to the effect's point over `FLY` frames: the Sage's fireball
+/// (its sheet, turning over as it flies straight), the spitter's gob and the catapult's stone (a few pixels each,
+/// on an arc, a speck of a trail behind).
+fn missile(cv: &mut Image, a: &Assets, e: &Effect, from: (f32, f32), f: i32) {
+    let k = f - e.start;
+    if !(0..FLY).contains(&k) {
+        return;
+    }
+    let t = k as f32 / FLY as f32;
+    let arc = if e.name == "fireball" { 0.0 } else { 34.0 * 4.0 * t * (1.0 - t) };
+    let (x, y) = (from.0 + (e.x - from.0) * t, from.1 + (e.y - from.1) * t - arc);
+    match e.name {
+        "fireball" => {
+            if let Some(fx) = a.fx.get("fireball") {
+                let n = ((k as f32 * fx.fps / 24.0) as i32).rem_euclid(fx.frames);
+                let px = if e.flip { fx.w - 1 - fx.pivot.0 } else { fx.pivot.0 };
+                cv.blit_region(&fx.img, n * fx.w, 0, fx.w, fx.h, x as i32 - px, y as i32 - fx.pivot.1, e.flip, 1.0);
+                cv.glow(x, y, 26.0, [255, 138, 42], 0.5);
+            }
+        }
+        _ => {
+            // a gob of green spit, or a grey stone: a dark rim, a body, a light fleck on its top left
+            let (rim, body, lit) = if e.name == "gob" {
+                ([28, 48, 16, 255], [106, 174, 28, 255], [220, 255, 106, 255])
+            } else {
+                ([24, 20, 28, 255], [96, 90, 104, 255], [160, 154, 168, 255])
+            };
+            let (xi, yi) = (x as i32, y as i32);
+            let (tx, ty) = ((from.0 + (e.x - from.0) * (t - 0.12).max(0.0)) as i32, (y + 3.0) as i32);
+            cv.fill(tx, ty, 2, 2, [body[0], body[1], body[2], 140]);
+            cv.fill(xi - 2, yi - 2, 5, 5, rim);
+            cv.fill(xi - 1, yi - 1, 3, 3, body);
+            cv.fill(xi - 1, yi - 1, 1, 1, lit);
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -673,11 +729,13 @@ pub fn draw(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec
 pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number>, Vec<Effect>), view: &View) {
     let total = rec.frames();
     let f = (view.frame as i32).min(total - 1);
-    // the ground, opaque and the field's own size: copied whole (a blend of two million pixels is most of a frame)
-    if (cv.w, cv.h) == (a.ground.w, a.ground.h) {
-        cv.px.copy_from_slice(&a.ground.px);
+    // the ground (an ordinary fight's, an elite's, a boss's), opaque and the field's own size: copied whole (a blend
+    // of two million pixels is most of a frame)
+    let ground = rec.ground.checked_sub(1).and_then(|k| a.grounds.get(k)).unwrap_or(&a.ground);
+    if (cv.w, cv.h) == (ground.w, ground.h) {
+        cv.px.copy_from_slice(&ground.px);
     } else {
-        cv.blit(&a.ground, 0, 0, false, 1.0);
+        cv.blit(ground, 0, 0, false, 1.0);
     }
     ground_layers(cv, rec, (f / FR) as usize);
     // the units, in depth order. The small ones of a cell stand as one pack: no more than three bodies show — one in
@@ -749,6 +807,9 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     // a death is drawn again over the fire and smoke: the flash of the killed and the dust of its fall must show
     // even inside a blast
     let mut over: Vec<Dying> = vec![];
+    // the standing bodies as drawn: where their head is, what is on them (all they stand for), whether the glyph row
+    // goes over them (a pack has one, over its front body; a leader's sits above his health meter)
+    let mut marked: Vec<Marks> = vec![];
     for p in &placed {
         let (x, y, s, lying) = (p.x, p.y, p.s, p.lying);
         let info = &rec.units[s.id];
@@ -816,6 +877,28 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         }
         if let Some(k) = s.dead_at.filter(|_| !info.ghost) {
             over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.machine, big, t: ff - k as f32, name });
+        } else if !lying && anim.pose != Pose::Dead && !info.ghost {
+            let body = p.stands_for.iter().fold(0, |m, &id| m | rec.state_at(id, f).flags);
+            let pack = small(s.id).then(|| packs.get(&key(s.id, s.cell))).flatten();
+            let (row, all) = match pack {
+                Some(v) if v.first() == Some(&s.id) => (true, v.iter().fold(0, |m, &id| m | rec.state_at(id, f).flags)),
+                Some(_) => (false, 0),
+                None => (true, body),
+            };
+            marked.push(Marks { x: x + anim.dx, top: sy as f32, foot: y + anim.dy, h: spr.img.h, body, row: if row { all } else { 0 }, leader: info.leader, id: s.id });
+        }
+    }
+    // fire on the burning bodies: tongues licking up from the lower half, two on a big one, and their light
+    if let Some(fx) = a.fx.get("burn-body") {
+        for m in marked.iter().filter(|m| m.body & S_BURN != 0) {
+            let spots: &[f32] = if m.h > 40 { &[-0.22, 0.2] } else { &[0.0] };
+            for (n, &dx) in spots.iter().enumerate() {
+                let k = ((ff * fx.fps / 24.0) as i32 + m.id as i32 * 3 + n as i32 * 5).rem_euclid(fx.frames);
+                let bx = m.x + dx * m.h as f32 * 0.8;
+                let by = m.foot - m.h as f32 * 0.22;
+                cv.blit_region(&fx.img, k * fx.w, 0, fx.w, fx.h, bx as i32 - fx.pivot.0, by as i32 - fx.pivot.1, false, 1.0);
+                cv.glow(bx, by - fx.h as f32 * 0.4, fx.h as f32 * 1.3, [240, 138, 32], 0.35);
+            }
         }
     }
     // how many a pack holds: a dot a body, under it
@@ -862,6 +945,27 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     }
     for n in &sparks.0 {
         number(cv, a, rec, n, f, &bars);
+    }
+    // the glyphs of what is on them, in a row over the head (no more than four: the worst first), over the numbers:
+    // a number flies off, the state stays
+    for m in marked.iter().filter(|m| m.row != 0) {
+        let keys: Vec<&str> = STATUS_GLYPHS.iter().filter(|(bit, _)| m.row & bit != 0).map(|&(_, k)| k).take(4).collect();
+        let rects: Vec<(&Image, [i32; 4])> = keys
+            .iter()
+            .filter_map(|k| a.icons.get(*k).and_then(|(atlas, r)| a.atlases.get(atlas).map(|img| (img, *r))))
+            .collect();
+        if rects.is_empty() {
+            continue;
+        }
+        let w: i32 = rects.iter().map(|(_, r)| r[2] + 2).sum::<i32>() - 2;
+        let gh = rects.iter().map(|(_, r)| r[3]).max().unwrap_or(9);
+        // over a leader the health meter stands first
+        let top = if m.leader { m.top - 22.0 } else { m.top - 4.0 };
+        let mut gx = m.x as i32 - w / 2;
+        for (img, r) in rects {
+            cv.blit_region(img, r[0], r[1], r[2], r[3], gx, top as i32 - gh + (gh - r[3]) / 2, false, 1.0);
+            gx += r[2] + 2;
+        }
     }
     let end = view.frame as i32 - (total - 1);
     if end > 0 {
