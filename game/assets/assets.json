@@ -10345,6 +10345,34 @@
     48
    ],
    "pad": 2
+  },
+  "camp_rest_0": {
+   "file": "ui/camp_rest_0.png",
+   "size": [
+    260,
+    128
+   ]
+  },
+  "camp_up_0": {
+   "file": "ui/camp_up_0.png",
+   "size": [
+    260,
+    128
+   ]
+  },
+  "camp_rest_1": {
+   "file": "ui/camp_rest_1.png",
+   "size": [
+    260,
+    128
+   ]
+  },
+  "camp_up_1": {
+   "file": "ui/camp_up_1.png",
+   "size": [
+    260,
+    128
+   ]
   }
  },
  "icons": {
@@ -12098,6 +12126,46 @@
    ],
    "name": "Королевская кладка"
   },
+  "swarm/m_mimic": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    96,
+    160,
+    16,
+    16
+   ],
+   "name": "Мимикрия"
+  },
+  "swarm/m_puppet": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    112,
+    160,
+    16,
+    16
+   ],
+   "name": "Кукловод"
+  },
+  "swarm/m_mirage": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    128,
+    160,
+    16,
+    16
+   ],
+   "name": "Мираж"
+  },
+  "swarm/m_third": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    144,
+    160,
+    16,
+    16
+   ],
+   "name": "Третья ступень"
+  },
   "glyph/всегда": {
    "atlas": "icons/glyphs.png",
    "rect": [
@@ -13357,46 +13425,6 @@
     11
    ],
    "name": "пси"
-  },
-  "swarm/m_mimic": {
-   "atlas": "icons/swarm_icons.png",
-   "rect": [
-    128,
-    112,
-    16,
-    16
-   ],
-   "name": "Мимикрия"
-  },
-  "swarm/m_puppet": {
-   "atlas": "icons/swarm_icons.png",
-   "rect": [
-    112,
-    128,
-    16,
-    16
-   ],
-   "name": "Кукловод"
-  },
-  "swarm/m_mirage": {
-   "atlas": "icons/swarm_icons.png",
-   "rect": [
-    80,
-    128,
-    16,
-    16
-   ],
-   "name": "Мираж"
-  },
-  "swarm/m_third": {
-   "atlas": "icons/swarm_icons.png",
-   "rect": [
-    16,
-    144,
-    16,
-    16
-   ],
-   "name": "Третья ступень"
   },
   "status/hunger": {
    "atlas": "icons/status.png",

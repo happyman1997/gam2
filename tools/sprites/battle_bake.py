@@ -205,6 +205,8 @@ def devourer_third(manifest):
 
 
 def bake(manifest):
+    import camp_scenes
+    camp_scenes.bake(manifest, DST)
     devourer_third(manifest)
     grounds()
     status(manifest)
@@ -215,6 +217,10 @@ def bake(manifest):
 if __name__ == "__main__":
     path = os.path.join(DST, "assets.json")
     m = json.load(open(path))
+    # the engine kits and icon atlases again (a new icon drawn since), then the battle's own pieces over them
+    import demo_bake as DB
+    DB.MANIFEST = m
+    DB.kits()
     bake(m)
     json.dump(m, open(path, "w"), ensure_ascii=False, indent=1)
     print("status", sum(1 for k in m["icons"] if k.startswith("status/")), "fx", len(m["fx"]))

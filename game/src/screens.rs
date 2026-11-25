@@ -371,6 +371,19 @@ fn growth_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: 
         portrait(ui, &mut pic, a, &m.t, r.cx() - inner.x, pedestal - inner.y, 1.0, false);
         cv.blit(&pic, inner.x, inner.y, false, 1.0);
     }
+    // what this growth gives, large in the picture's corner: the two cards no longer show one and the same
+    if let Some(icon) = growth_icon(key) {
+        if let Some((_, rr)) = a.icons.get(icon) {
+            let k = if rr[2] <= 13 { 4 } else { 3 };
+            let (w, h) = (rr[2] * k, rr[3] * k);
+            let (x, y) = (r.x + r.w - w - 18, r.y + 16);
+            cv.fill(x - 6, y - 6, w + 12, h + 12, [14, 10, 18, 230]);
+            let rim = if cls == Class::Foundry { [200, 150, 70, 255] } else { [122, 176, 64, 255] };
+            cv.fill(x - 6, y - 6, w + 12, 2, rim);
+            cv.fill(x - 6, y + h + 4, w + 12, 2, rim);
+            ui.icon(cv, a, icon, x, y, k, 1.0);
+        }
+    }
     let font = &a.fonts["text16"];
     let title_col = if cls == Class::Foundry { [255, 214, 150] } else { ACID2 };
     let mut y = pedestal + 14;
@@ -387,6 +400,33 @@ fn growth_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: 
         y += 18;
     }
     hit
+}
+
+/// The icon of what a leader's growth gives (growth.ron keys), for its card.
+fn growth_icon(key: &str) -> Option<&'static str> {
+    Some(match key {
+        "colossus_cell" | "inventor_cells" | "maniac_cells" => "glyph/клетка",
+        "colossus_quake" => "glyph/оглушение",
+        "colossus_hull" => "glyph/литой",
+        "inventor_coil" => "module/a_coil",
+        "inventor_shocker" => "glyph/dmg:молния",
+        "maniac_tinker" => "glyph/модуль",
+        "maniac_saw" => "module/c_saw",
+        "builder_mason" => "glyph/призыв",
+        "builder_walls" => "glyph/стена",
+        "builder_bricks" => "glyph/дальность",
+        "matka_often" => "glyph/яйцо",
+        "matka_more" => "glyph/личинка",
+        "matka_big" | "devourer_bigger" => "glyph/размер",
+        "mind_mark" => "glyph/цель",
+        "mind_will" => "glyph/пси",
+        "mind_shell" | "plague_shell" => "glyph/броня",
+        "devourer_jaws" => "glyph/урон",
+        "devourer_hide" => "glyph/тяжхитин",
+        "plague_venom" => "glyph/яд",
+        "plague_blood" => "glyph/заражение",
+        _ => return None,
+    })
 }
 
 /// What a body carries, as a row of small icons along its card's foot: a golem's modules (and its free cells as
@@ -1960,8 +2000,14 @@ fn camp(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, stage: CampStage, sa
                 let (_, k, hit) = ui.card(cv, a, cls, &format!("camp{i}"), r, if i == 0 { "hi" } else { "rare" }, on);
                 let r = r.shift(0, -(k * 4.0).round() as i32);
                 cv.glow(r.cx() as f32, (r.y + 100) as f32, 70.0, g, 0.15 + 0.2 * k);
-                let ik = if icon.starts_with("glyph") { 6 } else { 4 };
-                ui.icon(cv, a, icon, r.cx() - 32, r.y + 64, ik, if on { 1.0 } else { 0.4 });
+                // the card's picture: the camp's own scene (camp_scenes.py), or its icon in an older asset folder
+                let scene = format!("camp_{}_{c}", if i == 0 { "rest" } else { "up" });
+                if let Some(p) = a.ui.get(&scene) {
+                    cv.blit(&p.img, r.cx() - p.img.w / 2, r.y + 22, false, if on { 1.0 } else { 0.4 });
+                } else {
+                    let ik = if icon.starts_with("glyph") { 6 } else { 4 };
+                    ui.icon(cv, a, icon, r.cx() - 32, r.y + 64, ik, if on { 1.0 } else { 0.4 });
+                }
                 heading(cv, a, title, r.cx(), r.y + 168, 24, if on { cols(cls) } else { (MUTED, PALE) }, Align::Center);
                 let mut y = r.y + 210;
                 let line = if on { line.clone() } else { t("shop.service.none") };

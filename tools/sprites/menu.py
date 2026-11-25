@@ -41,6 +41,69 @@ def furnace(sc, ax, ay, ar, floor, frame=0, hot=True):
         FU.rivet(sc, ax - np.cos(a_) * (ar + 6), ay - np.sin(a_) * (ar + 6))
 
 
+def hive_mouth(sc, ax, ay, ar, floor, frame=0):
+    """The swarm's answer to the furnace: the mouth of a brood chamber — a lumpy arch of dark wax with resin run down
+    it; inside, from the dark down to a green glow at the floor, the back wall is comb: cells capped, cells lit amber
+    with an egg or a curled larva, one and then another glowing brighter in turn."""
+    X, Y = sc.xx, sc.yy
+    wob = 3.0 * np.sin(Y / 7.0 + 1.3) * np.cos(X / 9.0) + 2.0 * np.sin(X / 5.0)
+    arch = ((((X - ax) / (ar + wob)) ** 2 + ((Y - ay) / (ar + wob)) ** 2 <= 1) & (Y <= ay)) | ((np.abs(X - ax) <= ar + wob) & (Y > ay) & (Y < floor))
+    inner = ((((X - ax) / (ar - 6)) ** 2 + ((Y - ay) / (ar - 6)) ** 2 <= 1) & (Y <= ay)) | ((np.abs(X - ax) <= ar - 6) & (Y > ay) & (Y < floor))
+    t = np.clip((Y - (ay - ar)) / (floor - ay + ar), 0, 1)
+    deep = hexc("#0c120a")[None, None, :] * (1 - t[..., None]) + hexc("#2a4a14")[None, None, :] * t[..., None] ** 1.6
+    sc.rgb[inner] = deep[inner]
+    # the comb of the back wall: rows of hexagons, each capped, empty or lit with what grows in it
+    R = 11
+    dx, dy = R * 1.5, R * np.sqrt(3)
+    rnd = np.random.RandomState(17)
+    k = 0
+    for i in range(-int(ar / dx) - 1, int(ar / dx) + 2):
+        for j in range(-int(ar / dy) - 1, int((floor - ay) / dy) + 1):
+            cx, cy = ax + i * dx, ay + j * dy + (dy / 2 if i % 2 else 0)
+            if not (0 <= int(cx) < sc.w and 0 <= int(cy) < sc.h) or not inner[int(cy), int(cx)] or cy > floor - 26:
+                continue
+            m = (np.abs(X - cx) <= (R - 1) * 0.866) & (np.abs(Y - cy) <= (R - 1) - np.abs(X - cx) * 0.577) & inner
+            kind = rnd.choice(["cap", "cap", "cap", "cap", "empty", "empty", "egg", "larva"])
+            k += 1
+            lit = kind in ("egg", "larva") and (k + frame // 2) % 5 == 0
+            if kind == "cap":                                       # a wax cap, a shade lighter on its top left
+                sc.rgb[m] = sc.rgb[m] * 0.35 + hexc("#3e322a") * 0.65
+                sc.rgb[m & (X < cx - 2) & (Y < cy - 2)] = hexc("#54443a")
+            elif kind == "empty":
+                sc.rgb[m] = sc.rgb[m] * 0.6
+            else:
+                sc.rgb[m] = sc.rgb[m] * 0.4 + hexc("#4e3412" if not lit else "#a8701e") * 0.6
+                if kind == "egg":
+                    egg = ((X - cx) / 3.0) ** 2 + ((Y - cy) / 4.2) ** 2 <= 1
+                    sc.rgb[egg & m] = hexc("#e8dcb4")
+                    sc.rgb[egg & m & (X < cx) & (Y < cy - 1)] = hexc("#fff4dc")
+                else:
+                    curl = (np.abs(np.hypot(X - cx, Y - cy) - 3.2) < 1.3) & ~((X > cx) & (Y < cy))
+                    sc.rgb[curl & m] = hexc("#d8c89a")
+                if lit:
+                    sc.glow(cx, cy, R * 1.5, hexc("#e0a030"), 0.3)
+            o = m & ~(np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1))
+            sc.rgb[o] = hexc("#1a1410")
+    sc.glow(ax, floor - 10, ar * 1.3, hexc("#7ac83a"), 0.4)
+    # the wax lip: lumpy, lit on its top-left, with resin run down from it
+    lip = arch & ~inner
+    sh = np.clip((X - ax + Y - ay) / (2.0 * ar), -1, 1)
+    sc.rgb[lip] = (hexc("#5a4434")[None, None, :] * (1 - (sh[..., None] + 1) / 2) + hexc("#2a1e1a")[None, None, :] * ((sh[..., None] + 1) / 2))[lip]
+    for kk in range(-5, 6):
+        a_ = np.pi * (0.5 + kk / 12)
+        bx, by = ax - np.cos(a_) * (ar - 3), ay - np.sin(a_) * (ar - 3)
+        lump = ((X - bx) ** 2 + (Y - by) ** 2) <= 9
+        sc.rgb[lump] = hexc("#6a5240")
+        sc.rgb[lump & (X < bx) & (Y < by)] = hexc("#8a6e54")
+    for x0, n in ((ax - ar + 10, 22), (ax - 30, 14), (ax + 24, 18), (ax + ar - 14, 26)):
+        drip = int(n + 4 * np.sin(frame * 0.4 + x0))
+        top = int(ay - np.sqrt(max(0.0, ar ** 2 - (x0 - ax) ** 2))) if abs(x0 - ax) < ar else ay
+        for yy in range(top, top + drip):
+            if 0 <= yy < sc.h:
+                sc.rgb[yy, int(x0)] = hexc("#8a5214")
+        sc.rgb[top + drip:top + drip + 2, int(x0) - 1:int(x0) + 2] = hexc("#b87420")
+
+
 def main_menu(frame=0, ret=False):
     sc = FH.screen(101)
     sc.glow(400, 330, 260, hexc("#ff7a2a"), 0.28)
@@ -79,6 +142,24 @@ def main_menu(frame=0, ret=False):
     print("menu_main.png", img.size)
 
 
+# the swarm's crowd before the brood chamber on the class pick: (traits, x, y, scale)
+CROWD = ((("stinger",), 560, 300, 0.9), (("wings",), 596, 262, 0.85), ((), 612, 304, 0.9), (("horn",), 650, 300, 1.0),
+         (("acid",), 580, 286, 0.8), (("scythes",), 880, 302, 1.0), ((), 846, 296, 0.85), (("stinger",), 906, 280, 0.85),
+         (("wings",), 868, 252, 0.8), (("jumper",), 812, 304, 0.9), ((), 690, 306, 0.8), (("acid",), 902, 306, 0.8))
+
+
+def swarm_half(sc, frame=0):
+    """The swarm's half of the class pick: its plate, the brood chamber's mouth glowing behind the Mother, her swarm
+    crowding the floor before it, a bug or two snapping in turn."""
+    UI.plate(sc, 498, 56, 944, 420, antennae=True)
+    hive_mouth(sc, 721, 190, 96, 300, frame)
+    q = SH.leader("Матка", "idle", 1.15)
+    SH.put(sc, q, 740, 296, 30)
+    for j, (tr, x, y, kk) in enumerate(sorted(CROWD, key=lambda c: c[2])):
+        pose = "attack" if (j + frame // 2) % 5 == 0 else "idle"
+        SH.put(sc, SH.bug(tr, pose, kk, 50 + j), x, y, 8)
+
+
 def class_pick(chosen="foundry", ret=False, frame=0):
     sc = FH.screen(103)
     nest = UI.nest(WW, HH, 7)
@@ -106,12 +187,7 @@ def class_pick(chosen="foundry", ret=False, frame=0):
     letters(sc, "големы из деталей · модули · ремонт", 44, 364, "text", 16, col=MUTED)
     letters(sc, "4 лидера", 44, 384, "text", 16, col=MUTED)
     # the swarm's half
-    UI.plate(sc, 498, 56, 944, 420, antennae=True)
-    q = SH.leader("Матка", "idle", 1.15)
-    SH.put(sc, q, 760, 296, 30)
-    for j, (tr, x, y) in enumerate(((("stinger",), 560, 300), (("wings",), 610, 280), ((), 900, 296),
-                                    (("horn",), 870, 270), (("acid",), 590, 250))):
-        SH.put(sc, SH.bug(tr, "idle", 0.8, 50 + j), x, y, 8)
+    swarm_half(sc, frame)
     UI.cell(sc, 512, 312, 930, 410, "hi" if chosen == "swarm" else "normal")
     letters(sc, "РОЙ", 526, 320, "title", 16, col=(176, 244, 70), col2=(70, 150, 50), jitter=1, hairs=3)
     letters(sc, "масса и селекция", 526, 344, "text", 16, col=INK)

@@ -38,6 +38,61 @@ def antennae(p, x, y, ramp="chitin", lv=3, long=4, elbow=True):
         p.line([(x, y), (x + long, y - long)], ramp, lv)
 
 
+# ---------------------------------------------------------------- the doctrines that had borrowed an older icon
+@icon("m_mimic")
+def mimic():
+    """Мимикрия: a bug wearing what it took off a broken machine — a riveted steel plate on its back, a crackle of
+    current at its jaws."""
+    p = Pix()
+    bug(p, 7, 10, "chitin", s=1.35)
+    p.rect(3, 6, 8, 7, "steel", [4, 2])                            # the plate it took up
+    p.dark(4, 7)                                                   # a rivet hole
+    p.dark(7, 7)
+    p.line([(12, 9), (13, 7), (12, 6), (14, 4)], "volt", 4)        # the current in its bite
+    p.px(15, 3, "volt", 3)
+    return p.done()
+
+
+@icon("m_puppet")
+def puppet():
+    """Кукловод: a machine's helm, fallen, hooked from above; out of its visor a green grub works its way."""
+    p = Pix()
+    p.fill(ell(6.5, 9.5, 5.2, 4.6), "iron", inner=(3, 2))
+    for x in range(3, 10):                                         # the visor slit
+        p.dark(x, 9)
+    p.fill(ell(12.0, 10.5, 2.6, 1.6), "slime", inner=(3, 2))      # the grub crawling out of it
+    p.px(14, 10, "slime", 1)
+    p.line([(9, 9), (10, 10)], "slime", 3)
+    p.line([(7, 0), (7, 3)], "steel", 3)                           # the hook it hangs from
+    p.line([(7, 4), (8, 5), (9, 4)], "steel", 4)
+    return p.done()
+
+
+@icon("m_mirage")
+def mirage():
+    """Мираж: a bug and, a step behind it, its twin of psi — the same bug in pale violet, there and not there."""
+    p = Pix()
+    bug(p, 6, 7, "phero", s=1.3, eye="phero")
+    for x, y in ((3, 6), (5, 8), (7, 6)):                          # the twin thins out: gaps where it is not
+        if p.a[y, x]:
+            p.a[y, x] = False
+    bug(p, 9, 11, "chitin", s=1.3)
+    return p.done()
+
+
+@icon("m_third")
+def third_stage():
+    """Третья ступень: the Devourer's back with three spines, each taller than the last — the third, the tallest,
+    white with its new growth."""
+    p = Pix()
+    p.fill(ell(7.5, 12.5, 7.0, 3.0), "crimson", inner=(3, 2))
+    for x, top, lv in ((3, 9, 2), (7, 6, 3), (11, 2, 4)):
+        p.line([(x, 10), (x, top)], "bone", lv)
+        p.line([(x + 1, 10), (x + 1, top + 2)], "bone", lv - 1)
+    p.px(11, 1, "bone", 4)
+    return p.done()
+
+
 # ---------------------------------------------------------------- the swarm's traits: one bug for each
 @icon("ant")
 def ant():

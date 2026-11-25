@@ -126,12 +126,7 @@ def class_frames():
             for fr, x in (("Механик", 120), ("Орудие", 362)):
                 g = F.build(fr, "idle", k=F.FRAMES[fr][0] * 0.62)
                 sc.blit(g, int(x - g.ox), int(300 - g.oy))
-            UI.plate(sc, 498, 56, 944, 420, antennae=True)
-            q = SH.leader("Матка", "idle", 1.15)
-            SH.put(sc, q, 760, 296, 30)
-            for j, (tr, x, y) in enumerate(((("stinger",), 560, 300), (("wings",), 610, 280), ((), 900, 296),
-                                            (("horn",), 870, 270), (("acid",), 590, 250))):
-                SH.put(sc, SH.bug(tr, "attack" if (j + f) % 4 == 0 else "idle", 0.8, 50 + j), x, y, 8)
+            menu.swarm_half(sc, f)
             FU.sill(sc, 440, None)
             UI.wing(sc, WW // 2, 440, WW, HH)
             save_bg(f"class_{f}", sc)
