@@ -144,8 +144,8 @@ pub enum Trait {
     Glow,
     /// Hive Mind: every ally has the full «Стая» bonus.
     HiveMind,
-    /// Devourer: every 2nd kill — ×1.5 health and +2 to the blow, up to twice; the leader starves without kills. Its
-    /// blood in a breed (Кровь Пожирателя): a body grows on the damage it bites out, 6 and then 12.
+    /// Devourer: it eats every enemy that falls beside it (within a cell), whoever killed it; every 2nd meal — ×1.5
+    /// health and +2 to the blow, up to twice (with its third stage every meal, thrice); it starves without meals.
     Grows,
     /// Cuckoo: a blow that gets through infects; an infected enemy that dies hatches 2 larvae
     /// (not mechanisms).
@@ -176,9 +176,6 @@ pub enum Trait {
     /// Inventor's: the bite shocks; a Forge's: it sets alight, +1; a Guard's, a Mason's or the Architect's: the shell is
     /// two points harder; a Gun's or the Father's: the bite is blunt; a Mechanic's: it mends two a round; the Maniac's: +2.
     Mimic,
-    /// Пир: with no enemy beside it, a body eats a corpse beside it (its own or the enemy's, not a burnt one) instead of
-    /// striking, and a larva hatches from what it ate (two from a golem, three from a big one).
-    Feast,
     /// Кукловод: its blows hook a machine (an infected one is hooked too); a hooked machine that falls rises for its side
     /// with a quarter of its health, its modules silent —
     /// larvae work its hull for two rounds, its own weapons turned on its own (then it falls apart, and the larvae come
@@ -190,8 +187,11 @@ pub enum Trait {
     Mirage,
     /// A ghost of the Hive Mind's mirage: does not strike, melts away at the first blow, no army.
     Ghost,
+    /// Третья ступень (the Devourer's own mutation): it grows on every meal, not every second, and thrice, not twice;
+    /// at the third stage its every blow tramples all enemies of size 5 or less beside it.
+    ThirdStage,
     /// The Devourer at the start of a run (Голод): `left` more enemies for the swarm to kill this run before it is fed;
-    /// till then it starves from the 2nd round without a kill and loses a fifth of its health a round (fed: from the
+    /// till then it starves from the 2nd round without a meal and loses a fifth of its health a round (fed: from the
     /// 3rd, a tenth).
     Hungry { left: u32 },
     /// Стрекот: every second round an enemy with four or more of these beside it loses its blow (the chirr shakes it;

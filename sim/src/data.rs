@@ -188,6 +188,9 @@ pub struct MutationFind {
     pub form: Option<String>,
     #[serde(default)]
     pub leader: Option<String>,
+    /// The leader's own mutation (the Devourer mutates itself): it goes onto the leader, not onto the swarm.
+    #[serde(default)]
+    pub personal: bool,
     pub give: Give,
 }
 

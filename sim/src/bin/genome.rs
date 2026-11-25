@@ -4,6 +4,7 @@
 //! in the hard fights moves the second more) — each against the army without mutations. A leader's own pool only with
 //! that leader. Changes are printed to the nearest 5 % (the stand's noise is 5–10 %). With `--late`: a swarm of the run's second half (the start's bodies three times over) against armies
 //! from 300 (6 steps, ×1.15; 4 armies, 8 seeds) — a mutation that grows with the swarm shows there, not at the start.
+//! The late swarm's Devourer is fed (the run's kills are behind it), the start's is hungry.
 //! `cargo run --release --bin genome -- <leader 0–3> [--late] [keys…]`
 
 use rayon::prelude::*;
@@ -46,6 +47,15 @@ fn army(r: &Run, late: bool) -> Vec<sim::model::Template> {
     out
 }
 
+/// The run the army comes from: late in a run the Devourer has eaten its fill and is no longer hungry.
+fn run_of(leader: usize, late: bool) -> Run {
+    let mut r = Run::new(Class::Swarm, leader, 1);
+    if late {
+        r.stats.kills = sim::data::rules().devourer_fed;
+    }
+    r
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let leader: usize = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
@@ -57,7 +67,7 @@ fn main() {
         .iter()
         .map(|&b| (b, (0..armies).map(|e| Run::new(Class::Swarm, leader, if late { 700 } else { 500 } + e * 13).enemy_of(Kind::Fight, b).0).collect()))
         .collect();
-    let base = Run::new(Class::Swarm, leader, 1);
+    let base = run_of(leader, late);
     let (h0, m0) = half(&army(&base, late), &enemies, seeds);
     println!("{}: без мутаций {:.0}, побед в среднем {:.2}", base.leader_key(), h0, m0);
     let own = base.leader_key();
@@ -70,7 +80,7 @@ fn main() {
         .map(|m| m.key.clone())
         .collect();
     for k in keys {
-        let mut r = Run::new(Class::Swarm, leader, 1);
+        let mut r = run_of(leader, late);
         r.breeds.push((SWARM.to_string(), k.clone()));
         let (h, m) = half(&army(&r, late), &enemies, seeds);
         println!("{k}: {:.0} ({:+}%), побед {:.2} ({:+}%)", h, round5(100.0 * (h / h0 - 1.0)), m, round5(100.0 * (m / m0 - 1.0)));

@@ -13245,16 +13245,6 @@
    ],
    "name": "Мимикрия"
   },
-  "swarm/m_feast": {
-   "atlas": "icons/swarm_icons.png",
-   "rect": [
-    48,
-    144,
-    16,
-    16
-   ],
-   "name": "Пир"
-  },
   "swarm/m_puppet": {
    "atlas": "icons/swarm_icons.png",
    "rect": [
@@ -13274,6 +13264,16 @@
     16
    ],
    "name": "Мираж"
+  },
+  "swarm/m_third": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    16,
+    144,
+    16,
+    16
+   ],
+   "name": "Третья ступень"
   }
  },
  "bg": {

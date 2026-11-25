@@ -465,11 +465,13 @@ impl Run {
                 }
             }
         }
-        // the swarm's mutations onto every body of it (not the leader), a form's evolutions onto that form
-        if self.class == Class::Swarm && !self.is_leader(m) {
+        // the swarm's mutations onto every body of it (not the leader), a form's evolutions onto that form; the
+        // leader's own mutations (the Devourer's) onto the leader alone
+        if self.class == Class::Swarm {
+            let lead = self.is_leader(m);
             let form = form_of(&m.t).to_string();
             for key in self.mutations_of(&form) {
-                if let Some(mu) = finds.mutations.iter().find(|x| &x.key == key) {
+                if let Some(mu) = finds.mutations.iter().find(|x| &x.key == key).filter(|mu| mu.personal == lead) {
                     mu.give.apply(&mut t);
                 }
             }

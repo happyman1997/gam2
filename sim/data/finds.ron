@@ -71,10 +71,10 @@
         // призрачный двойник: враг тратит на него удар, он тает)
         (key: "m_strider", leader: "razum", give: (traits: [Chirr], speed: 1)),
         (key: "m_mirage", leader: "razum", give: (traits: [Mirage])),
-        // Пожиратель — пожирание
-        // Пир: особь без врага рядом съедает труп рядом (свой или чужой, не сгоревший) — из съеденного вылупляется личинка
-        (key: "m_feast", leader: "pozhiratel", give: (traits: [Feast])),
-        (key: "m_devblood", leader: "pozhiratel", give: (traits: [Grows])),
+        // Пожиратель — единственный в рое, кто мутирует сам (personal: на него, не на рой)
+        // Третья ступень: растёт с каждым съеденным (враг, павший рядом), а не с каждым вторым, и трижды; на третьей
+        // ступени каждый удар топчет всех врагов размера 5 и меньше рядом
+        (key: "m_third", leader: "pozhiratel", personal: true, give: (traits: [ThirdStage])),
         // Чума — заражение
         (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects])),
         // Кукловод: удар цепляет машину; павшая зацепленная (или заражённая) встаёт за рой на 2 хода с четвертью здоровья, потом

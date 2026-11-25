@@ -125,6 +125,8 @@ pub struct Unit {
     pub born: u32,
     pub charged: bool,
     pub kills: u32,
+    /// Enemies the Devourer has eaten this battle — its own kills and every enemy that fell beside it.
+    pub meals: u32,
     /// Its place in the army it was deployed from (None for one summoned in the battle).
     pub src: Option<usize>,
     pub growth: u32,
@@ -142,10 +144,6 @@ pub struct Unit {
     pub budded: bool,
     /// Half torn out of the enemy's web: the next action frees it.
     pub struggling: bool,
-    /// Damage it has bitten out of the enemy this battle (Кровь Пожирателя: a body grows on what it eats).
-    pub fed: i32,
-    /// Its corpse is eaten (Пир): gone from the field.
-    pub eaten: bool,
     /// Marked by a puppeteer's blow (Кукловод): falling, it rises for that side.
     pub hooked: Option<u8>,
 }
@@ -496,6 +494,7 @@ impl Battle {
             born: self.round,
             charged: false,
             kills: 0,
+            meals: 0,
             src: None,
             growth: 0,
             last_meal: self.round,
@@ -506,8 +505,6 @@ impl Battle {
             glued_until: 0,
             budded: false,
             struggling: false,
-            fed: 0,
-            eaten: false,
             hooked: None,
         });
         id
@@ -1042,10 +1039,6 @@ impl Battle {
         if self.units[i].silenced_until >= round {
             return; // Замыкание: the windings are shorted
         }
-        // a feaster with no enemy beside it eats a corpse beside it, and a larva hatches from what it ate
-        if self.units[i].t.has(Trait::Feast) && self.adjacent_enemies(i).is_empty() && self.feast(i) {
-            return;
-        }
         // a spinner spins every fourth round: to catch an enemy beside it not in the web yet, or when it has nothing to
         // strike at anyway (a shooter with a target in range shoots, one beside webbed enemies strikes them)
         if self.units[i].t.has(Trait::Spinner) && round % 4 == 1 {
@@ -1204,34 +1197,6 @@ impl Battle {
         if took != 0 {
             self.mimicry[1 - u.side as usize % 2] = took;
         }
-    }
-
-    /// Пир: eats the nearest corpse beside it (its own or the enemy's, not a burnt one, not a cloud's or a ghost's);
-    /// a larva of its side hatches from it, two from a golem, three from a big one. False if there is none to eat.
-    fn feast(&mut self, i: usize) -> bool {
-        let Some(c) = (0..self.units.len())
-            .filter(|&k| {
-                let u = &self.units[k];
-                !u.alive && u.on_field && !u.eaten && u.burn == 0 && u.t.is_army()
-            })
-            .find(|&k| self.dist(i, k) <= 1)
-        else {
-            return false;
-        };
-        self.units[c].eaten = true;
-        self.units[c].on_field = false;
-        let n = match self.units[c].t.size {
-            0..=2 => 1,
-            3..=4 => 2,
-            _ => 3,
-        };
-        let (side, x, y) = (self.units[i].side, self.units[c].x, self.units[c].y);
-        for _ in 0..n {
-            let mut larva = crate::data::rabochaya();
-            larva.name = "Личинка".into();
-            self.spawn(side, larva, x, y);
-        }
-        true
     }
 
     /// Стрекот: every second round an enemy with four or more chirring bodies beside it shakes with their chirr (metal
@@ -1422,8 +1387,14 @@ impl Battle {
         let mimic = if self.units[i].t.has(Trait::Mimic) { self.mimicry[self.units[i].side as usize % 2] } else { 0 };
         let probivnoy = self.units[i].t.has(Trait::Probivnoy);
         let tj = &self.units[j];
+        // the Devourer at its third stage, the Colossus's size: the blow tramples every enemy of size 5 or less beside it
+        let colossal = self.units[i].t.has(Trait::ThirdStage) && self.units[i].growth >= 3;
         // a flyer is not trampled: it is over the blow, not under the foot
-        let victims: Vec<usize> = if size >= tj.t.size + 2 && tj.fp() == 1 {
+        let victims: Vec<usize> = if colossal {
+            let mut v = vec![j];
+            v.extend(self.adjacent_enemies(i).into_iter().filter(|&k| k != j && self.units[k].t.size <= 5));
+            v
+        } else if size >= tj.t.size + 2 && tj.fp() == 1 {
             let (cx, cy) = (tj.x, tj.y);
             self.enemies_of(i)
                 .filter(|&v| v == j || (self.units[v].fp() == 1 && self.units[v].x == cx && self.units[v].y == cy && !self.units[v].t.has(Trait::Flyer)))
@@ -1546,7 +1517,6 @@ impl Battle {
         }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
-        self.feed(h.attacker, d);
         if h.stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
             self.units[t].stunned = true;
             self.ev(Event::Stun { t });
@@ -1611,22 +1581,6 @@ impl Battle {
             for k in neighbours {
                 self.fear_check(k, 7);
             }
-        }
-    }
-
-    /// Кровь Пожирателя in a breed: a body grows on the damage it has bitten out — six for the first growth, twelve for
-    /// the second (a body seldom kills: golems are few and hard).
-    fn feed(&mut self, a: usize, d: i32) {
-        let u = &mut self.units[a];
-        if d <= 0 || !u.t.has(Trait::Grows) || u.t.has(Trait::Leader) || !u.present() {
-            return;
-        }
-        u.fed += d;
-        if u.growth < 2 && u.fed >= 6 * (u.growth as i32 + 1) {
-            u.growth += 1;
-            let gain = u.t.hp / 2;
-            u.t.hp += gain;
-            u.hp += gain;
         }
     }
 
@@ -1704,15 +1658,26 @@ impl Battle {
         if !self.units[a].present() {
             return;
         }
+        self.units[a].kills += 1;
+        // the Devourer has already eaten it in `kill` (whatever falls beside it is its meal, its own kill too)
+        if !(self.units[a].t.has(Trait::Grows) && self.units[a].t.has(Trait::Leader)) {
+            self.eat(a);
+        }
+    }
+
+    /// A meal: the killer eats («Пожирание» heals a quarter), the Devourer is fed and grows on every second one —
+    /// twice, or thrice with its third stage.
+    fn eat(&mut self, a: usize) {
         let round = self.round;
         let u = &mut self.units[a];
         u.last_meal = round;
         if u.t.has(Trait::Devour) {
             u.hp = (u.hp + (u.t.hp / 4).max(1)).min(u.t.hp);
         }
-        u.kills += 1;
-        // the Devourer grows on every second kill (its blood in a breed grows on what it bites: `feed`)
-        if u.t.has(Trait::Grows) && u.t.has(Trait::Leader) && u.kills.is_multiple_of(2) && u.growth < 2 {
+        u.meals += 1;
+        // the third stage: grows on every meal, not every second, and one stage further
+        let (stages, every) = if u.t.has(Trait::ThirdStage) { (3, 1) } else { (2, 2) };
+        if u.t.has(Trait::Grows) && u.t.has(Trait::Leader) && u.meals.is_multiple_of(every) && u.growth < stages {
             u.growth += 1;
             let gain = u.t.hp / 2;
             u.t.hp += gain;
@@ -1765,6 +1730,17 @@ impl Battle {
                 self.spawn(side, crate::data::unit("moshkara"), x, y);
             }
         }
+        // an enemy that falls beside the Devourer is its meal: the swarm brings a machine down, the beast eats it (the
+        // killer's own meal is counted in on_kill; the Devourer does not eat its own swarm)
+        if self.units[t].t.is_army() {
+            let eaters: Vec<usize> = (0..self.units.len())
+                .filter(|&k| self.units[k].side != side && self.units[k].present() && self.units[k].t.has(Trait::Grows) && self.units[k].t.has(Trait::Leader))
+                .filter(|&k| self.dist(k, t) <= 1)
+                .collect();
+            for k in eaters {
+                self.eat(k);
+            }
+        }
         // a cloud and a ghost leave nothing behind
         if self.units[t].t.has(Trait::Cloud) || self.units[t].t.has(Trait::Ghost) {
             self.units[t].on_field = false;
@@ -1793,7 +1769,6 @@ impl Battle {
                 if let Some(p) = self.spawn(by, hull, x, y) {
                     self.units[p].hp = quarter;
                     self.units[p].infected = Some(by);
-                    self.units[t].eaten = true; // the hull walked off: no corpse to eat
                     return;
                 }
             }
@@ -1839,8 +1814,8 @@ impl Battle {
                     self.kill(j);
                 }
             }
-            // the Devourer starves without a kill for 3 rounds, a tenth of its health a round (the leader; its blood in
-            // a breed grows, never starves); hungry at the start of a run, from the 2nd round and a fifth
+            // the Devourer starves without a meal for 3 rounds, a tenth of its health a round; hungry at the start of a
+            // run, from the 2nd round and a fifth
             let hungry = self.units[j].t.traits.iter().any(|x| matches!(x, Trait::Hungry { .. }));
             let (after, part) = if hungry { (2, 5) } else { (3, 10) };
             if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.units[j].t.has(Trait::Leader) && self.round >= self.units[j].last_meal + after {

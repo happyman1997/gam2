@@ -139,24 +139,6 @@ fn flyers_are_not_trampled() {
     }
 }
 
-/// Кровь Пожирателя in a breed: a body grows on what it bites out (6, then 12), not on kills.
-#[test]
-fn devourer_blood_grows_on_what_it_eats() {
-    // a Mechanic does not strike back: the beetle bites in peace
-    let mut bt = Battle::new(2);
-    let g = bt.place(1, mekhanik(), 10, 10);
-    let b = bt.place(0, with(zhuk(), Trait::Grows), 9, 10);
-    let hp0 = bt.units[b].t.hp;
-    for _ in 0..12 {
-        if bt.step().is_some() || bt.units[b].fed >= 6 {
-            break;
-        }
-    }
-    assert!(bt.units[b].fed >= 6 && bt.units[b].growth >= 1, "fed {} growth {}", bt.units[b].fed, bt.units[b].growth);
-    assert!(bt.units[b].t.hp > hp0);
-    let _ = g;
-}
-
 /// Стрекот: every second round an enemy with four chirring bodies beside it — a machine too — loses its blow.
 #[test]
 fn the_chirr_shakes_the_surrounded() {
@@ -213,23 +195,6 @@ fn mimics_take_up_the_fallen_machines_weapons() {
     assert_eq!(bt.mimicry(0), MIMIC_SHELL, "the lightning stayed beside the shell");
 }
 
-/// Пир: a feaster with no enemy beside it eats a corpse beside it; a larva hatches from it and the corpse is gone.
-#[test]
-fn the_feast_eats_the_fallen() {
-    let mut bt = Battle::new(4);
-    let dead = bt.place(0, soldat(), 5, 10);
-    let f = bt.place(0, with(rabochaya(), Trait::Feast), 4, 10);
-    bt.place(1, strazh(), 33, 20);
-    bt.units[dead].hp = 0;
-    bt.units[dead].alive = false;
-    bt.units[f].glued_until = 9; // it stays by the corpse
-    let n0 = bt.units.len();
-    bt.step();
-    assert!(bt.units[dead].eaten && !bt.units[dead].on_field, "the corpse was not eaten");
-    assert_eq!(bt.units.len(), n0 + 1, "no larva hatched");
-    assert_eq!(bt.units[n0].side, 0);
-}
-
 /// Кукловод: an infected machine that falls rises for the swarm for two rounds; then it falls apart, and larvae come
 /// out of it; the puppet is no army.
 #[test]
@@ -277,4 +242,46 @@ fn the_mirage_takes_the_blows() {
     }
     let melted = ghosts.iter().filter(|&&k| !bt.units[k].alive).count();
     assert!(melted > 0, "no ghost took a blow");
+}
+
+/// Третья ступень — the Devourer's own mutation: it goes onto the Devourer, not onto the swarm; the Devourer grows on
+/// every meal, not every second, thrice, and at the third stage its blow tramples every enemy of size 5 or less
+/// beside it.
+#[test]
+fn the_devourer_grows_a_third_stage() {
+    use sim::run::{Class, Run, SWARM};
+    let mut r = Run::new(Class::Swarm, 2, 1);
+    r.breeds.push((SWARM.to_string(), "m_third".to_string()));
+    let lead = r.army.iter().position(|m| r.is_leader(m)).unwrap();
+    let body = r.army.iter().position(|m| !r.is_leader(m)).unwrap();
+    assert!(r.body(&r.army[lead]).has(Trait::ThirdStage), "the Devourer did not mutate");
+    assert!(!r.body(&r.army[body]).has(Trait::ThirdStage), "the swarm took the Devourer's own mutation");
+    // one meal — an enemy falling beside it — grows it with the third stage, not without
+    for (third, grown) in [(true, 1), (false, 0)] {
+        let mut t = r.body(&r.army[lead]);
+        if !third {
+            t.traits.retain(|x| *x != Trait::ThirdStage);
+        }
+        let mut bt = Battle::new(5);
+        let d = bt.place(0, t, 10, 10);
+        let m = bt.place(1, mekhanik(), 11, 10);
+        bt.units[m].hp = 1;
+        bt.step();
+        assert!(!bt.units[m].alive, "the golem beside it did not fall");
+        assert_eq!(bt.units[d].growth, grown, "third stage {third}: one meal grew it {} times", bt.units[d].growth);
+    }
+    // grown thrice, it tramples the golems beside it with each blow
+    let mut bt = Battle::new(3).with_log();
+    let d = bt.place(0, r.body(&r.army[lead]), 10, 10);
+    bt.units[d].growth = 3;
+    let a = bt.place(1, mekhanik(), 13, 10);
+    let b = bt.place(1, mekhanik(), 13, 12);
+    let c = bt.place(1, strazh(), 10, 13);
+    bt.step();
+    let hit = |t: usize| bt.log.as_ref().unwrap().iter().any(|e| matches!(e, Event::Hit { a: x, t: y, .. } if *x == d && *y == t));
+    let small = [a, b].iter().filter(|&&k| bt.dist(d, k) <= 1 && hit(k)).count();
+    let near_small = [a, b].iter().filter(|&&k| bt.dist(d, k) <= 1).count();
+    assert!(near_small >= 2, "the golems did not stand beside it");
+    assert_eq!(small, near_small, "the third stage did not trample the small golems beside it");
+    let _ = c;
 }

@@ -221,7 +221,7 @@ def kits():
             MANIFEST["icons"][f"{key}/{name}"] = dict(atlas=f"icons/{png}", rect=[cx * cell, cy * cell, cell, cell], name=v.get("name", ""))
     # the swarm's doctrines drawn by an icon of an older name: mimicry by the hybrid, the feast by the table, the
     # puppeteer by the psi leash, the mirage by the echo
-    for new, old, title in (("m_mimic", "m_hybrid", "Мимикрия"), ("m_feast", "m_table", "Пир"), ("m_puppet", "m_psi_leash", "Кукловод"),
+    for new, old, title in (("m_mimic", "m_hybrid", "Мимикрия"), ("m_third", "m_fattened", "Третья ступень"), ("m_puppet", "m_psi_leash", "Кукловод"),
                             ("m_mirage", "m_psi_echo", "Мираж")):
         MANIFEST["icons"][f"swarm/{new}"] = dict(MANIFEST["icons"][f"swarm/{old}"], name=title)
     g = json.load(open(os.path.join(HERE, "assets", "ui_kit", "foundry", "glyphs.json")))

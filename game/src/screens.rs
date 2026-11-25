@@ -336,6 +336,7 @@ fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: R
     let genome = tf("find.genome", &[("n", &run.genome()), ("max", &sim::data::rules().genome)]);
     let kind = match &o.find {
         Find::Module(k) => format!("{} · {}", t("find.module"), module_for(k)),
+        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.personal) => format!("{} · {genome}", t("find.personal")),
         Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.is_some()) => format!("{} · {genome}", t("find.pool")),
         _ => format!("{} · {genome}", t("find.mutation")),
     };
@@ -2679,9 +2680,9 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Honey => n("tr.honey", "tr.honey.l"),
         T::Buds => n("tr.buds", "tr.buds.l"),
         T::Chirr => n("tr.chirr", "tr.chirr.l"),
+        T::ThirdStage => n("tr.thirdstage", "tr.thirdstage.l"),
         T::Hungry { left } => (t("tr.hungry"), tf("tr.hungry.l", &[("n", &left)])),
         T::Mimic => n("tr.mimic", "tr.mimic.l"),
-        T::Feast => n("tr.feast", "tr.feast.l"),
         T::Puppeteer => n("tr.puppeteer", "tr.puppeteer.l"),
         T::Puppet => n("tr.puppet", "tr.puppet.l"),
         T::Mirage => n("tr.mirage", "tr.mirage.l"),
