@@ -452,6 +452,7 @@ impl Run {
             if let Some(f) = finds.modules.iter().find(|f| &f.key == key) {
                 let had = t.abilities.len();
                 f.give.apply(&mut t);
+                t.mods.push((key.clone(), m.level(j)));
                 // a level above I: what the module gave a round sooner and a die bigger — or, with nothing of that
                 // to raise, a harder blow
                 for _ in 1..m.level(j) {

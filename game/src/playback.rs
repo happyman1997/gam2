@@ -32,6 +32,8 @@ pub struct UnitInfo {
     pub ghost: bool,
     /// A fallen machine worked by larvae (Кукловод): sickly, not counted.
     pub puppet: bool,
+    /// The modules on a golem with their levels (finds.ron keys): drawn over its body.
+    pub mods: Vec<(String, u8)>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -152,6 +154,7 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
             cloud: u.t.has(Trait::Cloud),
             ghost: u.t.has(Trait::Ghost),
             puppet: u.t.has(Trait::Puppet),
+            mods: u.t.mods.clone(),
         })
         .collect()
 }

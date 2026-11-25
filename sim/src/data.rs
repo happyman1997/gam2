@@ -329,6 +329,10 @@ pub fn army(key: &str) -> Vec<Template> {
         }
         for m in &e.modules {
             t = t.with(module(m));
+            // the picture: the find that gives this module, at level I
+            if let Some(f) = DATA.finds.modules.iter().find(|f| f.give.module.as_deref() == Some(m.as_str())) {
+                t.mods.push((f.key.clone(), 1));
+            }
         }
         for a in &e.abilities {
             t = t.with(*a);
@@ -641,6 +645,7 @@ pub fn swarm(c: Caste, f: Form) -> Template {
         golem: false,
         traits,
         abilities: if soldier { d.abilities.1.clone() } else { d.abilities.0.clone() },
+        mods: vec![],
     }
 }
 

@@ -360,6 +360,21 @@ pub fn run(demo: Demo, dir: &str) {
     let first = |want: sim::Cast| {
         (0..rec.rounds.len()).flat_map(|r| rec.moments(r)).find(|m| matches!(m.ev, sim::Event::Cast { kind, .. } if kind == want)).map(|m| m.frame)
     };
+    // the workshop's work seen in battle: golems with their modules on them, as the battle begins
+    let mut kit = vec![];
+    for (mut t, mods) in [
+        (data::mudrets(), vec![("fireball", 3), ("overload", 1)]),
+        (data::orudie(), vec![("mortar", 2), ("long", 1)]),
+        (data::orudie(), vec![("canister", 3)]),
+        (data::mekhanik(), vec![("repair", 2)]),
+        (data::strazh(), vec![("plates", 2), ("counter", 1)]),
+        (data::strazh(), vec![("tower", 3)]),
+    ] {
+        t.mods = mods.into_iter().map(|(k, l)| (k.to_string(), l)).collect();
+        kit.push(t);
+    }
+    let rec = crate::playback::record_of(31, &kit, &bugs);
+    snap_battle(&mut g, dir, "62_battle_modules", rec, 4.0, 2);
     for (name, want, after) in [("58_battle_fireball", sim::Cast::Fireball, 5), ("59_battle_quake", sim::Cast::Quake, 6), ("60_battle_spit", sim::Cast::Spit, 9),
                                 ("61_battle_grapeshot", sim::Cast::PointBlank, 4)] {
         if let Some(f) = first(want) {

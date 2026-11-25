@@ -315,6 +315,10 @@ pub struct Template {
     pub golem: bool,
     pub traits: Vec<Trait>,
     pub abilities: Vec<Ability>,
+    /// The modules put on it (finds.ron keys) with their levels I–III: only for the picture (its modules shown on it
+    /// in battle); what they give is already in the numbers, traits and abilities above.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mods: Vec<(String, u8)>,
 }
 
 impl Template {

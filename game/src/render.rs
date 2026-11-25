@@ -852,6 +852,19 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         let flip = info.side == 1;
         let ox = if flip { spr.img.w - 1 - spr.ox } else { spr.ox };
         let (sx, sy) = ((x + anim.dx).round() as i32 - ox, (y + anim.dy).round() as i32 - spr.oy);
+        // the modules on a golem, each a layer over its body in the same pose (sprites/mod/…), drawn as the body is
+        let mods: Vec<(&crate::assets::Sprite, i32, i32)> = match name.rsplit_once('_') {
+            Some((prefix, pose)) if info.machine && !info.mods.is_empty() => info
+                .mods
+                .iter()
+                .filter_map(|(key, lvl)| a.sprites.get(&format!("mod/{prefix}_{key}_{lvl}_{pose}")))
+                .map(|o| {
+                    let oox = if flip { o.img.w - 1 - o.ox } else { o.ox };
+                    (o, (x + anim.dx).round() as i32 - oox, (y + anim.dy).round() as i32 - o.oy)
+                })
+                .collect(),
+            _ => vec![],
+        };
         if anim.pose == Pose::Dead {
             // the dead lie darker and greyer than the living, so a heap of them does not read as a living swarm; the
             // longer dead, the deeper they sink into the ground's colour — in steps, opaque, no see-through
@@ -863,12 +876,18 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
                 _ => (0.42, 0.75, 0.55),
             };
             cv.blit_shade_to(&spr.img, sx, sy, flip, mul, grey, [42, 34, 50], sink);
+            for (o, ox, oy) in &mods {
+                cv.blit_shade_to(&o.img, *ox, *oy, flip, mul, grey, [42, 34, 50], sink);
+            }
         } else if info.ghost {
             // a ghost of the mirage: see-through and psi-violet, wavering
             let waver = 0.42 + 0.12 * (ff * 0.4 + s.id as f32).sin();
             cv.blit_tint_faded(&spr.img, sx, sy, flip, [196, 160, 255], 0.55, waver);
         } else if anim.flash > 0.0 {
             cv.blit_tint(&spr.img, sx, sy, flip, [255, 250, 236], anim.flash);
+            for (o, ox, oy) in &mods {
+                cv.blit_tint(&o.img, *ox, *oy, flip, [255, 250, 236], anim.flash);
+            }
         } else if info.puppet {
             // a machine worked by larvae: a sickly green film over the metal, and the grubs themselves writhing in
             // its seams, at the chest and the hip, turning over now and then
@@ -883,6 +902,9 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             }
         } else {
             cv.blit(&spr.img, sx, sy, flip, 1.0);
+            for (o, ox, oy) in &mods {
+                cv.blit(&o.img, *ox, *oy, flip, 1.0);
+            }
         }
         if let Some(k) = s.dead_at.filter(|_| !info.ghost) {
             over.push(Dying { sx, sy, flip, flash: anim.flash, x, y, golem: info.machine, big, t: ff - k as f32, name });
