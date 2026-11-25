@@ -2422,6 +2422,20 @@ pub fn icon_label(key: &str) -> Option<String> {
         "glyph/dmg:кисл" => "dmg.acid",
         "swarm/clutch" => "alt.brood",
         "swarm/selection" => "alt.selection",
+        // what a leader's growth gives (growth_icon)
+        "glyph/клетка" => "alt.cell",
+        "glyph/оглушение" => "alt.quake",
+        "glyph/литой" => "alt.cast",
+        "glyph/модуль" => "alt.module",
+        "glyph/призыв" => "alt.summon",
+        "glyph/стена" => "alt.wall",
+        "glyph/яйцо" => "alt.egg",
+        "glyph/личинка" => "alt.larva",
+        "glyph/цель" => "alt.target",
+        "glyph/пси" => "alt.psi",
+        "glyph/тяжхитин" => "alt.hide",
+        "glyph/яд" => "dmg.poison",
+        "glyph/заражение" => "alt.infect",
         _ => return None,
     };
     Some(t(k))
