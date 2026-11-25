@@ -166,6 +166,20 @@ pub fn run(demo: Demo, dir: &str) {
         g.run = Some(r3);
         set(&mut g, Screen::Shop(shop));
         snap(&mut g, dir, &format!("13_{tag}_shop"), (370, 200));
+        if cls == Class::Swarm {
+            // the Devourer's own mutation on the trader's table: it goes onto him, not onto the swarm
+            let mut r = Run::new(Class::Swarm, 2, 7);
+            r.money = 37;
+            let mut shop = r.shop();
+            let third = sim::run::Offer { key: "m_third".into(), units: vec![], price: 12, find: sim::run::Find::Mutation("m_third".into()) };
+            match shop.offers.iter_mut().find(|(o, _)| matches!(o.find, sim::run::Find::Mutation(_))) {
+                Some(slot) => slot.0 = third,
+                None => shop.offers[2].0 = third,
+            }
+            g.run = Some(r);
+            set(&mut g, Screen::Shop(shop));
+            snap(&mut g, dir, "13b_s_shop_devourer", (370, 200));
+        }
         // an event of the class
         let ev = sim::run::EVENTS.iter().position(|e| e.1 == Some(cls)).unwrap_or(0);
         g.run = Some(run.clone());
