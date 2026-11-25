@@ -190,6 +190,10 @@ pub enum Trait {
     Mirage,
     /// A ghost of the Hive Mind's mirage: does not strike, melts away at the first blow, no army.
     Ghost,
+    /// The Devourer at the start of a run (Голод): `left` more enemies for the swarm to kill this run before it is fed;
+    /// till then it starves from the 2nd round without a kill and loses a fifth of its health a round (fed: from the
+    /// 3rd, a tenth).
+    Hungry { left: u32 },
     /// Стрекот: every second round an enemy with four or more of these beside it loses its blow (the chirr shakes it;
     /// machines ring with it too).
     Chirr,

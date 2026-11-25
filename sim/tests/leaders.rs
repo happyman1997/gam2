@@ -70,3 +70,35 @@ fn viviparous_lets_out_one_larva() {
     assert!(larvae.len() <= deaths, "{} larvae from {deaths} deaths", larvae.len());
     assert!(larvae.iter().all(|&u| !bt.units[u].t.has(Trait::Viviparous)), "a larva viviparous too");
 }
+
+/// The Devourer is hungry at the start of a run: till its swarm has killed 30 enemies it starves from the 2nd round
+/// without a kill, a fifth of its health a round; fed, from the 3rd round and a tenth.
+#[test]
+fn the_devourer_is_hungry_at_the_start() {
+    use sim::model::Trait;
+    use sim::run::{Class, Run};
+    let mut r = Run::new(Class::Swarm, 2, 1);
+    let lead = r.army.iter().position(|m| r.is_leader(m)).unwrap();
+    let fed = sim::data::rules().devourer_fed;
+    assert!(r.body(&r.army[lead]).traits.contains(&Trait::Hungry { left: fed }), "not hungry at the start");
+    r.stats.kills = fed - 5;
+    assert!(r.body(&r.army[lead]).traits.contains(&Trait::Hungry { left: 5 }));
+    r.stats.kills = fed;
+    let sated = r.body(&r.army[lead]);
+    assert!(!sated.traits.iter().any(|t| matches!(t, Trait::Hungry { .. })), "still hungry when fed");
+    // in battle, with no prey in reach: the hungry one loses health sooner and faster
+    let hungry = r.army[lead].t.clone().with_trait(Trait::Hungry { left: 10 });
+    let lost = |t: sim::model::Template| {
+        let mut bt = sim::Battle::new(1);
+        let d = bt.place(0, t, 2, 10);
+        bt.units[d].glued_until = 99; // it stays where it is, far from the enemy
+        bt.place(1, sim::data::strazh(), 33, 10);
+        bt.place(0, sim::data::rabochaya(), 2, 20);
+        for _ in 0..4 {
+            bt.step();
+        }
+        bt.units[d].t.hp - bt.units[d].hp
+    };
+    let (h, s) = (lost(hungry), lost(sated));
+    assert!(h > s && s > 0, "hungry lost {h}, fed lost {s}");
+}

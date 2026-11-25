@@ -235,6 +235,8 @@ pub struct RunRules {
     pub eaten_per_biomass: u32,
     /// How many mutations the swarm's genome holds.
     pub genome: usize,
+    /// How many enemies the Devourer's swarm must kill in a run before it is fed (Голод).
+    pub devourer_fed: u32,
 }
 
 #[derive(Debug, Deserialize)]

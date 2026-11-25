@@ -477,6 +477,11 @@ impl Run {
         for a in &self.artifacts {
             a.apply(&mut t);
         }
+        // the Devourer is hungry at the start of a run, till its swarm has killed enough
+        let fed = data::rules().devourer_fed;
+        if self.is_leader(m) && t.has(Trait::Grows) && self.stats.kills < fed {
+            t.traits.push(Trait::Hungry { left: fed - self.stats.kills });
+        }
         t
     }
 

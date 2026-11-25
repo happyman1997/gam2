@@ -1839,9 +1839,12 @@ impl Battle {
                     self.kill(j);
                 }
             }
-            // the Devourer starves without a kill for 3 rounds (the leader; its blood in a breed grows, never starves)
-            if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.units[j].t.has(Trait::Leader) && self.round >= self.units[j].last_meal + 3 {
-                let loss = (self.units[j].t.hp / 10).max(1);
+            // the Devourer starves without a kill for 3 rounds, a tenth of its health a round (the leader; its blood in
+            // a breed grows, never starves); hungry at the start of a run, from the 2nd round and a fifth
+            let hungry = self.units[j].t.traits.iter().any(|x| matches!(x, Trait::Hungry { .. }));
+            let (after, part) = if hungry { (2, 5) } else { (3, 10) };
+            if self.units[j].present() && self.units[j].t.has(Trait::Grows) && self.units[j].t.has(Trait::Leader) && self.round >= self.units[j].last_meal + after {
+                let loss = (self.units[j].t.hp / part).max(1);
                 self.units[j].hp -= loss;
                 if self.units[j].hp <= 0 {
                     self.kill(j);

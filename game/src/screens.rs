@@ -2679,6 +2679,7 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Honey => n("tr.honey", "tr.honey.l"),
         T::Buds => n("tr.buds", "tr.buds.l"),
         T::Chirr => n("tr.chirr", "tr.chirr.l"),
+        T::Hungry { left } => (t("tr.hungry"), tf("tr.hungry.l", &[("n", &left)])),
         T::Mimic => n("tr.mimic", "tr.mimic.l"),
         T::Feast => n("tr.feast", "tr.feast.l"),
         T::Puppeteer => n("tr.puppeteer", "tr.puppeteer.l"),

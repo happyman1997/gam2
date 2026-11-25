@@ -900,7 +900,7 @@ mod flow {
             Trait::Venom { die: 4 }, Trait::BurstAcid { die: 4 }, Trait::Charge, Trait::Thorns { die: 3 }, Trait::CurlUp, Trait::Leap,
             Trait::TwinBlades, Trait::Glow, Trait::HiveMind, Trait::Grows, Trait::Infects, Trait::Changeling, Trait::Viviparous,
             Trait::Spitter, Trait::Midges, Trait::Cloud, Trait::Spinner, Trait::Honey, Trait::Buds, Trait::Chirr, Trait::Mimic,
-            Trait::Feast, Trait::Puppeteer, Trait::Puppet, Trait::Mirage, Trait::Ghost,
+            Trait::Feast, Trait::Puppeteer, Trait::Puppet, Trait::Mirage, Trait::Ghost, Trait::Hungry { left: 12 },
         ];
         for tr in &traits {
             let (n, l) = trait_words(tr);
