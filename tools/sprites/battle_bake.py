@@ -171,12 +171,13 @@ def grounds():
 
 # the modules' effects (pixelfx, built by pxfx.py into tools/sprites/assets/fx): (name, every n-th frame, cut after)
 MODULE_FX = (("fireball", 2, None), ("fire-breath", 2, 24), ("ground-slam", 3, 66), ("muzzle-shotgun", 2, 50),
-             ("acid-splash", 3, 75), ("mana-burst", 2, None))
+             ("acid-splash", 3, 75), ("mana-burst", 2, None), ("devour-splash", 3, 66))
 
 
 def module_fx(manifest):
     """The effects of what goes off in battle, as demo_bake's sheets: the Sage's fireball in flight, the Forge's
-    flame, the Colossus's quake, the Gun's grapeshot, the spitter's gob bursting, the firefly's flash."""
+    flame, the Colossus's quake, the Gun's grapeshot, the spitter's gob bursting, the firefly's flash, the Devourer's
+    meal (tools/fx/swarm/devour-splash.js)."""
     import pxfx
     os.makedirs(os.path.join(DST, "fx"), exist_ok=True)
     for name, step, cut in MODULE_FX:
@@ -192,7 +193,19 @@ def module_fx(manifest):
                                                    fps=meta["fps"] / step)
 
 
+def devourer_third(manifest):
+    """The Devourer grown thrice (its own mutation, Третья ступень), in each pose, as demo_bake bakes the others."""
+    import demo_bake as DB
+    import swarm_leaders as SL
+    from swarm_menus import flip_dead
+    DB.MANIFEST["sprites"] = manifest.setdefault("sprites", {})
+    for pose in ("idle", "attack", "walk0", "walk1"):
+        DB.save_sprite(f"Пожиратель_3_{pose}", SL.build("Пожиратель", pose, 1.0, stage=3))
+    DB.save_sprite("Пожиратель_3_dead", flip_dead(SL.build("Пожиратель", "idle", 1.0, stage=3), 0.3))
+
+
 def bake(manifest):
+    devourer_third(manifest)
     grounds()
     status(manifest)
     flames(manifest)

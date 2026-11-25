@@ -204,6 +204,10 @@ pub enum Cast {
     Bolt,
     /// Картечь: a blast at the enemies beside it.
     PointBlank,
+    /// The Devourer eats one fallen beside it (`t`: the eaten).
+    Devour,
+    /// The Devourer at its third stage tramples all small ones beside it with one blow.
+    Trample,
 }
 
 #[derive(Clone, Debug)]
@@ -1442,6 +1446,9 @@ impl Battle {
         let victims: Vec<usize> = if colossal {
             let mut v = vec![j];
             v.extend(self.adjacent_enemies(i).into_iter().filter(|&k| k != j && self.units[k].t.size <= 5));
+            if v.len() > 1 {
+                self.ev(Event::Cast { u: i, kind: Cast::Trample, t: i });
+            }
             v
         } else if size >= tj.t.size + 2 && tj.fp() == 1 {
             let (cx, cy) = (tj.x, tj.y);
@@ -1787,6 +1794,7 @@ impl Battle {
                 .filter(|&k| self.dist(k, t) <= 1)
                 .collect();
             for k in eaters {
+                self.ev(Event::Cast { u: k, kind: Cast::Devour, t });
                 self.eat(k);
             }
         }

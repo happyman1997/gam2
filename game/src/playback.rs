@@ -526,6 +526,8 @@ impl Record {
                                 last_volley = Some((a, m.frame));
                                 "small-explosion"
                             }
+                            // the swarm with a Sage's or an Inventor's current in its bite (Мимикрия): its bites crackle
+                            _ if !att.machine && self.rounds[r].mimic[att.side as usize % 2] & sim::battle::MIMIC_SHOCK != 0 => "zap-hit",
                             _ => "hit-spark",
                         };
                         fx.push(Effect { name, x, y: if name == "hit-spark" { y - 14.0 } else { y }, start: m.frame, link: None, flip: false, from: None });
@@ -564,6 +566,10 @@ impl Record {
                                 }
                             }
                             Cast::PointBlank => fx.push(fx_at("muzzle-shotgun", ux, uy - 6.0, m.frame, left)),
+                            // the Devourer's jaws close on the fallen: blood where it lay
+                            Cast::Devour => fx.push(fx_at("devour-splash", tx, ty, m.frame + 2, false)),
+                            // its third stage: one blow, and all the small ones round it are under its feet
+                            Cast::Trample => fx.push(fx_at("ground-slam", ux, uy, m.frame, false)),
                         }
                     }
                     Event::Heal { t, amount, .. } => {

@@ -24,7 +24,7 @@ import swarm1 as W
 from swarm1 import (pivot, spike, leg_pairs, antennae, mandibles, rings, chitin, chitin_shift, M_EYE, M_FANG, M_BONE,
                     M_ICHOR, M_SHEEN, M_DARKEYE, M_WING, M_WING_NEAR, M_VEIN, M_EGG, M_MEMBRANE, AMBER, CRIMSON)
 
-SCALE = {1: 1.0, 2: 1.45, 3: 1.9, 4: 2.3, 5: 2.7, 6: 3.1, 7: 3.5}
+SCALE = {1: 1.0, 2: 1.45, 3: 1.9, 4: 2.3, 5: 2.7, 6: 3.1, 7: 3.5, 8: 3.9}
 SIZE = {"Матка": 6, "Разум улья": 4, "Пожиратель": 5, "Чума": 3, "личинка": 1}
 
 M_GRUB = Mat(ramp("#241a12", "#54442e", "#8a7656", "#bea98a", "#ece0c4"))
@@ -219,7 +219,9 @@ def razum(pose="idle", hue=0.0):
 
 # ---------------------------------------------------------------- Пожиратель
 def pozhiratel(pose="idle", stage=0, hue=0.0):
-    """stage 0, 1, 2 — sizes 5, 6, 7: more plates and spines as it grows; at the last its cracks glow."""
+    """stage 0, 1, 2 — sizes 5, 6, 7: more plates and spines as it grows; at the last its cracks glow. Stage 3 (its own
+    mutation, Третья ступень) — size 8: three rows of spines, a crown of bone horns over the maw, the cracks run its
+    whole back."""
     m = Model()
     mc = mat(DEVOURER, hue)
     heavy = Mat(chitin_shift(mc, 0.0, light=1.18))
@@ -238,17 +240,29 @@ def pozhiratel(pose="idle", stage=0, hue=0.0):
     m.ell((1.4, 10.6 + 0.2 * stage, 0), (2.4, 0.4, 2.6), M_SHEEN, rot_z(-0.1))
     for z in (1, -1):
         m.ell((1.4, 6.8, 4.0 * z), (3.6, 2.6, 1.0), heavy)                                   # side plates
-    nsp = (3, 4, 5)[stage]
+    nsp = (3, 4, 5, 6)[stage]
     for i in range(nsp):                                                                      # spines down the back
         x = 2.0 - i * (11.0 / max(1, nsp - 1))
         y = 10.4 + 0.2 * stage if x > -2.5 else ac[1] + 3.8 * np.sqrt(max(0, 1 - ((x - ac[0]) / (6.2 * g)) ** 2))
-        L = 3.0 + 0.9 * stage
-        for z in ((0.0,) if stage < 2 else (1.6, -1.6)):
-            spike(m, (x, y - 0.6, z), (x - L * 0.55, y + L, z * 1.5), 0.75 + 0.12 * stage, M_FANG)
-    if stage == 2:                                                                            # cracks glow with ichor
-        for a, b in (((2.8, 11.2, 1.6), (-0.4, 10.6, 3.4)), ((-0.4, 10.6, 3.4), (-2.6, 9.0, 3.2)),
-                     ((-5.0, 9.8, 2.0), (-8.6, 9.6, 3.0)), ((-8.6, 9.6, 3.0), (-11.0, 8.0, 2.8))):
+        L = 3.0 + 0.9 * min(stage, 2) + (0.6 if stage == 3 else 0.0)
+        # the third stage: the two rows wider apart, short ones between them on every other plate
+        rows = (0.0,) if stage < 2 else (1.6, -1.6) if stage == 2 else ((2.2, -2.2, 0.0) if i % 2 == 0 else (2.2, -2.2))
+        for z in rows:
+            short = z == 0 and stage == 3
+            spike(m, (x, y - 0.6, z), (x - L * 0.55, y + L * (0.5 if short else 1.0), z * 1.5),
+                  0.75 + 0.12 * min(stage, 2), M_FANG)
+    if stage >= 2:                                                                            # cracks glow with ichor
+        cracks = [((2.8, 11.2, 1.6), (-0.4, 10.6, 3.4)), ((-0.4, 10.6, 3.4), (-2.6, 9.0, 3.2)),
+                  ((-5.0, 9.8, 2.0), (-8.6, 9.6, 3.0)), ((-8.6, 9.6, 3.0), (-11.0, 8.0, 2.8))]
+        if stage == 3:                                                                        # down the other flank too
+            cracks += [((2.6, 11.0, -1.4), (-0.6, 10.4, -3.2)), ((-0.6, 10.4, -3.2), (-3.0, 8.6, -3.0)),
+                       ((-4.6, 10.0, -1.8), (-8.2, 9.8, -2.8)), ((0.4, 9.0, 4.4), (-4.0, 7.6, 4.6))]
+        for a, b in cracks:
             m.limb([np.array(a), np.array(b)], 1, M_CRACK, band=2)
+    if stage == 3:                                                                            # a crown of bone horns
+        for z, lift in ((0.0, 2.2), (2.0, 1.6), (-2.0, 1.6)):                                # swept forward
+            base = np.array((3.6, 10.2, z))
+            spike(m, base, base + np.array((4.4, lift, z * 0.5)), 1.0, M_BONE)
     # the head that is mostly maw: four jaws with rows of teeth, a hood of plate, small red eyes
     jaw = (0.35 if pose == "idle" else 0.95) + 0.05 * stage
     hd = Model()

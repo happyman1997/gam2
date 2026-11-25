@@ -252,7 +252,7 @@ fn sprite_name(rec: &Record, id: usize, pose: Pose, f: i32) -> String {
         Pose::Walk(k) => format!("walk{}", if info.fp >= 2 || info.leader { (k / 2) % 2 } else { k % 2 }),
     };
     match n {
-        "Пожиратель" => format!("Пожиратель_{}_{}", rec.state_at(id, f).growth.min(2), p("dead")),
+        "Пожиратель" => format!("Пожиратель_{}_{}", rec.state_at(id, f).growth.min(3), p("dead")),
         "Матка" | "Разум улья" | "Чума" | "Личинка" => format!("{n}_{}", p("dead")),
         "Рабочая" => format!("Муравей (рабочая)_{}_{}", id % 4, p("dead")),
         "Солдат" => format!("Муравей (солдат)_{}_{}", id % 4, p("dead")),
@@ -870,8 +870,17 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         } else if anim.flash > 0.0 {
             cv.blit_tint(&spr.img, sx, sy, flip, [255, 250, 236], anim.flash);
         } else if info.puppet {
-            // a machine worked by larvae: a sickly green film over the metal
+            // a machine worked by larvae: a sickly green film over the metal, and the grubs themselves writhing in
+            // its seams, at the chest and the hip, turning over now and then
             cv.blit_tint(&spr.img, sx, sy, flip, [130, 196, 70], 0.32);
+            for (n, (fx_, fy_)) in [(0.38f32, 0.34f32), (0.58, 0.56), (0.44, 0.74)].iter().enumerate() {
+                let pose = if ((ff as i32 / 5) + n as i32 + s.id as i32) % 2 == 0 { "Личинка_walk0" } else { "Личинка_walk1" };
+                if let Some(g) = a.sprites.get(pose) {
+                    let gx = sx + (spr.img.w as f32 * fx_) as i32 - g.img.w / 2;
+                    let gy = sy + (spr.img.h as f32 * fy_) as i32 - g.img.h / 2 + if (ff as i32 / 3 + n as i32) % 3 == 0 { -1 } else { 0 };
+                    cv.blit(&g.img, gx, gy, (n % 2 == 0) ^ flip, 1.0);
+                }
+            }
         } else {
             cv.blit(&spr.img, sx, sy, flip, 1.0);
         }
@@ -1004,6 +1013,21 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     let share = if sw + fo > 0.0 { sw / (sw + fo) } else { 0.5 };
     let title = &a.fonts["title16"];
     title.draw(cv, &crate::text::tf("hud.swarm", &[("n", &alive(swarm))]), 16, 8, ACID, Some(ACID_EDGE), Align::Left, 1.0);
+    // Мимикрия: the weapon the swarm took up from the last machine it broke, under its count — the module it came from
+    let took = rec.rounds.get((f / FR).max(0) as usize).map(|r| r.mimic[swarm as usize]).unwrap_or(0);
+    use sim::battle::{MIMIC_BLUNT, MIMIC_EDGE, MIMIC_FIRE, MIMIC_MEND, MIMIC_SHELL, MIMIC_SHOCK};
+    let weapon = [(MIMIC_SHOCK, "module/volt"), (MIMIC_FIRE, "module/fire"), (MIMIC_SHELL, "module/plates"), (MIMIC_BLUNT, "module/mortar"),
+        (MIMIC_MEND, "module/repair"), (MIMIC_EDGE, "module/blades")]
+    .iter()
+    .find(|(bit, _)| took & bit != 0)
+    .map(|&(_, k)| k);
+    if let Some((atlas, r)) = weapon.and_then(|k| a.icons.get(k)) {
+        if let Some(img) = a.atlases.get(atlas) {
+            cv.fill(14, 38, r[2] + 6, r[3] + 6, [20, 30, 14, 220]);
+            cv.fill(15, 39, r[2] + 4, 1, [122, 176, 64, 255]);
+            cv.blit_region(img, r[0], r[1], r[2], r[3], 17, 41, false, 1.0);
+        }
+    }
     let (ts, tf) = (&a.ui["tug_swarm"].img, &a.ui["tug_foundry"].img);
     let cut = (share * ts.w as f32) as i32;
     cv.blit_region(ts, 0, 0, cut, ts.h, 144, 10, false, 1.0);

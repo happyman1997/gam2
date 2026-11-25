@@ -102,7 +102,7 @@ def units():
                 for pose in ("idle", "attack", "walk0", "walk1"):          # walk: the two tripods of legs in turn
                     save_sprite(f"{full}_{v}_{pose}", W.build(traits, hue, pose, soldier, k=1.0, genes=W.genes_for(seed)))
                 save_sprite(f"{full}_{v}_dead", flip_dead(W.build(traits, hue, "idle", soldier, k=1.0, genes=W.genes_for(seed)), 0.3))
-    for stage in range(3):
+    for stage in range(4):                   # the fourth: its own mutation, Третья ступень
         for pose in ("idle", "attack", "walk0", "walk1"):
             save_sprite(f"Пожиратель_{stage}_{pose}", SL.build("Пожиратель", pose, 1.0, stage=stage))
         save_sprite(f"Пожиратель_{stage}_dead", flip_dead(SL.build("Пожиратель", "idle", 1.0, stage=stage), 0.3))
