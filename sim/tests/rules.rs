@@ -118,10 +118,49 @@ fn spit_glues_and_poisons_but_not_machines() {
 
 /// Flanking: a crowd bigger than the enemy's front can hold goes round its flanks to its back (a blow there is no
 /// harder than any other: the back blow is gone) — before, the crowd queued up in front.
+/// Удержание: a line of Guards standing fast across the whole field, the gaps between them no wider than four cells,
+/// keeps a crowd of the swarm off the Gun behind it — the crowd comes up to the Guards and fights them, none slips
+/// between them, not even the flankers that run for the archers. Wasps are not held: they fly over the line to it.
 #[test]
-fn a_crowd_goes_round_to_the_back() {
-    use sim::data::*;
-    use sim::Battle;
+fn a_line_holds_the_crowd() {
+    let still = |mut t: sim::model::Template| {
+        t.speed = 0;
+        t
+    };
+    let mut wasps = 0;
+    for form in [Form::Ant, Form::Grasshopper, Form::Wasp] {
+        for seed in 0..10 {
+            let mut bt = Battle::new(seed);
+            for y in [0, 7, 14, 21, 27] {
+                bt.place(0, still(strazh()), 8, y);
+            }
+            let gun = bt.place(0, still(orudie()), 3, 14);
+            for k in 0..24 {
+                bt.place(1, swarm(Caste::Worker, form), 26 + k % 4, 3 + (k / 4) * 4);
+            }
+            for _ in 0..40 {
+                if bt.step().is_some() {
+                    break;
+                }
+                let at = (0..bt.units.len()).any(|k| bt.units[k].side == 1 && bt.units[k].present() && bt.dist(k, gun) <= 1);
+                if form == Form::Wasp {
+                    if at {
+                        wasps += 1;
+                        break;
+                    }
+                } else {
+                    assert!(!at, "{:?} got through the line to the Gun (seed {seed}, round {})", form, bt.round);
+                }
+            }
+        }
+    }
+    assert!(wasps >= 5, "wasps flew over the line to the Gun in only {wasps} of 10 battles");
+}
+
+/// A crowd still surrounds a lone Guard: Удержание keeps it from slipping past him, not from coming round him from
+/// afar — those that come up later take the free places at his back.
+#[test]
+fn a_crowd_still_gets_round_a_lone_guard() {
     let (mut reached, mut battles) = (0, 0);
     for seed in 0..20 {
         let mut bt = Battle::new(seed);

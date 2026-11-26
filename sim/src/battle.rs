@@ -13,6 +13,8 @@ pub const EXHAUSTION_FROM: u32 = 50;
 pub const MAX_ROUNDS: u32 = 150;
 /// Deployment zone depth for each side.
 pub const ZONE: i32 = 15;
+/// How near an enemy's close fighter holds a unit in place (Удержание): within it the unit can only close on it.
+pub const HOLD: i32 = 2;
 /// The block an army of the usual size stands in: as deep and as tall as the whole zone once was. A bigger army
 /// widens it in the same proportions, up to the whole zone.
 pub const BLOCK: (i32, i32) = (6, 14);
@@ -312,6 +314,7 @@ pub struct Battle {
     /// The way-finding's own scratch (kept to spare an allocation a step): what each place costs to fight from, the
     /// first step of the way to each place.
     aim: Vec<u8>,
+    hold: Vec<u8>,
     first: Vec<(i32, i32)>,
     /// Bodies that died live-bearing, per side: every third gives a larva (a whole swarm of them would double itself).
     births: [u32; 2],
@@ -338,6 +341,7 @@ impl Battle {
             log: None,
             mark: [None, None],
             aim: vec![],
+            hold: vec![],
             first: vec![],
             births: [0, 0],
             clouds: [0, 0],
@@ -821,6 +825,28 @@ impl Battle {
                 return;
             }
         }
+        // Удержание: caught within two cells of an enemy's close fighter, it cannot slip past it — no going round to
+        // its flank or its back, no running on to the archers: it closes on that one
+        if let Some(h) = self.held_by(i) {
+            let (hx, hy, hf) = (self.units[h].x, self.units[h].y, self.units[h].fp());
+            self.grid.sub(size, x, y);
+            let mut best = (rect_dist(x, y, f, hx, hy, hf), center_d2(x, y, f, hx, hy, hf), x, y);
+            for (dx, dy) in DIRS {
+                let (nx, ny) = (x + dx, y + dy);
+                if self.grid.can_place(side, size, nx, ny) {
+                    let key = (rect_dist(nx, ny, f, hx, hy, hf), center_d2(nx, ny, f, hx, hy, hf));
+                    if key.0 < best.0 || (key.0 == best.0 && key.0 > 1 && key.1 < best.1) {
+                        best = (key.0, key.1, nx, ny);
+                    }
+                }
+            }
+            if (best.2, best.3) != (x, y) {
+                self.move_to(i, best.2, best.3);
+            } else {
+                self.grid.add(side, size, x, y);
+            }
+            return;
+        }
         let (tx, ty, tf) = {
             let t = &self.units[tj];
             (t.x, t.y, t.fp())
@@ -870,6 +896,28 @@ impl Battle {
         }
     }
 
+    /// Whether `j` holds the enemies near it (Удержание): a fighter of the close fight on its feet — it strikes in
+    /// melee; not one that flies, flees, is a cloud of midges or does not strike at all.
+    fn holds(&self, j: usize) -> bool {
+        let u = &self.units[j];
+        u.present() && !u.fleeing && u.t.range <= 1 && !u.t.has(Trait::NoAttack) && !u.t.has(Trait::Flyer) && !u.t.has(Trait::Cloud)
+    }
+
+    /// Whether the enemy's close fighters can hold `i`: not one in the air, the unstoppable, one that flees.
+    fn holdable(&self, i: usize) -> bool {
+        let u = &self.units[i];
+        !(u.fleeing || u.t.has(Trait::Flyer) || u.t.has(Trait::Unstoppable) || u.t.has(Trait::Cloud))
+    }
+
+    /// The enemy that holds `i` in place, if one does: the nearest of the enemy's close fighters within `HOLD` cells.
+    /// Those in the air, the unstoppable and those that flee are not held.
+    fn held_by(&self, i: usize) -> Option<usize> {
+        if !self.holdable(i) {
+            return None;
+        }
+        self.enemies_of(i).filter(|&j| self.holds(j)).map(|j| (self.dist(i, j), j)).filter(|&(d, _)| d <= HOLD).min().map(|(_, j)| j)
+    }
+
     /// Where to go to fight: the first step of the best way (eight directions, round everyone in the way) to a place
     /// within `reach` of one of `goals`, no longer than `limit` steps; a place at an enemy's back counts as the
     /// nearest, at its side one step farther, at its front three (so a unit goes round when that is up to two or three
@@ -902,6 +950,25 @@ impl Battle {
                 }
             }
         }
+        // Удержание: the ground within `HOLD` of the enemy's close fighters is held — a way that has come into it goes
+        // on only closer to them, not along their line nor past them (no slipping round to their flank or their back)
+        let mut hold = std::mem::take(&mut self.hold);
+        hold.clear();
+        hold.resize(n, u8::MAX);
+        if self.holdable(i) {
+            let holders: Vec<(i32, i32, i32)> = self.enemies_of(i).filter(|&j| self.holds(j)).map(|j| (self.units[j].x, self.units[j].y, self.units[j].fp())).collect();
+            for (hx, hy, hf) in holders {
+                for ny in (hy - f - HOLD + 1).max(0)..=(hy + hf + HOLD - 1).min(H - f) {
+                    for nx in (hx - f - HOLD + 1).max(0)..=(hx + hf + HOLD - 1).min(W - f) {
+                        let d = rect_dist(nx, ny, f, hx, hy, hf);
+                        if d <= HOLD {
+                            let k = Grid::idx(nx, ny);
+                            hold[k] = hold[k].min(d as u8);
+                        }
+                    }
+                }
+            }
+        }
         let mut best: Option<(i32, (i32, i32))> = None;
         first[Grid::idx(x, y)] = (x, y);
         let mut queue = VecDeque::from([(x, y, 0)]);
@@ -914,6 +981,10 @@ impl Battle {
                 let (nx, ny) = (cx + dx, cy + dy);
                 if nx < 0 || ny < 0 || nx + f > W || ny + f > H || first[Grid::idx(nx, ny)].0 >= 0 {
                     continue;
+                }
+                let held = hold[Grid::idx(cx, cy)];
+                if held != u8::MAX && hold[Grid::idx(nx, ny)] >= held {
+                    continue; // in held ground a way only closes in
                 }
                 if !self.grid.can_place(side, size, nx, ny) {
                     first[Grid::idx(nx, ny)] = (-2, -2);
@@ -933,6 +1004,7 @@ impl Battle {
             }
         }
         self.aim = aim;
+        self.hold = hold;
         self.first = first;
         best.map(|b| b.1)
     }
