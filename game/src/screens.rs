@@ -2790,6 +2790,8 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Wall => n("tr.wall", "tr.wall.l"),
         T::Metamorph => n("tr.metamorph", "tr.metamorph.l"),
         T::Contagion => n("tr.contagion", "tr.contagion.l"),
+        T::Grounded => n("tr.grounded", "tr.grounded.l"),
+        T::DryChitin => n("tr.drychitin", "tr.drychitin.l"),
         T::Knows { k } => {
             let who = sim::model::KNOWN.get(k as usize).map(|key| sim::data::unit(key).name.to_string()).unwrap_or_default();
             (t("tr.knows"), tf("tr.knows.l", &[("u", &who)]))

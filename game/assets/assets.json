@@ -14112,6 +14112,16 @@
    ],
    "name": "Третья ступень"
   },
+  "swarm/m_dry": {
+   "atlas": "icons/swarm_icons.png",
+   "rect": [
+    0,
+    176,
+    16,
+    16
+   ],
+   "name": "Сухой хитин"
+  },
   "glyph/всегда": {
    "atlas": "icons/glyphs.png",
    "rect": [

@@ -10,6 +10,8 @@ import icons as IC
 from icons_drawn import Pix, grid, flame
 
 NEW = {}
+# names of the icons drawn after the atlas was first laid out (the rest keep theirs from swarm_icons.json)
+EXTRA_NAMES = {"m_dry": "Сухой хитин"}
 
 
 def icon(key):
@@ -65,6 +67,20 @@ def puppet():
     p.line([(9, 9), (10, 10)], "slime", 3)
     p.line([(7, 0), (7, 3)], "steel", 3)                           # the hook it hangs from
     p.line([(7, 4), (8, 5), (9, 4)], "steel", 4)
+    return p.done()
+
+
+@icon("m_dry")
+def dry():
+    """Сухой хитин: a bug whose shell has dried to a pale cracked crust, and a spark of lightning breaking off it,
+    bent away — it does not take the current."""
+    p = Pix()
+    bug(p, 7, 10, "bone", s=1.45, eye="acid")
+    for x, y in ((4, 9), (5, 10), (6, 9), (8, 10), (9, 9), (7, 11)):   # the crust cracked
+        p.dark(x, y)
+    p.line([(13, 1), (11, 3), (12, 4), (10, 6)], "volt", 4)            # the bolt coming down
+    p.line([(10, 6), (13, 7), (15, 6)], "volt", 3)                     # and glancing off
+    p.px(15, 5, "volt", 2)
     return p.done()
 
 
@@ -1675,6 +1691,18 @@ def atlas():
         cx, cy = v["cell"]
         sheet[cy * 16:(cy + 1) * 16, cx * 16:(cx + 1) * 16] = NEW[k]()
         index[k] = {kk: vv for kk, vv in v.items() if kk != "source_row"}
+    used = {tuple(v["cell"]) for v in index.values()}
+    free = [(x, y) for y in range(H) for x in range(W) if (x, y) not in used]
+    for k in NEW:                                           # icons drawn since: into the free cells
+        if k in index:
+            continue
+        if not free:
+            sheet = np.concatenate([sheet, np.zeros((16, W * 16, 4), np.uint8)])
+            free = [(x, H) for x in range(W)]
+            H += 1
+        cx, cy = free.pop(0)
+        sheet[cy * 16:(cy + 1) * 16, cx * 16:(cx + 1) * 16] = NEW[k]()
+        index[k] = dict(cell=[cx, cy], name=EXTRA_NAMES.get(k, k), owner="мутация")
     Image.fromarray(sheet, "RGBA").save(png_path)
     json.dump(dict(source="drawn in code, pixel by pixel: tools/sprites/swarm_icons_drawn.py", icons=index),
               open(idx_path, "w"), ensure_ascii=False, indent=1)

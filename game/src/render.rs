@@ -87,6 +87,9 @@ const GOO: Pool = Pool { cols: [[236, 255, 196], [196, 226, 120], [44, 60, 14], 
 /// A machine's oil: near black, a cold rainbow sheen on its bulge.
 const OIL: Pool = Pool { cols: [[214, 196, 255], [96, 84, 118], [6, 4, 10], [64, 112, 140], [16, 14, 22]], alpha: [0.9, 0.7, 0.8, 0.55, 0.78] };
 
+/// Slime fire has dried, a dry shell's fallen: a dull grey-brown crust, no shine on it.
+const CRUST: Pool = Pool { cols: [[170, 156, 134], [140, 126, 104], [40, 32, 26], [118, 106, 88], [84, 74, 62]], alpha: [0.5, 0.55, 0.5, 0.4, 0.42] };
+
 /// A layer of a round as pixels of the field: one pool over all `cells` (each cell a soft blob, the blobs summed and
 /// cut at a level — neighbouring cells run into one pool, a lone one is a puddle), its outline lumpy, a darker rim
 /// along its lower edge, a sheen and a glint or two. Made once a round for each `slot` and kept.
@@ -189,7 +192,7 @@ fn ground_layers(cv: &mut Image, rec: &Record, r: usize) {
     // the fallen's slime and the machines' oil, the swarm's honey over them
     if !round.ground.is_empty() {
         let of = |k: u8| -> Vec<usize> { round.ground.iter().enumerate().filter(|(_, &g)| g == k).map(|(c, _)| c).collect() };
-        for (cells, pool, slot) in [(of(sim::battle::GOO), &GOO, 1), (of(sim::battle::OIL), &OIL, 2)] {
+        for (cells, pool, slot) in [(of(sim::battle::GOO), &GOO, 1), (of(sim::battle::OIL), &OIL, 2), (of(sim::battle::CRUST), &CRUST, 3)] {
             for &(x, y, col, a) in pool_layer(&cells, pool, slot).iter() {
                 cv.blend_px(x, y, [col[0], col[1], col[2], 255], a);
             }

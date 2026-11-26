@@ -907,7 +907,8 @@ mod flow {
             Trait::TwinBlades, Trait::Glow, Trait::HiveMind, Trait::Grows, Trait::Infects, Trait::Changeling, Trait::Viviparous,
             Trait::Spitter, Trait::Midges, Trait::Cloud, Trait::Spinner, Trait::Honey, Trait::Buds, Trait::Chirr, Trait::Mimic,
             Trait::ThirdStage, Trait::Puppeteer, Trait::Puppet, Trait::Mirage, Trait::Ghost, Trait::Hungry { left: 12 },
-            Trait::Tesla, Trait::Trophies, Trait::Wall, Trait::Metamorph, Trait::Contagion, Trait::Knows { k: 3 },
+            Trait::Tesla, Trait::Trophies, Trait::Wall, Trait::Metamorph, Trait::Contagion, Trait::Knows { k: 3 }, Trait::Grounded,
+            Trait::DryChitin,
         ];
         for tr in &traits {
             let (n, l) = trait_words(tr);

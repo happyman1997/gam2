@@ -220,6 +220,12 @@ pub enum Trait {
     /// Память роя (the Hive Mind, its run's rule): the swarm remembers the kind of enemy (index `k` into `KNOWN`) that
     /// killed the most of it in a battle, and strikes it +2 for the rest of the run.
     Knows { k: u8 },
+    /// Громоотвод (a module of the Foundry's): lightning from the sky goes for it three times as readily and runs off
+    /// into the ground, as does a jolt through slime — neither does it any harm.
+    Grounded,
+    /// Сухой хитин (a doctrine of the swarm's): its fallen leave a dry crust, not slime — lightning does not run
+    /// through it, and nothing nests in it.
+    DryChitin,
 }
 
 /// The enemies the Hive Mind can remember (Память роя), by units.ron key: `Trait::Knows { k }` is an index here.

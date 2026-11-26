@@ -26,6 +26,11 @@ pub const GARRISON_ROUNDS: u32 = 10;
 /// machine spills.
 pub const GOO: u8 = 1;
 pub const OIL: u8 = 2;
+/// Slime fire has dried, or a dry-shelled swarm's fallen: a crust that neither burns nor carries a jolt.
+pub const CRUST: u8 = 3;
+/// How many scraps the Maniac pulls out of the oil a battle, how much the Devourer heals a cell of oil it drinks.
+pub const SCRAP_MAX: u8 = 3;
+pub const OIL_DRINK: i32 = 3;
 /// Rounds a patch of oil burns once it is set alight.
 pub const OIL_BURNS: u8 = 3;
 /// How far a jolt runs through the slime from where it struck (cells), and what share of it reaches the others.
@@ -182,7 +187,7 @@ pub struct Unit {
     pub inside: Option<usize>,
     /// Parts bolted on it by the Maniac this battle (Трофеи).
     pub trophies: u8,
-    /// Walls a mason has laid this battle.
+    /// Walls a mason has laid this battle (scraps the Maniac has pulled out of oil).
     pub laid: u8,
     /// Its kind among those the Hive Mind can remember (`model::KNOWN`), if it is one of them.
     pub kind: Option<u8>,
@@ -1492,7 +1497,8 @@ impl Battle {
                         return;
                     }
                 }
-                Ability::Swap { every } if round.is_multiple_of(every) => {
+                // in the dark minds are easier to turn: a round sooner at night
+                Ability::Swap { every } if round.is_multiple_of(if self.weather == Weather::Night { (every - 1).max(1) } else { every }) => {
                     self.swap(i);
                 }
                 _ => {}
@@ -1536,6 +1542,10 @@ impl Battle {
         self.units[t].y = ly;
         self.grid.add(side, size, lx, ly);
         self.ev(Event::Thrown { u: i, t, fx: ox, fy: oy, x: lx, y: ly });
+        // it comes down on spilt oil with the mace's sparks still on it: the oil catches
+        if self.on_ground(t, OIL) {
+            self.ignite(t);
+        }
         self.ev(Event::Cast { u: i, kind: Cast::Hurl, t });
         hits.push(Hit { attacker: i, target: t, raw: self.rng.damage(10, 2), dmg: Dmg::Blunt, ..Default::default() });
         let under: Vec<usize> = (0..self.units.len())
@@ -2145,12 +2155,37 @@ impl Battle {
         }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
-        // fire on spilt oil sets it burning; lightning into slime runs through all of it
-        if (h.dmg == Dmg::Fire || h.ignite) && self.on_ground(t, OIL) {
-            self.ignite(t);
+        // the field's reactions (CONCEPT.md, «Поле живёт»): fire on oil — a blaze; on slime — it dries to a crust; on
+        // honey — caramel that holds fast. Lightning into slime runs through all of it. Acid into oil — a foam that eats
+        // the armor of all who stand in it; into slime — a poisonous reek over it
+        if h.dmg == Dmg::Fire || h.ignite {
+            if self.on_ground(t, OIL) {
+                self.ignite(t);
+            }
+            let wet: Vec<usize> = self.cells_of(t).filter(|&c| self.ground[c] == GOO).collect();
+            for c in wet {
+                self.ground[c] = CRUST;
+            }
+            if self.cells_of(t).any(|c| self.honey[c] != -1) && !self.units[t].t.has(Trait::Unstoppable) {
+                self.units[t].glued_until = self.units[t].glued_until.max(self.round + 1);
+            }
         }
         if h.dmg == Dmg::Shock && d > 0 {
             self.surge(t, raw, h.attacker);
+        }
+        if h.dmg == Dmg::Acid {
+            if self.on_ground(t, OIL) {
+                for v in self.spread(t, OIL, 2) {
+                    self.corrode(v);
+                }
+            }
+            if self.on_ground(t, GOO) {
+                for v in self.spread(t, GOO, 2) {
+                    if !self.units[v].t.has(Trait::PoisonImmune) {
+                        self.units[v].poison += self.rng.die(4) as i32;
+                    }
+                }
+            }
         }
         if h.stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
             self.units[t].stunned = true;
@@ -2371,6 +2406,7 @@ impl Battle {
             return;
         }
         let mut seen = vec![false; self.ground.len()];
+        let walled = self.walled();
         let mut queue: VecDeque<(usize, u32)> = VecDeque::new();
         for c in start {
             seen[c] = true;
@@ -2387,14 +2423,17 @@ impl Battle {
                     continue;
                 }
                 let k = Grid::idx(nx, ny);
-                if self.ground[k] == GOO && !seen[k] {
+                if self.ground[k] == GOO && !seen[k] && !walled[k] {
                     seen[k] = true;
                     queue.push_back((k, depth + 1));
                 }
             }
         }
+        // the Inventor grounds his own: while he stands, a jolt through slime spares his side; a lightning rod is spared
+        let grounded = |b: &Battle, side: u8| b.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Tesla));
         let victims: Vec<usize> = (0..self.units.len())
             .filter(|&v| v != t && self.units[v].present() && !self.units[v].t.has(Trait::Flyer) && !self.is_wall(v))
+            .filter(|&v| !self.units[v].t.has(Trait::Grounded) && !grounded(self, self.units[v].side))
             .filter(|&v| self.cells_of(v).any(|c| seen[c]))
             .collect();
         if victims.is_empty() {
@@ -2416,10 +2455,17 @@ impl Battle {
     /// the fire runs on along the oil, and burnt-out oil is gone.
     fn ground_round(&mut self) {
         for i in 0..self.units.len() {
-            if self.units[i].present() && self.units[i].burn > 0 && self.on_ground(i, OIL) {
-                self.ignite(i);
+            if self.units[i].present() && self.units[i].burn > 0 {
+                if self.on_ground(i, OIL) {
+                    self.ignite(i);
+                }
+                let wet: Vec<usize> = self.cells_of(i).filter(|&c| self.ground[c] == GOO).collect();
+                for c in wet {
+                    self.ground[c] = CRUST;
+                }
             }
         }
+        self.scavenge();
         if !self.flames.iter().any(|&f| f > 0) {
             return;
         }
@@ -2430,6 +2476,7 @@ impl Battle {
             }
         }
         let mut next = vec![];
+        let walled = self.walled();
         for c in 0..self.flames.len() {
             if self.flames[c] == 0 {
                 continue;
@@ -2439,7 +2486,7 @@ impl Battle {
                 let (nx, ny) = (cx + dx, cy + dy);
                 if (0..W).contains(&nx) && (0..H).contains(&ny) {
                     let k = Grid::idx(nx, ny);
-                    if self.ground[k] == OIL && self.flames[k] == 0 {
+                    if self.ground[k] == OIL && self.flames[k] == 0 && !walled[k] {
                         next.push(k);
                     }
                 }
@@ -2455,6 +2502,82 @@ impl Battle {
         }
         for k in next {
             self.flames[k] = OIL_BURNS;
+        }
+    }
+
+    /// The cells walls stand on: fire and a jolt stop at them.
+    fn walled(&self) -> Vec<bool> {
+        let mut w = vec![false; self.ground.len()];
+        for i in 0..self.units.len() {
+            if self.units[i].present() && self.is_wall(i) {
+                for c in self.cells_of(i) {
+                    w[c] = true;
+                }
+            }
+        }
+        w
+    }
+
+    /// Those standing in the patch of `kind` under `t` (within `reach` cells of it through that ground), `t` too.
+    fn spread(&self, t: usize, kind: u8, reach: u32) -> Vec<usize> {
+        let mut seen = vec![false; self.ground.len()];
+        let mut queue: VecDeque<(usize, u32)> = VecDeque::new();
+        for c in self.cells_of(t).filter(|&c| self.ground[c] == kind) {
+            seen[c] = true;
+            queue.push_back((c, 0));
+        }
+        while let Some((c, depth)) = queue.pop_front() {
+            if depth >= reach {
+                continue;
+            }
+            let (cx, cy) = ((c as i32) % W, (c as i32) / W);
+            for (dx, dy) in DIRS {
+                let (nx, ny) = (cx + dx, cy + dy);
+                if (0..W).contains(&nx) && (0..H).contains(&ny) {
+                    let k = Grid::idx(nx, ny);
+                    if self.ground[k] == kind && !seen[k] {
+                        seen[k] = true;
+                        queue.push_back((k, depth + 1));
+                    }
+                }
+            }
+        }
+        (0..self.units.len()).filter(|&v| self.units[v].present() && !self.units[v].t.has(Trait::Flyer) && self.cells_of(v).any(|c| seen[c])).collect()
+    }
+
+    /// What the oil gives two leaders: the Maniac standing in it pulls scrap out of it — a plate bolted on his golem
+    /// nearest to him (up to `SCRAP_MAX` a battle); the Devourer standing in it drinks it — `OIL_DRINK` health a cell.
+    /// The oil they took is gone.
+    fn scavenge(&mut self) {
+        for i in 0..self.units.len() {
+            if !self.units[i].present() {
+                continue;
+            }
+            let oil: Vec<usize> = self.cells_of(i).filter(|&c| self.ground[c] == OIL && self.flames[c] == 0).collect();
+            if oil.is_empty() {
+                continue;
+            }
+            if self.units[i].t.has(Trait::Trophies) && self.units[i].laid < SCRAP_MAX {
+                let side = self.units[i].side;
+                let golem = (0..self.units.len())
+                    .filter(|&k| self.units[k].side == side && self.units[k].present() && self.units[k].t.golem && self.dist(i, k) <= 3)
+                    .min_by_key(|&k| (self.dist(i, k), k));
+                if let Some(g) = golem {
+                    self.ground[oil[0]] = 0;
+                    self.units[i].laid += 1;
+                    self.units[g].plates += 1;
+                    self.ev(Event::Cast { u: i, kind: Cast::Trophy, t: g });
+                }
+            }
+            if self.units[i].t.has(Trait::Grows) && self.units[i].t.has(Trait::Leader) && self.units[i].hp < self.units[i].t.hp {
+                for &c in &oil {
+                    self.ground[c] = 0;
+                }
+                let heal = (OIL_DRINK * oil.len() as i32).min(self.units[i].t.hp - self.units[i].hp);
+                self.units[i].hp += heal;
+                self.units[i].last_meal = self.round;
+                self.ev(Event::Heal { u: i, t: i, amount: heal });
+            }
         }
     }
 
@@ -2478,7 +2601,8 @@ impl Battle {
             .filter(|&i| self.units[i].present() && (self.units[i].t.is_army() || self.is_wall(i)))
             .map(|i| {
                 let t = &self.units[i].t;
-                (i, 1 + t.size + if t.armor_type.metal() { 6 } else { 0 })
+                let w = 1 + t.size + if t.armor_type.metal() { 6 } else { 0 };
+                (i, if t.has(Trait::Grounded) { w * 3 } else { w })
             })
             .collect();
         let total: u32 = cands.iter().map(|c| c.1).sum();
@@ -2497,7 +2621,7 @@ impl Battle {
             return;
         };
         let raw = self.rng.damage(8, 0);
-        let d = self.calc(t, raw, Dmg::Shock, false);
+        let d = if self.units[t].t.has(Trait::Grounded) { 0 } else { self.calc(t, raw, Dmg::Shock, false) };
         self.ev(Event::Strike { t });
         self.units[t].hp -= d;
         self.ev(Event::Nature { t, dmg: d });
@@ -2590,7 +2714,7 @@ impl Battle {
                     if oil {
                         self.ground[c] = OIL;
                     } else if self.ground[c] == 0 {
-                        self.ground[c] = GOO;
+                        self.ground[c] = if self.units[t].t.has(Trait::DryChitin) { CRUST } else { GOO };
                     }
                 }
             }
@@ -2802,7 +2926,9 @@ impl Battle {
                 let cs = self.units[c].side;
                 let next = (0..self.units.len()).find(|&k| {
                     let u = &self.units[k];
-                    k != c && u.side == cs && u.present() && u.infected.is_none() && u.t.is_army() && self.dist(c, k) <= 1
+                    // beside it — or anywhere within two cells through the slime both stand in: the sickness runs in it
+                    let near = self.dist(c, k) <= 1 || (self.dist(c, k) <= 2 && self.on_ground(c, GOO) && self.on_ground(k, GOO));
+                    k != c && u.side == cs && u.present() && u.infected.is_none() && u.t.is_army() && near
                 });
                 if let Some(k) = next {
                     self.units[k].infected = Some(side);
@@ -2832,7 +2958,9 @@ impl Battle {
             let larvae: Vec<usize> = (0..self.units.len())
                 .filter(|&k| {
                     let u = &self.units[k];
-                    u.side == side && u.present() && u.t.name == "Личинка" && self.round >= u.born + 3
+                    // in slime — the nest the swarm's dead make — a larva ripens a round sooner
+                    let ripe = if self.cells_of(k).any(|c| self.ground[c] == GOO) { 2 } else { 3 };
+                    u.side == side && u.present() && u.t.name == "Личинка" && self.round >= u.born + ripe
                 })
                 .collect();
             for l in larvae {
