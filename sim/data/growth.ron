@@ -5,9 +5,10 @@
 // cells — ещё ячеек каждому голему армии, own_cells — только лидеру; units — тела в армию (ключи units.ron).
 // По концепту (CONCEPT.md, «Развитие: …»), только то, что симуляция уже умеет; числа временные.
 {
-    // +1 ячейка или колоссальный модуль (колоссальных модулей в симуляции пока нет)
+    // +1 ячейка или колоссальный модуль (колоссальных модулей в симуляции пока нет); бросок чаще и дальше
     "otets_kolossa": [
         (key: "colossus_cell", own_cells: 1),
+        (key: "colossus_hurl", leader: (better: [Hurl(every: 2, range: 8)])),
         (key: "colossus_quake", leader: (better: [Quake(every: 2, die: 8, bonus: 2, radius: 1)])),
         (key: "colossus_hull", leader: (hp: 40, armor: 1)),
     ],
@@ -23,9 +24,10 @@
         (key: "maniac_cells", cells: 1),
         (key: "maniac_saw", leader: (dmg: Slash, bonus: 3)),
     ],
-    // развёртывания в симуляции пока нет: каменщик, стены, кирпичи
+    // каменщик, чертёж шире, стены крепче (броня армии), кирпичи
     "zodchiy": [
         (key: "builder_mason", units: ["kamenshchik"]),
+        (key: "builder_plan", leader: (better: [Blueprint(n: 14)])),
         (key: "builder_walls", army: (armor: 1)),
         (key: "builder_bricks", leader: (bonus: 2, range: 1)),
     ],
@@ -35,15 +37,17 @@
         (key: "matka_more", leader: (better: [Brood(every: 3, n: 3)])),
         (key: "matka_big", leader: (hp: 25, armor: 1)),
     ],
-    // пси-удара, Захвата и Помутнения в симуляции пока нет: метка чаще, воля роя, панцирь
+    // пси-удара, Захвата и Помутнения в симуляции пока нет: метка чаще, подмена чаще, воля роя, панцирь
     "razum": [
         (key: "mind_mark", leader: (better: [Mark(every: 1)])),
+        (key: "mind_swap", leader: (better: [Swap(every: 2)])),
         (key: "mind_will", army: (bonus: 1)),
         (key: "mind_shell", leader: (hp: 12, armor: 2)),
     ],
-    // крупнее, челюсти, шкура
+    // крупнее, глотает чаще, челюсти, шкура
     "pozhiratel": [
         (key: "devourer_bigger", leader: (hp: 20, bonus: 1)),
+        (key: "devourer_belly", leader: (better: [Swallow(every: 2)])),
         (key: "devourer_jaws", leader: (bonus: 3)),
         (key: "devourer_hide", leader: (armor: 2)),
     ],

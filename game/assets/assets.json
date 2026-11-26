@@ -5898,6 +5898,62 @@
    "h": 21,
    "ox": 11,
    "oy": 32
+  },
+  "Стена_0_idle": {
+   "file": "sprites/Стена_0_idle.png",
+   "w": 46,
+   "h": 44,
+   "ox": 23,
+   "oy": 42
+  },
+  "Стена_0_dead": {
+   "file": "sprites/Стена_0_dead.png",
+   "w": 46,
+   "h": 18,
+   "ox": 23,
+   "oy": 16
+  },
+  "Стена_1_idle": {
+   "file": "sprites/Стена_1_idle.png",
+   "w": 46,
+   "h": 44,
+   "ox": 23,
+   "oy": 42
+  },
+  "Стена_1_dead": {
+   "file": "sprites/Стена_1_dead.png",
+   "w": 46,
+   "h": 18,
+   "ox": 23,
+   "oy": 16
+  },
+  "Стена_2_idle": {
+   "file": "sprites/Стена_2_idle.png",
+   "w": 46,
+   "h": 44,
+   "ox": 23,
+   "oy": 42
+  },
+  "Стена_2_dead": {
+   "file": "sprites/Стена_2_dead.png",
+   "w": 46,
+   "h": 18,
+   "ox": 23,
+   "oy": 16
+  },
+  "Стена_3_idle": {
+   "file": "sprites/Стена_3_idle.png",
+   "w": 46,
+   "h": 44,
+   "ox": 23,
+   "oy": 42
+  },
+  "Стена_3_dead": {
+   "file": "sprites/Стена_3_dead.png",
+   "w": 46,
+   "h": 18,
+   "ox": 23,
+   "oy": 16
   }
  },
  "fx": {

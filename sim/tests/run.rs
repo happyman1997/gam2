@@ -380,3 +380,54 @@ fn reference_armies() {
     assert!((70..=72).contains(&pts), "{pts} points for 70");
     assert!(s.iter().any(|t| t.size == 2), "no soldier among them");
 }
+
+/// The swarm leaders' run rules: the Hive Mind remembers the kind that killed the most of the swarm and the swarm
+/// strikes it harder after; the Devourer becomes what it eats; the Plague's enemies come infected as the run goes on.
+#[test]
+fn leaders_carry_the_run_with_them() {
+    use sim::model::{Ability, Trait, KNOWN};
+    use sim::run::{BattleResult, DIET_STEP, PANDEMIC_EVERY};
+    let won = |foe_kills: Vec<(u8, u32)>, eaten: Vec<u8>| BattleResult { won: true, dead: vec![], kills: 3, foe_kills, eaten };
+    let lead = |r: &Run| {
+        let m = r.army.iter().find(|m| r.is_leader(m)).unwrap();
+        r.body(m)
+    };
+    // the Hive Mind: the Gun killed the most — the swarm remembers the Gun
+    let mut r = Run::new(Class::Swarm, 1, 5);
+    let node = r.path[0].clone();
+    let gun = KNOWN.iter().position(|k| *k == "orudie").unwrap() as u8;
+    r.after_battle(&node, &won(vec![(0, 2), (gun, 7)], vec![]));
+    assert_eq!(r.memory, vec![gun]);
+    assert!(lead(&r).has(Trait::Knows { k: gun }));
+    // and strikes it +2: the same blow on a Gun hits harder with the memory than without
+    let blow = |knows: bool| {
+        let mut total = 0;
+        for seed in 0..30 {
+            let mut bt = sim::Battle::new(seed);
+            let mut mind = sim::data::razum();
+            if knows {
+                mind.traits.push(Trait::Knows { k: gun });
+            }
+            bt.place(1, mind, 30, 20);
+            let g = bt.place(0, sim::data::orudie(), 10, 10);
+            bt.units[g].t.speed = 0;
+            let a = bt.place(1, sim::data::soldat(), 12, 10);
+            bt.units[a].t.speed = 0;
+            bt.step();
+            total += bt.units[g].t.hp - bt.units[g].hp;
+        }
+        total
+    };
+    assert!(blow(true) > blow(false), "the remembered kind is struck no harder");
+    // the Devourer: five Guards eaten — the Guard's iron in his hide
+    let mut r = Run::new(Class::Swarm, 2, 5);
+    let node = r.path[0].clone();
+    let before = lead(&r).armor;
+    r.after_battle(&node, &won(vec![], vec![0; DIET_STEP as usize]));
+    assert_eq!(lead(&r).armor, before + 1);
+    // the Plague: past a few battles won the enemy comes infected
+    let mut r = Run::new(Class::Swarm, 3, 5);
+    assert!(!lead(&r).has_ability(|a| matches!(a, Ability::Pandemic { .. })));
+    r.stats.won = PANDEMIC_EVERY * 2;
+    assert!(lead(&r).has_ability(|a| *a == Ability::Pandemic { n: 2 }));
+}

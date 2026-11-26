@@ -322,6 +322,10 @@ pub struct BattleResult {
     pub won: bool,
     pub dead: Vec<usize>,
     pub kills: u32,
+    /// How many of the player's army each kind of enemy (`model::KNOWN` index) killed (Память роя).
+    pub foe_kills: Vec<(u8, u32)>,
+    /// The kinds of enemy (`model::KNOWN` indexes) the player's Devourer ate (Ты — то, что ты ешь).
+    pub eaten: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -346,6 +350,12 @@ pub struct Run {
     /// How the leader has grown after the bosses (keys of growth.ron).
     #[serde(default)]
     pub growth: Vec<String>,
+    /// Память роя (the Hive Mind): the kinds of enemy the swarm remembers, `model::KNOWN` indexes, oldest first.
+    #[serde(default)]
+    pub memory: Vec<u8>,
+    /// Ты — то, что ты ешь (the Devourer): how many of each kind of enemy (`model::KNOWN` index) it has eaten this run.
+    #[serde(default)]
+    pub diet: Vec<u32>,
     /// The roads to choose from now.
     pub path: Vec<Node>,
     /// A stop (trader, event, camp) was taken since the last battle: the next fork is battles only.
@@ -373,6 +383,8 @@ impl Run {
             leader_id: 0,
             breeds: vec![],
             growth: vec![],
+            memory: vec![],
+            diet: vec![],
             artifacts: vec![],
             path: vec![],
             stopped: false,
@@ -479,6 +491,22 @@ impl Run {
         }
         for a in &self.artifacts {
             a.apply(&mut t);
+        }
+        if self.is_leader(m) {
+            // Память роя: the Hive Mind brings what the swarm remembers
+            for &k in &self.memory {
+                t.traits.push(Trait::Knows { k });
+            }
+            // Ты — то, что ты ешь: what the Devourer has eaten enough of is in him now
+            for (k, &n) in self.diet.iter().enumerate() {
+                if n >= DIET_STEP {
+                    diet_gift(k, &mut t);
+                }
+            }
+            // Пандемия: the Plague's world is sick — the more battles won, the more of the enemy come infected
+            if t.has(Trait::Contagion) && self.stats.won >= PANDEMIC_EVERY {
+                t.abilities.push(Ability::Pandemic { n: self.stats.won / PANDEMIC_EVERY });
+            }
         }
         // the Devourer is hungry at the start of a run, till its swarm has killed enough
         let fed = data::rules().devourer_fed;
@@ -1097,6 +1125,7 @@ impl Run {
         }
         self.stats.kills += res.kills;
         self.stopped = false;
+        self.learn(res);
         if !res.won {
             self.over = Some(false);
             self.path.clear();
@@ -1137,6 +1166,27 @@ impl Run {
             self.over = Some(true);
         }
         rewards
+    }
+
+    /// What the leader takes from a battle for the rest of the run: the Hive Mind remembers the kind of enemy that
+    /// killed the most of the swarm (Память роя), the Devourer keeps count of what it ate (Ты — то, что ты ешь).
+    fn learn(&mut self, res: &BattleResult) {
+        let lead = self.army.iter().find(|m| self.is_leader(m)).map(|m| m.t.clone());
+        let Some(lead) = lead else { return };
+        if lead.has(Trait::HiveMind) {
+            if let Some(&(k, _)) = res.foe_kills.iter().filter(|(k, _)| !self.memory.contains(k)).max_by_key(|(k, n)| (*n, std::cmp::Reverse(*k))) {
+                self.memory.push(k);
+                if self.memory.len() > MEMORY {
+                    self.memory.remove(0);
+                }
+            }
+        }
+        if lead.has(Trait::Grows) {
+            self.diet.resize(crate::model::KNOWN.len(), 0);
+            for &k in &res.eaten {
+                self.diet[k as usize] += 1;
+            }
+        }
     }
 
     /// Spoils taken: currency, an artifact (a find is taken with `recruit`).
@@ -1488,5 +1538,44 @@ pub fn play(me: &[Template], enemy: &[Template], seed: u64) -> BattleResult {
 pub fn result_of(bt: &Battle, winner: Option<u8>) -> BattleResult {
     let dead = bt.units.iter().filter(|u| u.side == 0 && !u.alive).filter_map(|u| u.src).collect();
     let kills = bt.units.iter().filter(|u| u.side == 1 && !u.alive && u.t.is_army()).count() as u32;
-    BattleResult { won: winner == Some(0), dead, kills }
+    let mut foe_kills: Vec<(u8, u32)> = vec![];
+    for u in bt.units.iter().filter(|u| u.side == 1 && u.kills > 0) {
+        if let Some(k) = u.kind {
+            match foe_kills.iter_mut().find(|e| e.0 == k) {
+                Some(e) => e.1 += u.kills,
+                None => foe_kills.push((k, u.kills)),
+            }
+        }
+    }
+    let eaten = bt.eaten[0].iter().filter_map(|&t| bt.units[t].kind).collect();
+    BattleResult { won: winner == Some(0), dead, kills, foe_kills, eaten }
+}
+
+/// How many of a kind the Devourer eats in a run before it is in him (Ты — то, что ты ешь).
+pub const DIET_STEP: u32 = 5;
+/// Пандемия: one more of the enemy infected as the battle begins for every this many battles won.
+pub const PANDEMIC_EVERY: u32 = 3;
+/// Память роя: how many kinds the swarm remembers at once (a new one pushes the oldest out).
+pub const MEMORY: usize = 3;
+
+/// What a kind eaten enough of gives the Devourer (`model::KNOWN` index): a Guard's or a Mason's iron — armor; a
+/// Sage's coils — its bite shocks; a Forge's coals — it sets those beside it alight; a Gun's steel — teeth +2; a
+/// Mechanic's oil — health; a leader — health and a harder bite.
+pub fn diet_gift(k: usize, t: &mut Template) {
+    match crate::model::KNOWN.get(k).copied() {
+        Some("strazh" | "kamenshchik") => t.armor += 1,
+        Some("mudrets") => t.dmg = crate::model::Dmg::Shock,
+        Some("gorn") => {
+            if !t.has(Trait::ZharGorna) {
+                t.traits.push(Trait::ZharGorna);
+            }
+        }
+        Some("orudie") => t.bonus += 2,
+        Some("mekhanik") => t.hp += 15,
+        Some(_) => {
+            t.hp += 20;
+            t.bonus += 1;
+        }
+        None => {}
+    }
 }

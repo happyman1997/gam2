@@ -6,7 +6,7 @@ the Hive Mind's mark, blinded, hooked by the Puppeteer, the starving Devourer) a
 
 demo_bake.main calls bake(MANIFEST); run alone it updates the assets already baked:
 
-    python3 tools/sprites/battle_bake.py   -> game/assets/{ground*.png, icons/status.png, fx/…, sprites/mod/…, ui/camp_*, assets.json}
+    python3 tools/sprites/battle_bake.py   -> game/assets/{ground*.png, icons/status.png, fx/…, sprites/mod/…, sprites/Стена_*, ui/camp_*, assets.json}
 """
 import json
 import os
@@ -214,6 +214,8 @@ def bake(manifest):
     module_fx(manifest)
     import module_overlays
     module_overlays.bake(manifest)
+    import walls
+    walls.bake(manifest, DST)
 
 
 if __name__ == "__main__":

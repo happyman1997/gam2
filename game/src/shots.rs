@@ -107,7 +107,7 @@ pub fn run(demo: Demo, dir: &str) {
         let node = r2.path.iter().find(|n| n.kind.is_battle()).cloned().unwrap();
         let mut elite = node.clone();
         elite.kind = Kind::Elite;
-        let rewards = r2.after_battle(&elite, &sim::run::BattleResult { won: true, dead: vec![0], kills: 9 });
+        let rewards = r2.after_battle(&elite, &sim::run::BattleResult { won: true, dead: vec![0], kills: 9, foe_kills: vec![], eaten: vec![] });
         g.run = Some(r2.clone());
         let list: Vec<(Reward, bool)> = rewards.into_iter().map(|r| (r, false)).collect();
         let find = list.iter().position(|(r, _)| matches!(r, Reward::Find(_))).unwrap_or(0);
@@ -150,7 +150,7 @@ pub fn run(demo: Demo, dir: &str) {
         r5.fight = 4;
         let mut boss = node.clone();
         boss.kind = Kind::Boss;
-        let spoils = r5.after_battle(&boss, &sim::run::BattleResult { won: true, dead: vec![], kills: 30 });
+        let spoils = r5.after_battle(&boss, &sim::run::BattleResult { won: true, dead: vec![], kills: 30, foe_kills: vec![], eaten: vec![] });
         if let Some(gi) = spoils.iter().position(|r| matches!(r, Reward::Growth(_))) {
             g.run = Some(r5);
             let list: Vec<(Reward, bool)> = spoils.into_iter().map(|r| (r, false)).collect();
@@ -386,4 +386,43 @@ pub fn run(demo: Demo, dir: &str) {
         }
     }
 
+}
+
+/// Each leader's own thing in a battle, at the moment it happens (`--leaders dir`): the Colossus's hurl in the air,
+/// the Inventor's net crackling, the Maniac's trophy, the Architect's walls, the Mother's larva turning, the Hive Mind's
+/// swap, the Devourer swallowing, the Plague's infection passing on.
+pub fn leaders(demo: Demo, dir: &str) {
+    use crate::playback::{record_of, FR};
+    use sim::battle::{Cast, Event};
+    use sim::data::{army, start_izobretatel, start_manyak, start_otets, start_zodchiy};
+    std::fs::create_dir_all(dir).expect("dir");
+    let mut g = Game::new(demo);
+    type Pick = fn(&Event) -> bool;
+    type Case = (&'static str, fn() -> Vec<sim::model::Template>, &'static str, Pick, f32);
+    let cases: [Case; 8] = [
+        ("64_hurl", start_otets, "start_matka", |e| matches!(e, Event::Thrown { .. }), 4.0),
+        ("65_tesla", start_izobretatel, "start_matka", |e| matches!(e, Event::Arc { .. }), 2.0),
+        ("66_trophy", start_manyak, "start_matka", |e| matches!(e, Event::Cast { kind: Cast::Trophy, .. }), 3.0),
+        ("67_walls", start_zodchiy, "start_matka", |e| matches!(e, Event::Cast { kind: Cast::Lay, .. }), 40.0),
+        ("68_metamorph", start_zodchiy, "start_matka", |e| matches!(e, Event::Morph { .. }), 4.0),
+        ("69_swap", start_zodchiy, "start_razum", |e| matches!(e, Event::Swap { .. }), 3.0),
+        ("70_swallow", start_izobretatel, "start_pozhiratel", |e| matches!(e, Event::Swallow { .. }), 3.0),
+        ("71_contagion", start_otets, "start_kukushka", |e| matches!(e, Event::Cast { kind: Cast::Contagion, .. }), 3.0),
+    ];
+    for (name, a, b, pick, after) in cases {
+        let mut found = None;
+        for seed in 0..40 {
+            let rec = record_of(seed, &a(), &army(b));
+            let hit = (0..rec.rounds.len()).find_map(|r| rec.moments(r).into_iter().find(|m| pick(&m.ev)).map(|m| m.frame));
+            if let Some(f) = hit {
+                found = Some((rec, f));
+                break;
+            }
+        }
+        match found {
+            Some((rec, f)) => snap_battle(&mut g, dir, name, rec, f as f32 + after, 2),
+            None => println!("{name}: not seen in 40 battles"),
+        }
+    }
+    let _ = FR;
 }

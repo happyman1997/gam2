@@ -15,6 +15,13 @@ pub const MAX_ROUNDS: u32 = 150;
 pub const ZONE: i32 = 15;
 /// How near an enemy's close fighter holds a unit in place (Удержание): within it the unit can only close on it.
 pub const HOLD: i32 = 2;
+/// Тесла-сеть: how far apart two golems of the Inventor's can be for the lightning to run between them, and its die.
+pub const TESLA_REACH: i32 = 5;
+pub const TESLA_DIE: u32 = 4;
+/// How many walls a mason lays in a battle (Кладка стены).
+pub const LAY_MAX: u8 = 3;
+/// Гарнизон: the Architect's army waits behind his walls up to this round at most.
+pub const GARRISON_ROUNDS: u32 = 10;
 /// The block an army of the usual size stands in: as deep and as tall as the whole zone once was. A bigger army
 /// widens it in the same proportions, up to the whole zone.
 pub const BLOCK: (i32, i32) = (6, 14);
@@ -148,6 +155,16 @@ pub struct Unit {
     pub struggling: bool,
     /// Marked by a puppeteer's blow (Кукловод): falling, it rises for that side.
     pub hooked: Option<u8>,
+    /// The Devourer's belly: whom it has swallowed (Глотает целиком).
+    pub belly: Option<usize>,
+    /// Swallowed: inside whom it is (off the field, alive).
+    pub inside: Option<usize>,
+    /// Parts bolted on it by the Maniac this battle (Трофеи).
+    pub trophies: u8,
+    /// Walls a mason has laid this battle.
+    pub laid: u8,
+    /// Its kind among those the Hive Mind can remember (`model::KNOWN`), if it is one of them.
+    pub kind: Option<u8>,
 }
 
 impl Unit {
@@ -181,6 +198,19 @@ pub enum Event {
     /// A module or a form's gift goes off: who, which, and on whom (an enemy it aims at, an ally it serves, or itself
     /// for what spreads round it). Only for the picture: its hits, heals and states come as their own events.
     Cast { u: usize, kind: Cast, t: usize },
+    /// Бросок титана: `u` hurls `t` from where it was grabbed, `(fx, fy)`, and it lands at `(x, y)`.
+    Thrown { u: usize, t: usize, fx: i32, fy: i32, x: i32, y: i32 },
+    /// Тесла-сеть: lightning runs between `a` and `b` this round.
+    Arc { a: usize, b: usize },
+    /// Подмена: `a` (the swarm's) and `b` (the enemy's) swap places in a flash — from where they stood, `(ax, ay)` and
+    /// `(bx, by)`; where they land is in the round's states.
+    Swap { a: usize, b: usize, ax: i32, ay: i32, bx: i32, by: i32 },
+    /// Глотает целиком: `u` swallows `t` (it leaves the field, into the belly).
+    Swallow { u: usize, t: usize },
+    /// `t` bursts out of the one that swallowed it, which has fallen.
+    Burst { t: usize },
+    /// Метаморфоз: the larva `from` pupates and comes out as `to` (a new body in its place).
+    Morph { from: usize, to: usize },
 }
 
 /// What goes off in an `Event::Cast`.
@@ -210,6 +240,15 @@ pub enum Cast {
     Trample,
     /// Жар горна: the Forge's heat sets an enemy beside it alight.
     Kindle,
+    /// Бросок титана: the thrown body comes down on the target's place (`t`: the thrown).
+    Hurl,
+    /// Трофеи: the Maniac bolts a part torn off a fallen enemy on the golem `t`.
+    Trophy,
+    /// Эпидемия: the infection passes from `u` to `t`, one of its own beside it (or, as the battle begins, from the
+    /// Plague to `t`).
+    Contagion,
+    /// Кладка стены, Чертёж: a wall `t` rises.
+    Lay,
 }
 
 #[derive(Clone, Debug)]
@@ -328,6 +367,12 @@ pub struct Battle {
     web: Vec<i8>,
     /// The honey on each cell: the side whose dead flooded it, -1 none (Медовые соты).
     honey: Vec<i8>,
+    /// Гарнизон of each side this round's movement (worked out once as it begins).
+    garrison: [bool; 2],
+    /// Память роя: the kinds of enemy each side's swarm remembers (`model::KNOWN` indexes), from its leader's traits.
+    memory: [Vec<u8>; 2],
+    /// Who each side's Devourer has eaten this battle (for its run: Ты — то, что ты ешь).
+    pub eaten: [Vec<usize>; 2],
 }
 
 impl Battle {
@@ -349,6 +394,9 @@ impl Battle {
             mimicry: [0, 0],
             web: vec![-1; n],
             honey: vec![-1; n],
+            garrison: [false; 2],
+            memory: [vec![], vec![]],
+            eaten: [vec![], vec![]],
         }
     }
 
@@ -554,7 +602,13 @@ impl Battle {
             budded: false,
             struggling: false,
             hooked: None,
+            belly: None,
+            inside: None,
+            trophies: 0,
+            laid: 0,
+            kind: None,
         });
+        self.units[id].kind = crate::data::unit_key(&self.units[id].t.name).and_then(|k| crate::model::KNOWN.iter().position(|x| *x == k)).map(|k| k as u8);
         id
     }
 
@@ -611,8 +665,13 @@ impl Battle {
         (0..self.units.len()).filter(move |&j| self.units[j].side != side && self.units[j].present())
     }
 
+    /// The nearest enemy to go for — not a wall: walls are gone round, and broken only when they are in the way.
     fn nearest_enemy(&self, i: usize) -> Option<(usize, i32)> {
-        self.enemies_of(i).map(|j| (j, self.dist(i, j))).min_by_key(|&(j, d)| (d, j))
+        self.enemies_of(i).filter(|&j| !self.is_wall(j)).map(|j| (j, self.dist(i, j))).min_by_key(|&(j, d)| (d, j))
+    }
+
+    pub fn is_wall(&self, j: usize) -> bool {
+        self.units[j].t.has(Trait::Wall)
     }
 
     // ---------------------------------------------------------------- the round
@@ -698,6 +757,7 @@ impl Battle {
 
     // ---------------------------------------------------------------- movement
     fn movement(&mut self) {
+        self.garrison = [self.garrisoned(0), self.garrisoned(1)];
         if self.round == 1 {
             for i in 0..self.units.len() {
                 if self.units[i].present() && self.units[i].t.has(Trait::Leap) {
@@ -825,6 +885,10 @@ impl Battle {
                 return;
             }
         }
+        // Гарнизон: the Architect's army waits behind his walls while they stand, and steps out only to an enemy close by
+        if d > 3 && self.garrison[side as usize % 2] {
+            return;
+        }
         // Удержание: caught within two cells of an enemy's close fighter, it cannot slip past it — no going round to
         // its flank or its back, no running on to the archers: it closes on that one
         if let Some(h) = self.held_by(i) {
@@ -894,6 +958,16 @@ impl Battle {
         } else {
             self.grid.add(side, size, x, y);
         }
+    }
+
+    /// Гарнизон: the side's Architect with his blueprint stands, and a wall of his still stands — up to round
+    /// `GARRISON_ROUNDS`, then his army goes out whatever stands.
+    fn garrisoned(&self, side: u8) -> bool {
+        if self.round > GARRISON_ROUNDS {
+            return false;
+        }
+        let architect = self.units.iter().any(|u| u.side == side && u.present() && u.t.has_ability(|a| matches!(a, Ability::Blueprint { .. })));
+        architect && self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Wall))
     }
 
     /// Whether `j` holds the enemies near it (Удержание): a fighter of the close fight on its feet — it strikes in
@@ -1050,6 +1124,38 @@ impl Battle {
 
     /// What happens as the battle begins, the armies stood: the Inventor's augments.
     fn battle_begins(&mut self) {
+        for u in &self.units {
+            for tr in &u.t.traits {
+                if let Trait::Knows { k } = *tr {
+                    self.memory[u.side as usize % 2].push(k);
+                }
+            }
+        }
+        // the Architect's blueprint: the walls rise before anyone moves
+        let architects: Vec<(usize, u32)> = (0..self.units.len())
+            .filter(|&i| self.units[i].present())
+            .filter_map(|i| self.units[i].t.abilities.iter().find_map(|a| if let Ability::Blueprint { n } = a { Some((i, *n)) } else { None }))
+            .collect();
+        for (i, n) in architects {
+            self.blueprint(i, n);
+        }
+        // the Plague's pandemic: some of the enemy come to the battle infected already
+        let plagues: Vec<(usize, u32)> = (0..self.units.len())
+            .filter(|&i| self.units[i].present())
+            .filter_map(|i| self.units[i].t.abilities.iter().find_map(|a| if let Ability::Pandemic { n } = a { Some((i, *n)) } else { None }))
+            .collect();
+        for (i, n) in plagues {
+            let side = self.units[i].side;
+            let mut foes: Vec<usize> = self.enemies_of(i).filter(|&j| self.units[j].t.is_army() && self.units[j].infected.is_none()).collect();
+            for _ in 0..n {
+                if foes.is_empty() {
+                    break;
+                }
+                let j = foes.swap_remove(self.rng.die(foes.len() as u32) as usize - 1);
+                self.units[j].infected = Some(side);
+                self.ev(Event::Cast { u: i, kind: Cast::Contagion, t: j });
+            }
+        }
         // the Hive Mind's mirage: every second body of the swarm gets a ghost twin beside it
         let mirage: Vec<usize> = (0..self.units.len()).filter(|&i| self.units[i].present() && self.units[i].t.has(Trait::Mirage)).collect();
         for (n, i) in mirage.into_iter().enumerate() {
@@ -1152,6 +1258,17 @@ impl Battle {
             if fresh || idle {
                 self.spin(i);
                 return;
+            }
+        }
+        // Эпидемия: every third round the Plague spits spores at the nearest enemy not sick yet, wherever it is
+        if self.units[i].t.has(Trait::Contagion) && round.is_multiple_of(3) {
+            let near = self
+                .enemies_of(i)
+                .filter(|&j| self.units[j].t.is_army() && self.units[j].infected.is_none())
+                .min_by_key(|&j| (self.dist(i, j), j));
+            if let Some(j) = near {
+                self.units[j].infected = Some(self.units[i].side);
+                self.ev(Event::Cast { u: i, kind: Cast::Contagion, t: j });
             }
         }
         let powered = self.powered(i);
@@ -1280,6 +1397,24 @@ impl Battle {
                         return;
                     }
                 }
+                Ability::Hurl { every, range } if round.is_multiple_of(every) => {
+                    if self.hurl(i, range, hits) {
+                        return;
+                    }
+                }
+                Ability::Swallow { every } if round.is_multiple_of(every) => {
+                    if self.swallow(i) {
+                        return;
+                    }
+                }
+                Ability::Lay { every } if round.is_multiple_of(every) => {
+                    if self.lay(i) {
+                        return;
+                    }
+                }
+                Ability::Swap { every } if round.is_multiple_of(every) => {
+                    self.swap(i);
+                }
                 _ => {}
             }
         }
@@ -1287,6 +1422,292 @@ impl Battle {
             return;
         }
         self.normal_attack(i, hits);
+    }
+
+    /// Бросок титана: grab the biggest enemy beside (up to size 5, not the unstoppable, not a wall) and hurl it into the
+    /// thickest of its own within `range`. False if there is no one to grab or nowhere to throw it.
+    fn hurl(&mut self, i: usize, range: u32, hits: &mut Vec<Hit>) -> bool {
+        let Some(t) = self
+            .adjacent_enemies(i)
+            .into_iter()
+            .filter(|&j| self.units[j].t.size <= 5 && !self.units[j].t.has(Trait::Unstoppable) && !self.is_wall(j))
+            .max_by_key(|&j| (self.units[j].t.size, self.units[j].hp, Reverse(j)))
+        else {
+            return false;
+        };
+        let side = self.units[t].side;
+        // where its own stand thickest: the one of them with the most of its side round it, within range
+        let crowd = |b: &Battle, c: usize| (0..b.units.len()).filter(|&k| k != t && b.units[k].side == side && b.units[k].present() && b.dist(k, c) <= 1).count();
+        let Some(aim) = self
+            .enemies_of(i)
+            .filter(|&c| c != t && !self.is_wall(c) && self.dist(i, c) <= range as i32 && self.dist(i, c) >= 2)
+            .max_by_key(|&c| (crowd(self, c), self.dist(i, c), Reverse(c)))
+        else {
+            return false;
+        };
+        let (size, ox, oy) = (self.units[t].t.size, self.units[t].x, self.units[t].y);
+        let (ax, ay) = (self.units[aim].x, self.units[aim].y);
+        self.grid.sub(size, ox, oy);
+        let Some((lx, ly)) = self.free_spot_near(side, size, ax, ay, 2) else {
+            self.grid.add(side, size, ox, oy);
+            return false;
+        };
+        self.units[t].x = lx;
+        self.units[t].y = ly;
+        self.grid.add(side, size, lx, ly);
+        self.ev(Event::Thrown { u: i, t, fx: ox, fy: oy, x: lx, y: ly });
+        self.ev(Event::Cast { u: i, kind: Cast::Hurl, t });
+        hits.push(Hit { attacker: i, target: t, raw: self.rng.damage(10, 2), dmg: Dmg::Blunt, ..Default::default() });
+        let under: Vec<usize> = (0..self.units.len())
+            .filter(|&k| k != t && self.units[k].side == side && self.units[k].present() && !self.units[k].t.has(Trait::Flyer) && self.dist(k, t) <= 1)
+            .collect();
+        for k in under {
+            let stun = self.units[k].t.size <= 2;
+            hits.push(Hit { attacker: i, target: k, raw: self.rng.damage(6, 0), dmg: Dmg::Blunt, stun, ..Default::default() });
+        }
+        true
+    }
+
+    /// Глотает целиком: swallow the biggest enemy beside smaller than itself (its growth makes it bigger) — whole, off
+    /// the field into the belly. False if the belly is full or no one fits.
+    fn swallow(&mut self, i: usize) -> bool {
+        if self.units[i].belly.is_some() {
+            return false;
+        }
+        let me = self.units[i].t.size + self.units[i].growth;
+        let Some(t) = self
+            .adjacent_enemies(i)
+            .into_iter()
+            .filter(|&j| {
+                let u = &self.units[j];
+                u.t.size < me && u.t.is_army() && !u.t.has(Trait::Unstoppable)
+            })
+            .max_by_key(|&j| (self.units[j].t.size, Reverse(self.units[j].hp), Reverse(j)))
+        else {
+            return false;
+        };
+        let (size, x, y) = (self.units[t].t.size, self.units[t].x, self.units[t].y);
+        self.grid.sub(size, x, y);
+        self.units[t].on_field = false;
+        self.units[t].inside = Some(i);
+        self.units[i].belly = Some(t);
+        self.units[i].last_meal = self.round;
+        self.ev(Event::Swallow { u: i, t });
+        true
+    }
+
+    /// The belly at the end of a round: the swallowed is digested, past its armor, and strikes from within, past the
+    /// Devourer's; digested, it is a meal.
+    fn digest(&mut self, i: usize) {
+        let Some(t) = self.units[i].belly else { return };
+        if !self.units[i].present() || !self.units[t].alive {
+            self.units[i].belly = None;
+            return;
+        }
+        self.units[i].last_meal = self.round;
+        let raw = self.rng.damage(6, 2 * self.units[i].growth as i32);
+        self.units[t].hp -= raw;
+        self.ev(Event::Hit { a: i, t, dmg: raw });
+        if self.units[t].hp <= 0 {
+            self.units[i].belly = None;
+            // what comes out of it (larvae of an infected one) comes out of the Devourer
+            self.units[t].x = self.units[i].x;
+            self.units[t].y = self.units[i].y;
+            self.kill(t);
+            self.units[i].kills += 1;
+            self.ev(Event::Cast { u: i, kind: Cast::Devour, t });
+            self.eaten[self.units[i].side as usize % 2].push(t);
+            self.eat(i);
+            return;
+        }
+        let u = &self.units[t];
+        if u.t.has(Trait::NoAttack) || u.stunned {
+            return;
+        }
+        let back = self.rng.damage(u.t.die, u.t.bonus);
+        self.units[i].hp -= back;
+        self.ev(Event::Hit { a: t, t: i, dmg: back });
+        if self.units[i].hp <= 0 {
+            self.kill(i);
+        }
+    }
+
+    /// Кладка стены: a wall on a free cell beside the mason, the enemy's side first — under the enemy's nose too. False
+    /// if no enemy is near enough to build against, it has laid its share, or there is no room.
+    fn lay(&mut self, i: usize) -> bool {
+        if self.units[i].laid >= LAY_MAX {
+            return false;
+        }
+        let Some((_, d)) = self.nearest_enemy(i) else { return false };
+        if d > 8 {
+            return false;
+        }
+        let (side, x, y, f) = (self.units[i].side, self.units[i].x, self.units[i].y, self.units[i].fp());
+        let ahead = if side == 0 { 1 } else { -1 };
+        let wall = crate::data::unit("stena");
+        let mut spots = vec![];
+        for dy in -1..=f {
+            for dx in -1..=f {
+                let (nx, ny) = (x + dx, y + dy);
+                if rect_dist(nx, ny, 1, x, y, f) == 1 && self.grid.can_place(side, wall.size, nx, ny) {
+                    // the enemy's side first, then straight in front of it
+                    spots.push((-(dx * ahead), (2 * (ny - y) - f + 1).abs(), nx, ny));
+                }
+            }
+        }
+        let Some(&(_, _, nx, ny)) = spots.iter().min() else { return false };
+        let w = self.place(side, wall, nx, ny);
+        self.units[i].laid += 1;
+        self.ev(Event::Summon { u: w });
+        self.ev(Event::Cast { u: i, kind: Cast::Lay, t: w });
+        true
+    }
+
+    /// Чертёж: `n` wall segments rise in front of the army — a column two cells before its front, two walls and a gap of
+    /// two, from the middle of the army out.
+    fn blueprint(&mut self, i: usize, n: u32) {
+        let side = self.units[i].side;
+        let mine: Vec<usize> = (0..self.units.len()).filter(|&k| self.units[k].side == side && self.units[k].present()).collect();
+        if mine.is_empty() {
+            return;
+        }
+        let x = if side == 0 {
+            mine.iter().map(|&k| self.units[k].x + self.units[k].fp()).max().unwrap() + 1
+        } else {
+            mine.iter().map(|&k| self.units[k].x).min().unwrap() - 2
+        };
+        let (top, bottom) = (mine.iter().map(|&k| self.units[k].y).min().unwrap(), mine.iter().map(|&k| self.units[k].y + self.units[k].fp()).max().unwrap());
+        let mid = (top + bottom) / 2;
+        let wall = crate::data::unit("stena");
+        // rows by distance from the middle; in a pattern of four a row: walls on 0 and 1, a gap on 2 and 3
+        let mut rows: Vec<i32> = (0..H).filter(|y| (y - mid).rem_euclid(4) < 2).collect();
+        rows.sort_by_key(|y| ((y - mid).abs(), *y));
+        let mut built = 0;
+        for y in rows {
+            if built >= n {
+                break;
+            }
+            if self.grid.can_place(side, wall.size, x, y) {
+                let w = self.place(side, wall.clone(), x, y);
+                self.ev(Event::Summon { u: w });
+                self.ev(Event::Cast { u: i, kind: Cast::Lay, t: w });
+                built += 1;
+            }
+        }
+    }
+
+    /// Подмена: the enemy's shooter or leader safest behind its line and a body of the swarm's in the thick of the fight
+    /// swap places; the shooter is dazed.
+    fn swap(&mut self, i: usize) {
+        let side = self.units[i].side;
+        let mine = |b: &Battle, k: usize| {
+            let u = &b.units[k];
+            u.side == side && u.present() && !u.t.has(Trait::Leader) && u.t.is_army() && !u.t.has(Trait::Flyer)
+        };
+        // how far an enemy is from the nearest of the swarm
+        let safety = |b: &Battle, j: usize| (0..b.units.len()).filter(|&k| mine(b, k)).map(|k| b.dist(j, k)).min().unwrap_or(0);
+        let Some(e) = self
+            .enemies_of(i)
+            .filter(|&j| {
+                let t = &self.units[j].t;
+                (t.range > 1 || t.has(Trait::Caster) || t.has(Trait::Leader)) && !t.has(Trait::Unstoppable) && !t.has(Trait::Wall) && t.is_army()
+            })
+            .max_by_key(|&j| (safety(self, j), Reverse(j)))
+        else {
+            return;
+        };
+        if safety(self, e) < 3 {
+            return; // it stands among the swarm already
+        }
+        // the body of the swarm with the most of its own round it, close to the enemy
+        let crowd = |b: &Battle, k: usize| (0..b.units.len()).filter(|&o| o != k && mine(b, o) && b.dist(o, k) <= 2).count();
+        let Some(p) = (0..self.units.len()).filter(|&k| mine(self, k)).max_by_key(|&k| (crowd(self, k), Reverse(self.nearest_enemy(k).map(|n| n.1).unwrap_or(99)), Reverse(k))) else {
+            return;
+        };
+        let (es, ex, ey) = (self.units[e].t.size, self.units[e].x, self.units[e].y);
+        let (ps, px, py) = (self.units[p].t.size, self.units[p].x, self.units[p].y);
+        let eside = self.units[e].side;
+        self.grid.sub(es, ex, ey);
+        self.grid.sub(ps, px, py);
+        let to_e = self.free_spot_near(eside, es, px, py, 3);
+        if let Some((nx, ny)) = to_e {
+            self.grid.add(eside, es, nx, ny);
+            if let Some((qx, qy)) = self.free_spot_near(side, ps, ex, ey, 3) {
+                self.grid.add(side, ps, qx, qy);
+                self.units[e].x = nx;
+                self.units[e].y = ny;
+                self.units[p].x = qx;
+                self.units[p].y = qy;
+                self.units[e].stunned = true;
+                self.ev(Event::Swap { a: p, b: e, ax: px, ay: py, bx: ex, by: ey });
+                self.ev(Event::Stun { t: e });
+                return;
+            }
+            self.grid.sub(es, nx, ny);
+        }
+        self.grid.add(eside, es, ex, ey);
+        self.grid.add(side, ps, px, py);
+    }
+
+    /// Трофеи: an enemy fell near the Maniac — a part of it on the golem of his nearest to it (within 3 of him).
+    fn trophy(&mut self, fallen: usize) {
+        let fside = self.units[fallen].side;
+        let Some(m) = (0..self.units.len()).find(|&k| {
+            let u = &self.units[k];
+            u.side != fside && u.present() && u.t.has(Trait::Trophies) && self.dist(k, fallen) <= 3
+        }) else {
+            return;
+        };
+        let side = self.units[m].side;
+        let Some(g) = (0..self.units.len())
+            .filter(|&k| {
+                let u = &self.units[k];
+                u.side == side && u.present() && u.t.golem && !u.t.has(Trait::Puppet) && u.trophies < 2
+            })
+            .filter(|&k| self.dist(k, m) <= 3)
+            .min_by_key(|&k| (self.dist(k, fallen), k))
+        else {
+            return;
+        };
+        let f = self.units[fallen].t.clone();
+        let mut got = true;
+        {
+            let t = &mut self.units[g].t;
+            let has = |t: &Template, x: Trait| t.traits.contains(&x);
+            if f.has(Trait::Leader) && t.fear().is_none() {
+                t.traits.push(Trait::Fear { die: 6, radius: 2 }); // its head on a pike
+            } else if f.has(Trait::Flyer) && !has(t, Trait::Flyer) {
+                t.traits.push(Trait::Flyer); // a wasp's wings: the golem flies
+            } else if let Some(die) = f.traits.iter().find_map(|x| if let Trait::Venom { die } = x { Some(*die) } else { None }).filter(|_| !t.traits.iter().any(|x| matches!(x, Trait::Venom { .. }))) {
+                t.traits.push(Trait::Venom { die });
+            } else if f.has(Trait::TwinBlades) && !has(t, Trait::TwinBlades) && t.range <= 1 {
+                t.traits.push(Trait::TwinBlades);
+            } else if f.has(Trait::Charge) && !has(t, Trait::Charge) {
+                t.traits.push(Trait::Charge);
+            } else if let Some(die) = f.traits.iter().find_map(|x| if let Trait::Thorns { die } = x { Some(*die) } else { None }).filter(|_| !t.traits.iter().any(|x| matches!(x, Trait::Thorns { .. }))) {
+                t.traits.push(Trait::Thorns { die });
+            } else if let Some(die) = f.traits.iter().find_map(|x| if let Trait::BurstAcid { die } = x { Some(*die) } else { None }).filter(|_| !t.traits.iter().any(|x| matches!(x, Trait::BurstAcid { .. }))) {
+                t.traits.push(Trait::BurstAcid { die });
+            } else if f.has(Trait::Glow) && !t.has_ability(|a| matches!(a, Ability::Flash { .. })) {
+                t.abilities.push(Ability::Flash { every: 3 });
+            } else if f.has(Trait::Spitter) && !t.has_ability(|a| matches!(a, Ability::Spit { .. })) {
+                t.abilities.push(Ability::Spit { every: 3, die: 4 });
+            } else if let Some(a) = f.abilities.first().copied().filter(|_| f.golem && t.abilities.len() < 4) {
+                t.abilities.push(a);
+            } else if f.has(Trait::Leap) {
+                got = false; // the legs: it leaps at once (below)
+            } else {
+                t.bonus += 1; // jaws, a spike, a blade: something sharp
+            }
+        }
+        self.units[g].trophies += 1;
+        if f.has(Trait::Charge) {
+            self.units[g].charged = false;
+        }
+        self.ev(Event::Cast { u: m, kind: Cast::Trophy, t: g });
+        if !got && self.units[g].t.speed > 0 {
+            self.leap(g);
+        }
     }
 
     /// Мимикрия: a machine broken below half its health or fallen — its enemy's mimics take up its weapon, in place of
@@ -1381,7 +1802,11 @@ impl Battle {
     }
 
     fn melee_target(&self, i: usize) -> Option<usize> {
-        let adj = self.adjacent_enemies(i);
+        let all = self.adjacent_enemies(i);
+        let adj: Vec<usize> = all.iter().copied().filter(|&j| !self.is_wall(j)).collect();
+        if adj.is_empty() {
+            return all.first().copied(); // nothing but a wall beside: break it
+        }
         let mark = self.mark[self.units[i].side as usize];
         let flyer = self.units[i].t.has(Trait::Flyer);
         adj.iter()
@@ -1399,6 +1824,7 @@ impl Battle {
         }
         let far = self.units[i].t.has(Trait::Navodka);
         self.enemies_of(i)
+            .filter(|&j| !self.is_wall(j))
             .map(|j| (j, self.dist(i, j)))
             .filter(|&(_, d)| d <= range as i32)
             .min_by_key(|&(j, d)| (!self.units[j].t.has(Trait::Glow), if far { -d } else { d }, self.units[j].hp, j))
@@ -1603,6 +2029,12 @@ impl Battle {
             }
         }
         let mut raw = if self.units[h.attacker].overloaded == self.round { h.raw * 2 } else { h.raw };
+        // Память роя: the swarm strikes the kind it remembers harder
+        if let Some(k) = self.units[t].kind {
+            if self.memory[self.units[h.attacker].side as usize % 2].contains(&k) {
+                raw += 2;
+            }
+        }
         // standing in the enemy's honey: the blow sticks and lands weaker
         if self.on_enemy(h.attacker, &self.honey) {
             raw -= raw / 2;
@@ -1639,7 +2071,7 @@ impl Battle {
             self.units[t].poison += self.rng.die(h.venom) as i32;
         }
         // a parasite takes in a machine too: it nests in the works
-        if d > 0 && h.infect && self.units[t].infected.is_none() {
+        if d > 0 && h.infect && self.units[t].infected.is_none() && !self.is_wall(t) {
             self.units[t].infected = Some(self.units[a].side);
         }
         // a puppeteer's blow hooks it: falling, it rises for the puppeteers
@@ -1809,6 +2241,24 @@ impl Battle {
         }
         self.units[t].alive = false;
         self.ev(Event::Kill { t });
+        // the Devourer falls with a meal inside: it bursts out of him, dazed
+        if let Some(v) = self.units[t].belly.take() {
+            if self.units[v].alive {
+                let (vs, vside) = (self.units[v].t.size, self.units[v].side);
+                self.units[v].inside = None;
+                match self.free_spot_near(vside, vs, x, y, 3) {
+                    Some((nx, ny)) => {
+                        self.units[v].x = nx;
+                        self.units[v].y = ny;
+                        self.units[v].on_field = true;
+                        self.units[v].stunned = true;
+                        self.grid.add(vside, vs, nx, ny);
+                        self.ev(Event::Burst { t: v });
+                    }
+                    None => self.kill(v),
+                }
+            }
+        }
         // a barrel bursts with acid on the enemies adjacent
         if let Some(die) = self.units[t].t.traits.iter().find_map(|x| if let Trait::BurstAcid { die } = x { Some(*die) } else { None }) {
             // on the enemies beside it only: a whole breed that bursts (a mutation) must not eat its own crowd
@@ -1845,13 +2295,15 @@ impl Battle {
         }
         // an enemy that falls beside the Devourer is its meal: the swarm brings a machine down, the beast eats it (the
         // killer's own meal is counted in on_kill; the Devourer does not eat its own swarm)
-        if self.units[t].t.is_army() {
+        if self.units[t].t.is_army() && self.units[t].inside.is_none() {
+            self.trophy(t);
             let eaters: Vec<usize> = (0..self.units.len())
                 .filter(|&k| self.units[k].side != side && self.units[k].present() && self.units[k].t.has(Trait::Grows) && self.units[k].t.has(Trait::Leader))
                 .filter(|&k| self.dist(k, t) <= 1)
                 .collect();
             for k in eaters {
                 self.ev(Event::Cast { u: k, kind: Cast::Devour, t });
+                self.eaten[self.units[k].side as usize % 2].push(t);
                 self.eat(k);
             }
         }
@@ -1908,6 +2360,140 @@ impl Battle {
 
     // ---------------------------------------------------------------- lasting effects
     fn persistent(&mut self) {
+        self.tesla();
+        for i in 0..self.units.len() {
+            if self.units[i].belly.is_some() {
+                self.digest(i);
+            }
+        }
+        self.lasting();
+        self.contagion();
+        self.metamorph();
+    }
+
+    /// Тесла-сеть: lightning between the Inventor's golems, a jolt for every enemy standing on a line between two.
+    fn tesla(&mut self) {
+        for side in 0..2u8 {
+            let Some(inv) = (0..self.units.len()).find(|&k| {
+                let u = &self.units[k];
+                u.side == side && u.present() && u.t.has(Trait::Tesla) && u.silenced_until < self.round
+            }) else {
+                continue;
+            };
+            let nodes: Vec<usize> = (0..self.units.len())
+                .filter(|&k| {
+                    let u = &self.units[k];
+                    u.side == side && u.present() && (u.t.golem || k == inv) && u.t.is_army()
+                })
+                .collect();
+            let mut links: Vec<(usize, usize)> = vec![];
+            for &a in &nodes {
+                let mut near: Vec<(i32, usize)> = nodes.iter().copied().filter(|&b| b != a).map(|b| (self.dist(a, b), b)).filter(|&(d, _)| d <= TESLA_REACH).collect();
+                near.sort();
+                for &(_, b) in near.iter().take(2) {
+                    let l = (a.min(b), a.max(b));
+                    if !links.contains(&l) {
+                        links.push(l);
+                    }
+                }
+            }
+            // the cells the lines cross, between the middles of the two ends (not under the ends themselves)
+            let mut line = vec![false; (W * H) as usize];
+            for &(a, b) in &links {
+                self.ev(Event::Arc { a, b });
+                let c = |k: usize| (self.units[k].x as f32 + self.units[k].fp() as f32 / 2.0, self.units[k].y as f32 + self.units[k].fp() as f32 / 2.0);
+                let ((ax, ay), (bx, by)) = (c(a), c(b));
+                let steps = (((bx - ax).abs().max((by - ay).abs())) * 4.0).ceil() as i32;
+                for s in 0..=steps {
+                    let f = s as f32 / steps.max(1) as f32;
+                    let (cx, cy) = ((ax + (bx - ax) * f).floor() as i32, (ay + (by - ay) * f).floor() as i32);
+                    if (0..W).contains(&cx) && (0..H).contains(&cy) && rect_dist(cx, cy, 1, self.units[a].x, self.units[a].y, self.units[a].fp()) > 0 && rect_dist(cx, cy, 1, self.units[b].x, self.units[b].y, self.units[b].fp()) > 0 {
+                        line[Grid::idx(cx, cy)] = true;
+                    }
+                }
+            }
+            let struck: Vec<usize> = (0..self.units.len())
+                .filter(|&j| self.units[j].side != side && self.units[j].present() && !self.is_wall(j))
+                .filter(|&j| self.cells_of(j).any(|c| line[c]))
+                .collect();
+            for j in struck {
+                let raw = self.rng.damage(TESLA_DIE, 0);
+                let d = self.calc(j, raw, Dmg::Shock, false);
+                self.units[j].hp -= d;
+                self.ev(Event::Hit { a: inv, t: j, dmg: d });
+                if self.units[j].hp <= 0 {
+                    self.kill(j);
+                    self.units[inv].kills += 1;
+                }
+            }
+        }
+    }
+
+    /// Эпидемия: while the Plague stands, each infected enemy passes it on to one of its own beside it, one time in two.
+    fn contagion(&mut self) {
+        for side in 0..2u8 {
+            if !self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Contagion)) {
+                continue;
+            }
+            let carriers: Vec<usize> = (0..self.units.len()).filter(|&j| self.units[j].side != side && self.units[j].present() && self.units[j].infected == Some(side)).collect();
+            for c in carriers {
+                if self.rng.die(2) != 1 {
+                    continue;
+                }
+                let cs = self.units[c].side;
+                let next = (0..self.units.len()).find(|&k| {
+                    let u = &self.units[k];
+                    k != c && u.side == cs && u.present() && u.infected.is_none() && u.t.is_army() && self.dist(c, k) <= 1
+                });
+                if let Some(k) = next {
+                    self.units[k].infected = Some(side);
+                    self.ev(Event::Cast { u: c, kind: Cast::Contagion, t: k });
+                }
+            }
+        }
+    }
+
+    /// Метаморфоз: the Mother's larvae three rounds old pupate into the form that has killed the most this battle.
+    fn metamorph(&mut self) {
+        for side in 0..2u8 {
+            if !self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Metamorph)) {
+                continue;
+            }
+            let mut tally: Vec<(&str, u32, usize)> = vec![];
+            for (k, u) in self.units.iter().enumerate() {
+                if u.side != side || u.kills == 0 || !u.t.is_army() || u.t.has(Trait::Leader) || u.t.name == "Личинка" {
+                    continue;
+                }
+                match tally.iter_mut().find(|e| e.0 == u.t.name) {
+                    Some(e) => e.1 += u.kills,
+                    None => tally.push((u.t.name.as_ref(), u.kills, k)),
+                }
+            }
+            let Some(best) = tally.iter().max_by_key(|e| (e.1, Reverse(e.2))).map(|e| e.2) else { continue };
+            let larvae: Vec<usize> = (0..self.units.len())
+                .filter(|&k| {
+                    let u = &self.units[k];
+                    u.side == side && u.present() && u.t.name == "Личинка" && self.round >= u.born + 3
+                })
+                .collect();
+            for l in larvae {
+                let body = self.units[best].t.clone();
+                let (ls, lx, ly) = (self.units[l].t.size, self.units[l].x, self.units[l].y);
+                self.grid.sub(ls, lx, ly);
+                let Some((nx, ny)) = self.free_spot_near(side, body.size, lx, ly, 2) else {
+                    self.grid.add(side, ls, lx, ly);
+                    continue;
+                };
+                self.units[l].alive = false;
+                self.units[l].on_field = false;
+                let to = self.place(side, body, nx, ny);
+                self.ev(Event::Summon { u: to });
+                self.ev(Event::Morph { from: l, to });
+            }
+        }
+    }
+
+    fn lasting(&mut self) {
         let n = self.units.len();
         for i in 0..n {
             if self.units[i].present() && self.units[i].t.has(Trait::ZharGorna) {

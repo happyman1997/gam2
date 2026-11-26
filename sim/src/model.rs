@@ -197,7 +197,33 @@ pub enum Trait {
     /// Стрекот: every second round an enemy with four or more of these beside it loses its blow (the chirr shakes it;
     /// machines ring with it too).
     Chirr,
+    /// Тесла-сеть (the Inventor): while he stands, lightning runs between his golems — each to its two nearest within
+    /// `TESLA_REACH` cells — and every enemy standing on a line between two of them takes 1–`TESLA_DIE` lightning a
+    /// round. He falls — the net goes dark.
+    Tesla,
+    /// Трофеи (the Maniac): an enemy that falls within 3 cells of him — he tears a part off it and bolts it on the golem
+    /// nearest to it, for the rest of the battle (at most two a golem): a wasp's wings make it fly, a scorpion's sting
+    /// poisons, a beetle's horn charges, a woodlouse's shell pricks, a mantis's scythes strike twice, a grasshopper's legs
+    /// leap, a barrel's sack bursts with acid, a firefly's lantern flashes, an ant's jaws +1; a machine gives its first
+    /// module, a leader its head on a pike (terror).
+    Trophies,
+    /// A wall segment of the Architect's (Стена): stands, does not strike, holds a whole cell; no army. The enemy goes
+    /// round it, and breaks it only when there is nothing else beside to strike; shooters do not waste shots on it.
+    Wall,
+    /// Метаморфоз (the Mother): a larva of her side that has lived three rounds pupates and comes out as the form that
+    /// has killed the most in this battle — the brood turns into whatever wins.
+    Metamorph,
+    /// Эпидемия (the Plague): every third round she spits spores at the nearest enemy, however far — it is infected;
+    /// and while she stands, the infection runs on its own — every round an infected enemy passes it to one of its own
+    /// beside it, one time in two.
+    Contagion,
+    /// Память роя (the Hive Mind, its run's rule): the swarm remembers the kind of enemy (index `k` into `KNOWN`) that
+    /// killed the most of it in a battle, and strikes it +2 for the rest of the run.
+    Knows { k: u8 },
 }
+
+/// The enemies the Hive Mind can remember (Память роя), by units.ron key: `Trait::Knows { k }` is an index here.
+pub const KNOWN: [&str; 10] = ["strazh", "mudrets", "gorn", "orudie", "mekhanik", "kamenshchik", "otets_kolossa", "izobretatel", "manyak", "zodchiy"];
 
 /// Abilities with a condition.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -240,6 +266,27 @@ pub enum Ability {
     /// Every `every` rounds (besides attacking): an allied golem within two cells gets a module at random until the
     /// battle ends (Маньяк).
     Tinker { every: u32 },
+    /// Бросок титана (Отец колосса): every `every` rounds, instead of his blow, he grabs the biggest enemy beside him (up
+    /// to size 5) and hurls it into the thickest of its own within `range` cells: it takes 3–12 blunt, everyone of its
+    /// side round where it lands 1–6, the small ones stunned.
+    Hurl { every: u32, range: u32 },
+    /// Чертёж (Зодчий): as the battle begins `n` wall segments rise in front of his army — two by two with a gap of two
+    /// between, corridors for the enemy; while a wall stands his army waits behind them (Гарнизон) and steps out only
+    /// to an enemy within 3 cells (up to round 10).
+    Blueprint { n: u32 },
+    /// Кладка стены (Каменщик): every `every` rounds, instead of his blow, lays a wall segment beside him on the enemy's
+    /// side (at most 3 a battle), once an enemy is within 8 cells — under its nose too.
+    Lay { every: u32 },
+    /// Подмена (Разум улья): every `every` rounds (besides his blow) he swaps places in the minds of two: the enemy's
+    /// shooter or leader safest behind its line and a body of his own in the thick of the swarm — the shooter wakes up
+    /// among the swarm, dazed (it skips its next blow), the body stands at the enemy's back.
+    Swap { every: u32 },
+    /// Глотает целиком (Пожиратель): every `every` rounds, instead of his bite, he swallows an enemy beside him smaller
+    /// than himself, whole. Inside it is digested — 1–6 a round, +2 for each stage of his growth, past its armor — and it
+    /// strikes him from within, past his. Digested, it is his meal; he falls — it bursts out of him, dazed.
+    Swallow { every: u32 },
+    /// Пандемия (Чума, her run's rule): as the battle begins, `n` bodies of the enemy are infected already.
+    Pandemic { n: u32 },
 }
 
 impl Ability {
@@ -254,6 +301,11 @@ impl Ability {
             (Quake { every: a, die: d, bonus: x, radius: r }, Quake { every: b, die: e, bonus: y, radius: q }) => {
                 Quake { every: a.min(b), die: d.max(e), bonus: x.max(y), radius: r.max(q) }
             }
+            (Hurl { every: a, range: r }, Hurl { every: b, range: q }) => Hurl { every: a.min(b), range: r.max(q) },
+            (Blueprint { n: a }, Blueprint { n: b }) => Blueprint { n: a.max(b) },
+            (Swap { every: a }, Swap { every: b }) => Swap { every: a.min(b) },
+            (Swallow { every: a }, Swallow { every: b }) => Swallow { every: a.min(b) },
+            (Pandemic { n: a }, Pandemic { n: b }) => Pandemic { n: a.max(b) },
             (_, o) => o,
         }
     }
@@ -292,7 +344,11 @@ impl Ability {
             | Ability::Overload { every }
             | Ability::Fireball { every, .. }
             | Ability::Quake { every, .. }
-            | Ability::Tinker { every } => Some(every),
+            | Ability::Tinker { every }
+            | Ability::Hurl { every, .. }
+            | Ability::Lay { every }
+            | Ability::Swap { every }
+            | Ability::Swallow { every } => Some(every),
             _ => None,
         }
     }
@@ -326,10 +382,10 @@ impl Template {
         self.traits.contains(&t)
     }
 
-    /// Whether it counts as its side's army: a midge cloud, a ghost of a mirage and a puppet machine do not (a side of
+    /// Whether it counts as its side's army: a midge cloud, a ghost of a mirage, a puppet machine and a wall do not (a side of
     /// them alone has lost; they are not counted as fallen).
     pub fn is_army(&self) -> bool {
-        !self.has(Trait::Cloud) && !self.has(Trait::Ghost) && !self.has(Trait::Puppet)
+        !self.has(Trait::Cloud) && !self.has(Trait::Ghost) && !self.has(Trait::Puppet) && !self.has(Trait::Wall)
     }
 
     pub fn fear(&self) -> Option<(u32, u32)> {

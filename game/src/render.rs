@@ -467,7 +467,9 @@ fn number(cv: &mut Image, a: &Assets, rec: &Record, n: &Number, f: i32, bars: &[
 /// two. A white core, a blue rim, a dim glow; two short forks.
 fn bolt(cv: &mut Image, a: &Assets, rec: &Record, shown: &[crate::playback::Shown], e: &Effect, f: i32) {
     let Some((src, tgt)) = e.link else { return };
-    let k = f - (e.start - 3);
+    // the Inventor's net: lightning that stands between two golems' chests for a moment, no running out
+    let net = e.name == "tesla";
+    let k = if net { f - e.start } else { f - (e.start - 3) };
     if !(0..8).contains(&k) {
         return;
     }
@@ -478,9 +480,14 @@ fn bolt(cv: &mut Image, a: &Assets, rec: &Record, shown: &[crate::playback::Show
         ex = -ex;
     }
     let body = sprite(a, rec, tgt, Pose::Idle, f).map(|(p, _)| p.oy).unwrap_or(20);
-    let from = (s.x + ex as f32, s.y + ey as f32);
-    let to = (t.x, t.y - body as f32 * 0.45);
-    let reach = ((k + 1) as f32 / 3.0).min(1.0);
+    let from = if net {
+        let own = sprite(a, rec, src, Pose::Idle, f).map(|(p, _)| p.oy).unwrap_or(20);
+        (s.x, s.y - own as f32 * 0.5)
+    } else {
+        (s.x + ex as f32, s.y + ey as f32)
+    };
+    let to = (t.x, t.y - body as f32 * if net { 0.5 } else { 0.45 });
+    let reach = if net { 1.0 } else { ((k + 1) as f32 / 3.0).min(1.0) };
     let fade = if k <= 6 { 1.0 } else { 0.55 };
     // the same bolt while it runs out, a new one each frame after
     let seed = (e.start as u32).wrapping_mul(2654435761) ^ (src as u32 * 97 + tgt as u32 * 13) ^ if k < 3 { 0 } else { k as u32 * 7919 };
@@ -746,7 +753,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
     let shown = rec.shown(ff);
     let ms = rec.moments((f / FR) as usize);
     let lying_of = |o: &crate::playback::Shown| o.pose == Pose::Dead && o.dead_at.map(|k| ff - k as f32 >= 6.0).unwrap_or(true);
-    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader && !rec.units[id].cloud && !rec.units[id].ghost;
+    let small = |id: usize| rec.units[id].fp == 1 && !rec.units[id].leader && !rec.units[id].cloud && !rec.units[id].ghost && !rec.units[id].wall;
     // a pack: the small ones of one side, one size, in one cell (big ones never stand among small ones)
     type PackKey = ((i32, i32), u8, u32);
     let key = |id: usize, cell: (i32, i32)| -> PackKey { (cell, rec.units[id].side, rec.units[id].size) };
@@ -840,7 +847,9 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         let Some((spr, name)) = sprite(a, rec, s.id, anim.pose, f) else { continue };
         // a body that has no broken pose lies as it stood, dark (the drawing below darkens the dead)
         let big = info.fp >= 2 || info.machine;
-        if !lying && anim.pose != Pose::Dead {
+        if info.wall && !lying && anim.pose != Pose::Dead {
+            cv.shadow(x + 2.0, y, 26.0, 4.0);
+        } else if !lying && anim.pose != Pose::Dead {
             let pack = small(s.id) && packs.get(&key(s.id, s.cell)).map(|v| v.len() > 1).unwrap_or(false);
             let rank0 = small(s.id) && packs.get(&key(s.id, s.cell)).map(|v| v.first() == Some(&s.id)).unwrap_or(true);
             if !small(s.id) || !pack {
@@ -1015,7 +1024,7 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     cv.blit(&a.ui["wing_battle_960"].img, 0, 0, false, 1.0);
     // a midge cloud is no body of the army
     let alive = |side: u8| {
-        rec.units.iter().enumerate().filter(|(i, u)| u.side == side && !u.cloud && !u.ghost && !u.puppet && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count()
+        rec.units.iter().enumerate().filter(|(i, u)| u.side == side && !u.cloud && !u.ghost && !u.puppet && !u.wall && rec.state_at(*i, f).alive && rec.state_at(*i, f).present).count()
     };
     // the swarm's count on the left, the Foundry's leader and its golems on the right, whichever side each is on
     let swarm = if rec.units.iter().any(|u| u.side == 1 && !u.machine) { 1 } else { 0 };
@@ -1023,7 +1032,7 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     let hp = |side: u8| -> f32 {
         let (mut now, mut all) = (0.0, 0.0);
         for (i, u) in rec.units.iter().enumerate() {
-            if u.side == side && !u.cloud && !u.ghost && !u.puppet {
+            if u.side == side && !u.cloud && !u.ghost && !u.puppet && !u.wall {
                 all += u.max_hp as f32;
                 let s = rec.state_at(i, f);
                 if s.alive && s.present {
@@ -1061,7 +1070,7 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
         cv.blend_px(x, 10 + j, [255, 244, 200, 255], 1.0);
     }
     let text = &a.fonts["text16"];
-    let nf = rec.units.iter().filter(|u| u.side == forge).count();
+    let nf = rec.units.iter().filter(|u| u.side == forge && !u.wall).count();
     let leader = rec.units.iter().find(|u| u.side == forge && u.leader).map(|u| u.name.as_str()).unwrap_or("Литейщик");
     // the leader's name and his army's count, short enough to leave room for the turn before the buttons
     text.draw(cv, &format!("{leader} {}/{nf}", alive(forge)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);

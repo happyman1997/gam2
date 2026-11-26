@@ -103,6 +103,25 @@
         armor_type: Cast,
         golem: true,
         traits: [FireResist75, Mindless, PoisonImmune],
+        abilities: [Lay(every: 2)],
+    ),
+    // стена Зодчего (Чертёж, Кладка стены): занимает клетку, не бьёт, не армия; враг обходит её, а ломает, только когда
+    // рядом бить больше некого; камень держит колющий и рубящий вполовину, слаб к дробящему — толпа ломает её за несколько ходов
+    "stena": (
+        name: "Стена",
+        size: 4,
+        hp: 12,
+        die: 1,
+        bonus: 0,
+        dmg: Blunt,
+        init: 0,
+        armor: 0,
+        morale: 99,
+        speed: 0,
+        range: 1,
+        armor_type: Stone,
+        golem: false,
+        traits: [Wall, NoAttack, Mindless, PoisonImmune, Unstoppable],
         abilities: [],
     ),
     // ---- Литейщик: лидеры
@@ -121,7 +140,7 @@
         armor_type: Cast,
         golem: true,
         traits: [FireResist75, Mindless, PoisonImmune, Unstoppable, Fear(die: 6, radius: 2)],
-        abilities: [Quake(every: 6, die: 6, bonus: 0, radius: 1)],
+        abilities: [Quake(every: 6, die: 6, bonus: 0, radius: 1), Hurl(every: 4, range: 6)],
     ),
     "izobretatel": (
         name: "Изобретатель",
@@ -137,7 +156,7 @@
         range: 1,
         armor_type: Leather,
         golem: false,
-        traits: [FireResist75, Leader],
+        traits: [FireResist75, Leader, Tesla],
         abilities: [Augment],
     ),
     "manyak": (
@@ -154,7 +173,7 @@
         range: 1,
         armor_type: Leather,
         golem: false,
-        traits: [FireResist75, Leader, Fear(die: 8, radius: 2)],
+        traits: [FireResist75, Leader, Fear(die: 8, radius: 2), Trophies],
         abilities: [Tinker(every: 3)],
     ),
     "zodchiy": (
@@ -172,7 +191,7 @@
         armor_type: Leather,
         golem: false,
         traits: [FireResist75, Leader],
-        abilities: [],
+        abilities: [Blueprint(n: 8)],
     ),
     // ---- Рой: простые особи вне каст и форм (старые пробы и личинка)
     "rabochaya": (
@@ -277,7 +296,7 @@
         range: 1,
         armor_type: Chitin,
         golem: false,
-        traits: [Leader, Devour],
+        traits: [Leader, Devour, Metamorph],
         abilities: [Brood(every: 3, n: 2)],
     ),
     "razum": (
@@ -295,7 +314,7 @@
         armor_type: Soft,
         golem: false,
         traits: [Leader, Devour, HiveMind],
-        abilities: [Mark(every: 2)],
+        abilities: [Mark(every: 2), Swap(every: 4)],
     ),
     "pozhiratel": (
         name: "Пожиратель",
@@ -312,7 +331,7 @@
         armor_type: HeavyChitin,
         golem: false,
         traits: [Leader, Devour, Grows],
-        abilities: [],
+        abilities: [Swallow(every: 3)],
     ),
     "kukushka": (
         name: "Чума",
@@ -328,7 +347,7 @@
         range: 1,
         armor_type: Chitin,
         golem: false,
-        traits: [Leader, Devour, Infects, Changeling],
+        traits: [Leader, Devour, Infects, Changeling, Contagion],
         abilities: [],
     ),
     // ---- Люди: воин и эталонный отряд (мерка силы — нейтральные люди размера 3 со всеми типами урона и брони)

@@ -196,6 +196,12 @@ fn main() {
         video::run(&mut demo, if seeds.is_empty() { &[184, 142] } else { &seeds }, &path);
         return;
     }
+    if let Some(i) = args.iter().position(|a| a == "--leaders") {
+        // each leader's own thing in a battle, at its moment (shots.rs)
+        let dir = args.get(i + 1).cloned().unwrap_or_else(|| "screens".into());
+        shots::leaders(demo, &dir);
+        return;
+    }
     if let Some(i) = args.iter().position(|a| a == "--screens") {
         // every screen of the game to a PNG (shots.rs)
         let dir = args.get(i + 1).cloned().unwrap_or_else(|| "screens".into());
@@ -312,7 +318,7 @@ mod flow {
             run.fight = 4;
             let mut boss = run.path[0].clone();
             boss.kind = Kind::Boss;
-            let list = run.after_battle(&boss, &BattleResult { won: true, dead: vec![], kills: 5 });
+            let list = run.after_battle(&boss, &BattleResult { won: true, dead: vec![], kills: 5, foe_kills: vec![], eaten: vec![] });
             let i = list.iter().position(|r| matches!(r, Reward::Growth(_))).expect("no growth after a boss");
             let Reward::Growth(keys) = &list[i] else { unreachable!() };
             let keys = keys.clone();
@@ -901,6 +907,7 @@ mod flow {
             Trait::TwinBlades, Trait::Glow, Trait::HiveMind, Trait::Grows, Trait::Infects, Trait::Changeling, Trait::Viviparous,
             Trait::Spitter, Trait::Midges, Trait::Cloud, Trait::Spinner, Trait::Honey, Trait::Buds, Trait::Chirr, Trait::Mimic,
             Trait::ThirdStage, Trait::Puppeteer, Trait::Puppet, Trait::Mirage, Trait::Ghost, Trait::Hungry { left: 12 },
+            Trait::Tesla, Trait::Trophies, Trait::Wall, Trait::Metamorph, Trait::Contagion, Trait::Knows { k: 3 },
         ];
         for tr in &traits {
             let (n, l) = trait_words(tr);
@@ -912,6 +919,8 @@ mod flow {
             Ability::Intercept, Ability::Flash { every: 3 }, Ability::Spit { every: 3, die: 4 }, Ability::Brood { every: 3, n: 2 },
             Ability::Mark { every: 2 }, Ability::Overload { every: 2 }, Ability::Fireball { every: 3, die: 4, bonus: 0, range: 5 },
             Ability::Quake { every: 3, die: 8, bonus: 2, radius: 1 }, Ability::Augment, Ability::Tinker { every: 3 },
+            Ability::Hurl { every: 4, range: 6 }, Ability::Blueprint { n: 8 }, Ability::Lay { every: 2 }, Ability::Swap { every: 4 },
+            Ability::Swallow { every: 3 }, Ability::Pandemic { n: 2 },
         ];
         for ab in &abilities {
             let l = ability_line(ab);

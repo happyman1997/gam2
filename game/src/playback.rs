@@ -34,6 +34,8 @@ pub struct UnitInfo {
     pub puppet: bool,
     /// The modules on a golem with their levels (finds.ron keys): drawn over its body.
     pub mods: Vec<(String, u8)>,
+    /// A wall of the Architect's: a block of masonry, not a body.
+    pub wall: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -104,6 +106,9 @@ pub struct Record {
     pub kills: Vec<u32>,
     /// The ground it is fought on: 0 an ordinary fight's, 1 an elite's, 2 a boss's.
     pub ground: usize,
+    /// What the leaders take from it for the run (Память роя, Ты — то, что ты ешь): `run::BattleResult`'s.
+    pub foe_kills: Vec<(u8, u32)>,
+    pub eaten: Vec<u8>,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
@@ -155,6 +160,7 @@ fn infos(bt: &Battle) -> Vec<UnitInfo> {
             ghost: u.t.has(Trait::Ghost),
             puppet: u.t.has(Trait::Puppet),
             mods: u.t.mods.clone(),
+            wall: u.t.has(Trait::Wall),
         })
         .collect()
 }
@@ -196,7 +202,19 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
     }
     let res = sim::run::result_of(&bt, outcome.winner);
     let kills = bt.units.iter().map(|u| u.kills).collect();
-    let mut rec = Record { units: infos(&bt), rounds, outcome, seed, died_at: vec![], dead0: res.dead, kills1: res.kills, kills, ground: 0 };
+    let mut rec = Record {
+        units: infos(&bt),
+        rounds,
+        outcome,
+        seed,
+        died_at: vec![],
+        dead0: res.dead,
+        kills1: res.kills,
+        kills,
+        ground: 0,
+        foe_kills: res.foe_kills,
+        eaten: res.eaten,
+    };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
         for m in rec.moments(r) {
@@ -323,7 +341,17 @@ impl Record {
         for (id, info) in self.units.iter().enumerate() {
             let (b, a) = (round.before[id], round.after[id]);
             let killed_at = ms.iter().find(|m| matches!(m.ev, Event::Kill { t } if t == id)).map(|m| m.frame);
-            let born_at = ms.iter().find(|m| matches!(m.ev, Event::Summon { u } if u == id)).map(|m| m.frame);
+            // summoned, or out of the belly that swallowed it: it appears there and then
+            let born_at = ms.iter().find(|m| matches!(m.ev, Event::Summon { u } if u == id) || matches!(m.ev, Event::Burst { t } if t == id)).map(|m| m.frame);
+            // swallowed, or pupated into another: gone at that moment, no corpse
+            let gone_at = ms.iter().find(|m| matches!(m.ev, Event::Swallow { t, .. } if t == id) || matches!(m.ev, Event::Morph { from, .. } if from == id)).map(|m| m.frame);
+            // hurled, or swapped in a flash: where it stood when it happened, and when
+            let jump = ms.iter().find_map(|m| match m.ev {
+                Event::Thrown { t, fx, fy, .. } if t == id => Some((m.frame, fx, fy, true)),
+                Event::Swap { a, ax, ay, .. } if a == id => Some((m.frame, ax, ay, false)),
+                Event::Swap { b, bx, by, .. } if b == id => Some((m.frame, bx, by, false)),
+                _ => None,
+            });
             if !b.present && !a.present {
                 continue; // fled off the field, or not summoned yet
             }
@@ -337,11 +365,29 @@ impl Record {
                     continue;
                 }
             }
+            if let Some(g) = gone_at {
+                if f >= g {
+                    continue;
+                }
+            }
             let (bx, by) = Self::spot(b.x, b.y, info.fp);
             let (ax, ay) = Self::spot(a.x, a.y, info.fp);
-            let (x, y) = (bx + (ax - bx) * e, by + (ay - by) * e);
-            let dead = killed_at.map(|k| f >= k).unwrap_or(false) || (!a.alive && killed_at.is_none() && ph >= MOVE);
-            if !a.present && !dead && ph >= MOVE {
+            let (mut x, mut y) = if born_at.is_some() { (ax, ay) } else { (bx + (ax - bx) * e, by + (ay - by) * e) };
+            if let Some((jf, jx, jy, thrown)) = jump {
+                // it walks to where it is grabbed (or swapped from), then flies in an arc (or is just there)
+                let (gx, gy) = Self::spot(jx, jy, info.fp);
+                if f < jf {
+                    (x, y) = (bx + (gx - bx) * e, by + (gy - by) * e);
+                } else if thrown && f < jf + FLY {
+                    let q = (f - jf) as f32 / FLY as f32;
+                    (x, y) = (gx + (ax - gx) * q, gy + (ay - gy) * q - 90.0 * 4.0 * q * (1.0 - q));
+                } else {
+                    (x, y) = (ax, ay);
+                }
+            }
+            let morphed = gone_at.is_some() && !a.alive;
+            let dead = !morphed && (killed_at.map(|k| f >= k).unwrap_or(false) || (!a.alive && killed_at.is_none() && ph >= MOVE));
+            if !a.present && !dead && ph >= MOVE && gone_at.is_none() {
                 continue;
             }
             let attacking = ms.iter().any(|m| matches!(m.ev, Event::Hit { a: at, .. } if at == id) && (f - m.frame).abs() <= 4);
@@ -430,6 +476,11 @@ impl Record {
                     }
                     Event::Heal { t, .. } => out.push(Cue { frame: m.frame, name: "heal", gain: 0.0, x: at(t) }),
                     Event::Absorbed { t } => out.push(Cue { frame: m.frame, name: "miss", gain: 0.0, x: at(t) }),
+                    // the hurled one comes down with a crash
+                    Event::Thrown { t, .. } => out.push(Cue { frame: m.frame + FLY, name: "blast", gain: 0.0, x: at(t) }),
+                    Event::Arc { a, .. } | Event::Swap { a, .. } => out.push(Cue { frame: m.frame, name: "zap", gain: -4.0, x: at(a) }),
+                    Event::Swallow { u, .. } => out.push(Cue { frame: m.frame, name: "bite", gain: 0.0, x: at(u) }),
+                    Event::Burst { t } | Event::Morph { to: t, .. } => out.push(Cue { frame: m.frame, name: "squish", gain: 0.0, x: at(t) }),
                     _ => {}
                 }
             }
@@ -464,6 +515,8 @@ impl Record {
             let mut last_volley: Option<(usize, i32)> = None;
             // who cast something this round: its hits are shown by the cast's own effect, not a spark each
             let mut cast_by: Vec<usize> = vec![];
+            // the Inventor's net has run this round: his hits from now on are its jolts, not bolts from his glove
+            let mut netted: Vec<usize> = vec![];
             for m in self.moments(r) {
                 let at = |id: usize| {
                     let s = after[id];
@@ -471,6 +524,10 @@ impl Record {
                 };
                 match m.ev {
                     Event::Hit { a, t, dmg } => {
+                        // a blow inside a belly: nothing to show where it is digested
+                        if !after[t].present && after[t].alive {
+                            continue;
+                        }
                         let (x, y) = at(t);
                         let att = &self.units[a];
                         let swarm_hits = !att.machine;
@@ -506,6 +563,10 @@ impl Record {
                         };
                         nums.push(Number { text, style, x, y, start: m.frame, t, k: 0, value, end: i32::MAX });
                         if cast_by.contains(&a) {
+                            continue;
+                        }
+                        if netted.contains(&a) {
+                            fx.push(Effect { name: "zap-hit", x, y: y - 14.0, start: m.frame, link: None, flip: false, from: None });
                             continue;
                         }
                         let name: &'static str = match att.name.as_str() {
@@ -571,7 +632,55 @@ impl Record {
                             Cast::Trample => fx.push(fx_at("ground-slam", ux, uy, m.frame, false)),
                             // the Forge breathes its heat on the one it sets alight
                             Cast::Kindle => fx.push(fx_at("fire-breath", ux, uy - 34.0, m.frame, left)),
+                            // the hurled one comes down: the ground bursts where it lands
+                            Cast::Hurl => fx.push(fx_at("ground-slam", tx, ty, m.frame + FLY, false)),
+                            // a part torn off the fallen, bolted on the golem with a spark
+                            Cast::Trophy => {
+                                fx.push(Effect { name: "bolt", x: tx, y: ty, start: m.frame, link: Some((u, t)), flip: false, from: None });
+                                fx.push(fx_at("hit-spark", tx, ty - 20.0, m.frame, false));
+                                nums.push(Number { text: t_("num.trophy"), style: NumStyle::Status, x: tx, y: ty, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                            }
+                            // the sickness passes on: a green puff on the newly infected
+                            Cast::Contagion => fx.push(fx_at("acid-splash", tx, ty - 6.0, m.frame, false)),
+                            // a wall rises: a mason's with a thud of its own, the blueprint's all at once, with dust
+                            Cast::Lay if self.units[u].name == "Каменщик" => fx.push(fx_at("ground-slam", tx, ty, m.frame, false)),
+                            Cast::Lay => fx.push(fx_at("hit-spark", tx, ty - 10.0, m.frame, false)),
                         }
+                    }
+                    Event::Arc { a, b } => {
+                        netted.push(a);
+                        netted.push(b);
+                        // the Inventor's hits after the net are its jolts (he is one of its ends or not)
+                        if let Some(inv) = self.units.iter().position(|u| u.name == "Изобретатель" && u.side == self.units[a].side) {
+                            netted.push(inv);
+                        }
+                        let (x, y) = at(b);
+                        fx.push(Effect { name: "tesla", x, y, start: m.frame, link: Some((a, b)), flip: false, from: None });
+                    }
+                    Event::Swallow { u, t } => {
+                        let (x, y) = Self::spot(self.rounds[r].before[t].x, self.rounds[r].before[t].y, self.units[t].fp);
+                        let _ = u;
+                        fx.push(Effect { name: "devour-splash", x, y, start: m.frame, link: None, flip: false, from: None });
+                        nums.push(Number { text: t_("num.swallowed"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                    }
+                    Event::Burst { t } => {
+                        let (x, y) = at(t);
+                        fx.push(Effect { name: "devour-splash", x, y, start: m.frame, link: None, flip: false, from: None });
+                    }
+                    Event::Morph { from, .. } => {
+                        let st = self.rounds[r].before[from];
+                        let (x, y) = Self::spot(st.x, st.y, self.units[from].fp);
+                        fx.push(Effect { name: "acid-splash", x, y: y - 4.0, start: m.frame, link: None, flip: false, from: None });
+                    }
+                    Event::Swap { a, b, ax, ay, bx, by } => {
+                        for (id, ox, oy) in [(a, ax, ay), (b, bx, by)] {
+                            let (x, y) = Self::spot(ox, oy, self.units[id].fp);
+                            fx.push(Effect { name: "mana-burst", x, y, start: m.frame, link: None, flip: false, from: None });
+                            let (nx, ny) = at(id);
+                            fx.push(Effect { name: "mana-burst", x: nx, y: ny, start: m.frame + 1, link: None, flip: false, from: None });
+                        }
+                        let (x, y) = at(b);
+                        nums.push(Number { text: t_("num.swapped"), style: NumStyle::Status, x, y, start: m.frame, t: b, k: 0, value: 0, end: i32::MAX });
                     }
                     Event::Heal { t, amount, .. } => {
                         let (x, y) = at(t);

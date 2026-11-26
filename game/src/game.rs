@@ -433,6 +433,8 @@ impl Game {
             won: self.demo.rec.outcome.winner == Some(0),
             dead: self.demo.rec.dead0.clone(),
             kills: self.demo.rec.kills1,
+            foe_kills: self.demo.rec.foe_kills.clone(),
+            eaten: self.demo.rec.eaten.clone(),
         };
         // the battle's summary, read before its losses are taken from the army: who fell (the leader always comes
         // back), who killed most

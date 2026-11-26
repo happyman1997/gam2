@@ -147,6 +147,12 @@ pub fn ability_name(ab: &Ability) -> String {
         Ability::Quake { .. } => "ab.quake",
         Ability::Augment => "ab.augment",
         Ability::Tinker { .. } => "ab.tinker",
+        Ability::Hurl { .. } => "ab.hurl",
+        Ability::Blueprint { .. } => "ab.blueprint",
+        Ability::Lay { .. } => "ab.lay",
+        Ability::Swap { .. } => "ab.swap",
+        Ability::Swallow { .. } => "ab.swallow",
+        Ability::Pandemic { .. } => "ab.pandemic",
     };
     t(k)
 }
@@ -2747,6 +2753,15 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Puppet => n("tr.puppet", "tr.puppet.l"),
         T::Mirage => n("tr.mirage", "tr.mirage.l"),
         T::Ghost => n("tr.ghost", "tr.ghost.l"),
+        T::Tesla => n("tr.tesla", "tr.tesla.l"),
+        T::Trophies => n("tr.trophies", "tr.trophies.l"),
+        T::Wall => n("tr.wall", "tr.wall.l"),
+        T::Metamorph => n("tr.metamorph", "tr.metamorph.l"),
+        T::Contagion => n("tr.contagion", "tr.contagion.l"),
+        T::Knows { k } => {
+            let who = sim::model::KNOWN.get(k as usize).map(|key| sim::data::unit(key).name.to_string()).unwrap_or_default();
+            (t("tr.knows"), tf("tr.knows.l", &[("u", &who)]))
+        }
     }
 }
 
@@ -2770,6 +2785,12 @@ pub fn ability_line(ab: &Ability) -> String {
         Ability::Quake { every, die, bonus, .. } => tf("ab.quake.l", &[("e", &every), ("h", &hit(die, bonus))]),
         Ability::Augment => t("ab.augment.l"),
         Ability::Tinker { every } => tf("ab.tinker.l", &[("e", &every)]),
+        Ability::Hurl { every, range } => tf("ab.hurl.l", &[("e", &every), ("r", &range)]),
+        Ability::Blueprint { n } => tf("ab.blueprint.l", &[("n", &n)]),
+        Ability::Lay { every } => tf("ab.lay.l", &[("e", &every)]),
+        Ability::Swap { every } => tf("ab.swap.l", &[("e", &every)]),
+        Ability::Swallow { every } => tf("ab.swallow.l", &[("e", &every)]),
+        Ability::Pandemic { n } => tf("ab.pandemic.l", &[("n", &n)]),
     }
 }
 
