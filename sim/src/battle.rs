@@ -176,8 +176,6 @@ pub enum Event {
     Glue { t: usize },
     /// Stunned: skips its next attack (Сотрясение).
     Stun { t: usize },
-    /// A melee blow from behind the target (its back, away from the enemy it faces): half as hard again.
-    Rear { t: usize },
     /// A module or a form's gift goes off: who, which, and on whom (an enemy it aims at, an ally it serves, or itself
     /// for what spreads round it). Only for the picture: its hits, heals and states come as their own events.
     Cast { u: usize, kind: Cast, t: usize },
@@ -939,18 +937,6 @@ impl Battle {
         best.map(|b| b.1)
     }
 
-    /// Whether `i` stands behind `j`: beyond the back of `j`, away from the enemy its side faces (the near side
-    /// faces right).
-    fn behind(&self, i: usize, j: usize) -> bool {
-        let (a, t) = (&self.units[i], &self.units[j]);
-        let ac = a.x as f32 + a.fp() as f32 / 2.0;
-        if t.side == 0 {
-            ac <= t.x as f32
-        } else {
-            ac >= (t.x + t.fp()) as f32
-        }
-    }
-
     /// Expects the unit already lifted off the grid.
     fn move_to(&mut self, i: usize, x: i32, y: i32) {
         let (side, size) = (self.units[i].side, self.units[i].t.size);
@@ -1483,11 +1469,8 @@ impl Battle {
             if charge {
                 raw = raw * 3 / 2;
             }
-            // a blow in the back, or at one caught in its web: half as hard again
-            if self.behind(i, v) {
-                raw = raw * 3 / 2;
-                self.ev(Event::Rear { t: v });
-            } else if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
+            // a blow at one caught in its web: half as hard again
+            if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
                 raw = raw * 3 / 2;
             }
             hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: mimic & MIMIC_FIRE != 0, stun: false });

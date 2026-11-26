@@ -116,21 +116,30 @@ fn spit_glues_and_poisons_but_not_machines() {
     assert_eq!(bt.units[g].poison, 0, "poison does nothing to a machine");
 }
 
-/// Flanking: a crowd bigger than the enemy's front can hold goes round its flanks to its back, and a melee blow
-/// there is half as hard again (Event::Rear) — before, the crowd queued up in front.
+/// Flanking: a crowd bigger than the enemy's front can hold goes round its flanks to its back (a blow there is no
+/// harder than any other: the back blow is gone) — before, the crowd queued up in front.
 #[test]
 fn a_crowd_goes_round_to_the_back() {
     use sim::data::*;
-    use sim::{Battle, Event};
+    use sim::Battle;
     let (mut reached, mut battles) = (0, 0);
     for seed in 0..20 {
-        let mut bt = Battle::new(seed).with_log();
+        let mut bt = Battle::new(seed);
         bt.add_armies(&many(soldat(), 24), &[strazh()]);
-        bt.run();
-        battles += 1;
-        if bt.log.as_ref().unwrap().iter().any(|e| matches!(e, Event::Rear { .. })) {
-            reached += 1;
+        let g = bt.units.iter().position(|u| u.side == 1).unwrap();
+        let mut back = false;
+        loop {
+            let done = bt.step();
+            // one of the crowd beside the Guard on its own army's side (the right: the far side faces left) — the
+            // round that ends the battle too: the crowd often gets round just as the Guard falls
+            let (gx, gf) = (bt.units[g].x, bt.units[g].fp());
+            back |= (0..bt.units.len()).any(|k| bt.units[k].side == 0 && bt.units[k].present() && bt.dist(k, g) <= 1 && bt.units[k].x >= gx + gf);
+            if done.is_some() {
+                break;
+            }
         }
+        battles += 1;
+        reached += back as i32;
     }
     assert!(reached * 2 >= battles, "the back reached in only {reached} of {battles} battles");
 }

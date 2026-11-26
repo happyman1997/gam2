@@ -593,10 +593,6 @@ impl Record {
                         let (x, y) = at(t);
                         nums.push(Number { text: t_("num.stun"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
                     }
-                    Event::Rear { t } => {
-                        let (x, y) = at(t);
-                        nums.push(Number { text: t_("num.rear"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
-                    }
                     _ => {}
                 }
             }
