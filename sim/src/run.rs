@@ -93,26 +93,35 @@ impl Artifact {
         }
     }
 
-    pub fn apply(self, t: &mut Template) {
+    /// What it does to a body of the army (`leader`: the one that carries the banner and the bell): not numbers but
+    /// habits (CONCEPT.md, «Повадки вместо цифр»).
+    pub fn apply(self, t: &mut Template, leader: bool) {
+        let mut add = |x: Trait| {
+            if !t.traits.contains(&x) {
+                t.traits.push(x);
+            }
+        };
         match self {
-            Artifact::Znamya => t.morale += 3,
-            Artifact::Sapogi => t.speed += 1,
-            Artifact::Chasha => t.hp += (t.hp + 4) / 5,
+            // the banner rises when half the army has fallen
+            Artifact::Znamya if leader => add(Trait::Banner),
+            // a dash in the first round: every first blow from the run-up
+            Artifact::Sapogi => add(Trait::Charge),
+            // a kill mends those beside the killer
+            Artifact::Chasha => add(Trait::Chalice),
+            // every blow flattens a point of armor, but they strike last
             Artifact::Nakovalnya => {
-                t.bonus += 3;
+                add(Trait::Crush);
                 t.init = 0;
             }
-            Artifact::Kolokol => t.init += 2,
-            Artifact::Grani => {
-                t.die = t.die.saturating_sub(2).max(1);
-                t.bonus += 2;
-            }
-            Artifact::Chasy => t.armor += 1,
-            Artifact::Fonar => {
-                if t.range > 1 {
-                    t.range += 1
-                }
-            }
+            // the leader's bell stuns the enemies round him every fourth round
+            Artifact::Kolokol if leader => add(Trait::Bell),
+            // the highest roll strikes double and stuns
+            Artifact::Grani => add(Trait::LoadedDice),
+            // a lethal blow turns time back, once
+            Artifact::Chasy => add(Trait::Hourglass),
+            // shooters' shots set alight, they see in the night
+            Artifact::Fonar if t.range > 1 => add(Trait::Flare),
+            _ => {}
         }
     }
 }
@@ -502,8 +511,9 @@ impl Run {
                 }
             }
         }
+        let lead = self.is_leader(m);
         for a in &self.artifacts {
-            a.apply(&mut t);
+            a.apply(&mut t, lead);
         }
         if self.is_leader(m) {
             // the sets: three finds of one element in the army — the leader brings what they make of the side
@@ -1623,24 +1633,28 @@ pub const PANDEMIC_EVERY: u32 = 3;
 /// Память роя: how many kinds the swarm remembers at once (a new one pushes the oldest out).
 pub const MEMORY: usize = 3;
 
-/// What a kind eaten enough of gives the Devourer (`model::KNOWN` index): a Guard's or a Mason's iron — armor; a
-/// Sage's coils — its bite shocks; a Forge's coals — it sets those beside it alight; a Gun's steel — teeth +2; a
-/// Mechanic's oil — health; a leader — health and a harder bite.
+/// What a kind eaten enough of gives the Devourer (`model::KNOWN` index): a Guard's or a Mason's iron — those beside
+/// him strike him first; a Sage's coils — his bite shocks; a Forge's coals — he sets those beside him alight; a Gun's
+/// steel — his teeth go through half the armor; a Mechanic's oil — he mends himself; a leader — its terror.
 pub fn diet_gift(k: usize, t: &mut Template) {
+    let mut add = |x: Trait| {
+        if !t.traits.contains(&x) {
+            t.traits.push(x);
+        }
+    };
     match crate::model::KNOWN.get(k).copied() {
-        Some("strazh" | "kamenshchik") => t.armor += 1,
+        // a Guard's, a Mason's iron: those beside him must strike him first
+        Some("strazh" | "kamenshchik") => add(Trait::Zaslon),
+        // a Sage's coils: his bite shocks
         Some("mudrets") => t.dmg = crate::model::Dmg::Shock,
-        Some("gorn") => {
-            if !t.has(Trait::ZharGorna) {
-                t.traits.push(Trait::ZharGorna);
-            }
-        }
-        Some("orudie") => t.bonus += 2,
-        Some("mekhanik") => t.hp += 15,
-        Some(_) => {
-            t.hp += 20;
-            t.bonus += 1;
-        }
+        // a Forge's coals: he sets those beside him alight
+        Some("gorn") => add(Trait::ZharGorna),
+        // a Gun's steel: his teeth go through half the armor
+        Some("orudie") => add(Trait::Probivnoy),
+        // a Mechanic's oil: he mends himself
+        Some("mekhanik") => add(Trait::Regen),
+        // a leader of the Foundry: its terror is in him now
+        Some(_) => add(Trait::Fear { die: 6, radius: 2 }),
         None => {}
     }
 }

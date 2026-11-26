@@ -518,6 +518,10 @@ impl Record {
                     Event::Bump { b, .. } => out.push(Cue { frame: m.frame, name: "hit_flesh", gain: -2.0, x: at(b) }),
                     Event::Surge { t } => out.push(Cue { frame: m.frame, name: "zap", gain: 0.0, x: at(t) }),
                     Event::Phase { u } => out.push(Cue { frame: m.frame, name: "blast", gain: 2.0, x: at(u) }),
+                    // the habits: time turned back, a cocoon spun, the banner raised, the bell rung
+                    Event::Rewind { t } | Event::Banner { u: t } => out.push(Cue { frame: m.frame, name: "heal", gain: 0.0, x: at(t) }),
+                    Event::Cocoon { t } => out.push(Cue { frame: m.frame, name: "squish", gain: 0.0, x: at(t) }),
+                    Event::Bell { u } => out.push(Cue { frame: m.frame, name: "zap", gain: -2.0, x: at(u) }),
                     _ => {}
                 }
             }
@@ -746,6 +750,50 @@ impl Record {
                     Event::Defy { t } => {
                         let (x, y) = at(t);
                         nums.push(Number { text: t_("num.defy"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                    }
+                    // Песочные часы: its time turns back
+                    Event::Rewind { t } => {
+                        let (x, y) = at(t);
+                        fx.push(Effect { name: "mana-burst", x, y: y - 10.0, start: m.frame, link: None, flip: false, from: None });
+                        nums.push(Number { text: t_("num.rewind"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                    }
+                    // Кокон: the Plague pupates
+                    Event::Cocoon { t } => {
+                        let (x, y) = at(t);
+                        fx.push(Effect { name: "acid-splash", x, y: y - 6.0, start: m.frame, link: None, flip: false, from: None });
+                        nums.push(Number { text: t_("num.cocoon"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
+                    }
+                    // Знамя: the banner rises over the one that picked it up
+                    Event::Banner { u } => {
+                        let (x, y) = at(u);
+                        fx.push(Effect { name: "mana-burst", x, y: y - 20.0, start: m.frame, link: None, flip: false, from: None });
+                        nums.push(Number {
+                            text: t_("num.banner"),
+                            style: NumStyle::Status,
+                            x,
+                            y,
+                            start: m.frame,
+                            t: u,
+                            k: 0,
+                            value: 0,
+                            end: i32::MAX,
+                        });
+                    }
+                    // Колокол: a ring of sound round the leader
+                    Event::Bell { u } => {
+                        let (x, y) = at(u);
+                        fx.push(Effect { name: "ground-slam", x, y, start: m.frame, link: None, flip: false, from: None });
+                        nums.push(Number {
+                            text: t_("num.bell"),
+                            style: NumStyle::Status,
+                            x,
+                            y,
+                            start: m.frame,
+                            t: u,
+                            k: 0,
+                            value: 0,
+                            end: i32::MAX,
+                        });
                     }
                     Event::Swap { a, b, ax, ay, bx, by } => {
                         for (id, ox, oy) in [(a, ax, ay), (b, bx, by)] {

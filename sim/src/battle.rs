@@ -196,6 +196,11 @@ pub struct Unit {
     /// A boss gone into its second phase; one Живучий that has cheated death once.
     pub phased: bool,
     pub defied: bool,
+    /// Its health as the round began (Песочные часы), whether its time has turned back already; the Colossus's
+    /// plates fallen off so far (Сброс плит).
+    pub hp_round: i32,
+    pub rewound: bool,
+    pub shed: u8,
 }
 
 impl Unit {
@@ -256,6 +261,14 @@ pub enum Event {
     Phase { u: usize },
     /// Живучие: a blow that should have killed `t` leaves it on 1.
     Defy { t: usize },
+    /// Песочные часы: `t`'s time turns back to the round's start.
+    Rewind { t: usize },
+    /// Кокон: the Plague `t` pupates instead of dying.
+    Cocoon { t: usize },
+    /// Знамя: the banner of `u`'s army rises (`u`: the one that picked it up).
+    Banner { u: usize },
+    /// Колокол тревоги: `u` rings.
+    Bell { u: usize },
 }
 
 /// What goes off in an `Event::Cast`.
@@ -433,6 +446,11 @@ pub struct Battle {
     sets: [u16; 2],
     /// The Inventor-boss's net overcharged (his second phase).
     overcharge: [bool; 2],
+    /// How many of each side's army stood as the battle began; whether it came with a banner, whether the banner
+    /// has risen (Знамя).
+    army0: [usize; 2],
+    bannered: [bool; 2],
+    banner: [bool; 2],
 }
 
 impl Battle {
@@ -464,6 +482,9 @@ impl Battle {
             rifts: 0,
             sets: [0, 0],
             overcharge: [false, false],
+            army0: [0, 0],
+            bannered: [false, false],
+            banner: [false, false],
         }
     }
 
@@ -703,6 +724,9 @@ impl Battle {
             stuck_until: 0,
             phased: false,
             defied: false,
+            hp_round: 0,
+            rewound: false,
+            shed: 0,
         });
         self.units[id].kind = crate::data::unit_key(&self.units[id].t.name).and_then(|k| crate::model::KNOWN.iter().position(|x| *x == k)).map(|k| k as u8);
         id
@@ -782,6 +806,9 @@ impl Battle {
     /// One round; `Some` when the battle is over.
     pub fn step(&mut self) -> Option<Outcome> {
         self.round += 1;
+        for u in &mut self.units {
+            u.hp_round = u.hp;
+        }
         self.ev(Event::Round(self.round));
         if self.round > MAX_ROUNDS {
             return Some(self.outcome(None));
@@ -1230,6 +1257,11 @@ impl Battle {
         if !u.present() || u.fleeing {
             return;
         }
+        // Воля роя: a swarm with the Hive Mind's will does not run
+        let side = u.side;
+        if self.units.iter().any(|k| k.side == side && k.present() && k.t.has(Trait::Rally)) {
+            return;
+        }
         let morale = self.morale_of(j);
         if self.rng.die(die) > morale {
             self.units[j].fleeing = true;
@@ -1247,6 +1279,20 @@ impl Battle {
                 if let Trait::Set { e } = *tr {
                     self.sets[u.side as usize % 2] |= e.bit();
                 }
+            }
+        }
+        for u in &self.units {
+            if u.present() && u.t.is_army() {
+                self.army0[u.side as usize % 2] += 1;
+            }
+            if u.t.has(Trait::Banner) {
+                self.bannered[u.side as usize % 2] = true;
+            }
+        }
+        // a living torch is alight from the start
+        for u in &mut self.units {
+            if u.t.has(Trait::Torch) {
+                u.burn = 3;
             }
         }
         // an elite standing in oil or in slime from the start
@@ -1444,7 +1490,8 @@ impl Battle {
                         for v in victims {
                             let raw = self.rng.damage(die, bonus);
                             let stun = self.units[v].t.size <= 2;
-                            hits.push(Hit { attacker: i, target: v, raw, dmg: Dmg::Blunt, melee: true, stun, ..Default::default() });
+                            let knock = self.units[i].t.has(Trait::Shockwave);
+                            hits.push(Hit { attacker: i, target: v, raw, dmg: Dmg::Blunt, melee: true, stun, knock, ..Default::default() });
                         }
                         return;
                     }
@@ -1502,7 +1549,12 @@ impl Battle {
                     }
                 }
                 Ability::Brood { every, n } if round.is_multiple_of(every) => {
-                    let (side, x, y) = (self.units[i].side, self.units[i].x, self.units[i].y);
+                    // Засада: out of the ground beside the nearest enemy
+                    let near = self.units[i].t.has(Trait::Ambush).then(|| self.nearest_enemy(i)).flatten();
+                    let (side, x, y) = match near {
+                        Some((j, _)) => (self.units[i].side, self.units[j].x, self.units[j].y),
+                        None => (self.units[i].side, self.units[i].x, self.units[i].y),
+                    };
                     for _ in 0..n {
                         let mut larva = crate::data::rabochaya();
                         larva.name = "Личинка".into();
@@ -1656,6 +1708,21 @@ impl Battle {
             self.ev(Event::Cast { u: i, kind: Cast::Devour, t });
             self.eaten[self.units[i].side as usize % 2].push(t);
             self.eat(i);
+            // Отрыжка: what is left of it comes back up as acid over the enemies round him
+            if self.units[i].t.has(Trait::Belch) {
+                self.ev(Event::Cast { u: i, kind: Cast::Spit, t: i });
+                let near: Vec<usize> = self.enemies_of(i).filter(|&v| self.dist(i, v) <= 2).collect();
+                for v in near {
+                    let raw = self.rng.damage(6, 0);
+                    let dd = self.calc(v, raw, Dmg::Acid, false);
+                    self.corrode(v);
+                    self.units[v].hp -= dd;
+                    self.ev(Event::Hit { a: i, t: v, dmg: dd });
+                    if self.units[v].hp <= 0 {
+                        self.kill(v);
+                    }
+                }
+            }
             return;
         }
         let u = &self.units[t];
@@ -1947,9 +2014,11 @@ impl Battle {
         }
         let mark = self.mark[self.units[i].side as usize];
         let flyer = self.units[i].t.has(Trait::Flyer);
+        let known = &self.memory[self.units[i].side as usize % 2];
         adj.iter()
             .copied()
-            .find(|&j| self.units[j].t.has(Trait::Zaslon))
+            .find(|&j| self.units[j].t.has(Trait::Zaslon) || (self.units[j].t.has(Trait::Bulwark) && self.units[j].curled))
+            .or_else(|| adj.iter().copied().find(|&j| self.units[j].kind.is_some_and(|k| known.contains(&k))))
             .or_else(|| adj.iter().copied().find(|&j| Some(j) == mark))
             .or_else(|| if flyer { adj.iter().copied().find(|&j| self.units[j].t.range > 1 || self.units[j].t.has(Trait::Leader)) } else { None })
             .or(adj.first().copied())
@@ -1961,11 +2030,11 @@ impl Battle {
             return None;
         }
         let far = self.units[i].t.has(Trait::Navodka);
-        let night = self.weather == Weather::Night;
+        let night = self.weather == Weather::Night && !self.units[i].t.has(Trait::Flare);
         self.enemies_of(i)
             .filter(|&j| !self.is_wall(j))
             .map(|j| (j, self.dist(i, j)))
-            .filter(|&(j, d)| d <= range as i32 && (!night || d <= NIGHT_SIGHT || self.lit(j)))
+            .filter(|&(j, d)| d <= range as i32 && (!night || d <= NIGHT_SIGHT || self.lit(j)) && !self.covered(i, j))
             // at night what burns or glows draws every eye
             .min_by_key(|&(j, d)| (!self.units[j].t.has(Trait::Glow), night && !self.lit(j), if far { -d } else { d }, self.units[j].hp, j))
             .map(|(j, _)| j)
@@ -2020,7 +2089,33 @@ impl Battle {
                 raw = (raw + 1) / 2;
             }
             let (venom, infect) = self.blow_effects(i);
-            hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy, venom, infect, ..Default::default() });
+            let ignite = self.units[i].t.has(Trait::Flare);
+            hits.push(Hit { attacker: i, target: j, raw, dmg, probivnoy, venom, infect, ignite, ..Default::default() });
+            // Длинный ствол: the shot goes on into the enemy right behind the target
+            if self.units[i].t.has(Trait::Pierce) {
+                let dj = self.dist(i, j);
+                if let Some(v) =
+                    self.enemies_of(i).filter(|&v| v != j && self.dist(v, j) <= 1 && self.dist(i, v) > dj).min_by_key(|&v| (self.dist(i, v), v))
+                {
+                    hits.push(Hit { attacker: i, target: v, raw: (raw + 1) / 2, dmg, probivnoy, ignite, ..Default::default() });
+                }
+            }
+            // Дальний плевок: the acid splashes the target's neighbours
+            if self.units[i].t.has(Trait::Splash) {
+                for v in self.beside(i, j, 8) {
+                    hits.push(Hit { attacker: i, target: v, raw: (raw + 1) / 2, dmg, ..Default::default() });
+                }
+            }
+            // Кирпичи навесом: the throw lands on the whole cell, the small ones there stunned one time in two
+            if self.units[i].t.has(Trait::Lob) {
+                let (cx, cy) = (self.units[j].x, self.units[j].y);
+                let cell: Vec<usize> =
+                    self.enemies_of(i).filter(|&v| v != j && self.units[v].fp() == 1 && (self.units[v].x, self.units[v].y) == (cx, cy)).collect();
+                for v in cell {
+                    let stun = self.units[v].t.size <= 2 && self.rng.die(2) == 1;
+                    hits.push(Hit { attacker: i, target: v, raw, dmg, stun, ..Default::default() });
+                }
+            }
             // a heavy shot (blunt, from one bigger by 2+) lands on the whole cell of small ones, as a trampling does
             if dmg == Dmg::Blunt && self.units[i].t.size >= self.units[j].t.size + 2 && self.units[j].fp() == 1 {
                 let (cx, cy) = (self.units[j].x, self.units[j].y);
@@ -2036,6 +2131,12 @@ impl Battle {
         }
         let Some(j) = self.melee_target(i) else { return };
         self.melee_blow(i, j, hits);
+        // Пила-вихрь: the saw goes round — every enemy beside him
+        if self.units[i].t.has(Trait::Whirl) {
+            for w in self.adjacent_enemies(i).into_iter().filter(|&w| w != j) {
+                self.melee_blow(i, w, hits);
+            }
+        }
         if self.units[i].t.has(Trait::TwinBlades) {
             let j2 = self.adjacent_enemies(i).into_iter().find(|&x| x != j).unwrap_or(j);
             self.melee_blow(i, j2, hits);
@@ -2111,9 +2212,36 @@ impl Battle {
             if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
                 raw = raw * 3 / 2;
             }
-            let ignite = mimic & MIMIC_FIRE != 0 || self.units[i].t.has(Trait::Blazing);
+            let ignite = mimic & MIMIC_FIRE != 0 || self.units[i].t.has(Trait::Blazing) || self.units[i].t.has(Trait::Torch);
             let knock = charge || self.has_set(self.units[i].side, Element::Impact);
             hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock, venom, infect, ignite, stun: false, from: None });
+            // Длинные лапы: the sting goes on into the one right behind
+            if self.units[i].t.has(Trait::Reach) {
+                let dv = self.dist(i, v);
+                if let Some(w) =
+                    self.enemies_of(i).filter(|&w| w != v && self.dist(w, v) <= 1 && self.dist(i, w) > dv).min_by_key(|&w| (self.dist(i, w), w))
+                {
+                    hits.push(Hit { attacker: i, target: w, raw, dmg, venom, melee: true, ..Default::default() });
+                }
+            }
+            // Цепной шокер: the blow leaps to two beside the target
+            if self.units[i].t.has(Trait::Chain) {
+                for w in self.beside(i, v, 2) {
+                    hits.push(Hit { attacker: i, target: w, raw: (raw + 1) / 2, dmg: Dmg::Shock, ..Default::default() });
+                }
+            }
+        }
+        // Искрящий молот: a spark off the blow — an enemy beside the target catches fire
+        if self.units[i].t.has(Trait::Sparks) {
+            if let Some(w) = self.beside(i, j, 1).first().copied() {
+                if !self.units[w].t.armor_type.immune(Dmg::Fire) {
+                    self.units[w].burn = self.units[w].burn.max(2);
+                    self.ev(Event::Cast { u: i, kind: Cast::Kindle, t: w });
+                    if self.on_ground(w, OIL) {
+                        self.ignite(w);
+                    }
+                }
+            }
         }
     }
 
@@ -2170,12 +2298,30 @@ impl Battle {
                 t = k;
             }
         }
-        let mut raw = if self.units[h.attacker].overloaded == self.round { h.raw * 2 } else { h.raw };
-        // Память роя: the swarm strikes the kind it remembers harder
-        if let Some(k) = self.units[t].kind {
-            if self.memory[self.units[h.attacker].side as usize % 2].contains(&k) {
-                raw += 2;
+        // Живой щит: a body of the Mother's beside her takes the blow meant for her
+        if self.units[t].t.has(Trait::Escort) {
+            let side = self.units[t].side;
+            if let Some(k) = (0..self.units.len())
+                .filter(|&k| {
+                    k != t
+                        && self.units[k].side == side
+                        && self.units[k].present()
+                        && self.units[k].t.is_army()
+                        && !self.units[k].t.has(Trait::Leader)
+                })
+                .filter(|&k| self.dist(k, t) <= 1)
+                .min_by_key(|&k| (self.units[k].t.size, k))
+            {
+                t = k;
             }
+        }
+        let mut raw = if self.units[h.attacker].overloaded == self.round { h.raw * 2 } else { h.raw };
+        // Гранёные кости: the highest roll strikes double, and stuns
+        let mut stun = h.stun;
+        let att = &self.units[h.attacker].t;
+        if att.has(Trait::LoadedDice) && h.raw >= att.die as i32 + att.bonus && h.raw > 0 {
+            raw *= 2;
+            stun = true;
         }
         // standing in the enemy's honey: the blow sticks and lands weaker
         if self.on_enemy(h.attacker, &self.honey) {
@@ -2192,9 +2338,32 @@ impl Battle {
             d = 0;
             self.ev(Event::Absorbed { t });
         }
-        // Хитиновая стена: the shell set takes a point less from every blow
-        if d > 0 && self.has_set(self.units[t].side, Element::Shell) {
-            d -= 1;
+        // Сцепка (the shell set): a body standing with its own in one cell shares the blow with them
+        if d > 1 && self.has_set(self.units[t].side, Element::Shell) && self.units[t].fp() == 1 {
+            let (side, x, y) = (self.units[t].side, self.units[t].x, self.units[t].y);
+            let pack: Vec<usize> = (0..self.units.len())
+                .filter(|&k| {
+                    k != t
+                        && self.units[k].side == side
+                        && self.units[k].present()
+                        && self.units[k].fp() == 1
+                        && (self.units[k].x, self.units[k].y) == (x, y)
+                })
+                .collect();
+            if !pack.is_empty() {
+                // the others each take an even share; the one struck, what is left of it
+                let share = d / (pack.len() as i32 + 1);
+                if share > 0 {
+                    for &k in &pack {
+                        self.units[k].hp -= share;
+                        self.ev(Event::Hit { a: h.attacker, t: k, dmg: share });
+                        if self.units[k].hp <= 0 {
+                            self.kill(k);
+                        }
+                    }
+                    d -= share * pack.len() as i32;
+                }
+            }
         }
         if h.dmg == Dmg::Acid {
             self.corrode(t);
@@ -2240,7 +2409,7 @@ impl Battle {
                 }
             }
         }
-        if h.stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
+        if stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
             self.units[t].stunned = true;
             self.ev(Event::Stun { t });
         }
@@ -2249,6 +2418,41 @@ impl Battle {
         let rot = self.has_set(self.units[a].side, Element::Venom);
         if (d > 0 || rot) && h.venom > 0 && (!self.units[t].t.has(Trait::PoisonImmune) || rot) {
             self.units[t].poison += self.rng.die(h.venom) as i32;
+        }
+        // Плющит броню (наковальня, рвущие челюсти)
+        if d > 0 && self.units[a].t.has(Trait::Crush) {
+            self.corrode(t);
+        }
+        // Бугристые надкрылья: a blow the shell stopped whole glances off into another enemy beside it
+        if h.melee && d == 0 && raw > 0 && self.units[t].t.has(Trait::Ricochet) {
+            let side = self.units[a].side;
+            if let Some(w) = (0..self.units.len()).find(|&w| w != a && self.units[w].side == side && self.units[w].present() && self.dist(w, t) <= 1)
+            {
+                let dd = self.calc(w, raw, h.dmg, false);
+                self.units[w].hp -= dd;
+                self.ev(Event::Hit { a: t, t: w, dmg: dd });
+                if self.units[w].hp <= 0 {
+                    self.kill(w);
+                }
+            }
+        }
+        if h.melee && self.units[a].present() && !self.units[a].t.has(Trait::Unstoppable) {
+            // Пси-отпор: whoever strikes the Mind close loses its thought
+            if self.units[t].t.has(Trait::MindWard) {
+                self.units[a].stunned = true;
+                self.ev(Event::Stun { t: a });
+            }
+        }
+        // Кислотная кровь: whoever strikes it close is splashed
+        if h.melee && self.units[t].t.has(Trait::AcidBlood) && self.units[a].present() {
+            let raw = self.rng.damage(4, 0);
+            let dd = self.calc(a, raw, Dmg::Acid, false);
+            self.corrode(a);
+            self.units[a].hp -= dd;
+            self.ev(Event::Hit { a: t, t: a, dmg: dd });
+            if self.units[a].hp <= 0 {
+                self.kill(a);
+            }
         }
         // Раскалённая броня: whoever strikes it close catches fire
         if h.melee && self.units[t].t.has(Trait::HotArmor) && self.units[a].present() && !self.units[a].t.armor_type.immune(Dmg::Fire) {
@@ -2283,6 +2487,49 @@ impl Battle {
             self.units[t].defied = true;
             self.units[t].hp = 1;
             self.ev(Event::Defy { t });
+        }
+        // Кокон: the Plague pupates instead of dying — half her health back, two rounds still
+        if self.units[t].hp <= 0 && self.units[t].t.has(Trait::Cocoon) && !self.units[t].defied {
+            self.units[t].defied = true;
+            self.units[t].hp = self.units[t].t.hp / 2;
+            self.units[t].stunned = true;
+            self.units[t].stuck_until = self.round + 2;
+            self.ev(Event::Cocoon { t });
+        }
+        // Песочные часы: its time turns back to the round's start
+        if self.units[t].hp <= 0 && self.units[t].t.has(Trait::Hourglass) && !self.units[t].rewound && self.units[t].hp_round > 0 {
+            self.units[t].rewound = true;
+            self.units[t].hp = self.units[t].hp_round;
+            self.ev(Event::Rewind { t });
+        }
+        // Чумная кровь: whoever kills a body of the Plague's close is infected
+        if self.units[t].hp <= 0 && h.melee && self.units[a].present() && self.units[a].infected.is_none() {
+            let side = self.units[t].side;
+            if self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::PlagueBlood)) {
+                self.units[a].infected = Some(side);
+                self.ev(Event::Cast { u: t, kind: Cast::Contagion, t: a });
+            }
+        }
+        // Сброс плит: with every quarter of the Colossus's health lost a plate falls on those beside him
+        while self.units[t].t.has(Trait::ShedPlates)
+            && self.units[t].shed < 3
+            && self.units[t].hp > 0
+            && self.units[t].hp * 4 < self.units[t].t.hp * (3 - self.units[t].shed as i32)
+        {
+            self.units[t].shed += 1;
+            self.ev(Event::Cast { u: t, kind: Cast::Quake, t });
+            let under: Vec<usize> = self.enemies_of(t).filter(|&v| self.dist(t, v) <= 1 && !self.units[v].t.has(Trait::Flyer)).collect();
+            for v in under {
+                let raw = self.rng.damage(8, 0);
+                let dd = self.calc(v, raw, Dmg::Blunt, false);
+                self.units[v].hp -= dd;
+                self.ev(Event::Hit { a: t, t: v, dmg: dd });
+                if self.units[v].hp <= 0 {
+                    self.kill(v);
+                } else if self.units[v].t.size <= 2 {
+                    self.units[v].stunned = true;
+                }
+            }
         }
         if self.units[t].hp * 2 < self.units[t].t.hp {
             self.take_apart(t);
@@ -2463,6 +2710,21 @@ impl Battle {
 
     pub fn on_ground(&self, i: usize, kind: u8) -> bool {
         self.cells_of(i).any(|c| self.ground[c] == kind)
+    }
+
+    /// Ростовой щит: `j` stands right behind a tower shield of its own, the shield between it and the shooter `i`.
+    fn covered(&self, i: usize, j: usize) -> bool {
+        let cx = |k: usize| 2 * self.units[k].x + self.units[k].fp();
+        let side = self.units[j].side;
+        (0..self.units.len()).any(|k| {
+            let u = &self.units[k];
+            k != j
+                && u.side == side
+                && u.present()
+                && u.t.has(Trait::TowerShield)
+                && self.dist(j, k) <= 1
+                && (cx(k) - cx(i)).abs() < (cx(j) - cx(i)).abs()
+        })
     }
 
     /// Ночь: what a shooter sees from afar — a body that burns, one that glows, one standing in burning oil.
@@ -2759,6 +3021,18 @@ impl Battle {
             return;
         }
         self.units[a].kills += 1;
+        // Кровавая чаша: a kill mends its own beside it
+        if self.units[a].t.has(Trait::Chalice) {
+            let side = self.units[a].side;
+            let near: Vec<usize> = (0..self.units.len())
+                .filter(|&k| self.units[k].side == side && self.units[k].present() && self.dist(a, k) <= 1 && self.units[k].hp < self.units[k].t.hp)
+                .collect();
+            for k in near {
+                let amount = 2.min(self.units[k].t.hp - self.units[k].hp);
+                self.units[k].hp += amount;
+                self.ev(Event::Heal { u: a, t: k, amount });
+            }
+        }
         // the Devourer has already eaten it in `kill` (whatever falls beside it is its meal, its own kill too)
         if !(self.units[a].t.has(Trait::Grows) && self.units[a].t.has(Trait::Leader)) {
             self.eat(a);
@@ -2796,6 +3070,9 @@ impl Battle {
         }
         self.units[t].alive = false;
         self.ev(Event::Kill { t });
+        if self.units[t].t.is_army() {
+            self.banner_check(side);
+        }
         // what it leaves on the ground: a broken machine spills its oil, a fallen body of the swarm its slime
         if on && self.units[t].t.is_army() {
             let oil = machine(&self.units[t].t);
@@ -2877,6 +3154,23 @@ impl Battle {
                 self.eat(k);
             }
         }
+        // Каменный дождь: an Architect's wall falls on the enemies beside it
+        if self.units[t].t.has(Trait::Wall) && self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Rubble)) {
+            self.ev(Event::Cast { u: t, kind: Cast::Quake, t });
+            let near: Vec<usize> =
+                self.enemies_of(t).filter(|&v| rect_dist(x, y, 1, self.units[v].x, self.units[v].y, self.units[v].fp()) <= 1).collect();
+            for v in near {
+                let raw = self.rng.damage(6, 0);
+                let dd = self.calc(v, raw, Dmg::Blunt, false);
+                self.units[v].hp -= dd;
+                self.ev(Event::Hit { a: t, t: v, dmg: dd });
+                if self.units[v].hp <= 0 {
+                    self.kill(v);
+                } else if self.units[v].t.size <= 2 {
+                    self.units[v].stunned = true;
+                }
+            }
+        }
         // a cloud and a ghost leave nothing behind
         if self.units[t].t.has(Trait::Cloud) || self.units[t].t.has(Trait::Ghost) {
             self.units[t].on_field = false;
@@ -2942,6 +3236,55 @@ impl Battle {
         self.metamorph();
         self.weather_round();
         self.phases();
+        self.habits();
+    }
+
+    /// Знамя: half the side's army fallen — its banner rises once: the rest mended a quarter, their fear gone.
+    fn banner_check(&mut self, side: u8) {
+        let s = side as usize % 2;
+        if self.banner[s] || !self.bannered[s] || self.army0[s] == 0 {
+            return;
+        }
+        // the bearer may have fallen: another picks the banner up
+        let Some(b) = (0..self.units.len()).find(|&k| self.units[k].side == side && self.units[k].present() && self.units[k].t.is_army()) else {
+            return;
+        };
+        let standing = self.units.iter().filter(|u| u.side == side && u.present() && u.t.is_army()).count();
+        if standing * 2 > self.army0[s] {
+            return;
+        }
+        self.banner[s] = true;
+        self.ev(Event::Banner { u: b });
+        for u in &mut self.units {
+            if u.side == side && u.alive && u.on_field && u.t.is_army() {
+                u.hp = (u.hp + u.t.hp / 4).min(u.t.hp);
+                u.fleeing = false;
+            }
+        }
+    }
+
+    /// The habits that go off at the round's end: a body that mends itself, the bell ringing.
+    fn habits(&mut self) {
+        for i in 0..self.units.len() {
+            if self.units[i].present() && self.units[i].t.has(Trait::Regen) && self.units[i].hp < self.units[i].t.hp {
+                self.units[i].hp = (self.units[i].hp + 2).min(self.units[i].t.hp);
+            }
+        }
+        // Колокол тревоги: every fourth round, the enemies within 2 cells of the bell stunned
+        if self.round.is_multiple_of(4) {
+            let bells: Vec<usize> = (0..self.units.len()).filter(|&k| self.units[k].present() && self.units[k].t.has(Trait::Bell)).collect();
+            for b in bells {
+                let near: Vec<usize> = self.enemies_of(b).filter(|&j| self.dist(b, j) <= 2 && !self.units[j].t.has(Trait::Unstoppable)).collect();
+                if near.is_empty() {
+                    continue;
+                }
+                self.ev(Event::Bell { u: b });
+                for j in near {
+                    self.units[j].stunned = true;
+                    self.ev(Event::Stun { t: j });
+                }
+            }
+        }
     }
 
     /// A boss at half its health goes into its second phase, once — each leader its own way.
@@ -3187,6 +3530,10 @@ impl Battle {
         }
         let n = self.units.len();
         for j in 0..n {
+            if self.units[j].present() && self.units[j].burn > 0 && self.units[j].t.has(Trait::Torch) {
+                self.web_fire(j); // a living torch: it burns the whole battle and takes no harm of it
+                continue;
+            }
             if self.units[j].present() && self.units[j].burn > 0 {
                 self.web_fire(j);
                 self.units[j].burn -= 1;

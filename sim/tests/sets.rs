@@ -142,7 +142,7 @@ fn the_nest_set_sinks_the_enemy_in_its_slime() {
 }
 
 #[test]
-fn the_venom_set_rots_machines_the_wing_set_is_not_held_the_shell_set_takes_less() {
+fn the_venom_set_rots_machines_the_wing_set_is_not_held_the_shell_set_shares_the_blow() {
     // venom: a scorpion's sting poisons a Guard
     let mut bt = Battle::new(6);
     let g = bt.place(0, still(strazh()), 10, 10);
@@ -158,22 +158,30 @@ fn the_venom_set_rots_machines_the_wing_set_is_not_held_the_shell_set_takes_less
     let a = bt.place(1, with_set(swarm(Caste::Worker, Form::Ant), Element::Wing), 14, 11);
     assert!(!bt.units.is_empty());
     let _ = a;
-    // shell: the same blow takes a point less
-    let dmg = |shell: bool| {
-        let mut total = 0;
+    // shell: two bugs in one cell share each blow — the Guard's blows land on twice as many bodies
+    let landed = |shell: bool| {
+        let mut n = 0;
         for seed in 0..20 {
-            let mut bt = Battle::new(seed);
-            bt.place(0, still(strazh()), 10, 10);
-            let s = if shell { with_set(still(soldat()), Element::Shell) } else { still(soldat()) };
-            let v = bt.place(1, s, 13, 10);
-            bt.units[v].hp = 999;
-            bt.units[v].t.hp = 999;
+            let mut bt = Battle::new(seed).with_log();
+            let g = bt.place(0, still(strazh()), 10, 10);
+            let ant = |set| {
+                if set {
+                    with_set(still(swarm(Caste::Worker, Form::Ant)), Element::Shell)
+                } else {
+                    still(swarm(Caste::Worker, Form::Ant))
+                }
+            };
+            for _ in 0..2 {
+                let v = bt.place(1, ant(shell), 11, 10);
+                bt.units[v].hp = 999;
+                bt.units[v].t.hp = 999;
+            }
             bt.step();
-            total += 999 - bt.units[v].hp;
+            n += bt.log.as_ref().unwrap().iter().filter(|e| matches!(e, Event::Hit { a, dmg, .. } if *a == g && *dmg > 0)).count();
         }
-        total
+        n
     };
-    assert!(dmg(true) < dmg(false), "the shell set took no less");
+    assert!(landed(true) > landed(false), "the shell set shared no blow: {} with, {} without", landed(true), landed(false));
 }
 
 #[test]

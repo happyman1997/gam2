@@ -4,13 +4,13 @@
 // корпусов из units.ron, на которые модуль ставится ([] — на любой); give — что даёт: module — способность из
 // modules.ron, abilities / traits — прямо, hp / armor / bonus / range / speed — прибавки, dmg — новый тип урона;
 // tag — стихия: три находки одной стихии в армии — сет (CONCEPT.md, «Сеты стихий»).
-// Только то, что симуляция уже умеет; числа временные.
+// Не прибавки к числам, а повадки (CONCEPT.md, «Повадки вместо цифр»); числа временные.
 (
     modules: [
         // Страж
         (key: "intercept", for: ["strazh"], give: (abilities: [Intercept]), tag: Iron),
         (key: "plates", for: ["strazh"], give: (abilities: [Plates(3)]), tag: Iron),
-        (key: "tower", for: ["strazh"], give: (armor: 2, speed: -1), tag: Iron),
+        (key: "tower", for: ["strazh"], give: (traits: [TowerShield]), tag: Iron),
         (key: "counter", for: ["strazh"], give: (traits: [Thorns(die: 6)]), tag: Iron),
         // Мудрец
         (key: "overload", for: ["mudrets"], give: (module: "peregruzka"), tag: Volt),
@@ -19,15 +19,15 @@
         // Орудие
         (key: "mortar", for: ["orudie"], give: (module: "mortira"), tag: Impact),
         (key: "canister", for: ["orudie"], give: (abilities: [PointBlank]), tag: Impact),
-        (key: "long", for: ["orudie"], give: (range: 1), tag: Impact),
+        (key: "long", for: ["orudie"], give: (traits: [Pierce]), tag: Impact),
         (key: "c_catapult", for: ["orudie", "manyak"], give: (module: "golova_katapulta"), tag: Impact),
         // Механик
         (key: "repair", for: ["mekhanik"], give: (module: "remont"), tag: Iron),
         // любой корпус
         (key: "flail", for: [], give: (abilities: [Flail]), tag: Impact),
         (key: "ram", for: [], give: (traits: [Charge]), tag: Impact),
-        (key: "spark", for: [], give: (dmg: Shock, bonus: 1), tag: Volt),
-        (key: "torch", for: [], give: (dmg: Fire), tag: Fire),
+        (key: "spark", for: [], give: (dmg: Shock, traits: [Sparks]), tag: Volt),
+        (key: "torch", for: [], give: (dmg: Fire, traits: [Torch]), tag: Fire),
         // Громоотвод: молния с неба бьёт в него втрое охотнее и уходит в землю, разряд по слизи его не берёт
         (key: "rod", for: [], give: (traits: [Grounded]), tag: Volt),
         // Раскалённая броня: кто бьёт его вплотную, загорается
@@ -40,13 +40,13 @@
         (key: "evo_phalanx", form: "Муравей", give: (traits: [Stroy]), tag: Shell),
         (key: "evo_syringe", form: "Оса", give: (traits: [Venom(die: 4)]), tag: Venom),
         (key: "evo_dive", form: "Оса", give: (traits: [Charge]), tag: Wing),
-        (key: "evo_longlegs", form: "Скорпион", give: (speed: 1), tag: Wing),
-        (key: "evo_farspit", form: "Бочонок", give: (range: 1), tag: Venom),
+        (key: "evo_longlegs", form: "Скорпион", give: (traits: [Reach]), tag: Wing),
+        (key: "evo_farspit", form: "Бочонок", give: (traits: [Splash]), tag: Venom),
         (key: "evo_forked", form: "Жук", give: (traits: [Charge]), tag: Shell),
-        (key: "evo_bosses", form: "Жук", give: (hp: 2), tag: Shell),
+        (key: "evo_bosses", form: "Жук", give: (traits: [Ricochet]), tag: Shell),
         (key: "evo_flyer", form: "Жук", give: (traits: [Flyer]), tag: Wing),
         (key: "evo_longspines", form: "Мокрица", give: (traits: [Thorns(die: 3)]), tag: Shell),
-        (key: "evo_lime", form: "Мокрица", give: (armor: 1), tag: Shell),
+        (key: "evo_lime", form: "Мокрица", give: (traits: [Bulwark]), tag: Shell),
         (key: "evo_farjump", form: "Кузнечик", give: (traits: [Leap]), tag: Wing),
         (key: "evo_saws", form: "Богомол", give: (traits: [TwinBlades], hp: -2), tag: Shell),
         // мутации — доктрины роя (CONCEPT.md, «Мутации»): каждая на весь рой и меняет, чем он воюет, у каждой цена;
@@ -77,7 +77,7 @@
         (key: "m_bud", leader: "matka", give: (traits: [Buds]), tag: Nest),
         // Разум улья — стрекот (резонанс: машину, обсаженную роем, трясёт) и мираж (в начале боя у каждой второй особи
         // призрачный двойник: враг тратит на него удар, он тает)
-        (key: "m_strider", leader: "razum", give: (traits: [Chirr], speed: 1), tag: Wing),
+        (key: "m_strider", leader: "razum", give: (traits: [Chirr]), tag: Wing),
         (key: "m_mirage", leader: "razum", give: (traits: [Mirage])),
         // Пожиратель — единственный в рое, кто мутирует сам (personal: на него, не на рой)
         // Третья ступень: растёт с каждым съеденным (враг, павший рядом), а не с каждым вторым, и трижды; на третьей

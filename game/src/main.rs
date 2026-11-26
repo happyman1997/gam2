@@ -912,6 +912,10 @@ mod flow {
             Trait::Set { e: sim::model::Element::Fire }, Trait::Set { e: sim::model::Element::Volt }, Trait::Set { e: sim::model::Element::Iron },
             Trait::Set { e: sim::model::Element::Impact }, Trait::Set { e: sim::model::Element::Nest }, Trait::Set { e: sim::model::Element::Venom },
             Trait::Set { e: sim::model::Element::Wing }, Trait::Set { e: sim::model::Element::Shell },
+            Trait::TowerShield, Trait::Pierce, Trait::Sparks, Trait::Torch, Trait::Reach, Trait::Splash, Trait::Ricochet, Trait::Bulwark,
+            Trait::Banner, Trait::Chalice, Trait::Crush, Trait::Bell, Trait::LoadedDice, Trait::Hourglass, Trait::Flare, Trait::ShedPlates,
+            Trait::Chain, Trait::Whirl, Trait::Rubble, Trait::Lob, Trait::Escort, Trait::Rally, Trait::MindWard, Trait::Belch,
+            Trait::AcidBlood, Trait::PlagueBlood, Trait::Cocoon, Trait::Shockwave, Trait::Ambush, Trait::Regen,
         ];
         for tr in &traits {
             let (n, l) = trait_words(tr);

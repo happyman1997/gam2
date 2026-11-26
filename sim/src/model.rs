@@ -218,7 +218,7 @@ pub enum Trait {
     /// beside it, one time in three.
     Contagion,
     /// Память роя (the Hive Mind, its run's rule): the swarm remembers the kind of enemy (index `k` into `KNOWN`) that
-    /// killed the most of it in a battle, and strikes it +2 for the rest of the run.
+    /// killed the most of it in a battle, and goes for it first for the rest of the run.
     Knows { k: u8 },
     /// Громоотвод (a module of the Foundry's): lightning from the sky goes for it three times as readily and runs off
     /// into the ground, as does a jolt through slime — neither does it any harm.
@@ -240,6 +240,68 @@ pub enum Trait {
     Stubborn,
     /// A boss: at half its health it goes into its second phase (each leader its own).
     Boss,
+    // ---- not numbers but habits (CONCEPT.md, «Повадки вместо цифр»)
+    /// Ростовой щит: the allies right behind it (beside it, farther from the shooter) can't be shot at.
+    TowerShield,
+    /// Длинный ствол: a shot goes through — the enemy right behind the target takes half.
+    Pierce,
+    /// Искрящий молот: every blow throws a spark — an enemy beside the target catches fire.
+    Sparks,
+    /// Живой факел: burns the whole battle and takes no harm of it; its blows set alight, it lights the night.
+    Torch,
+    /// Длинные лапы: the sting reaches the one right behind the target too.
+    Reach,
+    /// Дальний плевок: the acid splashes the target's neighbours, half each.
+    Splash,
+    /// Бугристые надкрылья: a blow its shell stops whole glances off into another enemy beside it.
+    Ricochet,
+    /// Известковый панцирь: curled up, it draws the blows of the enemies beside it (a living shield).
+    Bulwark,
+    /// Знамя (the leader brings it): when half the army has fallen, the banner rises — whoever stands picks it up — the
+    /// rest are mended a quarter and stand fast, once a battle.
+    Banner,
+    /// Кровавая чаша: its kill mends its own beside it, 2 each.
+    Chalice,
+    /// Тяжёлая наковальня, Рвущие челюсти: every blow that gets through takes a point of armor off.
+    Crush,
+    /// Колокол тревоги (on the leader): every fourth round it rings — the enemies within 2 cells of it are stunned.
+    Bell,
+    /// Гранёные кости: the highest roll of the die strikes double and stuns.
+    LoadedDice,
+    /// Песочные часы: the first blow that would kill it turns its time back — to the health it had as the round began.
+    Hourglass,
+    /// Фонарь дальнобоя: its shots set alight, and it sees in the night.
+    Flare,
+    /// Сброс плит (the Colossus): with every quarter of his health lost a plate falls off onto the enemies beside him.
+    ShedPlates,
+    /// Цепной шокер (the Inventor): his blow leaps to two enemies beside the target, half each.
+    Chain,
+    /// Пила-вихрь (the Maniac): his blow cuts every enemy beside him.
+    Whirl,
+    /// Каменный дождь (the Architect): his walls, falling, crush the enemies beside them.
+    Rubble,
+    /// Кирпичи навесом (the Architect): his throw lands on the whole cell, the small ones there stunned one time in two.
+    Lob,
+    /// Живой щит (the Mother): a blow at her is taken by a body of hers beside her.
+    Escort,
+    /// Воля роя (the Hive Mind): his swarm does not flee.
+    Rally,
+    /// Пси-отпор (the Hive Mind): whoever strikes him close loses its thought — skips its next blow.
+    MindWard,
+    /// Отрыжка (the Devourer): a meal digested, he spits its acid over the enemies within 2 cells.
+    Belch,
+    /// Кислотная кровь (the Devourer): whoever strikes him close is splashed with acid.
+    AcidBlood,
+    /// Чумная кровь (the Plague): whoever kills a body of hers close is infected.
+    PlagueBlood,
+    /// Кокон (the Plague): the first blow that would kill her, she pupates: half her health back, two rounds still.
+    Cocoon,
+    /// Ударная волна (the Colossus): his quake throws back all it strikes (and they bowl over the others).
+    Shockwave,
+    /// Засада (the Mother): her larvae hatch out of the ground beside the nearest enemy.
+    Ambush,
+    /// Mends 2 a round (the Devourer who ate Mechanics).
+    Regen,
 }
 
 /// What a find is made of, its element: three finds of one element in an army make a set (`Trait::Set`) — the
