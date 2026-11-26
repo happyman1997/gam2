@@ -177,6 +177,9 @@ pub struct ModuleFind {
     #[serde(rename = "for")]
     pub frames: Vec<String>,
     pub give: Give,
+    /// Its element: three of one in the army make a set.
+    #[serde(default)]
+    pub tag: Option<crate::model::Element>,
 }
 
 /// A mutation of the swarm: the whole breed takes it. An evolution is one form's (`form`, its name) and is bought
@@ -192,6 +195,9 @@ pub struct MutationFind {
     #[serde(default)]
     pub personal: bool,
     pub give: Give,
+    /// Its element: three of one in the swarm's breed make a set.
+    #[serde(default)]
+    pub tag: Option<crate::model::Element>,
 }
 
 /// A leader's growth after a boss (growth.ron): onto the leader, onto the rest of the army, more cells, more bodies.

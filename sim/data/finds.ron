@@ -2,88 +2,91 @@
 // Находки похода: модули Литейщика (ставятся на одного голема, в его ячейку) и мутации роя (их получает вся порода,
 // и будущий выводок тоже). key — имя значка в атласе (module_icons / swarm_icons) и ключ слов в игре; for — ключи
 // корпусов из units.ron, на которые модуль ставится ([] — на любой); give — что даёт: module — способность из
-// modules.ron, abilities / traits — прямо, hp / armor / bonus / range / speed — прибавки, dmg — новый тип урона.
+// modules.ron, abilities / traits — прямо, hp / armor / bonus / range / speed — прибавки, dmg — новый тип урона;
+// tag — стихия: три находки одной стихии в армии — сет (CONCEPT.md, «Сеты стихий»).
 // Только то, что симуляция уже умеет; числа временные.
 (
     modules: [
         // Страж
-        (key: "intercept", for: ["strazh"], give: (abilities: [Intercept])),
-        (key: "plates", for: ["strazh"], give: (abilities: [Plates(3)])),
-        (key: "tower", for: ["strazh"], give: (armor: 2, speed: -1)),
-        (key: "counter", for: ["strazh"], give: (traits: [Thorns(die: 6)])),
+        (key: "intercept", for: ["strazh"], give: (abilities: [Intercept]), tag: Iron),
+        (key: "plates", for: ["strazh"], give: (abilities: [Plates(3)]), tag: Iron),
+        (key: "tower", for: ["strazh"], give: (armor: 2, speed: -1), tag: Iron),
+        (key: "counter", for: ["strazh"], give: (traits: [Thorns(die: 6)]), tag: Iron),
         // Мудрец
-        (key: "overload", for: ["mudrets"], give: (module: "peregruzka")),
-        (key: "fireball", for: ["mudrets"], give: (module: "ognenny_shar")),
-        (key: "a_coil", for: ["mudrets", "gorn", "izobretatel"], give: (module: "grozovaya_katushka")),
+        (key: "overload", for: ["mudrets"], give: (module: "peregruzka"), tag: Volt),
+        (key: "fireball", for: ["mudrets"], give: (module: "ognenny_shar"), tag: Fire),
+        (key: "a_coil", for: ["mudrets", "gorn", "izobretatel"], give: (module: "grozovaya_katushka"), tag: Volt),
         // Орудие
-        (key: "mortar", for: ["orudie"], give: (module: "mortira")),
-        (key: "canister", for: ["orudie"], give: (abilities: [PointBlank])),
-        (key: "long", for: ["orudie"], give: (range: 1)),
-        (key: "c_catapult", for: ["orudie", "manyak"], give: (module: "golova_katapulta")),
+        (key: "mortar", for: ["orudie"], give: (module: "mortira"), tag: Impact),
+        (key: "canister", for: ["orudie"], give: (abilities: [PointBlank]), tag: Impact),
+        (key: "long", for: ["orudie"], give: (range: 1), tag: Impact),
+        (key: "c_catapult", for: ["orudie", "manyak"], give: (module: "golova_katapulta"), tag: Impact),
         // Механик
-        (key: "repair", for: ["mekhanik"], give: (module: "remont")),
+        (key: "repair", for: ["mekhanik"], give: (module: "remont"), tag: Iron),
         // любой корпус
-        (key: "flail", for: [], give: (abilities: [Flail])),
-        (key: "ram", for: [], give: (traits: [Charge])),
-        (key: "spark", for: [], give: (dmg: Shock, bonus: 1)),
-        (key: "torch", for: [], give: (dmg: Fire)),
+        (key: "flail", for: [], give: (abilities: [Flail]), tag: Impact),
+        (key: "ram", for: [], give: (traits: [Charge]), tag: Impact),
+        (key: "spark", for: [], give: (dmg: Shock, bonus: 1), tag: Volt),
+        (key: "torch", for: [], give: (dmg: Fire), tag: Fire),
         // Громоотвод: молния с неба бьёт в него втрое охотнее и уходит в землю, разряд по слизи его не берёт
-        (key: "rod", for: [], give: (traits: [Grounded])),
+        (key: "rod", for: [], give: (traits: [Grounded]), tag: Volt),
+        // Раскалённая броня: кто бьёт его вплотную, загорается
+        (key: "hot", for: [], give: (traits: [HotArmor]), tag: Fire),
     ],
     mutations: [
         // эволюции (CONCEPT.md, «Эволюция форм»): каждая — своей формы (form — имя формы), находкой не выпадают,
         // их покупают за биомассу в выводке (добыча) и в Улье, каждая следующая для формы дороже
-        (key: "evo_formic", form: "Муравей", give: (dmg: Acid)),
-        (key: "evo_phalanx", form: "Муравей", give: (traits: [Stroy])),
-        (key: "evo_syringe", form: "Оса", give: (traits: [Venom(die: 4)])),
-        (key: "evo_dive", form: "Оса", give: (traits: [Charge])),
-        (key: "evo_longlegs", form: "Скорпион", give: (speed: 1)),
-        (key: "evo_farspit", form: "Бочонок", give: (range: 1)),
-        (key: "evo_forked", form: "Жук", give: (traits: [Charge])),
-        (key: "evo_bosses", form: "Жук", give: (hp: 2)),
-        (key: "evo_flyer", form: "Жук", give: (traits: [Flyer])),
-        (key: "evo_longspines", form: "Мокрица", give: (traits: [Thorns(die: 3)])),
-        (key: "evo_lime", form: "Мокрица", give: (armor: 1)),
-        (key: "evo_farjump", form: "Кузнечик", give: (traits: [Leap])),
-        (key: "evo_saws", form: "Богомол", give: (traits: [TwinBlades], hp: -2)),
+        (key: "evo_formic", form: "Муравей", give: (dmg: Acid), tag: Venom),
+        (key: "evo_phalanx", form: "Муравей", give: (traits: [Stroy]), tag: Shell),
+        (key: "evo_syringe", form: "Оса", give: (traits: [Venom(die: 4)]), tag: Venom),
+        (key: "evo_dive", form: "Оса", give: (traits: [Charge]), tag: Wing),
+        (key: "evo_longlegs", form: "Скорпион", give: (speed: 1), tag: Wing),
+        (key: "evo_farspit", form: "Бочонок", give: (range: 1), tag: Venom),
+        (key: "evo_forked", form: "Жук", give: (traits: [Charge]), tag: Shell),
+        (key: "evo_bosses", form: "Жук", give: (hp: 2), tag: Shell),
+        (key: "evo_flyer", form: "Жук", give: (traits: [Flyer]), tag: Wing),
+        (key: "evo_longspines", form: "Мокрица", give: (traits: [Thorns(die: 3)]), tag: Shell),
+        (key: "evo_lime", form: "Мокрица", give: (armor: 1), tag: Shell),
+        (key: "evo_farjump", form: "Кузнечик", give: (traits: [Leap]), tag: Wing),
+        (key: "evo_saws", form: "Богомол", give: (traits: [TwinBlades], hp: -2), tag: Shell),
         // мутации — доктрины роя (CONCEPT.md, «Мутации»): каждая на весь рой и меняет, чем он воюет, у каждой цена;
         // геном держит 4, предлагают их редко — после элиты и босса и в Улье
         // общий пул: у любого лидера
         // Крылатый рой: все летают — через строй к стрелкам и лидеру, летящих не растоптать и не стряхнуть
         // сотрясением; цена — рой бросает строй
-        (key: "m_flight", give: (traits: [Flyer])),
+        (key: "m_flight", give: (traits: [Flyer]), tag: Wing),
         // Мошкара: каждая третья павшая рассыпается облаком на 2 хода (жалит сквозь броню, слепит стрелков); огонь его
         // сжигает
-        (key: "m_midge", give: (traits: [Midges])),
+        (key: "m_midge", give: (traits: [Midges]), tag: Venom),
         // Паутина: раз в 4 хода сеть вместо удара; враг в сети два хода бьётся, удары по нему ×1,5; огонь бежит по
         // сети
-        (key: "m_spinner", give: (traits: [Spinner])),
+        (key: "m_spinner", give: (traits: [Spinner]), tag: Nest),
         // Медовые соты: раненые рядом со своими заживают по 2, павшие заливают клетки мёдом — враг в нём бьёт вдвое
         // слабее
-        (key: "m_honey", give: (traits: [Honey])),
+        (key: "m_honey", give: (traits: [Honey]), tag: Nest),
         // Мимикрия: рой перенимает оружие последней машины, разломанной ниже половины (или павшей), одно за раз — Мудрец и
         // Изобретатель: укус током; Горн: поджигает и +1; Страж, Каменщик, Зодчий: панцирь +2; Орудие и Отец колосса:
         // удар дробящий; Механик: заживает 2 в ход; Маньяк: +2 к удару. Пока ни одна машина не разломана — пустая
-        (key: "m_mimic", give: (traits: [Mimic])),
+        (key: "m_mimic", give: (traits: [Mimic]), tag: Shell),
         // Сухой хитин: павшие оставляют сухую корку, а не слизь — по ней не бежит молния големов; цена — нет слизи, в
         // которой зреют личинки Матки и ходит зараза Чумы
-        (key: "m_dry", give: (traits: [DryChitin])),
+        (key: "m_dry", give: (traits: [DryChitin]), tag: Shell),
         // пулы лидеров (leader — ключ лидера в units.ron): только у него, поверх общих
         // Матка — размножение
-        (key: "m_vivi", leader: "matka", give: (traits: [Viviparous])),
-        (key: "m_bud", leader: "matka", give: (traits: [Buds])),
+        (key: "m_vivi", leader: "matka", give: (traits: [Viviparous]), tag: Nest),
+        (key: "m_bud", leader: "matka", give: (traits: [Buds]), tag: Nest),
         // Разум улья — стрекот (резонанс: машину, обсаженную роем, трясёт) и мираж (в начале боя у каждой второй особи
         // призрачный двойник: враг тратит на него удар, он тает)
-        (key: "m_strider", leader: "razum", give: (traits: [Chirr], speed: 1)),
+        (key: "m_strider", leader: "razum", give: (traits: [Chirr], speed: 1), tag: Wing),
         (key: "m_mirage", leader: "razum", give: (traits: [Mirage])),
         // Пожиратель — единственный в рое, кто мутирует сам (personal: на него, не на рой)
         // Третья ступень: растёт с каждым съеденным (враг, павший рядом), а не с каждым вторым, и трижды; на третьей
         // ступени каждый удар топчет всех врагов размера 5 и меньше рядом
         (key: "m_third", leader: "pozhiratel", personal: true, give: (traits: [ThirdStage])),
         // Чума — заражение
-        (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects])),
+        (key: "m_parasitoid", leader: "kukushka", give: (traits: [Infects]), tag: Venom),
         // Кукловод: удар цепляет машину; павшая зацепленная (или заражённая) встаёт за рой на 2 хода с четвертью здоровья, потом
         // разваливается — и личинки наружу
-        (key: "m_puppet", leader: "kukushka", give: (traits: [Puppeteer])),
+        (key: "m_puppet", leader: "kukushka", give: (traits: [Puppeteer]), tag: Venom),
     ],
 )

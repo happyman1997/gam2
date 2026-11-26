@@ -908,7 +908,10 @@ mod flow {
             Trait::Spitter, Trait::Midges, Trait::Cloud, Trait::Spinner, Trait::Honey, Trait::Buds, Trait::Chirr, Trait::Mimic,
             Trait::ThirdStage, Trait::Puppeteer, Trait::Puppet, Trait::Mirage, Trait::Ghost, Trait::Hungry { left: 12 },
             Trait::Tesla, Trait::Trophies, Trait::Wall, Trait::Metamorph, Trait::Contagion, Trait::Knows { k: 3 }, Trait::Grounded,
-            Trait::DryChitin,
+            Trait::DryChitin, Trait::HotArmor, Trait::Blazing, Trait::Oily, Trait::Slimy, Trait::Stubborn, Trait::Boss,
+            Trait::Set { e: sim::model::Element::Fire }, Trait::Set { e: sim::model::Element::Volt }, Trait::Set { e: sim::model::Element::Iron },
+            Trait::Set { e: sim::model::Element::Impact }, Trait::Set { e: sim::model::Element::Nest }, Trait::Set { e: sim::model::Element::Venom },
+            Trait::Set { e: sim::model::Element::Wing }, Trait::Set { e: sim::model::Element::Shell },
         ];
         for tr in &traits {
             let (n, l) = trait_words(tr);

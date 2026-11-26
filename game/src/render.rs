@@ -1258,9 +1258,18 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     text.draw(cv, &format!("{leader} {}/{nf}", alive(forge)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);
     let turn = (f / FR + 1).min(rec.rounds.len() as i32);
     text.draw(cv, &crate::text::tf("hud.turn", &[("n", &turn)]), 728, 9, MUTED, Some([16, 12, 16]), Align::Right, 1.0);
+    // the sky and the elite's face, under the turn
+    let mut under = vec![];
     if rec.weather != sim::model::Weather::Clear {
-        let w = crate::text::t(&format!("weather.{}", rec.weather.key()));
-        text.draw(cv, &w, 712, 30, [150, 190, 255], Some([16, 12, 16]), Align::Right, 1.0);
+        under.push((crate::text::t(&format!("weather.{}", rec.weather.key())), [150, 190, 255]));
+    }
+    if rec.affix != sim::model::Affix::None {
+        under.push((crate::text::t(&format!("affix.{}", rec.affix.key())), [255, 196, 110]));
+    }
+    if !under.is_empty() {
+        let line = under.iter().map(|(w, _)| w.as_str()).collect::<Vec<_>>().join(" · ");
+        let col = under[0].1;
+        text.draw(cv, &line, 712, 30, col, Some([16, 12, 16]), Align::Right, 1.0);
     }
     let hot = |b: Button| view.hover == Some(b);
     // the keys show under a button only while the cursor is on it, and for the first seconds of a battle (to teach

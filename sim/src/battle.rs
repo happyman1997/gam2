@@ -1,6 +1,6 @@
 //! The battle: rounds and phases as in docs/CONCEPT.md («Ходы», «Удар и числа»).
 
-use crate::model::{Ability, Dmg, Template, Trait, Weather};
+use crate::model::{Ability, Dmg, Element, Template, Trait, Weather};
 use crate::rng::Rng;
 use std::cmp::Reverse;
 use std::collections::VecDeque;
@@ -193,6 +193,9 @@ pub struct Unit {
     pub kind: Option<u8>,
     /// Fallen into the earthquake's crack: walks no farther up to and including this round.
     pub stuck_until: u32,
+    /// A boss gone into its second phase; one Живучий that has cheated death once.
+    pub phased: bool,
+    pub defied: bool,
 }
 
 impl Unit {
@@ -249,6 +252,10 @@ pub enum Event {
     Rift { x: i32 },
     /// What the field does to `t` (a strike from the sky, a fall into a rift): `dmg` with no one striking.
     Nature { t: usize, dmg: i32 },
+    /// A boss `u` at half its health goes into its second phase.
+    Phase { u: usize },
+    /// Живучие: a blow that should have killed `t` leaves it on 1.
+    Defy { t: usize },
 }
 
 /// What goes off in an `Event::Cast`.
@@ -422,6 +429,10 @@ pub struct Battle {
     /// The cracks the earthquake has opened.
     rift: Vec<bool>,
     rifts: u32,
+    /// Each side's sets of finds (`Element::bit`), from its leader's traits.
+    sets: [u16; 2],
+    /// The Inventor-boss's net overcharged (his second phase).
+    overcharge: [bool; 2],
 }
 
 impl Battle {
@@ -451,6 +462,8 @@ impl Battle {
             flames: vec![0; n],
             rift: vec![false; n],
             rifts: 0,
+            sets: [0, 0],
+            overcharge: [false, false],
         }
     }
 
@@ -688,6 +701,8 @@ impl Battle {
             laid: 0,
             kind: None,
             stuck_until: 0,
+            phased: false,
+            defied: false,
         });
         self.units[id].kind = crate::data::unit_key(&self.units[id].t.name).and_then(|k| crate::model::KNOWN.iter().position(|x| *x == k)).map(|k| k as u8);
         id
@@ -1061,7 +1076,16 @@ impl Battle {
     /// Whether the enemy's close fighters can hold `i`: not one in the air, the unstoppable, one that flees.
     fn holdable(&self, i: usize) -> bool {
         let u = &self.units[i];
-        !(u.fleeing || u.t.has(Trait::Flyer) || u.t.has(Trait::Unstoppable) || u.t.has(Trait::Cloud))
+        !(u.fleeing || u.t.has(Trait::Flyer) || u.t.has(Trait::Unstoppable) || u.t.has(Trait::Cloud) || self.has_set(u.side, Element::Wing))
+    }
+
+    /// How far `j`'s side holds: a cell farther with the iron set (Стальная стена).
+    fn hold_of(&self, j: usize) -> i32 {
+        if self.has_set(self.units[j].side, Element::Iron) {
+            HOLD + 1
+        } else {
+            HOLD
+        }
     }
 
     /// The enemy that holds `i` in place, if one does: the nearest of the enemy's close fighters within `HOLD` cells.
@@ -1070,7 +1094,7 @@ impl Battle {
         if !self.holdable(i) {
             return None;
         }
-        self.enemies_of(i).filter(|&j| self.holds(j)).map(|j| (self.dist(i, j), j)).filter(|&(d, _)| d <= HOLD).min().map(|(_, j)| j)
+        self.enemies_of(i).filter(|&j| self.holds(j)).map(|j| (self.dist(i, j), j)).filter(|&(d, j)| d <= self.hold_of(j)).min().map(|(_, j)| j)
     }
 
     /// Where to go to fight: the first step of the best way (eight directions, round everyone in the way) to a place
@@ -1111,12 +1135,13 @@ impl Battle {
         hold.clear();
         hold.resize(n, u8::MAX);
         if self.holdable(i) {
-            let holders: Vec<(i32, i32, i32)> = self.enemies_of(i).filter(|&j| self.holds(j)).map(|j| (self.units[j].x, self.units[j].y, self.units[j].fp())).collect();
-            for (hx, hy, hf) in holders {
-                for ny in (hy - f - HOLD + 1).max(0)..=(hy + hf + HOLD - 1).min(H - f) {
-                    for nx in (hx - f - HOLD + 1).max(0)..=(hx + hf + HOLD - 1).min(W - f) {
+            let holders: Vec<(i32, i32, i32, i32)> =
+                self.enemies_of(i).filter(|&j| self.holds(j)).map(|j| (self.units[j].x, self.units[j].y, self.units[j].fp(), self.hold_of(j))).collect();
+            for (hx, hy, hf, reach) in holders {
+                for ny in (hy - f - reach + 1).max(0)..=(hy + hf + reach - 1).min(H - f) {
+                    for nx in (hx - f - reach + 1).max(0)..=(hx + hf + reach - 1).min(W - f) {
                         let d = rect_dist(nx, ny, f, hx, hy, hf);
-                        if d <= HOLD {
+                        if d <= reach {
                             let k = Grid::idx(nx, ny);
                             hold[k] = hold[k].min(d as u8);
                         }
@@ -1175,8 +1200,13 @@ impl Battle {
         if self.on_enemy(i, &self.web) {
             self.units[i].glued_until = self.units[i].glued_until.max(self.round);
         }
-        // stepped into the earthquake's crack: it climbs out next round
-        if !self.units[i].t.has(Trait::Flyer) && self.cells_of(i).any(|c| self.rift[c]) {
+        // stepped into the earthquake's crack: it climbs out next round (the wing set leaps it)
+        let side = self.units[i].side;
+        if !self.units[i].t.has(Trait::Flyer) && !self.has_set(side, Element::Wing) && self.cells_of(i).any(|c| self.rift[c]) {
+            self.units[i].stuck_until = self.round;
+        }
+        // Трясина: in the nest set's slime the enemy sinks and walks no farther this round
+        if !self.units[i].t.has(Trait::Flyer) && self.has_set(1 - side % 2, Element::Nest) && self.on_ground(i, GOO) {
             self.units[i].stuck_until = self.round;
         }
     }
@@ -1214,6 +1244,23 @@ impl Battle {
                 if let Trait::Knows { k } = *tr {
                     self.memory[u.side as usize % 2].push(k);
                 }
+                if let Trait::Set { e } = *tr {
+                    self.sets[u.side as usize % 2] |= e.bit();
+                }
+            }
+        }
+        // an elite standing in oil or in slime from the start
+        for i in 0..self.units.len() {
+            let kind = if self.units[i].t.has(Trait::Oily) {
+                OIL
+            } else if self.units[i].t.has(Trait::Slimy) {
+                GOO
+            } else {
+                continue;
+            };
+            let cells: Vec<usize> = self.cells_of(i).collect();
+            for c in cells {
+                self.ground[c] = kind;
             }
         }
         // the Architect's blueprint: the walls rise before anyone moves
@@ -2064,7 +2111,9 @@ impl Battle {
             if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
                 raw = raw * 3 / 2;
             }
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: mimic & MIMIC_FIRE != 0, stun: false, from: None });
+            let ignite = mimic & MIMIC_FIRE != 0 || self.units[i].t.has(Trait::Blazing);
+            let knock = charge || self.has_set(self.units[i].side, Element::Impact);
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock, venom, infect, ignite, stun: false, from: None });
         }
     }
 
@@ -2143,6 +2192,10 @@ impl Battle {
             d = 0;
             self.ev(Event::Absorbed { t });
         }
+        // Хитиновая стена: the shell set takes a point less from every blow
+        if d > 0 && self.has_set(self.units[t].side, Element::Shell) {
+            d -= 1;
+        }
         if h.dmg == Dmg::Acid {
             self.corrode(t);
             self.short_circuit(t);
@@ -2192,8 +2245,18 @@ impl Battle {
             self.ev(Event::Stun { t });
         }
         let a = h.attacker;
-        if d > 0 && h.venom > 0 && !self.units[t].t.has(Trait::PoisonImmune) {
+        // Мор: the venom set's poison eats into machines too, and through armor that held the blow
+        let rot = self.has_set(self.units[a].side, Element::Venom);
+        if (d > 0 || rot) && h.venom > 0 && (!self.units[t].t.has(Trait::PoisonImmune) || rot) {
             self.units[t].poison += self.rng.die(h.venom) as i32;
+        }
+        // Раскалённая броня: whoever strikes it close catches fire
+        if h.melee && self.units[t].t.has(Trait::HotArmor) && self.units[a].present() && !self.units[a].t.armor_type.immune(Dmg::Fire) {
+            self.units[a].burn = self.units[a].burn.max(3);
+        }
+        // Пал: the fire set's fire leaves burning oil where it lands
+        if (h.dmg == Dmg::Fire || h.ignite) && self.has_set(self.units[a].side, Element::Fire) {
+            self.blaze(t);
         }
         // a parasite takes in a machine too: it nests in the works
         if d > 0 && h.infect && self.units[t].infected.is_none() && !self.is_wall(t) {
@@ -2215,6 +2278,12 @@ impl Battle {
             }
         }
         let crushing = d * 2 > self.units[t].t.hp;
+        // Живучие: the first blow that should kill it leaves it on 1
+        if self.units[t].hp <= 0 && self.units[t].t.has(Trait::Stubborn) && !self.units[t].defied {
+            self.units[t].defied = true;
+            self.units[t].hp = 1;
+            self.ev(Event::Defy { t });
+        }
         if self.units[t].hp * 2 < self.units[t].t.hp {
             self.take_apart(t);
         }
@@ -2230,7 +2299,11 @@ impl Battle {
             self.kill(t);
             self.on_kill(a);
         } else {
-            let pushable = self.units[t].t.size <= self.units[a].t.size && !self.units[t].t.has(Trait::Unstoppable);
+            let side = self.units[t].side;
+            let pushable = self.units[t].t.size <= self.units[a].t.size
+                && !self.units[t].t.has(Trait::Unstoppable)
+                && !self.has_set(side, Element::Iron)
+                && !self.has_set(side, Element::Shell);
             if (crushing || h.knock) && pushable {
                 self.knockback(t, h.from.unwrap_or(a));
             }
@@ -2322,7 +2395,8 @@ impl Battle {
         let slick = self.on_ground(t, OIL);
         // Кегли: the one standing straight behind it is bowled over (up to `BOWL` in a row)
         let (bx, by) = (x + sx, y + sy);
-        let behind = (depth < BOWL)
+        let limit = if self.has_set(1 - self.units[t].side % 2, Element::Impact) { BOWL + 2 } else { BOWL };
+        let behind = (depth < limit)
             .then(|| {
                 (0..self.units.len()).find(|&v| {
                     let u = &self.units[v];
@@ -2333,6 +2407,8 @@ impl Battle {
                         && !u.t.has(Trait::Unstoppable)
                         && !u.t.has(Trait::Wall)
                         && !u.t.has(Trait::Flyer)
+                        && !self.has_set(u.side, Element::Iron)
+                        && !self.has_set(u.side, Element::Shell)
                         && u.t.size <= size + 1
                         && rect_dist(bx, by, f, u.x, u.y, u.fp()) == 0
                 })
@@ -2380,6 +2456,11 @@ impl Battle {
         false
     }
 
+    /// Whether side `side` has the set of element `e`.
+    pub fn has_set(&self, side: u8, e: Element) -> bool {
+        self.sets[side as usize % 2] & e.bit() != 0
+    }
+
     pub fn on_ground(&self, i: usize, kind: u8) -> bool {
         self.cells_of(i).any(|c| self.ground[c] == kind)
     }
@@ -2388,6 +2469,15 @@ impl Battle {
     fn lit(&self, j: usize) -> bool {
         let u = &self.units[j];
         u.burn > 0 || u.t.has(Trait::Glow) || self.cells_of(j).any(|c| self.flames[c] > 0)
+    }
+
+    /// Пал: burning oil poured under `t` (not on a crust).
+    fn blaze(&mut self, t: usize) {
+        let cells: Vec<usize> = self.cells_of(t).filter(|&c| self.ground[c] != CRUST).collect();
+        for c in cells {
+            self.ground[c] = OIL;
+            self.flames[c] = self.flames[c].max(OIL_BURNS);
+        }
     }
 
     /// The oil under `t` catches fire.
@@ -2412,8 +2502,10 @@ impl Battle {
             seen[c] = true;
             queue.push_back((c, 0));
         }
+        // Громовая сеть: the volt set's jolts run two cells farther
+        let reach = if a < self.units.len() && self.has_set(self.units[a].side, Element::Volt) { SURGE_REACH + 2 } else { SURGE_REACH };
         while let Some((c, depth)) = queue.pop_front() {
-            if depth >= SURGE_REACH {
+            if depth >= reach {
                 continue;
             }
             let (cx, cy) = ((c as i32) % W, (c as i32) / W);
@@ -2430,7 +2522,7 @@ impl Battle {
             }
         }
         // the Inventor grounds his own: while he stands, a jolt through slime spares his side; a lightning rod is spared
-        let grounded = |b: &Battle, side: u8| b.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Tesla));
+        let grounded = |b: &Battle, side: u8| b.has_set(side, Element::Volt) || b.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Tesla));
         let victims: Vec<usize> = (0..self.units.len())
             .filter(|&v| v != t && self.units[v].present() && !self.units[v].t.has(Trait::Flyer) && !self.is_wall(v))
             .filter(|&v| !self.units[v].t.has(Trait::Grounded) && !grounded(self, self.units[v].side))
@@ -2471,7 +2563,7 @@ impl Battle {
         }
         for i in 0..self.units.len() {
             let u = &self.units[i];
-            if u.present() && !u.t.has(Trait::Flyer) && !u.t.armor_type.immune(Dmg::Fire) && self.cells_of(i).any(|c| self.flames[c] > 0) {
+            if u.present() && !u.t.has(Trait::Flyer) && !u.t.armor_type.immune(Dmg::Fire) && !self.has_set(u.side, Element::Fire) && self.cells_of(i).any(|c| self.flames[c] > 0) {
                 self.units[i].burn = self.units[i].burn.max(2);
             }
         }
@@ -2849,6 +2941,80 @@ impl Battle {
         self.contagion();
         self.metamorph();
         self.weather_round();
+        self.phases();
+    }
+
+    /// A boss at half its health goes into its second phase, once — each leader its own way.
+    fn phases(&mut self) {
+        for i in 0..self.units.len() {
+            let u = &self.units[i];
+            if !u.present() || u.phased || !u.t.has(Trait::Boss) || u.hp * 2 >= u.t.hp {
+                continue;
+            }
+            self.units[i].phased = true;
+            self.ev(Event::Phase { u: i });
+            let side = self.units[i].side;
+            match crate::data::unit_key(&self.units[i].t.name) {
+                // the Colossus throws off his plates: quicker, and he shakes the ground every other round
+                Some("otets_kolossa") => {
+                    let t = &mut self.units[i].t;
+                    t.speed += 1;
+                    for a in &mut t.abilities {
+                        if let Ability::Quake { every, .. } = a {
+                            *every = 2;
+                        }
+                    }
+                }
+                // the Inventor overloads his net: its jolts twice as hard
+                Some("izobretatel") => self.overcharge[side as usize % 2] = true,
+                // the Maniac tinkers every round
+                Some("manyak") => {
+                    for a in &mut self.units[i].t.abilities {
+                        if let Ability::Tinker { every } = a {
+                            *every = 1;
+                        }
+                    }
+                }
+                // the Architect walls himself in anew
+                Some("zodchiy") => self.blueprint(i, 8),
+                // the Mother lays in a panic: three larvae every round
+                Some("matka") => {
+                    for a in &mut self.units[i].t.abilities {
+                        if let Ability::Brood { every, n } = a {
+                            *every = 1;
+                            *n = 3;
+                        }
+                    }
+                }
+                // the Hive Mind screams: every enemy within 3 cells stunned
+                Some("razum") => {
+                    let near: Vec<usize> = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 3 && !self.units[j].t.has(Trait::Unstoppable)).collect();
+                    for j in near {
+                        self.units[j].stunned = true;
+                        self.ev(Event::Stun { t: j });
+                    }
+                }
+                // the Devourer in a frenzy: a stage of growth at once
+                Some("pozhiratel") => {
+                    let u = &mut self.units[i];
+                    if u.growth < 3 {
+                        u.growth += 1;
+                        let gain = u.t.hp / 2;
+                        u.t.hp += gain;
+                        u.hp += gain;
+                    }
+                }
+                // the Plague bursts her sacs: every enemy within 4 cells infected
+                Some("kukushka") => {
+                    let near: Vec<usize> = self.enemies_of(i).filter(|&j| self.dist(i, j) <= 4 && self.units[j].t.is_army()).collect();
+                    for j in near {
+                        self.units[j].infected = Some(side);
+                        self.ev(Event::Cast { u: i, kind: Cast::Contagion, t: j });
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     /// Тесла-сеть: lightning between the Inventor's golems, a jolt for every enemy standing on a line between two.
@@ -2897,7 +3063,7 @@ impl Battle {
                 .filter(|&j| self.cells_of(j).any(|c| line[c]))
                 .collect();
             for j in struck {
-                let raw = self.rng.damage(TESLA_DIE, 0);
+                let raw = self.rng.damage(if self.overcharge[side as usize] { TESLA_DIE * 2 } else { TESLA_DIE }, 0);
                 let d = self.calc(j, raw, Dmg::Shock, false);
                 self.units[j].hp -= d;
                 self.ev(Event::Hit { a: inv, t: j, dmg: d });
@@ -2991,6 +3157,9 @@ impl Battle {
                         self.ev(Event::Cast { u: i, kind: Cast::Kindle, t: j });
                     }
                     self.units[j].burn = 3;
+                    if self.has_set(self.units[i].side, Element::Fire) {
+                        self.blaze(j);
+                    }
                 }
             }
         }

@@ -340,11 +340,18 @@ fn offer_card(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run, id: &str, r: R
     }
     // a mutation tells how full the genome is: it holds a few, and they are offered seldom
     let genome = tf("find.genome", &[("n", &run.genome()), ("max", &sim::data::rules().genome)]);
+    // its element and how near the set is: «огонь 2/3»
+    let tag = match &o.find {
+        Find::Module(k) => sim::data::finds().modules.iter().find(|m| &m.key == k).and_then(|m| m.tag),
+        Find::Mutation(k) => sim::data::finds().mutations.iter().find(|m| &m.key == k).and_then(|m| m.tag),
+        Find::Units => None,
+    };
+    let set = tag.map(|e| format!(" · {} {}/{}", t(&format!("set.{}.tag", e.key())), run.set_count(e).min(sim::run::SET_NEED), sim::run::SET_NEED)).unwrap_or_default();
     let kind = match &o.find {
-        Find::Module(k) => format!("{} · {}", t("find.module"), module_for(k)),
-        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.personal) => format!("{} · {genome}", t("find.personal")),
-        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.is_some()) => format!("{} · {genome}", t("find.pool")),
-        _ => format!("{} · {genome}", t("find.mutation")),
+        Find::Module(k) => format!("{} · {}{set}", t("find.module"), module_for(k)),
+        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.personal) => format!("{} · {genome}{set}", t("find.personal")),
+        Find::Mutation(k) if sim::data::finds().mutations.iter().any(|m| &m.key == k && m.leader.is_some()) => format!("{} · {genome}{set}", t("find.pool")),
+        _ => format!("{} · {genome}{set}", t("find.mutation")),
     };
     for l in font.wrap(&kind, r.w - 16).into_iter().take(2) {
         font.draw(cv, &l, r.cx(), y, if on { MUTED } else { PALE }, Some(EDGE), Align::Center, 1.0);
@@ -1492,6 +1499,16 @@ fn fork(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
                     let wr = Rect::new(scene.x + 4, scene.y + 4, a.fonts["text16"].width(&name) + 10, 22);
                     if ui.hot(&format!("weather{i}"), wr).0 {
                         ui.tooltip(vec![(name.clone(), [150, 190, 255]), (t(&format!("weather.{}.l", node.weather.key())), INK)]);
+                    }
+                }
+                // an elite's face: its affix in the scene's lower corner, what it means under the mouse
+                if node.affix != sim::model::Affix::None {
+                    let name = t(&format!("affix.{}", node.affix.key()));
+                    let w = a.fonts["text16"].width(&name);
+                    let (ax, ay) = (scene.x + scene.w - 8 - w, scene.y + scene.h - 24);
+                    a.fonts["text16"].draw(cv, &name, ax, ay, GOLD, Some(EDGE), Align::Left, 1.0);
+                    if ui.hot(&format!("affix{i}"), Rect::new(ax - 4, ay - 2, w + 8, 22)).0 {
+                        ui.tooltip(vec![(name.clone(), GOLD), (t(&format!("affix.{}.l", node.affix.key())), INK)]);
                     }
                 }
                 let total = node.enemy.len();
@@ -2791,6 +2808,13 @@ pub fn trait_words(tr: &sim::model::Trait) -> (String, String) {
         T::Metamorph => n("tr.metamorph", "tr.metamorph.l"),
         T::Contagion => n("tr.contagion", "tr.contagion.l"),
         T::Grounded => n("tr.grounded", "tr.grounded.l"),
+        T::Set { e } => (t(&format!("set.{}", e.key())), t(&format!("set.{}.l", e.key()))),
+        T::HotArmor => n("tr.hotarmor", "tr.hotarmor.l"),
+        T::Blazing => n("tr.blazing", "tr.blazing.l"),
+        T::Oily => n("tr.oily", "tr.oily.l"),
+        T::Slimy => n("tr.slimy", "tr.slimy.l"),
+        T::Stubborn => n("tr.stubborn", "tr.stubborn.l"),
+        T::Boss => n("tr.boss", "tr.boss.l"),
         T::DryChitin => n("tr.drychitin", "tr.drychitin.l"),
         T::Knows { k } => {
             let who = sim::model::KNOWN.get(k as usize).map(|key| sim::data::unit(key).name.to_string()).unwrap_or_default();

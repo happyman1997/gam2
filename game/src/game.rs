@@ -411,6 +411,7 @@ impl Game {
         let (me, _) = run.fighters();
         let seed = run.battle_seed();
         let mut rec = playback::record_in(seed, &me, &node.enemy, node.weather);
+        rec.affix = node.affix;
         rec.ground = match node.kind {
             run::Kind::Elite => 1,
             run::Kind::Boss => 2,

@@ -116,6 +116,8 @@ pub struct Record {
     pub eaten: Vec<u8>,
     /// The sky over it.
     pub weather: Weather,
+    /// What its elite enemy is besides its numbers (set by the run's road).
+    pub affix: sim::model::Affix,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
@@ -239,6 +241,7 @@ pub fn record_in(seed: u64, a: &[Template], b: &[Template], weather: Weather) ->
         foe_kills: res.foe_kills,
         eaten: res.eaten,
         weather,
+        affix: sim::model::Affix::None,
     };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
@@ -514,6 +517,7 @@ impl Record {
                     Event::Rift { .. } => out.push(Cue { frame: m.frame, name: "blast", gain: 0.0, x: 480.0 }),
                     Event::Bump { b, .. } => out.push(Cue { frame: m.frame, name: "hit_flesh", gain: -2.0, x: at(b) }),
                     Event::Surge { t } => out.push(Cue { frame: m.frame, name: "zap", gain: 0.0, x: at(t) }),
+                    Event::Phase { u } => out.push(Cue { frame: m.frame, name: "blast", gain: 2.0, x: at(u) }),
                     _ => {}
                 }
             }
@@ -731,6 +735,17 @@ impl Record {
                     Event::Surge { t } => {
                         let (x, y) = at(t);
                         fx.push(Effect { name: "zap-hit", x, y: y - 6.0, start: m.frame, link: None, flip: false, from: None });
+                    }
+                    // a boss's second phase: a burst round it and a word for it
+                    Event::Phase { u } => {
+                        let (x, y) = at(u);
+                        fx.push(Effect { name: "mana-burst", x, y: y - 20.0, start: m.frame, link: None, flip: false, from: None });
+                        fx.push(Effect { name: "ground-slam", x, y, start: m.frame + 2, link: None, flip: false, from: None });
+                        nums.push(Number { text: t_("num.phase"), style: NumStyle::Status, x, y, start: m.frame, t: u, k: 0, value: 0, end: i32::MAX });
+                    }
+                    Event::Defy { t } => {
+                        let (x, y) = at(t);
+                        nums.push(Number { text: t_("num.defy"), style: NumStyle::Status, x, y, start: m.frame, t, k: 0, value: 0, end: i32::MAX });
                     }
                     Event::Swap { a, b, ax, ay, bx, by } => {
                         for (id, ox, oy) in [(a, ax, ay), (b, bx, by)] {

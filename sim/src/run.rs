@@ -14,7 +14,7 @@
 
 use crate::battle::Battle;
 use crate::data::{self, Caste, Form};
-use crate::model::{Ability, Template, Trait, Weather};
+use crate::model::{Ability, Affix, Element, Template, Trait, Weather};
 use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -258,6 +258,9 @@ pub struct Node {
     /// The sky over the battle (its enemy is fitted under it).
     #[serde(default)]
     pub weather: Weather,
+    /// What an elite enemy is besides its numbers (armored, blazing…); its army is fitted with it.
+    #[serde(default)]
+    pub affix: Affix,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -366,9 +369,11 @@ pub struct Run {
     pub stats: Stats,
     /// Some(true) — the last boss beaten; Some(false) — a battle lost.
     pub over: Option<bool>,
-    /// The sky the enemy being fitted will fight under (a road's weather).
+    /// The sky the enemy being fitted will fight under (a road's weather), and what it is (an elite's affix).
     #[serde(skip)]
     fit_weather: Weather,
+    #[serde(skip)]
+    fit_affix: Affix,
 }
 
 impl Run {
@@ -397,6 +402,7 @@ impl Run {
             stats: Stats::default(),
             over: None,
             fit_weather: Weather::Clear,
+            fit_affix: Affix::None,
         };
         // the leader: the one with the trait, else the biggest (the Father of the Colossus has no trait yet)
         let lead = army
@@ -500,6 +506,12 @@ impl Run {
             a.apply(&mut t);
         }
         if self.is_leader(m) {
+            // the sets: three finds of one element in the army — the leader brings what they make of the side
+            for e in Element::ALL {
+                if self.set_count(e) >= SET_NEED {
+                    t.traits.push(Trait::Set { e });
+                }
+            }
             // Память роя: the Hive Mind brings what the swarm remembers
             for &k in &self.memory {
                 t.traits.push(Trait::Knows { k });
@@ -869,11 +881,13 @@ impl Run {
     /// The enemy for a battle of `kind`: a base (a leader's army for a boss) and a ladder of additions; the longest
     /// prefix that the class's reference army of the curve's size still beats half the time — as strong as the
     /// curve says, whatever the player brings.
-    fn enemy(&mut self, kind: Kind, danger: u8, weather: Weather) -> (Vec<Template>, String) {
+    fn enemy(&mut self, kind: Kind, danger: u8, weather: Weather, affix: Affix) -> (Vec<Template>, String) {
         let b = Self::budget(self.class, self.next_fight(), kind, danger);
         self.fit_weather = weather;
+        self.fit_affix = affix;
         let out = self.enemy_of(kind, b);
         self.fit_weather = Weather::Clear;
+        self.fit_affix = Affix::None;
         out
     }
 
@@ -929,7 +943,8 @@ impl Run {
             let k = leaders[self.roll(4)];
             let mut army = data::army(k);
             let lead = army.iter().position(|t| t.has(Trait::Leader)).or_else(|| (0..army.len()).max_by_key(|&i| army[i].size)).unwrap_or(0);
-            let leader = army.remove(lead);
+            let mut leader = army.remove(lead);
+            leader.traits.push(Trait::Boss);
             let mut small: Vec<Template> = vec![];
             for t in army {
                 if t.size <= 2 {
@@ -975,10 +990,14 @@ impl Run {
             keep += 1;
         }
         ladder.truncate(keep.max(1));
+        let affix = self.fit_affix;
         let with = |n: usize| -> Vec<Template> {
             let mut a = base.clone();
             for step in &ladder[..n] {
                 a.extend(step.iter().cloned());
+            }
+            for t in &mut a {
+                affix.apply(t);
             }
             a
         };
@@ -1075,8 +1094,8 @@ impl Run {
                 self.path.push(b);
             } else {
                 let weather = self.weather();
-                let (enemy, key) = self.enemy(Kind::Boss, 3, weather);
-                self.path.push(Node { kind: Kind::Boss, enemy, enemy_key: key, reward: 25 + fight as i32, event: 0, danger: 3, weather });
+                let (enemy, key) = self.enemy(Kind::Boss, 3, weather, Affix::None);
+                self.path.push(Node { kind: Kind::Boss, enemy, enemy_key: key, reward: 25 + fight as i32, event: 0, danger: 3, weather, affix: Affix::None });
             }
             return;
         }
@@ -1087,13 +1106,15 @@ impl Run {
             let kind = if k == 1 && elite { Kind::Elite } else { Kind::Fight };
             let danger = if k == 1 { 2 } else { 1 };
             let weather = self.weather();
-            let (enemy, key) = self.enemy(kind, danger, weather);
+            // an elite has a face: one affix of its own
+            let affix = if kind == Kind::Elite { Affix::ALL[self.roll(Affix::ALL.len())] } else { Affix::None };
+            let (enemy, key) = self.enemy(kind, danger, weather, affix);
             let reward = match (kind, danger) {
                 (Kind::Elite, _) => 14,
                 (_, 2) => 11,
                 _ => 7,
             } + fight as i32 / 2;
-            self.path.push(Node { kind, enemy, enemy_key: key, reward, event: 0, danger, weather });
+            self.path.push(Node { kind, enemy, enemy_key: key, reward, event: 0, danger, weather, affix });
         }
         if !self.stopped && fight > 1 {
             let kind = [Kind::Merchant, Kind::Event, Kind::Event, Kind::Camp][self.roll(4)];
@@ -1108,7 +1129,7 @@ impl Run {
             let fit: Vec<usize> = (0..EVENTS.len()).filter(|&i| EVENTS[i].1.is_none_or(|c| c == self.class)).collect();
             event = fit[self.roll(fit.len())];
         }
-        Node { kind, enemy: vec![], enemy_key: String::new(), reward: 0, event, danger: 0, weather: Weather::Clear }
+        Node { kind, enemy: vec![], enemy_key: String::new(), reward: 0, event, danger: 0, weather: Weather::Clear, affix: Affix::None }
     }
 
     /// A stop taken: the next fork has battles only.
@@ -1187,6 +1208,21 @@ impl Run {
             self.over = Some(true);
         }
         rewards
+    }
+
+    /// How many finds of element `e` the army has: the Foundry's modules on its golems, the swarm's mutations and
+    /// evolutions on its breed (each once).
+    pub fn set_count(&self, e: Element) -> usize {
+        let f = data::finds();
+        match self.class {
+            Class::Foundry => self
+                .army
+                .iter()
+                .flat_map(|m| m.mods.iter())
+                .filter(|k| f.modules.iter().any(|x| &x.key == *k && x.tag == Some(e)))
+                .count(),
+            Class::Swarm => self.breeds.iter().filter(|(_, k)| f.mutations.iter().any(|x| &x.key == k && x.tag == Some(e))).count(),
+        }
     }
 
     /// What the leader takes from a battle for the rest of the run: the Hive Mind remembers the kind of enemy that
@@ -1576,6 +1612,9 @@ pub fn result_of(bt: &Battle, winner: Option<u8>) -> BattleResult {
     let eaten = bt.eaten[0].iter().filter_map(|&t| bt.units[t].kind).collect();
     BattleResult { won: winner == Some(0), dead, kills, foe_kills, eaten }
 }
+
+/// How many finds of one element make a set.
+pub const SET_NEED: usize = 3;
 
 /// How many of a kind the Devourer eats in a run before it is in him (Ты — то, что ты ешь).
 pub const DIET_STEP: u32 = 5;

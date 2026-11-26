@@ -226,6 +226,106 @@ pub enum Trait {
     /// Сухой хитин (a doctrine of the swarm's): its fallen leave a dry crust, not slime — lightning does not run
     /// through it, and nothing nests in it.
     DryChitin,
+    /// A set of finds of one element (three or more in the army): what it does for the whole side (`Element`).
+    Set { e: Element },
+    /// Раскалённая броня (a module): whoever strikes it in melee catches fire.
+    HotArmor,
+    /// Огненные (an elite's): its blows set alight; fire does it a quarter.
+    Blazing,
+    /// В масле (an elite's): the battle begins with oil under it.
+    Oily,
+    /// В слизи (an elite's): the battle begins with slime under it.
+    Slimy,
+    /// Живучие (an elite's): the first blow that would kill it leaves it on 1.
+    Stubborn,
+    /// A boss: at half its health it goes into its second phase (each leader its own).
+    Boss,
+}
+
+/// What a find is made of, its element: three finds of one element in an army make a set (`Trait::Set`) — the
+/// Foundry's fire, lightning, iron and impact, the swarm's nest, venom, wing and shell.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Element {
+    Fire,
+    Volt,
+    Iron,
+    Impact,
+    Nest,
+    Venom,
+    Wing,
+    Shell,
+}
+
+impl Element {
+    pub const ALL: [Element; 8] = [Element::Fire, Element::Volt, Element::Iron, Element::Impact, Element::Nest, Element::Venom, Element::Wing, Element::Shell];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Element::Fire => "fire",
+            Element::Volt => "volt",
+            Element::Iron => "iron",
+            Element::Impact => "impact",
+            Element::Nest => "nest",
+            Element::Venom => "venom",
+            Element::Wing => "wing",
+            Element::Shell => "shell",
+        }
+    }
+
+    pub fn bit(self) -> u16 {
+        1 << (self as u16)
+    }
+}
+
+/// What an elite enemy is besides its numbers (a road with an elite brings one): armored, blazing, standing in oil or
+/// in slime, hard to kill, unstoppable.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Affix {
+    #[default]
+    None,
+    Armored,
+    Blazing,
+    Oily,
+    Slimy,
+    Stubborn,
+    Unstoppable,
+}
+
+impl Affix {
+    pub const ALL: [Affix; 6] = [Affix::Armored, Affix::Blazing, Affix::Oily, Affix::Slimy, Affix::Stubborn, Affix::Unstoppable];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Affix::None => "none",
+            Affix::Armored => "armored",
+            Affix::Blazing => "blazing",
+            Affix::Oily => "oily",
+            Affix::Slimy => "slimy",
+            Affix::Stubborn => "stubborn",
+            Affix::Unstoppable => "unstoppable",
+        }
+    }
+
+    /// Puts it on a body of the enemy.
+    pub fn apply(self, t: &mut Template) {
+        let mut add = |x: Trait| {
+            if !t.traits.contains(&x) {
+                t.traits.push(x);
+            }
+        };
+        match self {
+            Affix::None => {}
+            Affix::Armored => t.armor += 2,
+            Affix::Blazing => {
+                add(Trait::Blazing);
+                add(Trait::FireResist75);
+            }
+            Affix::Oily => add(Trait::Oily),
+            Affix::Slimy => add(Trait::Slimy),
+            Affix::Stubborn => add(Trait::Stubborn),
+            Affix::Unstoppable => add(Trait::Unstoppable),
+        }
+    }
 }
 
 /// The enemies the Hive Mind can remember (Память роя), by units.ron key: `Trait::Knows { k }` is an index here.
