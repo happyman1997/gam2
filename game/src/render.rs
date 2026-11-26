@@ -74,25 +74,32 @@ fn web_pixels(kind: u32) -> &'static [(i32, i32, f32)] {
 /// A pixel to lay on the field: where, its colour, how strongly.
 type Px = (i32, i32, [u8; 3], f32);
 
-/// The honey of a round as pixels of the field: one pool over all its cells (each cell a soft blob, the blobs summed
-/// and cut at a level — neighbouring cells run into one pool, a lone one is a puddle), its outline lumpy, a darker
-/// rim along its lower edge, a sheen and a glint or two. Made once a round and kept.
-fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<Px>> {
+/// Colours of a pool on the field, lit to dark: a glint, the lit upper rim, the dark lower rim, the gloss, the body —
+/// and how strongly each lies over the ground.
+struct Pool {
+    cols: [[u8; 3]; 5],
+    alpha: [f32; 5],
+}
+
+const HONEY: Pool = Pool { cols: [[255, 248, 210], [255, 226, 140], [96, 52, 8], [255, 190, 60], [178, 104, 14]], alpha: [0.9, 0.7, 0.5, 0.45, 0.34] };
+/// The swarm's slime: thin, yellow-green, a wet shine on it.
+const GOO: Pool = Pool { cols: [[236, 255, 196], [196, 226, 120], [44, 60, 14], [168, 206, 84], [112, 144, 44]], alpha: [0.85, 0.55, 0.45, 0.32, 0.26] };
+/// A machine's oil: near black, a cold rainbow sheen on its bulge.
+const OIL: Pool = Pool { cols: [[214, 196, 255], [96, 84, 118], [6, 4, 10], [64, 112, 140], [16, 14, 22]], alpha: [0.9, 0.7, 0.8, 0.55, 0.78] };
+
+/// A layer of a round as pixels of the field: one pool over all `cells` (each cell a soft blob, the blobs summed and
+/// cut at a level — neighbouring cells run into one pool, a lone one is a puddle), its outline lumpy, a darker rim
+/// along its lower edge, a sheen and a glint or two. Made once a round for each `slot` and kept.
+fn pool_layer(cells: &[usize], pool: &Pool, slot: u8) -> std::rc::Rc<Vec<Px>> {
     type Layer = (u64, std::rc::Rc<Vec<Px>>);
-    thread_local!(static KEPT: std::cell::RefCell<Option<Layer>> = const { std::cell::RefCell::new(None) });
-    // kept by what is flooded (a new battle in the same place must not see the old one's honey)
-    let key = rec.rounds[r].honey.iter().enumerate().filter(|(_, &s)| s != -1).fold(1469598103934665603u64, |h, (c, _)| (h ^ c as u64).wrapping_mul(1099511628211));
-    if let Some(l) = KEPT.with(|k| k.borrow().as_ref().filter(|l| l.0 == key).map(|l| l.1.clone())) {
+    thread_local!(static KEPT: std::cell::RefCell<std::collections::HashMap<u8, Layer>> = std::cell::RefCell::new(Default::default()));
+    // kept by what is covered (a new battle in the same place must not see the old one's pools)
+    let key = cells.iter().fold(1469598103934665603u64, |h, &c| (h ^ c as u64).wrapping_mul(1099511628211));
+    if let Some(l) = KEPT.with(|k| k.borrow().get(&slot).filter(|l| l.0 == key).map(|l| l.1.clone())) {
         return l;
     }
     let cols = sim::battle::W;
-    let cells: Vec<(f32, f32)> = rec.rounds[r]
-        .honey
-        .iter()
-        .enumerate()
-        .filter(|(_, &s)| s != -1)
-        .map(|(c, _)| (X0 + ((c as i32 % cols) as f32 + 0.5) * CW, Y0 + ((c as i32 / cols) as f32 + 0.5) * CH))
-        .collect();
+    let cells: Vec<(f32, f32)> = cells.iter().map(|&c| (X0 + ((c as i32 % cols) as f32 + 0.5) * CW, Y0 + ((c as i32 / cols) as f32 + 0.5) * CH)).collect();
     let mut out = vec![];
     if !cells.is_empty() {
         let (x0, x1) = (cells.iter().map(|c| c.0).fold(f32::MAX, f32::min) as i32 - 40, cells.iter().map(|c| c.0).fold(f32::MIN, f32::max) as i32 + 40);
@@ -122,30 +129,77 @@ fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<Px>> {
                 // the gloss: a band a few pixels in from the upper-left of the pool, where the light falls on the bulge
                 let gloss = at(x - 4, y - 4) < level && at(x, y - 2) >= level;
                 let glint = v > 1.5 && cell_hash((x / 2 * 31 + y * 17) as usize).is_multiple_of(61);
-                let (c, a) = if glint {
-                    ([255, 248, 210], 0.9)
+                let k = if glint {
+                    0
                 } else if top_edge {
-                    ([255, 226, 140], 0.7)
+                    1
                 } else if lower_edge {
-                    ([96, 52, 8], 0.5)
+                    2
                 } else if gloss {
-                    ([255, 190, 60], 0.45)
+                    3
                 } else {
-                    ([178, 104, 14], 0.34)
+                    4
                 };
-                out.push((x, y, c, a));
+                out.push((x, y, pool.cols[k], pool.alpha[k]));
             }
         }
     }
     let l = std::rc::Rc::new(out);
-    KEPT.with(|k| *k.borrow_mut() = Some((key, l.clone())));
+    KEPT.with(|k| k.borrow_mut().insert(slot, (key, l.clone())));
     l
+}
+
+fn honey_layer(rec: &Record, r: usize) -> std::rc::Rc<Vec<Px>> {
+    let cells: Vec<usize> = rec.rounds[r].honey.iter().enumerate().filter(|(_, &s)| s != -1).map(|(c, _)| c).collect();
+    pool_layer(&cells, &HONEY, 0)
+}
+
+/// The earthquake's crack down a column: a jagged black split, a pale lip of broken earth on its left, chips of it
+/// thrown up along the edge.
+fn rift_line(cv: &mut Image, col: i32) {
+    let cx = X0 + (col as f32 + 0.5) * CW;
+    let mut x = cx;
+    let (top, bottom) = (Y0 as i32 - 6, (Y0 + sim::battle::H as f32 * CH) as i32 + 6);
+    let mut y = top;
+    while y < bottom {
+        let step = 5 + (cell_hash((y * 31 + col * 7) as usize) % 5) as i32;
+        let nx = cx + ((cell_hash((y * 17 + col * 131) as usize) % 21) as f32 - 10.0);
+        let mut pts = vec![];
+        line(&mut pts, x, y as f32, nx, (y + step) as f32);
+        for (px, py) in pts {
+            let w = 1 + (cell_hash((py * 13 + col) as usize) % 3) as i32;
+            for o in -w..=w {
+                cv.blend_px(px + o, py, [12, 8, 14, 255], 0.92);
+            }
+            cv.blend_px(px - w - 1, py, [168, 150, 128, 255], 0.55);
+            cv.blend_px(px + w + 1, py, [40, 30, 34, 255], 0.5);
+            if cell_hash((py * 7 + px) as usize).is_multiple_of(23) {
+                cv.blend_px(px - w - 3, py - 1, [140, 124, 104, 255], 0.7);
+            }
+        }
+        x = nx;
+        y += step;
+    }
 }
 
 /// What lies on the field's ground at round `r`: the swarm's honey, then its web over it.
 fn ground_layers(cv: &mut Image, rec: &Record, r: usize) {
     let round = &rec.rounds[r];
     let cols = sim::battle::W;
+    // the fallen's slime and the machines' oil, the swarm's honey over them
+    if !round.ground.is_empty() {
+        let of = |k: u8| -> Vec<usize> { round.ground.iter().enumerate().filter(|(_, &g)| g == k).map(|(c, _)| c).collect() };
+        for (cells, pool, slot) in [(of(sim::battle::GOO), &GOO, 1), (of(sim::battle::OIL), &OIL, 2)] {
+            for &(x, y, col, a) in pool_layer(&cells, pool, slot).iter() {
+                cv.blend_px(x, y, [col[0], col[1], col[2], 255], a);
+            }
+        }
+    }
+    for c in 0..cols {
+        if !round.rift.is_empty() && round.rift[c as usize] != 0 {
+            rift_line(cv, c);
+        }
+    }
     for &(x, y, col, a) in honey_layer(rec, r).iter() {
         cv.blend_px(x, y, [col[0], col[1], col[2], 255], a);
     }
@@ -153,6 +207,83 @@ fn ground_layers(cv: &mut Image, rec: &Record, r: usize) {
         let (x0, y0) = ((X0 + (c as i32 % cols) as f32 * CW) as i32, (Y0 + (c as i32 / cols) as f32 * CH) as i32);
         for &(x, y, a) in web_pixels(cell_hash(c) >> 3) {
             cv.blend_px(x0 + x, y0 + y, [232, 224, 208, 255], a);
+        }
+    }
+}
+
+/// Spilt oil burning: three tongues of fire on each burning cell, its light round it.
+fn burning_ground(cv: &mut Image, a: &Assets, rec: &Record, r: usize, ff: f32) {
+    let round = &rec.rounds[r];
+    if round.flames.is_empty() {
+        return;
+    }
+    let Some(fx) = a.fx.get("burn-body") else { return };
+    let cols = sim::battle::W;
+    for (c, _) in round.flames.iter().enumerate().filter(|(_, &v)| v > 0) {
+        let (cx, cy) = (X0 + ((c as i32 % cols) as f32 + 0.5) * CW, Y0 + ((c as i32 / cols) as f32 + 0.5) * CH);
+        for (n, (dx, dy)) in [(-13.0f32, 6.0f32), (11.0, 0.0), (0.0, 12.0)].iter().enumerate() {
+            let k = ((ff * fx.fps / 24.0) as i32 + c as i32 * 5 + n as i32 * 3).rem_euclid(fx.frames);
+            cv.blit_region(&fx.img, k * fx.w, 0, fx.w, fx.h, (cx + dx) as i32 - fx.pivot.0, (cy + dy) as i32 - fx.pivot.1, n == 1, 1.0);
+        }
+        cv.glow(cx, cy - 4.0, 52.0, [240, 138, 32], 0.35);
+    }
+}
+
+/// Гроза over the field: the light gone slate-blue, rain slanting down in streaks, a white flash as lightning strikes.
+fn storm(cv: &mut Image, ff: f32, flash: bool) {
+    let (mr, mg, mb) = if flash { (1.18, 1.2, 1.26) } else { (0.76, 0.8, 0.93) };
+    for p in cv.px.iter_mut() {
+        p[0] = (p[0] as f32 * mr).min(255.0) as u8;
+        p[1] = (p[1] as f32 * mg).min(255.0) as u8;
+        p[2] = (p[2] as f32 * mb).min(255.0) as u8;
+    }
+    let (w, h) = (cv.w as f32, cv.h as f32);
+    for k in 0..280usize {
+        let hsh = cell_hash(k * 977 + 13);
+        let speed = 30.0 + (hsh >> 8) as f32 % 12.0;
+        let y = ((hsh >> 4) as f32 % h + ff * speed) % h;
+        let x = (hsh % (cv.w as u32 + 300)) as f32 - 150.0 + y * 0.28;
+        for j in 0..8 {
+            let (px, py) = ((x + j as f32 * 0.28) as i32, (y + j as f32) as i32);
+            if px >= 0 && (px as f32) < w {
+                cv.blend_px(px, py, [176, 194, 228, 255], 0.3 + 0.03 * j as f32);
+            }
+        }
+    }
+}
+
+/// Ночь over the field: dark and cold, but light round each of `lights` (x, y, radius) — what burns, what glows,
+/// what flashes — in a few bands, as pixel art lights a night.
+fn night(cv: &mut Image, lights: &[(f32, f32, f32)]) {
+    const S: i32 = 8;
+    let (lw, lh) = (cv.w / S + 2, cv.h / S + 2);
+    let mut l = vec![0f32; (lw * lh) as usize];
+    for &(x, y, r) in lights {
+        let (gx0, gx1) = (((x - r) / S as f32).floor().max(0.0) as i32, (((x + r) / S as f32).ceil() as i32).min(lw - 1));
+        let (gy0, gy1) = (((y - r) / S as f32).floor().max(0.0) as i32, (((y + r) / S as f32).ceil() as i32).min(lh - 1));
+        for gy in gy0..=gy1 {
+            for gx in gx0..=gx1 {
+                let d = ((gx * S) as f32 - x).hypot((gy * S) as f32 - y) / r;
+                if d < 1.0 {
+                    let v = (1.0 - d).powf(1.3);
+                    let c = &mut l[(gy * lw + gx) as usize];
+                    *c = c.max(v);
+                }
+            }
+        }
+    }
+    let w = cv.w;
+    for j in 0..cv.h {
+        let (gy, fy) = (j / S, (j % S) as f32 / S as f32);
+        for i in 0..w {
+            let (gx, fx) = (i / S, (i % S) as f32 / S as f32);
+            let at = |x: i32, y: i32| l[(y * lw + x) as usize];
+            let v = (at(gx, gy) * (1.0 - fx) + at(gx + 1, gy) * fx) * (1.0 - fy) + (at(gx, gy + 1) * (1.0 - fx) + at(gx + 1, gy + 1) * fx) * fy;
+            let q = (v * 4.0).round() / 4.0;
+            let p = &mut cv.px[(j * w + i) as usize];
+            p[0] = (p[0] as f32 * (0.34 + 0.66 * q)) as u8;
+            p[1] = (p[1] as f32 * (0.38 + 0.62 * q)) as u8;
+            p[2] = (p[2] as f32 * (0.56 + 0.44 * q)) as u8;
         }
     }
 }
@@ -491,6 +622,12 @@ fn bolt(cv: &mut Image, a: &Assets, rec: &Record, shown: &[crate::playback::Show
     let fade = if k <= 6 { 1.0 } else { 0.55 };
     // the same bolt while it runs out, a new one each frame after
     let seed = (e.start as u32).wrapping_mul(2654435761) ^ (src as u32 * 97 + tgt as u32 * 13) ^ if k < 3 { 0 } else { k as u32 * 7919 };
+    zigzag(cv, from, to, seed, reach, fade, k);
+}
+
+/// A bolt of lightning from `from` to `to`, run out to `reach` (0..1) of the way: a jagged white core, a blue rim, a dim
+/// glow, two forks once it is all there, the ball it leaves flaring for its first frames (`k`, the bolt's frame).
+fn zigzag(cv: &mut Image, from: (f32, f32), to: (f32, f32), seed: u32, reach: f32, fade: f32, k: i32) {
     let mut rnd = seed | 1;
     let mut next = move || {
         rnd ^= rnd << 13;
@@ -602,6 +739,16 @@ fn line(out: &mut Vec<(i32, i32)>, x0: f32, y0: f32, x1: f32, y1: f32) {
 fn effect(cv: &mut Image, a: &Assets, e: &Effect, f: i32) {
     if e.link.is_some() {
         return; // a bolt, drawn by bolt()
+    }
+    if e.name == "sky" {
+        // lightning out of the sky straight down on it, a white flare where it lands
+        let k = f - e.start;
+        if (0..6).contains(&k) {
+            let seed = (e.start as u32).wrapping_mul(2654435761) ^ (e.x as u32 * 31) ^ if k < 2 { 0 } else { k as u32 * 7919 };
+            zigzag(cv, (e.x + 40.0, e.y - 460.0), (e.x, e.y - 24.0), seed, 1.0, if k < 4 { 1.0 } else { 0.55 }, k + 7);
+            cv.glow(e.x, e.y - 20.0, 60.0, [200, 230, 255], 0.7 - 0.1 * k as f32);
+        }
+        return;
     }
     if let Some(from) = e.from {
         missile(cv, a, e, from, f);
@@ -745,6 +892,7 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
         cv.blit(ground, 0, 0, false, 1.0);
     }
     ground_layers(cv, rec, (f / FR) as usize);
+    burning_ground(cv, a, rec, (f / FR) as usize, view.frame);
     // the units, in depth order. The small ones of a cell stand as one pack: no more than three bodies show — one in
     // front, two peeking out from behind it — with one shadow, and a row of dots under the pack when there are more
     // (a dot a body, no number to translate); a hidden one's swing or hit is shown by the body standing for it. The
@@ -952,6 +1100,37 @@ pub fn draw_field(cv: &mut Image, a: &Assets, rec: &Record, sparks: &(Vec<Number
             cv.fill(x0 + 1 + k * 3, y0 + 1, 2, 2, [232, 220, 178, 255]);
         }
     }
+    // the sky over it: a storm darkens it and rains on it, the night leaves only what burns or glows to be seen
+    match rec.weather {
+        sim::model::Weather::Storm => {
+            let flash = ms.iter().any(|m| matches!(m.ev, Event::Strike { .. }) && (0..3).contains(&(f - m.frame)));
+            storm(cv, ff, flash);
+        }
+        sim::model::Weather::Night => {
+            let mut lights: Vec<(f32, f32, f32)> = vec![];
+            for m in &marked {
+                if m.body & S_BURN != 0 {
+                    lights.push((m.x, m.foot - m.h as f32 * 0.4, 120.0));
+                }
+                if rec.units[m.id].name.starts_with("Светляк") {
+                    lights.push((m.x, m.foot - 10.0, 80.0));
+                }
+            }
+            let round = &rec.rounds[(f / FR) as usize];
+            for (c, _) in round.flames.iter().enumerate().filter(|(_, &v)| v > 0) {
+                let cols = sim::battle::W;
+                lights.push((X0 + ((c as i32 % cols) as f32 + 0.5) * CW, Y0 + ((c as i32 / cols) as f32 + 0.5) * CH, 100.0));
+            }
+            for e in &sparks.1 {
+                let bright = matches!(e.name, "fireball" | "small-explosion" | "fire-breath" | "zap-hit" | "mana-burst" | "muzzle-shotgun" | "heal" | "tesla" | "bolt");
+                if bright && (e.start..e.start + 10).contains(&f) {
+                    lights.push((e.x, e.y - 10.0, 110.0));
+                }
+            }
+            night(cv, &lights);
+        }
+        _ => {}
+    }
     // the leaders' health, the crown by it
     let mut bars = vec![];
     for (id, info) in rec.units.iter().enumerate() {
@@ -1076,6 +1255,10 @@ pub fn draw_hud(cv: &mut Image, a: &Assets, rec: &Record, view: &View) {
     text.draw(cv, &format!("{leader} {}/{nf}", alive(forge)), 530, 9, [214, 196, 150], Some([16, 12, 16]), Align::Left, 1.0);
     let turn = (f / FR + 1).min(rec.rounds.len() as i32);
     text.draw(cv, &crate::text::tf("hud.turn", &[("n", &turn)]), 728, 9, MUTED, Some([16, 12, 16]), Align::Right, 1.0);
+    if rec.weather != sim::model::Weather::Clear {
+        let w = crate::text::t(&format!("weather.{}", rec.weather.key()));
+        text.draw(cv, &w, 712, 30, [150, 190, 255], Some([16, 12, 16]), Align::Right, 1.0);
+    }
     let hot = |b: Button| view.hover == Some(b);
     // the keys show under a button only while the cursor is on it, and for the first seconds of a battle (to teach
     // them) — not over the field all the time

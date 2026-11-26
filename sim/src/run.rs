@@ -14,7 +14,7 @@
 
 use crate::battle::Battle;
 use crate::data::{self, Caste, Form};
-use crate::model::{Ability, Template, Trait};
+use crate::model::{Ability, Template, Trait, Weather};
 use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -255,6 +255,9 @@ pub struct Node {
     /// How hard the battle is: 1 — the usual, 2 — dangerous (pays more, a rarer find), 3 — a boss.
     #[serde(default)]
     pub danger: u8,
+    /// The sky over the battle (its enemy is fitted under it).
+    #[serde(default)]
+    pub weather: Weather,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -363,6 +366,9 @@ pub struct Run {
     pub stats: Stats,
     /// Some(true) — the last boss beaten; Some(false) — a battle lost.
     pub over: Option<bool>,
+    /// The sky the enemy being fitted will fight under (a road's weather).
+    #[serde(skip)]
+    fit_weather: Weather,
 }
 
 impl Run {
@@ -390,6 +396,7 @@ impl Run {
             stopped: false,
             stats: Stats::default(),
             over: None,
+            fit_weather: Weather::Clear,
         };
         // the leader: the one with the trait, else the biggest (the Father of the Colossus has no trait yet)
         let lead = army
@@ -826,7 +833,7 @@ impl Run {
             won += (played..played + n)
                 .into_par_iter()
                 .map(|k| {
-                    let mut bt = Battle::new(base.wrapping_add(k as u64 * 7919));
+                    let mut bt = Battle::new(base.wrapping_add(k as u64 * 7919)).with_weather(self.fit_weather);
                     bt.add_armies(a, b);
                     u32::from(bt.run().winner == Some(0))
                 })
@@ -862,9 +869,21 @@ impl Run {
     /// The enemy for a battle of `kind`: a base (a leader's army for a boss) and a ladder of additions; the longest
     /// prefix that the class's reference army of the curve's size still beats half the time — as strong as the
     /// curve says, whatever the player brings.
-    fn enemy(&mut self, kind: Kind, danger: u8) -> (Vec<Template>, String) {
+    fn enemy(&mut self, kind: Kind, danger: u8, weather: Weather) -> (Vec<Template>, String) {
         let b = Self::budget(self.class, self.next_fight(), kind, danger);
-        self.enemy_of(kind, b)
+        self.fit_weather = weather;
+        let out = self.enemy_of(kind, b);
+        self.fit_weather = Weather::Clear;
+        out
+    }
+
+    /// The sky over a battle road: from the second battle on, one road in three has weather — a thunderstorm, an
+    /// earthquake or the night.
+    fn weather(&mut self) -> Weather {
+        if self.next_fight() < 2 || self.roll(3) != 0 {
+            return Weather::Clear;
+        }
+        [Weather::Storm, Weather::Quake, Weather::Night][self.roll(3)]
     }
 
     /// A class's own reference army of `budget` — the curve's measure, the army a run's enemy is held against: the
@@ -1055,8 +1074,9 @@ impl Run {
                 self.path.push(a);
                 self.path.push(b);
             } else {
-                let (enemy, key) = self.enemy(Kind::Boss, 3);
-                self.path.push(Node { kind: Kind::Boss, enemy, enemy_key: key, reward: 25 + fight as i32, event: 0, danger: 3 });
+                let weather = self.weather();
+                let (enemy, key) = self.enemy(Kind::Boss, 3, weather);
+                self.path.push(Node { kind: Kind::Boss, enemy, enemy_key: key, reward: 25 + fight as i32, event: 0, danger: 3, weather });
             }
             return;
         }
@@ -1066,13 +1086,14 @@ impl Run {
         for k in 0..2 {
             let kind = if k == 1 && elite { Kind::Elite } else { Kind::Fight };
             let danger = if k == 1 { 2 } else { 1 };
-            let (enemy, key) = self.enemy(kind, danger);
+            let weather = self.weather();
+            let (enemy, key) = self.enemy(kind, danger, weather);
             let reward = match (kind, danger) {
                 (Kind::Elite, _) => 14,
                 (_, 2) => 11,
                 _ => 7,
             } + fight as i32 / 2;
-            self.path.push(Node { kind, enemy, enemy_key: key, reward, event: 0, danger });
+            self.path.push(Node { kind, enemy, enemy_key: key, reward, event: 0, danger, weather });
         }
         if !self.stopped && fight > 1 {
             let kind = [Kind::Merchant, Kind::Event, Kind::Event, Kind::Camp][self.roll(4)];
@@ -1087,7 +1108,7 @@ impl Run {
             let fit: Vec<usize> = (0..EVENTS.len()).filter(|&i| EVENTS[i].1.is_none_or(|c| c == self.class)).collect();
             event = fit[self.roll(fit.len())];
         }
-        Node { kind, enemy: vec![], enemy_key: String::new(), reward: 0, event, danger: 0 }
+        Node { kind, enemy: vec![], enemy_key: String::new(), reward: 0, event, danger: 0, weather: Weather::Clear }
     }
 
     /// A stop taken: the next fork has battles only.
@@ -1528,7 +1549,12 @@ impl Run {
 
 /// Plays a battle of the run out (no log): the result for `after_battle`.
 pub fn play(me: &[Template], enemy: &[Template], seed: u64) -> BattleResult {
-    let mut bt = Battle::new(seed);
+    play_in(me, enemy, seed, Weather::Clear)
+}
+
+/// The same under a sky (a road's weather).
+pub fn play_in(me: &[Template], enemy: &[Template], seed: u64, weather: Weather) -> BattleResult {
+    let mut bt = Battle::new(seed).with_weather(weather);
     bt.add_armies(me, enemy);
     let o = bt.run();
     result_of(&bt, o.winner)

@@ -3,7 +3,7 @@
 //! another, each with its effect and its number; the killed lie where they fell.
 
 use sim::data::{start_izobretatel, start_pozhiratel};
-use sim::model::{Template, Trait};
+use sim::model::{Template, Trait, Weather};
 use crate::text::t as t_;
 use sim::{Battle, Event, Outcome};
 
@@ -90,6 +90,11 @@ pub struct Round {
     pub honey: Vec<i8>,
     /// What each side's swarm has taken up from the machines it broke (Мимикрия), `sim::battle::MIMIC_*`.
     pub mimic: [u8; 2],
+    /// The ground as the round ends, cell by cell: spilt oil and slime (`sim::battle::OIL`, `GOO`), how long the oil
+    /// still burns, the earthquake's cracks (1); empty when the field has none.
+    pub ground: Vec<u8>,
+    pub flames: Vec<u8>,
+    pub rift: Vec<u8>,
 }
 
 pub struct Record {
@@ -109,6 +114,8 @@ pub struct Record {
     /// What the leaders take from it for the run (Память роя, Ты — то, что ты ешь): `run::BattleResult`'s.
     pub foe_kills: Vec<(u8, u32)>,
     pub eaten: Vec<u8>,
+    /// The sky over it.
+    pub weather: Weather,
 }
 
 fn states(bt: &Battle) -> Vec<State> {
@@ -172,7 +179,12 @@ pub fn record(seed: u64) -> Record {
 
 /// A battle of army `a` (left) against army `b` (right), round by round.
 pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
-    let mut bt = Battle::new(seed).with_log();
+    record_in(seed, a, b, Weather::Clear)
+}
+
+/// The same under a sky (a road's weather).
+pub fn record_in(seed: u64, a: &[Template], b: &[Template], weather: Weather) -> Record {
+    let mut bt = Battle::new(seed).with_log().with_weather(weather);
     bt.add_armies(a, b);
     let mut rounds = vec![];
     let outcome = loop {
@@ -190,7 +202,19 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
         let layer = |l: &[i8]| if l.iter().any(|&c| c != -1) { l.to_vec() } else { vec![] };
         // the battle notes what any side would take up from a machine; only a side with Мимикрия does
         let mimic = |side: u8| if bt.units.iter().any(|u| u.side == side && u.t.has(Trait::Mimic)) { bt.mimicry(side) } else { 0 };
-        rounds.push(Round { before, after, events, web: layer(bt.web()), honey: layer(bt.honey()), mimic: [mimic(0), mimic(1)] });
+        let bytes = |l: &[u8]| if l.iter().any(|&c| c != 0) { l.to_vec() } else { vec![] };
+        let rift: Vec<u8> = bt.rift().iter().map(|&c| c as u8).collect();
+        rounds.push(Round {
+            before,
+            after,
+            events,
+            web: layer(bt.web()),
+            honey: layer(bt.honey()),
+            mimic: [mimic(0), mimic(1)],
+            ground: bytes(bt.ground()),
+            flames: bytes(bt.flames()),
+            rift: bytes(&rift),
+        });
         if let Some(o) = done {
             break o;
         }
@@ -214,6 +238,7 @@ pub fn record_of(seed: u64, a: &[Template], b: &[Template]) -> Record {
         ground: 0,
         foe_kills: res.foe_kills,
         eaten: res.eaten,
+        weather,
     };
     rec.died_at = vec![None; rec.units.len()];
     for r in 0..rec.rounds.len() {
@@ -481,6 +506,14 @@ impl Record {
                     Event::Arc { a, .. } | Event::Swap { a, .. } => out.push(Cue { frame: m.frame, name: "zap", gain: -4.0, x: at(a) }),
                     Event::Swallow { u, .. } => out.push(Cue { frame: m.frame, name: "bite", gain: 0.0, x: at(u) }),
                     Event::Burst { t } | Event::Morph { to: t, .. } => out.push(Cue { frame: m.frame, name: "squish", gain: 0.0, x: at(t) }),
+                    // the sky splits: the crack of a strike, the thunder after it
+                    Event::Strike { t } => {
+                        out.push(Cue { frame: m.frame, name: "zap", gain: 2.0, x: at(t) });
+                        out.push(Cue { frame: m.frame + 2, name: "blast", gain: -2.0, x: at(t) });
+                    }
+                    Event::Rift { .. } => out.push(Cue { frame: m.frame, name: "blast", gain: 0.0, x: 480.0 }),
+                    Event::Bump { b, .. } => out.push(Cue { frame: m.frame, name: "hit_flesh", gain: -2.0, x: at(b) }),
+                    Event::Surge { t } => out.push(Cue { frame: m.frame, name: "zap", gain: 0.0, x: at(t) }),
                     _ => {}
                 }
             }
@@ -671,6 +704,33 @@ impl Record {
                         let st = self.rounds[r].before[from];
                         let (x, y) = Self::spot(st.x, st.y, self.units[from].fp);
                         fx.push(Effect { name: "acid-splash", x, y: y - 4.0, start: m.frame, link: None, flip: false, from: None });
+                    }
+                    // lightning from the sky, its number on the one it struck
+                    Event::Strike { t } => {
+                        let (x, y) = at(t);
+                        fx.push(Effect { name: "sky", x, y, start: m.frame, link: None, flip: false, from: None });
+                        fx.push(Effect { name: "zap-hit", x, y: y - 14.0, start: m.frame + 1, link: None, flip: false, from: None });
+                    }
+                    Event::Nature { t, dmg } => {
+                        let (x, y) = at(t);
+                        nums.push(Number { text: format!("-{dmg}"), style: NumStyle::Hurt, x, y, start: m.frame, t, k: 0, value: dmg, end: i32::MAX });
+                    }
+                    // the earth splits along a column: dust bursting up all along it
+                    Event::Rift { x } => {
+                        for row in (0..sim::battle::H).step_by(4) {
+                            let (sx, sy) = Self::spot(x, row, 1);
+                            fx.push(Effect { name: "ground-slam", x: sx, y: sy, start: m.frame + row / 4, link: None, flip: false, from: None });
+                        }
+                    }
+                    // Кегли: a thump where they crash, and a word for it
+                    Event::Bump { b, .. } => {
+                        let (x, y) = at(b);
+                        fx.push(Effect { name: "hit-spark", x, y: y - 10.0, start: m.frame, link: None, flip: false, from: None });
+                        nums.push(Number { text: t_("num.bump"), style: NumStyle::Status, x, y, start: m.frame, t: b, k: 0, value: 0, end: i32::MAX });
+                    }
+                    Event::Surge { t } => {
+                        let (x, y) = at(t);
+                        fx.push(Effect { name: "zap-hit", x, y: y - 6.0, start: m.frame, link: None, flip: false, from: None });
                     }
                     Event::Swap { a, b, ax, ay, bx, by } => {
                         for (id, ox, oy) in [(a, ax, ay), (b, bx, by)] {

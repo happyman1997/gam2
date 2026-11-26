@@ -225,6 +225,29 @@ pub enum Trait {
 /// The enemies the Hive Mind can remember (Память роя), by units.ron key: `Trait::Knows { k }` is an index here.
 pub const KNOWN: [&str; 10] = ["strazh", "mudrets", "gorn", "orudie", "mekhanik", "kamenshchik", "otets_kolossa", "izobretatel", "manyak", "zodchiy"];
 
+/// What the sky and the earth do over a battle (a road on the map can bring it): nothing, a thunderstorm — lightning
+/// from the sky, drawn to iron; an earthquake — the ground splits across the field; the night — shooters see only
+/// what burns or glows past three cells.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Weather {
+    #[default]
+    Clear,
+    Storm,
+    Quake,
+    Night,
+}
+
+impl Weather {
+    pub fn key(self) -> &'static str {
+        match self {
+            Weather::Clear => "clear",
+            Weather::Storm => "storm",
+            Weather::Quake => "quake",
+            Weather::Night => "night",
+        }
+    }
+}
+
 /// Abilities with a condition.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Ability {

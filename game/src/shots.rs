@@ -425,4 +425,48 @@ pub fn leaders(demo: Demo, dir: &str) {
         }
     }
     let _ = FR;
+    field(&mut g, dir);
+}
+
+/// The field as a party to the fight: lightning through the slime, oil burning, a storm, an earthquake's crack, the
+/// night, bodies bowled over.
+fn field(g: &mut Game, dir: &str) {
+    use crate::playback::{record_in, Record, FR};
+    use sim::battle::Event;
+    use sim::data::{army, gorn, mudrets, orudie, start_izobretatel, start_manyak, start_otets, start_zodchiy, strazh};
+    use sim::model::Weather;
+    type Find = fn(&Record) -> Option<i32>;
+    type Case = (&'static str, fn() -> Vec<sim::model::Template>, &'static str, Weather, Find);
+    let cases: [Case; 6] = [
+        ("72_slime_surge", start_izobretatel, "start_matka", Weather::Clear, |rec| {
+            (0..rec.rounds.len()).find_map(|r| rec.moments(r).into_iter().find(|m| matches!(m.ev, Event::Surge { .. })).map(|m| m.frame + 2))
+        }),
+        ("73_oil_fire", || vec![gorn(), gorn(), gorn(), strazh(), mudrets(), orudie()], "start_matka", Weather::Clear, |rec| {
+            (0..rec.rounds.len()).find(|&r| rec.rounds[r].flames.iter().filter(|&&f| f > 0).count() >= 3).map(|r| (r as i32 + 1) * FR - 2)
+        }),
+        ("74_storm", start_otets, "start_matka", Weather::Storm, |rec| {
+            (0..rec.rounds.len()).find_map(|r| rec.moments(r).into_iter().find(|m| matches!(m.ev, Event::Strike { .. })).map(|m| m.frame + 1))
+        }),
+        ("75_quake", start_zodchiy, "start_matka", Weather::Quake, |rec| {
+            (0..rec.rounds.len()).find_map(|r| rec.moments(r).into_iter().find(|m| matches!(m.ev, Event::Rift { .. })).map(|m| m.frame + 8))
+        }),
+        ("76_night", start_manyak, "start_matka", Weather::Night, |rec| Some((3 * FR + 18).min(rec.frames() - 1))),
+        ("77_bowling", start_otets, "start_matka", Weather::Clear, |rec| {
+            (0..rec.rounds.len()).find_map(|r| rec.moments(r).into_iter().find(|m| matches!(m.ev, Event::Bump { .. })).map(|m| m.frame + 1))
+        }),
+    ];
+    for (name, a, b, weather, find) in cases {
+        let mut found = None;
+        for seed in 0..40 {
+            let rec = record_in(seed, &a(), &army(b), weather);
+            if let Some(f) = find(&rec) {
+                found = Some((rec, f));
+                break;
+            }
+        }
+        match found {
+            Some((rec, f)) => snap_battle(g, dir, name, rec, f as f32, 1),
+            None => println!("{name}: not seen in 40 battles"),
+        }
+    }
 }

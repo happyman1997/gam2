@@ -1,6 +1,6 @@
 //! The battle: rounds and phases as in docs/CONCEPT.md («Ходы», «Удар и числа»).
 
-use crate::model::{Ability, Dmg, Template, Trait};
+use crate::model::{Ability, Dmg, Template, Trait, Weather};
 use crate::rng::Rng;
 use std::cmp::Reverse;
 use std::collections::VecDeque;
@@ -22,6 +22,22 @@ pub const TESLA_DIE: u32 = 4;
 pub const LAY_MAX: u8 = 3;
 /// Гарнизон: the Architect's army waits behind his walls up to this round at most.
 pub const GARRISON_ROUNDS: u32 = 10;
+/// The ground of a cell (`Battle::ground`): bare, the slime a fallen body of the swarm leaves, the oil a broken
+/// machine spills.
+pub const GOO: u8 = 1;
+pub const OIL: u8 = 2;
+/// Rounds a patch of oil burns once it is set alight.
+pub const OIL_BURNS: u8 = 3;
+/// How far a jolt runs through the slime from where it struck (cells), and what share of it reaches the others.
+pub const SURGE_REACH: u32 = 3;
+/// Ночь: how far a shooter sees what neither burns nor glows.
+pub const NIGHT_SIGHT: i32 = 2;
+/// Гроза: strikes from the sky a round. Землетрясение: the ground splits every this many rounds, at most this often.
+pub const STRIKES: u32 = 2;
+pub const QUAKE_EVERY: u32 = 4;
+pub const RIFTS: u32 = 3;
+/// Кегли: how many bodies a knocked one can bowl over in a row.
+pub const BOWL: u32 = 3;
 /// The block an army of the usual size stands in: as deep and as tall as the whole zone once was. A bigger army
 /// widens it in the same proportions, up to the whole zone.
 pub const BLOCK: (i32, i32) = (6, 14);
@@ -51,6 +67,11 @@ fn cell_cost(size: u32) -> u8 {
         2 => 2,
         _ => 4,
     }
+}
+
+/// A body of the Foundry: a golem, or one of its leaders in their machines (they break, spill oil, are taken apart).
+pub fn machine(t: &Template) -> bool {
+    t.golem || matches!(t.name.as_ref(), "Изобретатель" | "Маньяк" | "Зодчий" | "Отец колосса")
 }
 
 pub fn rect_dist(ax: i32, ay: i32, af: i32, bx: i32, by: i32, bf: i32) -> i32 {
@@ -165,6 +186,8 @@ pub struct Unit {
     pub laid: u8,
     /// Its kind among those the Hive Mind can remember (`model::KNOWN`), if it is one of them.
     pub kind: Option<u8>,
+    /// Fallen into the earthquake's crack: walks no farther up to and including this round.
+    pub stuck_until: u32,
 }
 
 impl Unit {
@@ -211,6 +234,16 @@ pub enum Event {
     Burst { t: usize },
     /// Метаморфоз: the larva `from` pupates and comes out as `to` (a new body in its place).
     Morph { from: usize, to: usize },
+    /// Кегли: the knocked `a` crashes into `b` and bowls it over.
+    Bump { a: usize, b: usize },
+    /// A jolt runs from `t` through the slime it stands in (the others in it are hit by their own `Hit`s).
+    Surge { t: usize },
+    /// Гроза: lightning from the sky strikes `t`.
+    Strike { t: usize },
+    /// Землетрясение: the ground splits along column `x`, top to bottom.
+    Rift { x: i32 },
+    /// What the field does to `t` (a strike from the sky, a fall into a rift): `dmg` with no one striking.
+    Nature { t: usize, dmg: i32 },
 }
 
 /// What goes off in an `Event::Cast`.
@@ -340,6 +373,8 @@ struct Hit {
     ignite: bool,
     /// The blow stuns: the target skips its next attack (not the unstoppable).
     stun: bool,
+    /// Knocked back away from this one rather than from the attacker (the body the Colossus hurled down on them).
+    from: Option<usize>,
 }
 
 pub struct Battle {
@@ -373,6 +408,15 @@ pub struct Battle {
     memory: [Vec<u8>; 2],
     /// Who each side's Devourer has eaten this battle (for its run: Ты — то, что ты ешь).
     pub eaten: [Vec<usize>; 2],
+    /// The sky over the battle.
+    pub weather: Weather,
+    /// What lies on each cell: 0 bare, `GOO`, `OIL`.
+    ground: Vec<u8>,
+    /// Burning oil on each cell: rounds it still burns (0 none).
+    flames: Vec<u8>,
+    /// The cracks the earthquake has opened.
+    rift: Vec<bool>,
+    rifts: u32,
 }
 
 impl Battle {
@@ -397,12 +441,43 @@ impl Battle {
             garrison: [false; 2],
             memory: [vec![], vec![]],
             eaten: [vec![], vec![]],
+            weather: Weather::Clear,
+            ground: vec![0; n],
+            flames: vec![0; n],
+            rift: vec![false; n],
+            rifts: 0,
         }
     }
 
     /// The web on the field, cell by cell (`y * W + x`): the side that spun it, -1 none.
     pub fn web(&self) -> &[i8] {
         &self.web
+    }
+
+    /// The battle under a sky (a road's weather).
+    pub fn with_weather(mut self, w: Weather) -> Self {
+        self.weather = w;
+        self
+    }
+
+    /// What lies on the field, cell by cell: 0 bare, `GOO`, `OIL`.
+    pub fn ground(&self) -> &[u8] {
+        &self.ground
+    }
+
+    /// The burning oil, cell by cell: rounds it still burns.
+    pub fn flames(&self) -> &[u8] {
+        &self.flames
+    }
+
+    /// The earthquake's cracks, cell by cell.
+    pub fn rift(&self) -> &[bool] {
+        &self.rift
+    }
+
+    /// Pours `GOO` or `OIL` on a cell (a set piece, a test).
+    pub fn pour(&mut self, x: i32, y: i32, kind: u8) {
+        self.ground[Grid::idx(x, y)] = kind;
     }
 
     /// The honey on the field, cell by cell: the side whose dead flooded it, -1 none.
@@ -607,6 +682,7 @@ impl Battle {
             trophies: 0,
             laid: 0,
             kind: None,
+            stuck_until: 0,
         });
         self.units[id].kind = crate::data::unit_key(&self.units[id].t.name).and_then(|k| crate::model::KNOWN.iter().position(|x| *x == k)).map(|k| k as u8);
         id
@@ -775,7 +851,7 @@ impl Battle {
         }
         for step in 1..=3u32 {
             for i in 0..self.units.len() {
-                if !self.units[i].present() || self.units[i].t.speed < step || self.units[i].glued_until >= self.round {
+                if !self.units[i].present() || self.units[i].t.speed < step || self.units[i].glued_until >= self.round || self.units[i].stuck_until >= self.round {
                     continue;
                 }
                 if self.units[i].t.has(Trait::Flyer) && !self.units[i].fleeing {
@@ -1093,6 +1169,10 @@ impl Battle {
         // walked into the enemy's web: stuck, no farther this round (and it tears free instead of its next blow)
         if self.on_enemy(i, &self.web) {
             self.units[i].glued_until = self.units[i].glued_until.max(self.round);
+        }
+        // stepped into the earthquake's crack: it climbs out next round
+        if !self.units[i].t.has(Trait::Flyer) && self.cells_of(i).any(|c| self.rift[c]) {
+            self.units[i].stuck_until = self.round;
         }
     }
 
@@ -1463,7 +1543,8 @@ impl Battle {
             .collect();
         for k in under {
             let stun = self.units[k].t.size <= 2;
-            hits.push(Hit { attacker: i, target: k, raw: self.rng.damage(6, 0), dmg: Dmg::Blunt, stun, ..Default::default() });
+            // knocked away from where it came down — and they bowl over the ones behind them
+            hits.push(Hit { attacker: i, target: k, raw: self.rng.damage(6, 0), dmg: Dmg::Blunt, stun, knock: true, from: Some(t), ..Default::default() });
         }
         true
     }
@@ -1823,11 +1904,13 @@ impl Battle {
             return None;
         }
         let far = self.units[i].t.has(Trait::Navodka);
+        let night = self.weather == Weather::Night;
         self.enemies_of(i)
             .filter(|&j| !self.is_wall(j))
             .map(|j| (j, self.dist(i, j)))
-            .filter(|&(_, d)| d <= range as i32)
-            .min_by_key(|&(j, d)| (!self.units[j].t.has(Trait::Glow), if far { -d } else { d }, self.units[j].hp, j))
+            .filter(|&(j, d)| d <= range as i32 && (!night || d <= NIGHT_SIGHT || self.lit(j)))
+            // at night what burns or glows draws every eye
+            .min_by_key(|&(j, d)| (!self.units[j].t.has(Trait::Glow), night && !self.lit(j), if far { -d } else { d }, self.units[j].hp, j))
             .map(|(j, _)| j)
     }
 
@@ -1971,7 +2054,7 @@ impl Battle {
             if self.on_enemy(v, &self.web) && self.units[v].side != self.units[i].side {
                 raw = raw * 3 / 2;
             }
-            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: mimic & MIMIC_FIRE != 0, stun: false });
+            hits.push(Hit { attacker: i, target: v, raw, dmg, probivnoy, melee: true, knock: charge, venom, infect, ignite: mimic & MIMIC_FIRE != 0, stun: false, from: None });
         }
     }
 
@@ -2062,6 +2145,13 @@ impl Battle {
         }
         self.units[t].hp -= d;
         self.ev(Event::Hit { a: h.attacker, t, dmg: d });
+        // fire on spilt oil sets it burning; lightning into slime runs through all of it
+        if (h.dmg == Dmg::Fire || h.ignite) && self.on_ground(t, OIL) {
+            self.ignite(t);
+        }
+        if h.dmg == Dmg::Shock && d > 0 {
+            self.surge(t, raw, h.attacker);
+        }
         if h.stun && d > 0 && self.units[t].hp > 0 && !self.units[t].t.has(Trait::Unstoppable) {
             self.units[t].stunned = true;
             self.ev(Event::Stun { t });
@@ -2107,7 +2197,7 @@ impl Battle {
         } else {
             let pushable = self.units[t].t.size <= self.units[a].t.size && !self.units[t].t.has(Trait::Unstoppable);
             if (crushing || h.knock) && pushable {
-                self.knockback(t, a);
+                self.knockback(t, h.from.unwrap_or(a));
             }
             let u = &self.units[t];
             if u.t.has(Trait::CurlUp) && !u.curled && u.hp * 2 < u.t.hp {
@@ -2180,22 +2270,271 @@ impl Battle {
     }
 
     fn knockback(&mut self, t: usize, a: usize) {
+        self.bowl(t, a, 0);
+    }
+
+    /// Knocked back a cell away from `a`. Кегли: one of its own standing straight behind it is crashed into — both take
+    /// 1–3 — and bowled over in turn (up to `BOWL` in a row); then it takes the room there is. On spilt oil it slides a
+    /// cell farther and falls.
+    fn bowl(&mut self, t: usize, a: usize, depth: u32) {
         let (ut, ua) = (&self.units[t], &self.units[a]);
         let sx = ((2 * ut.x + ut.fp()) - (2 * ua.x + ua.fp())).signum();
         let sy = ((2 * ut.y + ut.fp()) - (2 * ua.y + ua.fp())).signum();
-        if sx == 0 && sy == 0 {
+        if sx == 0 && sy == 0 || !ut.present() {
             return;
         }
-        let (side, size, x, y) = (ut.side, ut.t.size, ut.x, ut.y);
+        let (size, x, y, f) = (ut.t.size, ut.x, ut.y, ut.fp());
+        let slick = self.on_ground(t, OIL);
+        // Кегли: the one standing straight behind it is bowled over (up to `BOWL` in a row)
+        let (bx, by) = (x + sx, y + sy);
+        let behind = (depth < BOWL)
+            .then(|| {
+                (0..self.units.len()).find(|&v| {
+                    let u = &self.units[v];
+                    v != t
+                        && v != a
+                        && u.present()
+                        && u.side == self.units[t].side
+                        && !u.t.has(Trait::Unstoppable)
+                        && !u.t.has(Trait::Wall)
+                        && !u.t.has(Trait::Flyer)
+                        && u.t.size <= size + 1
+                        && rect_dist(bx, by, f, u.x, u.y, u.fp()) == 0
+                })
+            })
+            .flatten();
+        if let Some(v) = behind {
+            self.ev(Event::Bump { a: t, b: v });
+            for (k, other) in [(t, v), (v, t)] {
+                let raw = self.rng.damage(3, 0);
+                let d = self.calc(k, raw, Dmg::Blunt, false);
+                self.units[k].hp -= d;
+                self.ev(Event::Hit { a: other, t: k, dmg: d });
+            }
+            for k in [t, v] {
+                if self.units[k].alive && self.units[k].hp <= 0 {
+                    self.kill(k);
+                }
+            }
+            if self.units[v].present() {
+                self.bowl(v, t, depth + 1);
+            }
+        }
+        if self.units[t].present() && self.push(t, sx, sy) && slick && self.units[t].present() {
+            // on spilt oil it slides on and falls
+            self.push(t, sx, sy);
+            if !self.units[t].t.has(Trait::Unstoppable) {
+                self.units[t].stunned = true;
+                self.ev(Event::Stun { t });
+            }
+        }
+    }
+
+    /// A step `(sx, sy)` for `t` if there is room (straight on, else the nearer of the two sides of it).
+    fn push(&mut self, t: usize, sx: i32, sy: i32) -> bool {
+        let (side, size, x, y) = (self.units[t].side, self.units[t].t.size, self.units[t].x, self.units[t].y);
         self.grid.sub(size, x, y);
         for (cx, cy) in [(x + sx, y + sy), (x + sx, y), (x, y + sy)] {
             if (cx, cy) != (x, y) && self.grid.can_place(side, size, cx, cy) {
                 self.move_to(t, cx, cy);
                 self.ev(Event::Knockback { t });
-                return;
+                return true;
             }
         }
         self.grid.add(side, size, x, y);
+        false
+    }
+
+    pub fn on_ground(&self, i: usize, kind: u8) -> bool {
+        self.cells_of(i).any(|c| self.ground[c] == kind)
+    }
+
+    /// Ночь: what a shooter sees from afar — a body that burns, one that glows, one standing in burning oil.
+    fn lit(&self, j: usize) -> bool {
+        let u = &self.units[j];
+        u.burn > 0 || u.t.has(Trait::Glow) || self.cells_of(j).any(|c| self.flames[c] > 0)
+    }
+
+    /// The oil under `t` catches fire.
+    fn ignite(&mut self, t: usize) {
+        let cells: Vec<usize> = self.cells_of(t).filter(|&c| self.ground[c] == OIL && self.flames[c] == 0).collect();
+        for c in cells {
+            self.flames[c] = OIL_BURNS;
+        }
+    }
+
+    /// A jolt of `raw` into `t` standing in slime runs through the slime round it (`SURGE_REACH` cells): everyone else
+    /// standing in it — its own and the enemy's, not those in the air — takes half, as lightning.
+    fn surge(&mut self, t: usize, raw: i32, a: usize) {
+        let start: Vec<usize> = self.cells_of(t).filter(|&c| self.ground[c] == GOO).collect();
+        if start.is_empty() {
+            return;
+        }
+        let mut seen = vec![false; self.ground.len()];
+        let mut queue: VecDeque<(usize, u32)> = VecDeque::new();
+        for c in start {
+            seen[c] = true;
+            queue.push_back((c, 0));
+        }
+        while let Some((c, depth)) = queue.pop_front() {
+            if depth >= SURGE_REACH {
+                continue;
+            }
+            let (cx, cy) = ((c as i32) % W, (c as i32) / W);
+            for (dx, dy) in DIRS {
+                let (nx, ny) = (cx + dx, cy + dy);
+                if nx < 0 || ny < 0 || nx >= W || ny >= H {
+                    continue;
+                }
+                let k = Grid::idx(nx, ny);
+                if self.ground[k] == GOO && !seen[k] {
+                    seen[k] = true;
+                    queue.push_back((k, depth + 1));
+                }
+            }
+        }
+        let victims: Vec<usize> = (0..self.units.len())
+            .filter(|&v| v != t && self.units[v].present() && !self.units[v].t.has(Trait::Flyer) && !self.is_wall(v))
+            .filter(|&v| self.cells_of(v).any(|c| seen[c]))
+            .collect();
+        if victims.is_empty() {
+            return;
+        }
+        self.ev(Event::Surge { t });
+        let part = (raw + 1) / 2;
+        for v in victims {
+            let d = self.calc(v, part, Dmg::Shock, false);
+            self.units[v].hp -= d;
+            self.ev(Event::Hit { a, t: v, dmg: d });
+            if self.units[v].hp <= 0 {
+                self.kill(v);
+            }
+        }
+    }
+
+    /// The ground at the end of a round: a burning body on oil sets it alight; those standing in the fire catch it;
+    /// the fire runs on along the oil, and burnt-out oil is gone.
+    fn ground_round(&mut self) {
+        for i in 0..self.units.len() {
+            if self.units[i].present() && self.units[i].burn > 0 && self.on_ground(i, OIL) {
+                self.ignite(i);
+            }
+        }
+        if !self.flames.iter().any(|&f| f > 0) {
+            return;
+        }
+        for i in 0..self.units.len() {
+            let u = &self.units[i];
+            if u.present() && !u.t.has(Trait::Flyer) && !u.t.armor_type.immune(Dmg::Fire) && self.cells_of(i).any(|c| self.flames[c] > 0) {
+                self.units[i].burn = self.units[i].burn.max(2);
+            }
+        }
+        let mut next = vec![];
+        for c in 0..self.flames.len() {
+            if self.flames[c] == 0 {
+                continue;
+            }
+            let (cx, cy) = ((c as i32) % W, (c as i32) / W);
+            for (dx, dy) in DIRS {
+                let (nx, ny) = (cx + dx, cy + dy);
+                if (0..W).contains(&nx) && (0..H).contains(&ny) {
+                    let k = Grid::idx(nx, ny);
+                    if self.ground[k] == OIL && self.flames[k] == 0 {
+                        next.push(k);
+                    }
+                }
+            }
+        }
+        for c in 0..self.flames.len() {
+            if self.flames[c] > 0 {
+                self.flames[c] -= 1;
+                if self.flames[c] == 0 {
+                    self.ground[c] = 0;
+                }
+            }
+        }
+        for k in next {
+            self.flames[k] = OIL_BURNS;
+        }
+    }
+
+    /// The sky's and the earth's doing at the end of a round.
+    fn weather_round(&mut self) {
+        match self.weather {
+            Weather::Storm => {
+                for _ in 0..STRIKES {
+                    self.strike();
+                }
+            }
+            Weather::Quake if self.round.is_multiple_of(QUAKE_EVERY) && self.rifts < RIFTS => self.quake(),
+            _ => {}
+        }
+    }
+
+    /// Гроза: lightning from the sky on one of those on the field, the big and the iron ones far likelier: 1–8, as
+    /// lightning (and through the slime round it).
+    fn strike(&mut self) {
+        let cands: Vec<(usize, u32)> = (0..self.units.len())
+            .filter(|&i| self.units[i].present() && (self.units[i].t.is_army() || self.is_wall(i)))
+            .map(|i| {
+                let t = &self.units[i].t;
+                (i, 1 + t.size + if t.armor_type.metal() { 6 } else { 0 })
+            })
+            .collect();
+        let total: u32 = cands.iter().map(|c| c.1).sum();
+        if total == 0 {
+            return;
+        }
+        let mut roll = self.rng.die(total);
+        let Some(&(t, _)) = cands.iter().find(|c| {
+            if roll <= c.1 {
+                true
+            } else {
+                roll -= c.1;
+                false
+            }
+        }) else {
+            return;
+        };
+        let raw = self.rng.damage(8, 0);
+        let d = self.calc(t, raw, Dmg::Shock, false);
+        self.ev(Event::Strike { t });
+        self.units[t].hp -= d;
+        self.ev(Event::Nature { t, dmg: d });
+        self.surge(t, raw, t);
+        if self.units[t].alive && self.units[t].hp <= 0 {
+            self.kill(t);
+        }
+    }
+
+    /// Землетрясение: the ground splits along a column across the middle of the field: those standing on it fall in —
+    /// 1–6, stunned — and the crack stays: whoever steps into it climbs out only the next round.
+    fn quake(&mut self) {
+        let x = ZONE - 6 + self.rng.die((W - 2 * (ZONE - 6)) as u32) as i32 - 1;
+        self.rifts += 1;
+        for y in 0..H {
+            self.rift[Grid::idx(x, y)] = true;
+        }
+        self.ev(Event::Rift { x });
+        let fallen: Vec<usize> = (0..self.units.len())
+            .filter(|&i| {
+                let u = &self.units[i];
+                u.present() && !u.t.has(Trait::Flyer) && u.x <= x && x < u.x + u.fp()
+            })
+            .collect();
+        for v in fallen {
+            let raw = self.rng.damage(6, 0);
+            let d = self.calc(v, raw, Dmg::Blunt, false);
+            self.units[v].hp -= d;
+            self.ev(Event::Nature { t: v, dmg: d });
+            if self.units[v].hp <= 0 {
+                self.kill(v);
+            } else if !self.units[v].t.has(Trait::Unstoppable) {
+                self.units[v].stunned = true;
+                self.units[v].stuck_until = self.round + 1;
+                self.ev(Event::Stun { t: v });
+            }
+        }
     }
 
     /// The killer eats («Пожирание») and the Devourer grows.
@@ -2235,12 +2574,27 @@ impl Battle {
         if !u.alive {
             return;
         }
-        let (size, x, y, side) = (u.t.size, u.x, u.y, u.side);
+        let (size, x, y, side, on) = (u.t.size, u.x, u.y, u.side, u.on_field);
         if u.on_field {
             self.grid.sub(size, x, y);
         }
         self.units[t].alive = false;
         self.ev(Event::Kill { t });
+        // what it leaves on the ground: a broken machine spills its oil, a fallen body of the swarm its slime
+        if on && self.units[t].t.is_army() {
+            let oil = machine(&self.units[t].t);
+            let f = footprint(size);
+            for yy in y.max(0)..(y + f).min(H) {
+                for xx in x.max(0)..(x + f).min(W) {
+                    let c = Grid::idx(xx, yy);
+                    if oil {
+                        self.ground[c] = OIL;
+                    } else if self.ground[c] == 0 {
+                        self.ground[c] = GOO;
+                    }
+                }
+            }
+        }
         // the Devourer falls with a meal inside: it bursts out of him, dazed
         if let Some(v) = self.units[t].belly.take() {
             if self.units[v].alive {
@@ -2361,6 +2715,7 @@ impl Battle {
     // ---------------------------------------------------------------- lasting effects
     fn persistent(&mut self) {
         self.tesla();
+        self.ground_round();
         for i in 0..self.units.len() {
             if self.units[i].belly.is_some() {
                 self.digest(i);
@@ -2369,6 +2724,7 @@ impl Battle {
         self.lasting();
         self.contagion();
         self.metamorph();
+        self.weather_round();
     }
 
     /// Тесла-сеть: lightning between the Inventor's golems, a jolt for every enemy standing on a line between two.
@@ -2421,6 +2777,9 @@ impl Battle {
                 let d = self.calc(j, raw, Dmg::Shock, false);
                 self.units[j].hp -= d;
                 self.ev(Event::Hit { a: inv, t: j, dmg: d });
+                if d > 0 {
+                    self.surge(j, raw, inv);
+                }
                 if self.units[j].hp <= 0 {
                     self.kill(j);
                     self.units[inv].kills += 1;

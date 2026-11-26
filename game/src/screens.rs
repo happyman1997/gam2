@@ -1462,6 +1462,38 @@ fn fork(ui: &mut Ui, cv: &mut Image, a: &Assets, run: &Run) -> Option<Act> {
                     }
                 }
                 cv.glow(scene.cx() as f32, (scene.y + scene.h) as f32, 120.0, [200, 60, 30], 0.12);
+                // the sky over the road: the scene under it, its name in the corner, what it does under the mouse
+                if node.weather != sim::model::Weather::Clear {
+                    use sim::model::Weather;
+                    match node.weather {
+                        Weather::Storm => {
+                            cv.dim(scene.x, scene.y, scene.w, scene.h, 0.78);
+                            for k in 0..40usize {
+                                let h = (k * 2654435761usize) as u32;
+                                let (x, y) = (scene.x + (h % scene.w as u32) as i32, scene.y + ((h >> 9) % scene.h as u32) as i32);
+                                for j in 0..6 {
+                                    cv.blend_px(x + j / 3, y + j, [170, 190, 230, 255], 0.4);
+                                }
+                            }
+                        }
+                        Weather::Night => cv.dim(scene.x, scene.y, scene.w, scene.h, 0.45),
+                        Weather::Quake => {
+                            let mut x = scene.cx();
+                            for y in (scene.y..scene.y + scene.h).step_by(4) {
+                                x += (((y * 31) % 7) - 3) / 2;
+                                cv.fill(x - 1, y, 3, 4, [10, 6, 12, 255]);
+                                cv.fill(x - 2, y, 1, 4, [150, 132, 110, 255]);
+                            }
+                        }
+                        Weather::Clear => {}
+                    }
+                    let name = t(&format!("weather.{}", node.weather.key()));
+                    a.fonts["text16"].draw(cv, &name, scene.x + 8, scene.y + 6, [150, 190, 255], Some(EDGE), Align::Left, 1.0);
+                    let wr = Rect::new(scene.x + 4, scene.y + 4, a.fonts["text16"].width(&name) + 10, 22);
+                    if ui.hot(&format!("weather{i}"), wr).0 {
+                        ui.tooltip(vec![(name.clone(), [150, 190, 255]), (t(&format!("weather.{}.l", node.weather.key())), INK)]);
+                    }
+                }
                 let total = node.enemy.len();
                 text(cv, a, &tf("node.enemy", &[("n", &total)]), r.cx(), r.y + 220, INK, Align::Center);
                 let summary: Vec<String> = gs

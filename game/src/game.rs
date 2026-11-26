@@ -410,7 +410,7 @@ impl Game {
         let Some(run) = &mut self.run else { return };
         let (me, _) = run.fighters();
         let seed = run.battle_seed();
-        let mut rec = playback::record_of(seed, &me, &node.enemy);
+        let mut rec = playback::record_in(seed, &me, &node.enemy, node.weather);
         rec.ground = match node.kind {
             run::Kind::Elite => 1,
             run::Kind::Boss => 2,

@@ -19,7 +19,7 @@ fn play_run(class: Class, leader: usize, seed: u64) -> (Run, f64) {
                 assert!(!node.enemy.is_empty(), "a battle with no enemy");
                 let (me, _) = r.fighters();
                 let seed = r.battle_seed();
-                let res = run::play(&me, &node.enemy, seed);
+                let res = run::play_in(&me, &node.enemy, seed, node.weather);
                 let rewards = r.after_battle(&node, &res);
                 for rw in &rewards {
                     match rw {
@@ -430,4 +430,31 @@ fn leaders_carry_the_run_with_them() {
     assert!(!lead(&r).has_ability(|a| matches!(a, Ability::Pandemic { .. })));
     r.stats.won = PANDEMIC_EVERY * 2;
     assert!(lead(&r).has_ability(|a| *a == Ability::Pandemic { n: 2 }));
+}
+
+/// From the second battle on, a road in three or so has weather (a storm, an earthquake, the night), and its enemy is
+/// fitted under it; the first battle is always under a clear sky.
+#[test]
+fn some_roads_have_weather() {
+    use sim::model::Weather;
+    let first = Run::new(Class::Foundry, 0, 3);
+    assert!(first.path.iter().all(|n| n.weather == Weather::Clear), "weather on the first battle");
+    let (mut with, mut all) = (0, 0);
+    let mut kinds = vec![];
+    for seed in 0..30 {
+        let mut r = Run::new(Class::Swarm, (seed % 4) as usize, seed);
+        r.fight = 3;
+        r.fork();
+        for n in r.path.iter().filter(|n| n.kind.is_battle()) {
+            all += 1;
+            if n.weather != Weather::Clear {
+                with += 1;
+                kinds.push(n.weather);
+            }
+        }
+    }
+    assert!(with * 5 >= all && with * 2 <= all, "{with} of {all} roads with weather");
+    for w in [Weather::Storm, Weather::Quake, Weather::Night] {
+        assert!(kinds.contains(&w), "no {w:?} in {with} roads with weather");
+    }
 }

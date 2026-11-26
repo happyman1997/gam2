@@ -18,8 +18,8 @@ struct Out {
 fn road(r: &Run) -> usize {
     let (me, _) = r.fighters();
     let rate = |i: usize| -> f32 {
-        let e = &r.path[i].enemy;
-        (0..8u64).filter(|&k| run::play(&me, e, 31 + k).won).count() as f32 / 8.0
+        let (e, w) = (&r.path[i].enemy, r.path[i].weather);
+        (0..8u64).filter(|&k| run::play_in(&me, e, 31 + k, w).won).count() as f32 / 8.0
     };
     let battles: Vec<usize> = (0..r.path.len()).filter(|&i| r.path[i].kind.is_battle()).collect();
     if battles.len() < 2 {
@@ -58,7 +58,7 @@ fn play(class: Class, leader: usize, seed: u64, takes: bool) -> Out {
                 if node.kind == Kind::Boss {
                     boss.push(me.len());
                 }
-                let res = run::play(&me, &node.enemy, r.battle_seed());
+                let res = run::play_in(&me, &node.enemy, r.battle_seed(), node.weather);
                 if !res.won {
                     lost_at = Some((r.next_fight(), node.kind, node.danger));
                 }
