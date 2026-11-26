@@ -1260,8 +1260,8 @@ impl Battle {
                 return;
             }
         }
-        // Эпидемия: every third round the Plague spits spores at the nearest enemy not sick yet, wherever it is
-        if self.units[i].t.has(Trait::Contagion) && round.is_multiple_of(3) {
+        // Эпидемия: every fourth round the Plague spits spores at the nearest enemy not sick yet, wherever it is
+        if self.units[i].t.has(Trait::Contagion) && round.is_multiple_of(4) {
             let near = self
                 .enemies_of(i)
                 .filter(|&j| self.units[j].t.is_army() && self.units[j].infected.is_none())
@@ -2429,7 +2429,7 @@ impl Battle {
         }
     }
 
-    /// Эпидемия: while the Plague stands, each infected enemy passes it on to one of its own beside it, one time in two.
+    /// Эпидемия: while the Plague stands, each infected enemy passes it on to one of its own beside it, one time in three.
     fn contagion(&mut self) {
         for side in 0..2u8 {
             if !self.units.iter().any(|u| u.side == side && u.present() && u.t.has(Trait::Contagion)) {
@@ -2437,7 +2437,7 @@ impl Battle {
             }
             let carriers: Vec<usize> = (0..self.units.len()).filter(|&j| self.units[j].side != side && self.units[j].present() && self.units[j].infected == Some(side)).collect();
             for c in carriers {
-                if self.rng.die(2) != 1 {
+                if self.rng.die(3) != 1 {
                     continue;
                 }
                 let cs = self.units[c].side;

@@ -213,9 +213,9 @@ pub enum Trait {
     /// Метаморфоз (the Mother): a larva of her side that has lived three rounds pupates and comes out as the form that
     /// has killed the most in this battle — the brood turns into whatever wins.
     Metamorph,
-    /// Эпидемия (the Plague): every third round she spits spores at the nearest enemy, however far — it is infected;
+    /// Эпидемия (the Plague): every fourth round she spits spores at the nearest enemy, however far — it is infected;
     /// and while she stands, the infection runs on its own — every round an infected enemy passes it to one of its own
-    /// beside it, one time in two.
+    /// beside it, one time in three.
     Contagion,
     /// Память роя (the Hive Mind, its run's rule): the swarm remembers the kind of enemy (index `k` into `KNOWN`) that
     /// killed the most of it in a battle, and strikes it +2 for the rest of the run.

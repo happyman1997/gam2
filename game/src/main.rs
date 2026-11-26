@@ -1238,6 +1238,12 @@ mod finds {
             }
         }
         assert!(a.grounds.iter().all(|g| g.is_some()), "an elite's or a boss's ground is missing");
+        // the Architect's walls: four blocks and their rubble (a wall is drawn as a swarm body is, by its number)
+        for k in 0..4 {
+            for pose in ["idle", "dead"] {
+                assert!(a.sprites.contains_key(&format!("Стена_{k}_{pose}")), "no wall {k} {pose}");
+            }
+        }
         for c in 0..2 {
             for k in ["rest", "up"] {
                 assert!(a.ui.contains_key(&format!("camp_{k}_{c}")), "no camp scene {k} {c}");
